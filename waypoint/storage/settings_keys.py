@@ -21,6 +21,9 @@ AI_AUTO = "ai_auto"
 
 MCP_ALLOW_WRITES = "mcp_allow_writes"
 
+PHOTOS_LAST_RELIST = "photos_last_relist"
+PHOTOS_RELIST_STARTED = "photos_relist_started"
+
 
 VAPID_PRIVATE_KEY = "vapid_private_key"
 

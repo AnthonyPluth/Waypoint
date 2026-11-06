@@ -5,7 +5,7 @@ import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, photogrants, photosources, reminders
+from ..domain import flightstatus, photogrants, photosources, photosync, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db, roads, states
@@ -16,6 +16,8 @@ FLIGHT_STATUS_EVERY = 300
 REMINDERS_EVERY = 300
 SCAN_EVERY = 4 * 3600
 SCAN_FIRST = 300
+PHOTO_SYNC_EVERY = 6 * 3600
+PHOTO_SYNC_FIRST = 600
 
 
 def warm_map_data() -> None:
@@ -43,8 +45,15 @@ def sweep_lapsed() -> None:
         monitoring.report(e, values=False)
 
 
+def sync_photos() -> None:
+    try:
+        photosync.sync_all(datetime.now(UTC))
+    except Exception as e:
+        monitoring.report(e, values=False)
+
+
 def sync_photos_now(source_id: int) -> bool:
-    return False
+    return photosync.start(source_id)
 
 
 def send_reminders() -> None:
@@ -117,7 +126,9 @@ def start(stop: threading.Event) -> list[threading.Thread]:
                threading.Thread(target=every, args=(SWEEP_EVERY, sweep_lapsed), daemon=True, name="gmail-lapse-sweep"),
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
-               threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan")]
+               threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan"),
+               threading.Thread(target=every, args=(PHOTO_SYNC_EVERY, sync_photos, PHOTO_SYNC_FIRST), daemon=True, name="photo-sync")]
+    photosync.background.set()
     for t in threads:
         t.start()
     return threads

@@ -80,6 +80,11 @@ def read(conn: db.Connection) -> HomeOut:
             "saved": True, "placed": _point(home) is not None}
 
 
+def located(conn: db.Connection) -> geocode.Point | None:
+    home = _stored(conn)
+    return _point(home) if home else None
+
+
 def point(conn: db.Connection) -> HomePoint | None:
     home = _stored(conn)
     found = _point(home) if home else None

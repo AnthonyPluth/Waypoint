@@ -10,7 +10,7 @@ from tests.test_trips import HOTEL, OUT, Household
 from waypoint.domain import people, photogrants, photos, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
-from waypoint.storage.models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, User
+from waypoint.storage.models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, TripPerson, User
 
 ALLOWED = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "u-jane@example.com,u-sam@example.com"}
 INSIDE_B = "2026-06-04T12:00"
@@ -186,7 +186,6 @@ class StandingSettingTests(GrantCase):
         newer = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid))["trip_id"]
         self.assertIsNone(self.grant(self.jid, newer))
         trips.edit_trip(self.c, self.sam, newer, {"people": [self.sid, self.jid]}, confirmed=True)
-        self.assertTrue(photogrants.joined(self.c, self.jid, newer, 51.0))
         self.assertEqual(self.grant(self.jid, newer), ("trip", None, "u-jane"))
         self.assertFalse(photogrants.joined(self.c, self.jid, newer, 52.0))
         self.c.orm.add(source_row(self.mia, "u-jane"))
@@ -196,7 +195,7 @@ class StandingSettingTests(GrantCase):
         self.assertFalse(photogrants.joined(self.c, self.mia, hidden, 54.0))
         self.assertIsNone(self.grant(self.mia, hidden))
         self.assertEqual(photogrants.reconcile(self.c, hidden, 55.0), 0)
-        trips.edit_trip(self.c, self.sam, hidden, {"people": [self.sid, self.mia, self.jid]}, confirmed=True)
+        self.c.execute(insert(TripPerson).values(trip_id=hidden, person_id=self.jid))
         self.assertEqual(photogrants.reconcile(self.c, hidden, 56.0), 2)
         self.assertEqual(self.grant(self.mia, hidden), ("only_me", None, "u-jane"))
         self.assertEqual(self.grant(self.jid, hidden), ("trip", None, "u-jane"))

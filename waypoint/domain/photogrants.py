@@ -8,8 +8,8 @@ from sqlalchemy import and_, delete, or_, select, update
 
 from .. import oidc
 from ..storage import db
-from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, User
-from . import people, photos, trippeople, visibility
+from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, TripPerson, User
+from . import people, photos, photosync, trippeople, visibility
 from .photos import AMBIGUOUS, ONLY_ME, OWNER, SCOPES, Scope
 from .visibility import Viewer
 
@@ -67,6 +67,7 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: Scope, by: 
     else:
         row.scope, row.revoked, row.changed, row.granted_by = scope, None, now, by
     conn.orm.flush()
+    photosync.after_commit(conn, person_id, trip_id)
 
 
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
@@ -173,6 +174,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.trip_id == trip_id))
     if not (photo.decided_by == OWNER and photo.trip_id not in (None, trip_id)):
         photos.re_place(conn, photo, person)
+    photosync.after_commit(conn, person, trip_id)
     return sharing(conn, viewer, person, trip_id)
 
 
@@ -242,15 +244,55 @@ def joined(conn: db.Connection, person_id: int, trip_id: int, now: float | None 
     return True
 
 
+def _unseen(conn: db.Connection, trip_id: int) -> list[PhotoGrant]:
+    gone: list[PhotoGrant] = []
+    for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).order_by(PhotoGrant.person_id)).all():
+        setter = _setter(conn, g.granted_by)
+        if setter is not None and visibility.visible_trip(conn, setter, trip_id) is None:
+            gone.append(g)
+    return gone
+
+
 def reconcile(conn: db.Connection, trip_id: int, now: float | None = None) -> int:
     stamp = time.time() if now is None else now
+    for g in _unseen(conn, trip_id):
+        left(conn, g.person_id, trip_id)
     return sum(1 for person in trippeople.of(conn, [trip_id])[trip_id] if joined(conn, person, trip_id, stamp))
+
+
+def reconcile_all(conn: db.Connection, now: float | None = None) -> int:
+    standing = select(PhotoSharingPrefs.person_id).where(PhotoSharingPrefs.share_all.is_(True))
+    trip_ids = set(conn.execute(select(TripPerson.trip_id).where(TripPerson.person_id.in_(standing))).scalars())
+    trip_ids |= set(conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.revoked.is_(None))).scalars())
+    return sum(reconcile(conn, trip_id, now) for trip_id in sorted(trip_ids))
 
 
 def left(conn: db.Connection, person_id: int, trip_id: int) -> None:
     lock(conn, person_id, [trip_id])
     conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == person_id, PhotoGrant.trip_id == trip_id))
     _drop_derived(conn, person_id, trip_id)
+
+
+def _photo_people(conn: db.Connection, trip_id: int) -> set[int]:
+    granted = set(conn.execute(select(PhotoGrant.person_id).where(PhotoGrant.trip_id == trip_id)).scalars())
+    placed = set(conn.execute(select(PhotoSource.person_id).join(Photo, Photo.source_id == PhotoSource.id).where(Photo.trip_id == trip_id)).scalars())
+    return granted | placed
+
+
+def trips_changed(conn: db.Connection, trip_ids: Iterable[int], now: float | None = None) -> None:
+    stamp = time.time() if now is None else now
+    for trip_id in [t for t in sorted(set(trip_ids)) if conn.orm.get(Trip, t) is not None]:
+        aboard = set(trippeople.of(conn, [trip_id])[trip_id])
+        for person in sorted(_photo_people(conn, trip_id) - aboard):
+            left(conn, person, trip_id)
+        reconcile(conn, trip_id, stamp)
+
+
+def merged(conn: db.Connection, kept: int, gone: int) -> None:
+    for e in conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.trip_id == gone).order_by(PhotoExclusion.person_id, PhotoExclusion.asset_id)).all():
+        db.insert_ignore(conn, PhotoExclusion, {"person_id": e.person_id, "asset_id": e.asset_id, "trip_id": kept, "created": e.created},
+                         key=["person_id", "asset_id", "trip_id"])
+    trip_deleted(conn, gone)
 
 
 def trip_deleted(conn: db.Connection, trip_id: int) -> None:

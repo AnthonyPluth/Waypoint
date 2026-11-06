@@ -8,6 +8,7 @@ import os
 import re
 import sqlite3
 import threading
+from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any
 from urllib.parse import urlsplit
@@ -183,6 +184,10 @@ class Connection:
         self.sa = sa_conn
         self.postgres = sa_conn.dialect.name == "postgresql"
         self._orm: Session | None = None
+        self._committed: list[Callable[[], None]] = []
+
+    def after_commit(self, then: Callable[[], None]) -> None:
+        self._committed.append(then)
 
     @property
     def orm(self) -> Session:
@@ -222,13 +227,18 @@ class Connection:
         if self._orm is not None:
             self._orm.commit()
         self.sa.commit()
+        waiting, self._committed = self._committed, []
+        for then in waiting:
+            then()
 
     def rollback(self) -> None:
+        self._committed = []
         if self._orm is not None:
             self._orm.rollback()
         self.sa.rollback()
 
     def close(self) -> None:
+        self._committed = []
         if self._orm is not None:
             self._orm.close()
             self._orm = None
