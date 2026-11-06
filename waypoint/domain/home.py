@@ -11,6 +11,7 @@ from .. import validate
 from ..storage import db, geocode
 from ..storage import settings_keys as sk
 from ..storage.models import Airport, Segment
+from . import photogrants
 
 FALLBACK_COUNTRY = "US"
 CITY_LIMIT = 80
@@ -113,11 +114,17 @@ def save(conn: db.Connection, body: dict[str, Any]) -> HomeOut:
         "zip": _field(body, "zip", "ZIP or postal code", POSTAL_LIMIT, POSTAL).upper(),
         "country": _field(body, "country", "country", 2, COUNTRY).upper() or default_country(conn),
     }
+    dated = photogrants.dated_trips(conn)
+    before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, json.dumps(home))
+    photogrants.trips_changed(conn, dated, before)
     return {"city": home["city"], "state": home["state"], "zip": home["zip"], "country": home["country"],
             "saved": True, "placed": _point(home) is not None}
 
 
 def clear(conn: db.Connection) -> HomeOut:
+    dated = photogrants.dated_trips(conn)
+    before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, None)
+    photogrants.trips_changed(conn, dated, before)
     return read(conn)
