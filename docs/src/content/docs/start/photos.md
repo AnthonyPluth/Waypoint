@@ -1,6 +1,6 @@
 ---
 title: Photos
-description: How a trip's photos are read from each member's Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone.
+description: "How a trip's photos are read from each member's Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone."
 sidebar:
   order: 6
 ---
