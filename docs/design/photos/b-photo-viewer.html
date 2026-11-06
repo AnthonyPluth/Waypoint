@@ -631,6 +631,16 @@ details.looks > summary::-webkit-details-marker { display: none; }
   try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
   setWidth(start);
 })();
+
+  document.querySelectorAll('[aria-modal="true"]').forEach(function (dlg) {
+    var dev = dlg.closest(".dev");
+    if (!dev) return;
+    Array.prototype.forEach.call(dev.children, function (el) {
+      if (el === dlg) return;
+      el.inert = true;
+      el.setAttribute("aria-hidden", "true");
+    });
+  });
 </script>
 </body>
 </html>

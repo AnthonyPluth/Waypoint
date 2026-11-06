@@ -436,6 +436,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       <div><h3>Accessible names</h3><ul>
         <li>Card: <code>section</code> named <q>Your photos on this trip</q>; shown only to someone whose library has photos from the trip.</li>
         <li>Every count on the card and in both questions leaves out the photos under <q>Removed from this trip</q>: the 171 photos from the library minus the 2 removed are 169, as k and m count (168 after 3 removed).</li>
+        <li>While the question is open everything behind it is inert and hidden from assistive technology, navigation included. Focus moves to <q>Keep sharing</q> (the safe choice) on open, Tab and Shift-Tab cycle between the two buttons, Escape closes it like Keep sharing, and focus returns to <q>Stop sharing on this trip</q>.</li>
         <li>Radio group <q>Who can see your photos on this trip</q>: <q>Only me</q>, <q>Everyone on this trip</q>. Choosing Only me saves at once and announces the toast; choosing everyone asks “Show your 169 photos to everyone on this trip?” with <q>Cancel</q> and <q>Show them</q>.</li>
         <li><q>Stop sharing on this trip</q> opens an <code>alertdialog</code> <q>Stop sharing your photos on this trip?</q> with <q>Keep sharing</q> (focused first) and <q>Stop sharing</q>.</li>
         <li><q>Removed from this trip (2)</q>: a disclosure (<code>aria-expanded</code>), see (k).</li>
@@ -630,6 +631,16 @@ details.looks > summary::-webkit-details-marker { display: none; }
   try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
   setWidth(start);
 })();
+
+  document.querySelectorAll('[aria-modal="true"]').forEach(function (dlg) {
+    var dev = dlg.closest(".dev");
+    if (!dev) return;
+    Array.prototype.forEach.call(dev.children, function (el) {
+      if (el === dlg) return;
+      el.inert = true;
+      el.setAttribute("aria-hidden", "true");
+    });
+  });
 </script>
 </body>
 </html>

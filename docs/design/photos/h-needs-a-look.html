@@ -438,6 +438,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>Disclosure: native <code>details</code>, summary <q>Needs a look, 5 photos</q>; list <q>Photos that need a look</q>.</li>
         <li>Per photo, naming its time: <q>Pick a trip for the photo from Sat 13 Sep, 5:40 PM</q>, <q>Leave the photo from … off both trips</q>, and for far photos <q>Remove the photo from … from this trip</q> (the visible label is <q>Remove from this trip</q>) and <q>Keep the photo from … on Four Corners loop</q>.</li>
         <li>Pick a trip offers only trips the person is on and has shared photos on (an active grant), as in docs/PHOTOS.md. A trip with no grant is never listed, so choosing it can’t apply a default scope or skip the sharing prompt; if one is chosen anyway (a stale list) the request is refused with “Share your photos on that trip first” and the sheet stays open. A photo put on a granted trip follows that grant’s scope as it stands; nothing is widened.</li>
+        <li>While the sheet is open everything behind it is inert and hidden from assistive technology (the whole shell: navigation, tab bar and page, not only the page). Focus moves to the sheet’s first control on open, Tab and Shift-Tab cycle inside it, Escape closes it like Cancel, and focus returns to the <q>Pick a trip</q> button that opened it.</li>
         <li>Sheet: dialog <q>Pick a trip for this photo</q>, described by <q>Waypoint won’t move it again by itself.</q>; radio group <q>Trips it could belong to</q>; <q>Cancel</q>; the confirm button names the choice, <q>Put on Canyon weekend</q>; <q>Close</q>.</li>
         <li>Remove from this trip shows the toast from (k), <q>Removed from Four Corners loop.</q> Leave off shows its own, <q>Left off both trips.</q>, because the photo was on neither trip; its <q>Undo</q> is named <q>Undo leaving the photo from Sat 13 Sep, 5:40 PM off both trips</q> and returns the photo to Needs a look, as it was. Undo on the Remove toast puts the far photo back on its trip and keeps it in Needs a look. Both toasts are <code>role="status"</code>.</li>
       </ul></div>
@@ -631,6 +632,16 @@ details.looks > summary::-webkit-details-marker { display: none; }
   try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
   setWidth(start);
 })();
+
+  document.querySelectorAll('[aria-modal="true"]').forEach(function (dlg) {
+    var dev = dlg.closest(".dev");
+    if (!dev) return;
+    Array.prototype.forEach.call(dev.children, function (el) {
+      if (el === dlg) return;
+      el.inert = true;
+      el.setAttribute("aria-hidden", "true");
+    });
+  });
 </script>
 </body>
 </html>
