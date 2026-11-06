@@ -320,10 +320,6 @@ def zone_offset(name: Any, at: datetime) -> int | None:
         return None
 
 
-def original_offset(original: datetime) -> int | None:
-    return _minutes(original.utcoffset())
-
-
 def taken_local(value: Any) -> str | None:
     found = LOCAL.match(value) if isinstance(value, str) else None
     if found is None:
@@ -350,14 +346,11 @@ def parse_asset(item: Any) -> Asset | None:
     if not isinstance(asset_id, str) or not ASSET_ID.fullmatch(asset_id) or kind is None:
         return None
     exif: dict[str, Any] = item["exifInfo"] if isinstance(item.get("exifInfo"), dict) else {}
-    original = _instant(exif.get("dateTimeOriginal"))
-    taken = original or _instant(item.get("fileCreatedAt"))
+    taken = _instant(item.get("fileCreatedAt")) or _instant(exif.get("dateTimeOriginal"))
     local, updated = taken_local(item.get("localDateTime")), _instant(item.get("updatedAt"))
     if taken is None or local is None or updated is None:
         return None
     offset = zone_offset(exif.get("timeZone"), taken)
-    if offset is None and original is not None:
-        offset = original_offset(original)
     position = _position(exif)
     return Asset(id=asset_id, kind=kind, taken_utc=_utc_text(taken), taken_local=local, taken_offset=offset,
                  latitude=position[0] if position else None, longitude=position[1] if position else None,

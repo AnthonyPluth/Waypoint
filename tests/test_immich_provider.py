@@ -138,7 +138,7 @@ class ParseTests(unittest.TestCase):
         self.assertEqual((a.taken_utc, a.taken_local, a.taken_offset), ("2026-01-10T14:15:00.000Z", "2026-01-10T09:15", -300))
         self.assertEqual((a.latitude, a.longitude, a.state, a.country), (None, None, None, None))
 
-    def test_no_exif_falls_back_to_file_created_with_no_offset(self):
+    def test_no_exif_has_no_offset(self):
         a = self.by_id["03"]
         self.assertEqual((a.taken_utc, a.taken_local, a.taken_offset, a.latitude), ("2026-03-01T08:00:00.000Z", "2026-03-01T08:00", None, None))
 
@@ -158,23 +158,38 @@ class ParseTests(unittest.TestCase):
         a = self.by_id["08"]
         self.assertEqual((a.latitude, a.longitude, a.taken_offset, a.taken_local), (-90.0, 180.0, 720, "2026-12-24T23:59"))
 
-    def test_an_unknown_zone_uses_the_offset_in_date_time_original_and_bad_gps_is_dropped(self):
+    def test_an_unknown_zone_leaves_the_offset_unknown_and_bad_gps_is_dropped(self):
         a = self.by_id["09"]
-        self.assertEqual((a.taken_utc, a.taken_offset, a.latitude, a.longitude), ("2026-08-15T08:00:00.000Z", 120, None, None))
+        self.assertEqual((a.taken_utc, a.taken_local, a.taken_offset, a.latitude, a.longitude),
+                         ("2026-08-15T08:00:00.000Z", "2026-08-15T10:00", None, None, None))
 
-    def test_date_time_original_wins_over_file_created(self):
-        item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-02T00:00:00.000Z",
-                "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T10:00:00+01:00"}}
+    def test_file_created_wins_over_date_time_original(self):
+        item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
+                "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T09:00:05.000Z", "timeZone": None}}
         a = immich.parse_asset(item)
         assert a
-        self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T09:00:00.000Z", 60))
+        self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T09:00:00.000Z", None))
 
-    def test_a_date_time_original_without_an_offset_is_not_an_instant(self):
-        item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
-                "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T10:00:00"}}
-        a = immich.parse_asset(item)
-        assert a
-        self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T15:00:00.000Z", None))
+    def test_date_time_original_is_used_only_when_file_created_is_missing_or_unusable(self):
+        for created in (None, "", "yesterday", "2026-01-01T09:00:00"):
+            item = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": created,
+                    "updatedAt": "2026-01-02T00:00:00Z", "exifInfo": {"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "Europe/Paris"}}
+            with self.subTest(created=created):
+                a = immich.parse_asset(item)
+                assert a
+                self.assertEqual((a.taken_utc, a.taken_offset), ("2026-01-01T09:00:00.000Z", 60))
+
+    def test_the_offset_comes_only_from_the_time_zone(self):
+        base = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T09:00:00.000Z",
+                "updatedAt": "2026-01-02T00:00:00Z"}
+        for exif, offset in (({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": None}, None),
+                             ({"dateTimeOriginal": "2026-01-01T10:00:00+01:00"}, None),
+                             ({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "Mars/Olympus_Mons"}, None),
+                             ({"dateTimeOriginal": "2026-01-01T09:00:00.000Z", "timeZone": "UTC+01:00"}, 60)):
+            with self.subTest(exif=exif):
+                a = immich.parse_asset({**base, "exifInfo": exif})
+                assert a
+                self.assertEqual(a.taken_offset, offset)
 
     def test_assets_that_are_not_usable_are_dropped(self):
         good = {"id": "a1", "type": "IMAGE", "localDateTime": "2026-01-01T10:00:00.000Z", "fileCreatedAt": "2026-01-01T15:00:00.000Z",
