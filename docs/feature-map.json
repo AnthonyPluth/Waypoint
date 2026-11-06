@@ -116,6 +116,7 @@
         "tests/test_loyalty.py",
         "tests/test_mcp_routes.py",
         "tests/test_people.py",
+        "tests/test_photo_access.py",
         "tests/test_photo_sources.py",
         "tests/test_trips.py"
       ],
@@ -237,6 +238,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
+        "tests/test_photo_access.py",
         "tests/test_photos_api.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
@@ -258,6 +260,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_onboarding.py",
+        "tests/test_photo_access.py",
         "tests/test_photos_api.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
@@ -297,6 +300,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_photo_access.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],
@@ -316,6 +320,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_offline.py",
+        "tests/test_photo_access.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
@@ -337,6 +342,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_monitoring.py",
+        "tests/test_photo_access.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
@@ -417,6 +423,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
         "tests/test_photos_api.py",
         "tests/test_trips.py"
       ],
@@ -432,6 +439,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
         "tests/test_photos_api.py"
       ],
       "docs": [
@@ -446,6 +454,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
         "tests/test_photos_api.py"
       ],
       "docs": [
@@ -549,6 +558,115 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/trips/{id}/photo-sharing",
+      "handler": "waypoint/server/api/photos.py:api_photo_sharing",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/trips/{id}/photo-sharing",
+      "handler": "waypoint/server/api/photos.py:api_photo_sharing_set",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/trips/{id}/photo-sharing",
+      "handler": "waypoint/server/api/photos.py:api_photo_sharing_stop",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/trips/{id}/photo-exclusions",
+      "handler": "waypoint/server/api/photos.py:api_photo_exclude",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/trips/{id}/photo-exclusions/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_put_back",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/photo-grants",
+      "handler": "waypoint/server/api/photos.py:api_photo_grants",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sharing-prefs/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_prefs_set",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/segments",
       "handler": "waypoint/server/api/trips.py:api_segment_add",
@@ -563,6 +681,7 @@
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
         "tests/test_onboarding.py",
+        "tests/test_photo_access.py",
         "tests/test_reminders.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"

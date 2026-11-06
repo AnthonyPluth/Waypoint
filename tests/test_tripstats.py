@@ -6,7 +6,7 @@ from sqlalchemy import insert, select
 
 from tests.test_trips import Household
 from waypoint.domain import stats, trips, tripstats
-from waypoint.storage.models import Airport, Photo, PhotoSource
+from waypoint.storage.models import Airport, Photo, PhotoExclusion, PhotoGrant, PhotoSource
 
 MOUNTAIN = {"start_zone": "America/Denver", "end_zone": "America/Denver"}
 SFO_DEN = {"kind": "flight", "origin": "SFO", "destination": "DEN", "start_local": "2026-06-01T08:00", "end_local": "2026-06-01T11:30",
@@ -46,12 +46,18 @@ class TripSummaryCase(Household):
         return self.c.execute(insert(PhotoSource).values(person_id=person_id, owner_sub="u-jane", url=url, immich_user_id="u-1",
                                                          api_key="enc:v1:made-up", status="ok", created=time.time())).lastrowid
 
-    def photo(self, source, trip_id, state=None, country=None, match="place", inferred=False, hidden=False, decided_by="auto"):
+    def share(self, person_id, trip_id, scope="trip"):
+        self.c.execute(insert(PhotoGrant).values(person_id=person_id, trip_id=trip_id, scope=scope, revoked=None, changed=1.0, granted_by="u-jane"))
+
+    def photo(self, source, trip_id, state=None, country=None, match="place", inferred=False, removed=False, decided_by="auto"):
         self.asset += 1
         self.c.execute(insert(Photo).values(source_id=source, asset_id=f"asset-{self.asset}", asset_updated="2026-06-02T00:00:00Z", kind="image",
                                             taken_utc="2026-06-02T18:00:00Z", taken_local="2026-06-02T12:00", latitude=40.0, longitude=-105.0,
                                             location_source="inferred" if inferred else "exif", state=state, country=country, trip_id=trip_id,
-                                            match=match, decided_by=decided_by, hidden=hidden, seen=time.time()))
+                                            match=match, decided_by=decided_by, seen=time.time()))
+        if removed:
+            person = self.c.execute(select(PhotoSource.person_id).where(PhotoSource.id == source)).scalar()
+            self.c.execute(insert(PhotoExclusion).values(person_id=person, asset_id=f"asset-{self.asset}", trip_id=trip_id, created=1.0))
 
     def summary(self, trip_id, who=None):
         got = tripstats.summary(self.c, who or self.jane, trip_id)
@@ -69,6 +75,8 @@ class TripSummaryTests(TripSummaryCase):
         for fields in (DENVER, CAR, SALT_LAKE, SALT_LAKE_AGAIN, SLC_SFO, VANCOUVER, CANCELLED_FLIGHT):
             self.mine(fields, trip)
         mine, sams = self.library(self.jane.person_id), self.library(self.sam.person_id)
+        self.share(self.jane.person_id, trip)
+        self.share(self.sam.person_id, trip, "only_me")
         self.photo(mine, trip, "Utah", "United States of America")
         self.photo(mine, trip, "Utah", "United States of America")
         self.photo(mine, trip, "Idaho", "United States of America", match="time", inferred=True)
@@ -77,8 +85,8 @@ class TripSummaryTests(TripSummaryCase):
         self.photo(mine, trip, "Montana", "United States of America", match="far", decided_by="owner")
         self.photo(mine, trip, "Nevada", "United States of America", match="ambiguous")
         self.photo(mine, None, "Oregon", "United States of America", match="none")
-        self.photo(sams, trip, "Arizona", "Mexico", hidden=True)
-        self.photo(mine, trip, "New Mexico", "United States of America", hidden=True, inferred=True)
+        self.photo(sams, trip, "Arizona", "Mexico")
+        self.photo(mine, trip, "New Mexico", "United States of America", removed=True, inferred=True)
         return trip
 
     def test_a_trip_gets_its_days_nights_distance_places_and_photos(self):
@@ -90,17 +98,31 @@ class TripSummaryTests(TripSummaryCase):
         self.assertGreater(got["road_km"], 600)
         self.assertLess(got["road_km"], 1300)
         self.assertAlmostEqual(got["distance_km"], got["flight_km"] + got["road_km"], delta=0.2)
-        self.assertEqual(got["states"], ["Colorado", "Idaho", "Montana", "New Mexico", "Utah"])
+        self.assertEqual(got["states"], ["Colorado", "Idaho", "Montana", "Utah"])
         self.assertEqual(got["countries"], ["Canada", "United States"])
-        self.assertEqual(got["photos"], {"total": 7, "inferred": 2})
+        self.assertEqual(got["photos"], {"total": 6, "inferred": 1})
         self.assertEqual(got["kinds"], {**NO_KINDS, "flight": 2, "hotel": 3, "car": 1})
 
-    def test_hidden_photos_count_only_for_their_person(self):
+    def test_only_me_photos_count_for_their_person_alone_and_a_removed_one_for_nobody(self):
         trip = self.full_trip()
         got = self.summary(trip, self.sam)
         self.assertEqual(got["photos"], {"total": 7, "inferred": 1})
         self.assertEqual(got["countries"], ["Canada", "Mexico", "United States"])
         self.assertEqual(got["states"], ["Colorado", "Idaho", "Montana", "Utah"])
+        self.assertNotIn("New Mexico", self.summary(trip)["states"])
+
+    def test_an_ungranted_library_and_a_revoked_grant_add_nothing_for_anyone(self):
+        trip = self.add(self.jane, SFO_DEN, None, self.on(self.jane.person_id, self.sam.person_id))["trip_id"]
+        self.mine(DENVER, trip)
+        mine, sams = self.library(self.jane.person_id), self.library(self.sam.person_id)
+        self.photo(mine, trip, "Utah", "United States of America")
+        self.photo(sams, trip, "Arizona", "United States of America")
+        self.c.execute(insert(PhotoGrant).values(person_id=self.sam.person_id, trip_id=trip, scope="trip", revoked=2.0, changed=2.0, granted_by="u-sam"))
+        for who in (self.jane, self.sam):
+            got = self.summary(trip, who)
+            self.assertEqual((got["photos"], got["states"]), ({"total": 0, "inferred": 0}, ["Colorado"]), who)
+        self.share(self.jane.person_id, trip)
+        self.assertEqual(self.summary(trip, self.sam)["states"], ["Colorado", "Utah"])
 
     def test_cancelled_bookings_count_for_nothing(self):
         trip = self.mine(VANCOUVER)["trip_id"]

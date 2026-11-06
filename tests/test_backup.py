@@ -17,7 +17,8 @@ from sqlalchemy import func, insert, select, update
 from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import AuthSession, LoyaltyId, Mailbox, Person, Photo, PhotoSource, PhotoTripSync, ReviewItem, Segment, SegmentTraveler, Setting, Trip, TripPerson, User
+from waypoint.storage.models import (AuthSession, LoyaltyId, Mailbox, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, ReviewItem,
+                                     Segment, SegmentTraveler, Setting, Trip, TripPerson, User)
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -209,9 +210,12 @@ class BackupTests(unittest.TestCase):
         src.execute(insert(Photo).values(id=9, source_id=3, asset_id="asset-%_1", asset_updated="2026-01-02T03:04:05.678Z", kind="video",
                                          taken_utc="2026-01-02T03:04:05.000Z", taken_local="2026-01-01T22:04", taken_offset=-300,
                                          latitude=-12.3456789, longitude=0.0, location_source="inferred", state="Ñ", country="",
-                                         trip_id=7, match="far", distance_km=412.5, decided_by="owner", hidden=True, seen=1700000000.5))
+                                         trip_id=7, match="far", distance_km=412.5, decided_by="owner", seen=1700000000.5))
         src.execute(insert(PhotoTripSync).values(source_id=3, trip_id=7, window_start="2026-01-01T00:00:00Z", window_end="2026-01-09T00:00:00Z",
                                                  cursor="2026-01-05T00:00:00Z", resume_page=4, fetch_started=None, synced=2.5))
+        src.execute(insert(PhotoGrant).values(person_id=41, trip_id=7, scope="trip", revoked=1700000001.25, changed=1700000001.25, granted_by="a:1|’"))
+        src.execute(insert(PhotoExclusion).values(person_id=41, asset_id="asset-%_1", trip_id=7, created=-1e-9))
+        src.execute(insert(PhotoSharingPrefs).values(person_id=41, default_scope="trip", share_all=True, set_by="a:1|’"))
         src.commit()
         raw = backup.dump(src)
         self.assertNotIn(b"made-up-immich-key", raw)
@@ -221,10 +225,11 @@ class BackupTests(unittest.TestCase):
         dst = db.connect(self.b)
         backup.restore(dst, data)
         dst.commit()
-        for model in (PhotoSource, Photo, PhotoTripSync):
+        for model in (PhotoSource, Photo, PhotoTripSync, PhotoGrant, PhotoExclusion, PhotoSharingPrefs):
             self.assertEqual(sorted(map(tuple, dst.execute(select(model)))), sorted(map(tuple, src.execute(select(model)))), model.__name__)
         self.assertEqual(dst.execute(select(PhotoSource.api_key)).scalar(), key)
-        self.assertTrue(dst.execute(select(Photo.hidden)).scalar())
+        self.assertEqual(dst.execute(select(PhotoGrant.revoked, PhotoGrant.granted_by)).fetchone(), (1700000001.25, "a:1|’"))
+        self.assertEqual(dst.execute(select(PhotoSharingPrefs.share_all, PhotoSharingPrefs.set_by)).fetchone(), (True, "a:1|’"))
         src.close(); dst.close()
 
     def test_a_cruise_membership_comes_back_exact_and_encrypted(self):

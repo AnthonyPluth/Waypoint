@@ -37,7 +37,7 @@ def failing(error):
 def photo(source_id, trip_id, number, match="place"):
     return Photo(source_id=source_id, asset_id=f"asset-{number}", asset_updated="2026-06-02T00:00:00Z", kind="image", taken_utc="2026-06-02T09:00:00+00:00",
                  taken_local="2026-06-02T10:00", taken_offset=None, latitude=None, longitude=None, location_source=None, state=None, country=None,
-                 trip_id=trip_id, segment_id=None, match=match, distance_km=None, decided_by=None, hidden=False, seen=1.0)
+                 trip_id=trip_id, segment_id=None, match=match, distance_km=None, decided_by=None, seen=1.0)
 
 
 class SourceRoutes(RouteCase):
