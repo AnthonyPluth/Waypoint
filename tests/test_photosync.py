@@ -438,7 +438,7 @@ class BackgroundTests(SyncCase):
         started.assert_not_called()
         self.assertFalse(jobs.sync_photos_now(self.source))
 
-    def test_one_run_per_library_and_a_queued_trip_runs_after_it(self):
+    def test_one_run_per_library_and_a_waiting_whole_run_replaces_the_queued_trip(self):
         entered, release, done = threading.Event(), threading.Event(), threading.Event()
         seen = []
 
@@ -463,7 +463,7 @@ class BackgroundTests(SyncCase):
             if not photosync.running(self.source):
                 break
             threading.Event().wait(0.05)
-        self.assertEqual(seen, [None, {self.a}])
+        self.assertEqual(seen, [None, None])
         self.assertFalse(photosync.running(self.source))
 
     def test_a_failed_run_still_frees_the_library(self):
@@ -828,3 +828,56 @@ class ThirdReviewTests(SyncCase):
         self.sync()
         self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("unreachable", immich.UNREACHABLE, 5.0))
         self.assertEqual(self.lib.asked(), [])
+
+
+class FourthReviewTests(SyncCase):
+    def test_a_relist_due_while_nothing_is_shared_leaves_no_pending_generation(self):
+        self.c.execute(update(PhotoGrant).values(revoked=9.0))
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8))
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_a_window_not_read_in_full_under_a_pending_relist_is_read_in_full(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        db.set_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}", repr((NOW + timedelta(days=7)).timestamp()))
+        self.c.commit()
+        self.lib.items = self.lib.items[:1]
+        calls = len(self.lib.asked())
+        self.sync(NOW + timedelta(days=8))
+        self.assertTrue(all("updatedAfter" not in q for q in self.lib.asked()[calls:]))
+        self.assertEqual(list(self.rows()), [self.lib.items[0]["id"]])
+
+    def test_a_scheduled_run_that_finds_the_library_busy_runs_next_and_wins_over_queued_trips(self):
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        entered, release, done = threading.Event(), threading.Event(), threading.Event()
+        seen = []
+
+        def slow(conn, source_id, provider, now, *, full=False, trips=None):
+            seen.append((trips, full))
+            if len(seen) == 1:
+                entered.set()
+                release.wait(5)
+            else:
+                done.set()
+            return photosync.Summary(sources=1)
+        with mock.patch.object(photosync, "run", side_effect=slow):
+            self.assertTrue(photosync.start(self.source, {self.a}))
+            self.assertTrue(entered.wait(5))
+            self.assertFalse(photosync.start(self.source, {self.b}))
+            photosync.sync_all(NOW, full=True)
+            release.set()
+            self.assertTrue(done.wait(5))
+            for _ in range(100):
+                if not photosync.running(self.source):
+                    break
+                threading.Event().wait(0.05)
+        self.assertEqual(seen, [({self.a}, False), (None, True)])
+
+    def test_a_dense_window_on_a_library_that_was_unreachable_marks_it_reachable_with_the_warning(self):
+        photo_sources.mark(self.c, self.source, "unreachable", immich.UNREACHABLE, 5.0)
+        self.c.commit()
+        self.lib.items = [asset(n, "2026-06-02T12:00:00Z", gps=SOHO) for n in range(3)]
+        self.sync()
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", photosync.TOO_DENSE, 5.0))

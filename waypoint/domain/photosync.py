@@ -37,6 +37,7 @@ _clock = time.monotonic
 _lock = threading.Lock()
 _running: set[int] = set()
 _waiting: dict[int, set[int]] = {}
+_whole: dict[int, bool] = {}
 
 
 class Provider(Protocol):
@@ -154,14 +155,15 @@ def _syncs(conn: db.Connection, source_id: int) -> dict[int, PhotoTripSync]:
     return {s.trip_id: s for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == source_id)).all()}
 
 
-def _prepare(run: _Run, restart: bool) -> None:
+def _prepare(run: _Run, restart: bool, started: float | None = None) -> None:
     conn = run.conn
     conn.orm.expire_all()
     photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
-    if restart:
-        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), repr(run.now.timestamp()))
     conn.orm.expire_all()
     run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
+    if restart and run.windows:
+        db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), repr(run.now.timestamp()))
+    restart = restart and bool(run.windows)
     owned = _rows(conn, run.source_id)
     syncs = _syncs(conn, run.source_id)
     changed = False
@@ -178,7 +180,8 @@ def _prepare(run: _Run, restart: bool) -> None:
             changed = True
             continue
         moved = (row.window_start, row.window_end) != (start, end)
-        if moved or restart:
+        behind = started is not None and row.cursor is not None and (row.synced is None or row.synced < started)
+        if moved or restart or behind:
             row.window_start, row.window_end, row.cursor, row.resume_after, row.fetch_started = start, end, None, None, None
         if moved or row.inputs != inputs:
             row.inputs = inputs
@@ -343,7 +346,9 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, photos.home_in(conn), {}, summary, sealed)
     started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
-    _prepare(job, fresh)
+    _prepare(job, fresh, started if not fresh else None)
+    if fresh and not job.windows:
+        started = None
     windows = job.windows
     finished, dense, moved = True, False, False
     try:
@@ -360,7 +365,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if dense:
         summary.failed = 1
-        photo_sources.mark(conn, source_id, source["status"], TOO_DENSE, keep_off=True, sealed=job.sealed)
+        photo_sources.mark(conn, source_id, OK, TOO_DENSE, keep_off=True, sealed=job.sealed)
         conn.commit()
         return summary
     if not finished:
@@ -376,20 +381,25 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     return summary
 
 
-def _claim(source_id: int) -> bool:
+def _claim(source_id: int, full: bool = False) -> bool:
     with _lock:
         if source_id in _running:
+            _whole[source_id] = _whole.get(source_id, False) or full
             return False
         _running.add(source_id)
         return True
 
 
-def _release(source_id: int) -> set[int] | None:
+def _release(source_id: int) -> tuple[set[int] | None, bool] | None:
     with _lock:
+        if source_id in _whole:
+            _waiting.pop(source_id, None)
+            return None, _whole.pop(source_id)
         waiting = _waiting.pop(source_id, None)
         if waiting is None:
             _running.discard(source_id)
-        return waiting
+            return None
+        return waiting, False
 
 
 def running(source_id: int) -> bool:
@@ -406,9 +416,10 @@ def _sync(source_id: int, now: datetime, full: bool, trips: set[int] | None) -> 
         except Exception as e:
             total.failed += 1
             monitoring.report(e, values=False)
-        trips, full, now = _release(source_id), False, datetime.now(UTC)
-        if trips is None:
+        following = _release(source_id)
+        if following is None:
             return total
+        (trips, full), now = following, datetime.now(UTC)
 
 
 def sync_all(now: datetime, full: bool = False) -> Summary:
@@ -420,7 +431,7 @@ def sync_all(now: datetime, full: bool = False) -> Summary:
     with db.session() as conn:
         ids = photoqueue.syncing(conn)
     for source_id in ids:
-        if _claim(source_id):
+        if _claim(source_id, full):
             total.add(_sync(source_id, now, full, None))
     if total.sources:
         monitoring.log(total.line())
@@ -448,6 +459,7 @@ def start(source_id: int, trips: set[int] | None = None) -> bool:
         with _lock:
             _running.discard(source_id)
             _waiting.pop(source_id, None)
+            _whole.pop(source_id, None)
         monitoring.log("Photo sync: 1 library sync could not start; the next scheduled sync reads it.", "warning")
         return False
     return True
