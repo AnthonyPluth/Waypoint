@@ -435,6 +435,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
                 <li class="row grant"><div class="txt"><p class="t-heading">Redstone weekend</p><p class="t-caption muted">Sat 13 – Sun 14 Sep 2025 · 12 photos</p></div><div class="src-acts"><select class="input sel" aria-label="Who sees your photos on Redstone weekend"><option selected>Only me</option><option>Everyone on this trip</option></select><button class="btn danger sm" type="button" aria-label="Stop sharing on Redstone weekend">Stop sharing</button></div></li>
                 <li class="row grant"><div class="txt"><p class="t-heading">Coast and hills</p><p class="t-caption muted">Sat 2 – Thu 7 May 2026 · 112 photos · not shared</p></div><div class="src-acts"><span class="chip quiet">Not shared</span><button class="btn outline sm" type="button" aria-label="Share on Coast and hills">Share…</button></div></li>
               </ul>
+              <button class="btn outline sm" type="button" aria-expanded="false" aria-label="Show 9 more trips with your photos" style="align-self:flex-start">Show 9 more trips</button>
             </section>
           </main>
           <nav class="tabs" data-tabs="more" aria-label="Main"></nav>
@@ -446,7 +447,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>Toggle group <q>Whose sharing</q>: <q>Ada Brook (you)</q>, <q>June Brook</q> (<code>aria-pressed</code>); only libraries you manage are offered.</li>
         <li>Radio group <q>Who sees the photos you share</q>: <q>Only me</q> (default), <q>Everyone on the trip</q>. Changing the default doesn’t change trips already shared.</li>
         <li>Checkbox <q>Share on all my trips</q>.</li>
-        <li>List <q>Trips with your photos</q>; per trip <q>Who sees your photos on Four Corners loop</q> (select), <q>Stop sharing on Four Corners loop</q> (the dialog from j), <q>Share on Coast and hills</q> (opens the prompt from i).</li>
+        <li>List <q>Trips with your photos</q> (the first three trips, then <q>Show 9 more trips</q> lists the rest, so all 12 are reachable); choosing Everyone on this trip in a trip’s select opens the same widening question as (j) before it saves, and choosing Only me saves at once with an undo toast; per trip <q>Who sees your photos on Four Corners loop</q> (select), <q>Stop sharing on Four Corners loop</q> (the dialog from j), <q>Share on Coast and hills</q> (opens the prompt from i).</li>
       </ul></div>
       <div><h3>Tokens and components</h3><ul>
         <li>The Settings section pattern: <code>h2.eyebrow</code>, <code>.rows</code> cards; the width-toggle style segmented group is the <code>Button</code> pair used in <code>DistanceSection</code> (<code>aria-pressed</code>).</li>

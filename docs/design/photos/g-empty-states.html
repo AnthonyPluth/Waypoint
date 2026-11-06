@@ -458,7 +458,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>g1: link <q>Connect a library in Settings</q> (to <code>#settings</code>, scrolled to Photos). Shown on past and current trips only.</li>
         <li>g2: <q>Connect</q> with <code>aria-expanded</code>, opening the form from (f).</li>
         <li>g5: the problem text sits in the card’s description, so the buttons’ names stay the same as in (f).</li>
-        <li>g6: a tile that can’t load is a <code>button</code> named <q>Photo from Theo’s library, can’t be loaded right now</q>; it opens nothing.</li>
+        <li>g6: a tile that can’t load is not a control: an image named <q>Photo from Theo’s library, can’t be loaded right now</q>, skipped by Tab, and it opens nothing.</li>
       </ul></div>
       <div><h3>Tokens and components</h3><ul>
         <li>Empty text <code>text-muted-foreground</code>; g1 on a <code>bg-card</code> card with <code>Button outline size="sm"</code>.</li>
@@ -520,7 +520,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       return;
     }
     var html = STRIP.map(function (t, i) {
-      if (off && t.who === T) return '<button type="button" class="tile" aria-label="Photo from Theo’s library, can’t be loaded right now"><span class="mk mk-off" aria-hidden="true">' + ic("i-imgoff") + "</span></button>";
+      if (off && t.who === T) return '<div class="tile" role="img" aria-label="Photo from Theo’s library, can’t be loaded right now" style="cursor:default"><span class="mk mk-off" aria-hidden="true">' + ic("i-imgoff") + "</span></div>";
       return tile(t);
     }).join("");
     html += '<button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button>';
