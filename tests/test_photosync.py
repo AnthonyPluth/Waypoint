@@ -959,3 +959,82 @@ class SixthReviewTests(SyncCase):
         self.assertEqual((self.stored()["status"], self.stored()["last_sync"]), ("off", NOW.timestamp()))
         self.assertEqual(len(self.rows()), 6)
         self.assertEqual(got.budget_hit, 0)
+
+
+class SeventhReviewTests(SyncCase):
+    def test_a_library_removed_mid_run_stops_after_one_request(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-02T13:00:00Z", gps=SOHO),
+                          asset(3, "2026-06-02T14:00:00Z", gps=SOHO), asset(4, "2026-06-04T12:00:00Z", gps=SOHO)]
+
+        def removed(asked):
+            with db.session() as other:
+                photo_sources.remove(other, self.source)
+        self.lib.on_search = removed
+        got = self.sync()
+        self.assertEqual(len(self.lib.asked()), 1)
+        self.assertEqual(got.budget_hit, 0)
+        self.assertIsNone(photo_sources.get(self.c, self.source))
+
+    def test_a_library_the_sweep_ended_mid_run_stops_before_its_next_request(self):
+        self.lib.items = [asset(n, f"2026-06-02T1{n}:00:00Z", gps=SOHO) for n in range(5)]
+        gone = []
+        self.lib.on_search = lambda asked: gone.append(1)
+        real = photo_sources.status
+        with mock.patch.object(photo_sources, "status", side_effect=lambda conn, source_id: None if gone else real(conn, source_id)):
+            got = self.sync()
+        self.assertEqual(len(self.lib.asked()), 1)
+        self.assertEqual((got.budget_hit, self.stored()["status"], self.stored()["last_sync"]), (0, "ok", None))
+
+    def test_turning_on_share_all_queues_a_sync_of_each_new_trip_after_commit_only(self):
+        photoqueue.enable(photosync.start)
+        self.addCleanup(photoqueue.disable)
+        with mock.patch.object(photoqueue, "starter") as started:
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 40.0)
+            self.c.rollback()
+            started.assert_not_called()
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 41.0)
+            started.assert_not_called()
+            self.c.commit()
+        self.assertIn((self.source, {self.other}), [c.args for c in started.call_args_list])
+
+
+class EighthReviewTests(SyncCase):
+    def test_a_test_that_succeeds_mid_run_survives_a_later_network_error(self):
+        photo_sources.mark(self.c, self.source, "unreachable", immich.UNREACHABLE, 5.0)
+        self.c.commit()
+
+        def tested_ok():
+            with db.session() as other:
+                photo_sources.mark(other, self.source, "ok", None)
+            return b'{"message":"broken"}'
+        self.lib.fake.routes[immich.SEARCH] = (500, JSON_HEADERS, tested_ok)
+        got = self.sync()
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("ok", None))
+
+    def test_a_guest_claimed_mid_fetch_stops_the_run_and_deletes_nothing(self):
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.mia]}, confirmed=True)
+        mias = photo_sources.save(self.c, self.mia, "u-jane", self.lib.url, OWNER, KEY, None, 1.0)
+        self.share(self.a, self.mia)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-02T13:00:00Z", gps=SOHO)]
+        photosync.run(self.c, mias, immich, NOW)
+        before = {p.asset_id for p in self.c.orm.scalars(select(Photo).where(Photo.source_id == mias)).all()}
+        self.assertEqual(len(before), 2)
+        last = photo_sources.get(self.c, mias)["last_sync"]
+        relisted = db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}")
+        self.lib.items = self.lib.items[:1]
+
+        def claimed(asked):
+            if self.lib.on_search is None:
+                return
+            self.lib.on_search = None
+            with db.session() as other:
+                people.claim_guest(other, self.sid, self.mia, "2026-07-01")
+        self.lib.on_search = claimed
+        photosync.run(self.c, mias, immich, NOW + timedelta(days=8), full=True)
+        self.c.orm.expire_all()
+        after = {p.asset_id for p in self.c.orm.scalars(select(Photo).where(Photo.source_id == mias)).all()}
+        self.assertEqual(after, before)
+        self.assertEqual(photo_sources.get(self.c, mias)["last_sync"], last)
+        self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}"), relisted)

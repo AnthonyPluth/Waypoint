@@ -24,7 +24,7 @@ TIME_BUDGET = 600.0
 TOO_DENSE = "Some of your library couldn’t be read."
 Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
 PAUSED: Traversal = "paused"
-Written = Literal["written", "gone", "changed"]
+Written = Literal["written", "gone", "changed", "moved"]
 CHANGED: Traversal = "changed"
 DONE: Traversal = "done"
 STOPPED: Traversal = "stopped"
@@ -234,6 +234,9 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
     conn = run.conn
     conn.orm.expire_all()
     grants = photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
+    if not _same_person(run):
+        conn.commit()
+        return "moved"
     live = {t for t, g in grants.items() if g.revoked is None}
     row = conn.orm.get(PhotoTripSync, (run.source_id, trip_id))
     if trip_id not in live or row is None:
@@ -274,7 +277,7 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     while True:
-        if photo_sources.status(conn, run.source_id) == OFF:
+        if photo_sources.status(conn, run.source_id) in (OFF, None):
             conn.commit()
             return PAUSED
         got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=1)
@@ -282,6 +285,8 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
         written = _write(run, trip_id, got)
         if written == "changed":
             return CHANGED
+        if written == "moved":
+            return PAUSED
         if written == "gone" or got.next_page is None:
             return DONE
         if got.last_taken is None or got.one_instant:
@@ -291,10 +296,18 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
             return STOPPED
 
 
-def _finish_relist(run: _Run, started: float) -> None:
+def _same_person(run: _Run) -> bool:
+    current = photo_sources.get(run.conn, run.source_id)
+    return current is not None and current["person_id"] == run.person
+
+
+def _finish_relist(run: _Run, started: float) -> bool:
     conn = run.conn
     conn.orm.expire_all()
     photogrants.lock(conn, run.person, run.windows)
+    if not _same_person(run):
+        conn.commit()
+        return False
     windows = list(run.windows.values())
     for p in _rows(conn, run.source_id):
         if p.seen < started and _inside(windows, photos.instant(p.taken_utc)):
@@ -303,6 +316,7 @@ def _finish_relist(run: _Run, started: float) -> None:
     db.set_setting(conn, _key(sk.PHOTOS_LAST_RELIST, run.source_id), repr(run.now.timestamp()))
     db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), None)
     conn.commit()
+    return True
 
 
 def _relist(conn: db.Connection, source_id: int, now: datetime, full: bool) -> tuple[float | None, bool]:
@@ -323,13 +337,13 @@ def _order(conn: db.Connection, source_id: int, trip_ids: list[int]) -> list[int
 def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError, sealed: str | None) -> None:
     conn.rollback()
     if isinstance(error, immich.Refused | immich.NotConfigured):
-        photo_sources.mark(conn, source["id"], REFUSED, str(error), keep_off=True, sealed=sealed)
+        photo_sources.mark(conn, source["id"], REFUSED, str(error), keep_off=True, sealed=sealed, was=(source["status"], source["last_error"]))
     elif isinstance(error, immich.RateLimited):
         photo_sources.mark(conn, source["id"], source["status"], source["last_error"] or str(error), keep_off=True, sealed=sealed,
                            was=(source["status"], source["last_error"]))
     else:
         kept = source["last_error"] if source["status"] == UNREACHABLE and source["last_error"] else str(error)
-        photo_sources.mark(conn, source["id"], UNREACHABLE, kept, keep_off=True, sealed=sealed)
+        photo_sources.mark(conn, source["id"], UNREACHABLE, kept, keep_off=True, sealed=sealed, was=(source["status"], source["last_error"]))
     conn.commit()
 
 
@@ -343,7 +357,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     try:
         unlocked = photosources.unlock(conn, source_id)
     except secretbox.SecretError:
-        photo_sources.mark(conn, source_id, REFUSED, photosources.KEY_LOST, keep_off=True, sealed=sealed)
+        photo_sources.mark(conn, source_id, REFUSED, photosources.KEY_LOST, keep_off=True, sealed=sealed, was=(source["status"], source["last_error"]))
         conn.commit()
         summary.failed = 1
         return summary
@@ -372,7 +386,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if dense:
         summary.failed = 1
-        photo_sources.mark(conn, source_id, OK, TOO_DENSE, keep_off=True, sealed=job.sealed)
+        photo_sources.mark(conn, source_id, OK, TOO_DENSE, keep_off=True, sealed=job.sealed, was=(source["status"], source["last_error"]))
         conn.commit()
         return summary
     if not finished:
@@ -380,11 +394,13 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if moved or not summary.pages:
         return summary
-    if trips is None and started is not None:
-        _finish_relist(job, started)
+    if trips is None and started is not None and not _finish_relist(job, started):
+        return summary
     if trips is not None and source["status"] != UNREACHABLE:
         return summary
-    photo_sources.mark(conn, source_id, OK, None, now.timestamp() if trips is None else None, keep_off=True, sealed=job.sealed)
+    if not _same_person(job):
+        return summary
+    photo_sources.mark(conn, source_id, OK, None, now.timestamp() if trips is None else None, keep_off=True, sealed=job.sealed, was=(source["status"], source["last_error"]))
     conn.commit()
     return summary
 
