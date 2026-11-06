@@ -5,7 +5,7 @@ import os
 import unittest
 from unittest import mock
 
-from sqlalchemy import select, text
+from sqlalchemy import select, update
 
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
@@ -15,7 +15,7 @@ from waypoint.domain import people, photosources
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
 from waypoint.storage import backup, db, photo_sources, secretbox
-from waypoint.storage.models import Photo
+from waypoint.storage.models import Photo, PhotoSource
 
 URL = "https://immich-canary-8h2k.example:2283"
 LAN = "http://immich.local:2283"
@@ -54,7 +54,8 @@ class SourceRoutes(RouteCase):
 
     def raw(self, source_id):
         with db.session() as conn:
-            return conn.execute(text("SELECT api_key, status, last_error, immich_user_id FROM photo_sources WHERE id = :id"), {"id": source_id}).fetchone()
+            return tuple(conn.execute(select(PhotoSource.api_key, PhotoSource.status, PhotoSource.last_error, PhotoSource.immich_user_id)
+                                      .where(PhotoSource.id == source_id)).fetchone())
 
     def unlocked(self, source_id):
         with db.session() as conn:
@@ -238,7 +239,7 @@ class SourceRoutes(RouteCase):
     def test_a_key_that_can_no_longer_be_unlocked_asks_to_be_entered_again(self):
         made = self.connect()
         with db.session() as conn:
-            conn.execute(text("UPDATE photo_sources SET api_key = :key WHERE id = :id"), {"key": "enc:v1:not-a-token", "id": made["id"]})
+            conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(api_key="enc:v1:not-a-token"))
         with ping() as pong:
             self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {}), (400, {"error": photosources.KEY_LOST}))
         pong.assert_not_called()
@@ -341,7 +342,7 @@ class Storage(DbCase):
         self.c.commit()
 
     def raw(self):
-        return self.c.execute(text("SELECT api_key FROM photo_sources WHERE id = :id"), {"id": self.source}).scalar()
+        return self.c.execute(select(PhotoSource.api_key).where(PhotoSource.id == self.source)).scalar()
 
     def test_the_key_is_encrypted_at_rest_and_listed_nowhere(self):
         self.assertTrue(self.raw().startswith("enc:v1:"))
@@ -380,7 +381,7 @@ class Storage(DbCase):
         self.assertNotIn(KEY, out.getvalue())
 
     def test_a_plain_key_is_sealed_at_start(self):
-        self.c.execute(text("UPDATE photo_sources SET api_key = :key WHERE id = :id"), {"key": NEW_KEY, "id": self.source})
+        self.c.execute(update(PhotoSource).where(PhotoSource.id == self.source).values(api_key=NEW_KEY))
         self.assertEqual(secretbox.encrypt_stored(self.c), 1)
         self.assertTrue(self.raw().startswith("enc:v1:"))
         found = photo_sources.source_for_provider(self.c, self.source)
@@ -396,7 +397,7 @@ class Storage(DbCase):
         found = photo_sources.get(self.c, self.source)
         assert found is not None
         self.assertEqual((found["status"], found["last_error"], found["last_sync"]), ("ok", None, 5.0))
-        self.c.execute(text("UPDATE photo_sources SET status = 'weird' WHERE id = :id"), {"id": self.source})
+        self.c.execute(update(PhotoSource).where(PhotoSource.id == self.source).values(status="weird"))
         self.assertEqual(photo_sources.list_all(self.c)[0]["status"], "unreachable")
         self.assertTrue(photo_sources.remove(self.c, self.source))
         self.assertFalse(photo_sources.remove(self.c, self.source))
