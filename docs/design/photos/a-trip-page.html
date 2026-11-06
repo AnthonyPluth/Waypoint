@@ -417,9 +417,9 @@ details.looks > summary::-webkit-details-marker { display: none; }
             <section class="photos" aria-labelledby="a1-photos">
               <div class="photos-head">
                 <h2 id="a1-photos" class="t-heading">Photos <span class="muted t-caption">248</span></h2>
-                <button class="btn outline sm" type="button" aria-expanded="false" aria-controls="a1-strip">See all 248 photos</button>
+                <button class="btn outline sm" type="button" aria-expanded="false" aria-controls="a1-gallery">See all 248 photos</button>
               </div>
-              <div class="strip" id="a1-strip" data-strip></div>
+              <div id="a1-gallery"><div class="strip" data-strip></div></div>
               <div class="look">
                 <span class="chip warn small">Needs a look</span>
                 <p>3 of your photos were taken more than 400 km from every booking on this trip. Only you see this.</p>
@@ -461,8 +461,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <div class="spec">
       <div><h3>Accessible names</h3><ul>
         <li>Section: heading <q>Photos</q> (the count is in the heading’s caption).</li>
-        <li>Toggle button: <q>See all 248 photos</q>, then <q>Show fewer</q>; <code>aria-expanded</code> and <code>aria-controls</code> on the gallery.</li>
-        <li>Gallery header, next to the toggle: <q>Select</q> (<q>Select your photos to remove</q>), shown only to people who have photos of their own on the trip and so may remove them (as in k); it enters the select mode k2 shows.</li>
+        <li>Toggle button: <q>See all 248 photos</q>, then <q>Show fewer</q>; <code>aria-expanded</code> and <code>aria-controls</code> on the gallery. The gallery is one container with one id that stays in the page in both states (the strip when collapsed, the day groups when opened), so the button always controls an element that exists; a1 and a2 show it as <code>a1-gallery</code> and <code>a2-gallery</code> only because both frames share a page.</li>
+        <li>Gallery header, next to the toggle: <q>Select</q> (<q>Select your photos to remove</q>), shown only to people who may remove photos on this trip: those who have photos of their own on it, and stewards of a person without a sign-in whose library has photos on it (they act for that person and see the same <q>Put back</q>; for a steward the label is <q>Select June’s photos to remove</q> when June is the one shown); it enters the select mode k2 shows.</li>
         <li>Gallery end: <q>Show more days</q>, with <q>Showing 28 of 248 photos</q> as its description, until every photo is loaded, then both go away. Pressing it adds the next days after the last group, moves focus to the first new tile (so keyboard and screen-reader users continue from there instead of the top) and fills the polite <code>role="status"</code> line with <q>Loaded 35 more photos, 63 of 248 shown</q>; if loading fails the button stays and the status says <q>Couldn’t load more days. Try again.</q></li>
         <li>Each tile is a <code>button</code>: <q>Photo, 10:42 AM, near Marlow Springs, Ada’s library</q>; inferred adds <q>, place from the itinerary</q>; far adds <q>, 612 km from every booking</q>; a video starts <q>Video, 0:42, …</q>. Opens the viewer.</li>
         <li>Last strip tile: <q>See all 248 photos</q> (same action as the header button).</li>
