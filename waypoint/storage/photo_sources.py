@@ -6,7 +6,7 @@ from typing import Literal, TypedDict
 from sqlalchemy import ColumnElement, delete, func, select, true, update
 
 from . import db, secretbox
-from .models import Person, Photo, PhotoSharingPrefs, PhotoSource
+from .models import Person, Photo, PhotoGrant, PhotoSharingPrefs, PhotoSource
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -77,9 +77,15 @@ def set_steward(conn: db.Connection, person_id: int, sub: str) -> bool:
     return steward_of(conn, person_id) == sub
 
 
-def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
+def trip_shared(conn: db.Connection, person_id: int) -> bool:
+    return conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == person_id, PhotoGrant.scope == "trip", PhotoGrant.revoked.is_(None))
+                        .limit(1)).fetchone() is not None
+
+
+def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float,
+         status: Status = OK) -> int | None:
     values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
-              "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
+              "label": label, "status": status, "last_sync": None, "last_error": None, "created": now}
     if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url", "immich_user_id"]).rowcount == 0:
         return None
     found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.immich_user_id == immich_user_id,
@@ -100,11 +106,12 @@ def set_label(conn: db.Connection, source_id: int, label: str | None, owner: str
 
 
 def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None,
-         owner: str | None = None) -> bool:
+         owner: str | None = None, was: Status | None = None) -> bool:
     values: dict[str, object] = {"status": status, "last_error": error}
     if synced is not None:
         values["last_sync"] = synced
-    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner)).values(**values)).rowcount) > 0
+    unchanged = PhotoSource.status == was if was is not None else true()
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), unchanged).values(**values)).rowcount) > 0
 
 
 def remove(conn: db.Connection, source_id: int, owner: str | None = None) -> bool:

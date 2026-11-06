@@ -16,7 +16,7 @@ from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
 from waypoint.storage import backup, db, photo_sources, secretbox
-from waypoint.storage.models import Photo, PhotoSharingPrefs, PhotoSource
+from waypoint.storage.models import Photo, PhotoGrant, PhotoSharingPrefs, PhotoSource
 
 URL = "https://immich-canary-8h2k.example:2283"
 LAN = "http://immich.local:2283"
@@ -305,6 +305,72 @@ class SourceRoutes(RouteCase):
         self.assertEqual(self.unlocked(made["id"]), KEY)
         self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{made['id']}", {"label": "Mine now"})["label"], "Mine now")
+
+    def meanwhile(self, source_id, status):
+        def change(_source):
+            with db.session() as conn:
+                photo_sources.mark(conn, source_id, status, None)
+            return ACCOUNT
+        return mock.patch.object(immich, "ping", side_effect=change)
+
+    def test_a_pause_made_while_a_test_waits_on_immich_survives_the_test(self):
+        made = self.connect()
+        with self.meanwhile(made["id"], "off"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
+        with self.meanwhile(made["id"], "off"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY})["status"], "off")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
+    def test_a_resume_made_while_a_test_waits_on_immich_survives_the_test(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+
+        def resumed_then_refused(_source):
+            with db.session() as conn:
+                photo_sources.mark(conn, made["id"], "ok", None)
+            raise immich.Refused(immich.REFUSED)
+        with mock.patch.object(immich, "ping", side_effect=resumed_then_refused):
+            self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})[0], 400)
+        self.assertEqual(self.raw(made["id"])[1:3], ("refused", immich.REFUSED))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        with self.meanwhile(made["id"], "ok"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
+
+    def shared(self, who, scope="trip", revoked=None):
+        trip = self.book(who, travelers=[{"person_id": self.person[who]}])["trip_id"]
+        with db.session() as conn:
+            conn.orm.add(PhotoGrant(person_id=self.person[who], trip_id=trip, scope=scope, revoked=revoked, changed=1.0, granted_by=f"sub-{who}"))
+            conn.orm.flush()
+        return trip
+
+    def test_a_library_connected_under_an_active_trip_grant_starts_paused(self):
+        self.shared("ana")
+        self.shared("ben", scope="only_me")
+        self.shared("cy", revoked=2.0)
+        made = self.connect()
+        self.assertEqual((made["status"], self.raw(made["id"])[1:3]), ("off", ("off", None)))
+        self.assertEqual(self.connect(who="ben")["status"], "ok")
+        self.assertEqual(self.connect(who="cy")["status"], "ok")
+        self.assertEqual(self.connect(url=LAN, person_id=self.guest)["status"], "ok")
+        with ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+
+    def test_resuming_under_an_active_trip_grant_waits_for_a_confirmation_that_is_not_here_yet(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        self.shared("ana")
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (409, {"error": photosources.RESUME_ASKS}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True, "label": "Still off"})["status"], "off")
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"label": "Named"})["status"], "off")
+        theirs = self.connect(who="ben")
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": True})["status"], "off")
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": False})["status"], "ok")
 
     def test_a_key_that_can_no_longer_be_unlocked_asks_to_be_entered_again(self):
         made = self.connect()

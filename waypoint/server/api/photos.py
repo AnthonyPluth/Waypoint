@@ -29,7 +29,7 @@ KEY_LIMIT = 512
 LABEL_LIMIT = 100
 NOTHING_TO_CHANGE = 'Send "key", "label" or "paused"'
 FAILED = {immich.Refused: 400, immich.NotConfigured: 400, immich.RateLimited: 503, immich.Unavailable: 502}
-REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409}
+REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409, photosources.RESUME_ASKS: 409}
 _v = validate.Validator(ApiError, not_number=NOT_A_TRIP, too_long="The {label} is too long (at most {limit} characters)")
 NOT_A_PERSON = "The person must be a whole number"
 NOT_A_SCOPE = 'Send "scope" as "only_me" or "trip"'
