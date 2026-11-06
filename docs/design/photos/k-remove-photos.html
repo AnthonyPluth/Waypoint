@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
 <style>
 [hidden]{display:none!important}
-/* Layout: a design document of device frames, one section per Scope item (a)–(h); a toggle sets every frame to 390 px or 1280 px and the screens inside respond with container queries at Waypoint's 768 px phone breakpoint. Tokens copied from frontend/src/app.css; dark only. */
 :root {
   color-scheme: dark;
   --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
@@ -46,7 +45,6 @@ ul, ol { padding: 0; list-style: none; }
 .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* document chrome */
 .doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
 .dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
 .dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
@@ -81,14 +79,12 @@ body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
 .spec code, .checks code, .lede code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
 .spec q { color: var(--foreground); font-weight: 600; quotes: "“" "”"; }
 
-/* device frames */
 .dev { container-type: inline-size; position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
 body.desk .dev { width: 1280px; border-radius: 14px; }
 body.desk .dev.frag { width: 960px; }
 .dev.tall { height: 844px; }
 body.desk .dev.tall { height: 800px; }
 
-/* app shell */
 .shell { display: flex; min-height: 100%; }
 .side { display: none; }
 .app { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -113,7 +109,6 @@ body.desk .dev.tall { height: 800px; }
   .frag .main { padding: 28px 40px; }
 }
 
-/* app primitives */
 .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; }
 .t-display { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; }
@@ -155,7 +150,6 @@ body.desk .dev.tall { height: 800px; }
 .pass { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 28px; box-shadow: var(--shadow); background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
 .fade { -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent); mask-image: linear-gradient(180deg, #000 30%, transparent); }
 
-/* trip header + summary line */
 .triphead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .triphead .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .triphead .acts { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -168,7 +162,6 @@ body.desk .dev.tall { height: 800px; }
 .meta { font-size: 14px; }
 .meta .eyebrow { margin-right: 6px; }
 
-/* photo tiles */
 .g0 { background: linear-gradient(180deg, #7fa6c9 0%, #c9a27a 58%, #8a5a3c 100%); }
 .g1 { background: linear-gradient(170deg, #f2a65a, #c4566b 52%, #3b2c4a); }
 .g2 { background: linear-gradient(160deg, #9cc3a8, #3e6b52 60%, #1f3a2c); }
@@ -209,7 +202,6 @@ body.desk .dev.tall { height: 800px; }
   .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
 }
 
-/* map */
 .mapwrap { display: flex; flex-direction: column; gap: 12px; }
 .map { position: relative; border-radius: 16px; border: 1px solid var(--border); background: var(--map-sea); aspect-ratio: 8 / 5; max-width: 100%; overflow: hidden; }
 .map svg { display: block; width: 100%; height: 100%; }
@@ -253,7 +245,6 @@ body.desk .dev.tall { height: 800px; }
 .stoplist .n { width: 24px; height: 24px; border-radius: 99px; border: 2px solid var(--map-stay); display: grid; place-items: center; font-size: 12px; font-weight: 650; flex: none; }
 .stoplist li[aria-current] .n { background: var(--foreground); color: var(--background); }
 
-/* viewer */
 .viewer { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--lightbox); }
 .vbar { display: flex; align-items: center; justify-content: space-between; padding: 44px 8px 4px; }
 .vstage { display: flex; align-items: center; justify-content: center; position: relative; min-height: 0; }
@@ -280,7 +271,6 @@ body.desk .dev.tall { height: 800px; }
   .ph-only { display: none; }
 }
 
-/* sheet */
 .dim { position: absolute; inset: 0; background: rgb(0 0 0 / 60%); z-index: 4; }
 .sheet { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 92%; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-bottom: 0; border-radius: 28px 28px 0 0; box-shadow: var(--elevation-3); display: flex; flex-direction: column; }
 .grip { display: flex; justify-content: center; padding: 12px 0 4px; }
@@ -299,7 +289,6 @@ body.desk .dev.tall { height: 800px; }
 .choice:has(input:checked) { border-color: var(--ring); background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
 .choice input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--primary); flex: none; }
 
-/* settings */
 .src { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
 .src-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .src-top .txt { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -499,7 +488,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     var el = document.querySelector('[data-grid="' + k + '"]');
     if (el) el.innerHTML = GROUPS[k].map(tile).join("");
   });
-  var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d5[0], GROUPS.d3[9], GROUPS.d5[4], GROUPS.d1[7], GROUPS.d3[6]];
+  var STRIP = [GROUPS.d1[1], GROUPS.d1[4], GROUPS.d1[7], GROUPS.d3[1], GROUPS.d3[4], GROUPS.d3[5], GROUPS.d3[6], GROUPS.d3[9], GROUPS.d5[0], GROUPS.d5[4]];
   var ADA_ONLY = [].concat(GROUPS.d1, GROUPS.d3, GROUPS.d5).filter(function (t) { return t.who === A; }).slice(0, 10);
   document.querySelectorAll("[data-strip]").forEach(function (el) {
     var off = el.getAttribute("data-strip") === "off";
