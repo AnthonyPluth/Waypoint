@@ -65,6 +65,15 @@ class DeviceTests(Apple):
         self.assertEqual(again["id"], first["id"])
         self.assertEqual(self.c.orm.scalars(select(AppDevice)).one().environment, "sandbox")
 
+    def test_a_rotated_token_replaces_the_one_it_names_and_only_the_owners(self):
+        old = self.phone()
+        self.phone("u-other", OTHER)
+        new = app_push.add_device(self.c, "u-jane", "ef56" * 16, "production", time.time(), replaces=TOKEN)
+        self.assertNotEqual(new["id"], old["id"])
+        self.assertEqual([d.token for d in self.c.orm.scalars(select(AppDevice).order_by(AppDevice.id))], [OTHER, "ef56" * 16])
+        app_push.add_device(self.c, "u-jane", "ef56" * 16, "production", time.time(), replaces=OTHER)
+        self.assertEqual(len(self.c.orm.scalars(select(AppDevice)).all()), 2)
+
     def test_it_refuses_what_is_not_an_apns_registration(self):
         for token, environment in (("short", "production"), (TOKEN, "staging"), ("not hex! " * 8, "production"), (TOKEN + "zz", "production")):
             with self.assertRaises(app_push.Invalid):
@@ -101,9 +110,12 @@ class DeviceTests(Apple):
         for name, value in ((app_push.KEY_ID_ENV, "short"), (app_push.TEAM_ID_ENV, "lower12345"), (app_push.TOPIC_ENV, "has space"), (app_push.KEY_FILE_ENV, "/nonexistent/AuthKey.p8")):
             with mock.patch.dict(os.environ, {name: value}):
                 self.assertFalse(app_push.enabled(), name)
-        with open(self.key_path, "wb") as f:
-            f.write(b"not a key")
-        self.assertFalse(app_push.enabled())
+        for bad in (b"not a key", b"-----BEGIN PRIVATE KEY-----\nMADE-UP\n-----END PRIVATE KEY-----\n",
+                    ec.generate_private_key(ec.SECP384R1()).private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()),
+                    PRIVATE.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.BestAvailableEncryption(b"pw"))):
+            with open(self.key_path, "wb") as f:
+                f.write(bad)
+            self.assertFalse(app_push.enabled())
 
 
 class SendingTests(Apple):

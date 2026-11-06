@@ -60,6 +60,7 @@ export interface AirportMatches {
 export interface AppDeviceBody {
   token: string;
   environment: string;
+  replaces?: string;
 }
 
 export interface AppPush {

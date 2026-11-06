@@ -190,6 +190,15 @@ class AppSessionTests(AppSignIn):
             conn.execute(update(OAuthGrant).where(OAuthGrant.client_id == mcp_oauth.APP_CLIENT).values(revoked=time.time()))
         self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
 
+    def test_a_session_ends_when_the_sign_in_window_it_was_minted_under_lapses(self):
+        _t, cookie = self.minted()
+        self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 200)
+        groups = {"OIDC_ALLOWED_GROUPS": "household", "WAYPOINT_SESSION_DAYS": "14"}
+        with mock.patch.dict(os.environ, groups):
+            with db.session() as conn:
+                conn.execute(update(User).where(User.sub == "user-1").values(last_seen=time.time() - 20 * 86400))
+            self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
+
     def test_it_needs_the_app_header_and_a_valid_app_token(self):
         t = self.app_tokens()["access_token"]
         self.assertEqual(self.api(t, "POST", "/auth/app-session", b"").status, 403)

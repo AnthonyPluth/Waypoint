@@ -13,6 +13,8 @@ from waypoint.storage.models import IgnoredSender, LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import insert, select
 
 from waypoint import oidc
@@ -336,7 +338,8 @@ class Replies(DbCase):
         self.addCleanup(folder.cleanup)
         key_path = os.path.join(folder.name, "AuthKey.p8")
         with open(key_path, "wb") as f:
-            f.write(b"-----BEGIN PRIVATE KEY-----\nMADE-UP\n-----END PRIVATE KEY-----\n")
+            f.write(ec.generate_private_key(ec.SECP256R1()).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
         env = {"WAYPOINT_APNS_KEY_FILE": key_path, "WAYPOINT_APNS_KEY_ID": "ABC123DEFG", "WAYPOINT_APNS_TEAM_ID": "TEAM123456", "WAYPOINT_APNS_TOPIC": "com.example.waypoint"}
         with mock.patch.dict(os.environ, env):
             phone = reminders_api.api_app_device_add(self.c, {}, {"token": "ab12" * 16, "environment": "production"})

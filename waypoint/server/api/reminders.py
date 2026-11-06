@@ -80,7 +80,10 @@ def api_app_device_add(conn, _q, body: AppDeviceBody) -> ReminderDevice:
             raise ApiError(f'Send "{key}" as text')
         texts.append(body[key])
     try:
-        return ReminderDevice(**app_push.add_device(conn, owner(), texts[0], texts[1], time.time()))
+        replaces = body.get("replaces")
+        if replaces is not None and not isinstance(replaces, str):
+            raise ApiError('Send "replaces" as text')
+        return ReminderDevice(**app_push.add_device(conn, owner(), texts[0], texts[1], time.time(), replaces))
     except app_push.Invalid as e:
         raise ApiError(str(e)) from None
 

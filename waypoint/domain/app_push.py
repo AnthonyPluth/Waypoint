@@ -5,6 +5,9 @@ import re
 
 from typing import TypedDict
 
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import delete, select
 
 from .. import monitoring
@@ -43,7 +46,13 @@ def credentials() -> apns.Credentials | None:
             pem = f.read(8192)
     except OSError:
         return None
-    return apns.Credentials(pem, key_id, team_id, topic) if b"PRIVATE KEY" in pem else None
+    try:
+        key = serialization.load_pem_private_key(pem, password=None)
+    except (ValueError, TypeError, UnsupportedAlgorithm):
+        return None
+    if not (isinstance(key, ec.EllipticCurvePrivateKey) and isinstance(key.curve, ec.SECP256R1)):
+        return None
+    return apns.Credentials(pem, key_id, team_id, topic)
 
 
 def enabled() -> bool:
@@ -55,10 +64,13 @@ def devices(conn: db.Connection, owner: str) -> list[DeviceOut]:
     return [{"id": d.id, "service": "iPhone", "created": d.created} for d in rows]
 
 
-def add_device(conn: db.Connection, owner: str, token: str, environment: str, now: float) -> DeviceOut:
+def add_device(conn: db.Connection, owner: str, token: str, environment: str, now: float, replaces: str | None = None) -> DeviceOut:
     token = token.strip().lower()
+    old = (replaces or "").strip().lower()
     if not _TOKEN.fullmatch(token) or environment not in ENVIRONMENTS:
         raise Invalid("That isn’t a push registration Waypoint can use.")
+    if old and old != token:
+        conn.execute(delete(AppDevice).where(AppDevice.owner_sub == owner, AppDevice.token == old))
     mine = conn.orm.scalars(select(AppDevice).where(AppDevice.owner_sub == owner)).all()
     if len(mine) >= MAX_DEVICES and token not in {d.token for d in mine}:
         raise Invalid(f"Turn notifications off on an iPhone you no longer use first (at most {MAX_DEVICES}).")

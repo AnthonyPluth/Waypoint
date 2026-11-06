@@ -1097,6 +1097,7 @@ class DeviceBody(TypedDict):
 class AppDeviceBody(TypedDict):
     token: str
     environment: str
+    replaces: NotRequired[str]
 
 
 class AppPush(TypedDict):
