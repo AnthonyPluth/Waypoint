@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
 from sqlalchemy import ColumnElement, delete, func, select, true, update
+from sqlalchemy.orm import aliased
 
 from . import db, secretbox
 from .models import Person, Photo, PhotoSource
@@ -69,9 +70,10 @@ def lock_person(conn: db.Connection, person_id: int) -> bool:
 def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
     values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
               "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
-    if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url"]).rowcount == 0:
+    if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url", "immich_user_id"]).rowcount == 0:
         return None
-    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.owner_sub == owner_sub)).scalar()
+    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.immich_user_id == immich_user_id,
+                                                      PhotoSource.owner_sub == owner_sub)).scalar()
     return int(found) if found is not None else None
 
 
@@ -115,6 +117,6 @@ def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
 
 
 def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> int:
-    taken = select(PhotoSource.url).where(PhotoSource.person_id == member_id)
-    conn.execute(delete(PhotoSource).where(PhotoSource.person_id == guest_id, PhotoSource.url.in_(taken)))
-    return int(conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id).values(person_id=member_id, owner_sub=sub)).rowcount)
+    mine = aliased(PhotoSource)
+    twin = select(mine.id).where(mine.person_id == member_id, mine.url == PhotoSource.url, mine.immich_user_id == PhotoSource.immich_user_id).exists()
+    return int(conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id, ~twin).values(person_id=member_id, owner_sub=sub)).rowcount)

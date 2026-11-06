@@ -155,6 +155,14 @@ class PhotoRoutes(RouteCase):
         self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{torn}", {"excluded": True}), (404, {"error": "No such photo"}))
 
+    def test_the_canonical_lookup_reads_only_the_assets_asked_about(self):
+        mine = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO, asset="asked-1x")
+        self.photo(self.ana, self.trip, "2026-06-02T11:00", where=SOHO, asset="not-asked-2y")
+        with db.session() as conn:
+            self.assertEqual(photos.canonical_ids(conn, {(self.person["ana"], "asked-1x")}), {mine})
+            self.assertEqual(photos.canonical_ids(conn, {(self.person["ben"], "asked-1x")}), set())
+            self.assertEqual(photos.canonical_ids(conn, set()), set())
+
     def test_the_same_asset_through_two_libraries_of_one_person_is_one_photo(self):
         second = self.keep(PhotoSource(person_id=self.person["ana"], owner_sub="sub-ana", url=URL + "1", immich_user_id="immich-user-1",
                                        api_key=secretbox.encrypt(KEY) or "", status="ok", created=1.0))

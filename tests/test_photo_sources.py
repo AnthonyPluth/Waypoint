@@ -553,10 +553,11 @@ class Claiming(DbCase):
         self.c.orm.flush()
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         found = {s["id"]: s for s in photo_sources.list_all(self.c)}
-        self.assertEqual(sorted(found), [moved, mine])
+        self.assertEqual(sorted(found), [moved, dropped, mine])
         self.assertEqual((found[moved]["person_id"], found[moved]["owner_sub"], found[moved]["label"]), (self.member, "u1", "Mia’s"))
+        self.assertEqual((found[dropped]["person_id"], found[dropped]["owner_sub"], found[dropped]["immich_user_id"]), (self.member, "u1", ACCOUNT.user_id))
         self.assertEqual((found[mine]["person_id"], found[mine]["owner_sub"], found[mine]["immich_user_id"]), (self.member, "u1", OTHER.user_id))
-        self.assertEqual(self.c.execute(select(Photo.id)).scalars(), [])
+        self.assertEqual(len(self.c.execute(select(Photo.id)).scalars()), 1)
         unlocked = photo_sources.source_for_provider(self.c, moved)
         assert unlocked is not None
         self.assertEqual(unlocked.key, KEY)
