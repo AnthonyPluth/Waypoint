@@ -419,7 +419,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
                   <h3 id="f-connect" class="t-heading">Connect an Immich library</h3>
                   <div class="form-grid">
                     <div class="field"><label for="f-person">Whose library</label><select id="f-person" class="input"><option>Ada Brook (you)</option><option>Theo Brook</option><option selected>June Brook</option></select></div>
-                    <div class="field"><label for="f-addr">Immich address</label><input id="f-addr" class="input mono" value="http://immich.brook.example:2283" autocomplete="off"></div>
+                    <div class="field"><label for="f-addr">Immich address</label><input id="f-addr" class="input mono" value="http://nas.brook.example:2283" autocomplete="off"></div>
                     <div class="field wide"><label for="f-key">API key</label><div class="keyrow"><input id="f-key" class="input mono" type="password" value="exampleexampleexampleexample" autocomplete="off"><button class="btn outline" type="button" aria-pressed="false" aria-label="Show the key">Show</button></div>
                       <p class="t-caption muted">Make the key in Immich under Account settings › API keys, signed in as June, and tick:</p>
                       <p class="perm"><code>asset.read</code><code>asset.view</code><code>asset.download</code><code>user.read</code></p></div>
@@ -442,6 +442,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>A library the viewer manages gets the full card, counts and buttons: their own (Ada’s) and one they are steward of because its person has no sign-in (June’s), where the card says <q>You manage this library because June doesn’t sign in.</q> and the buttons are named for it: <q>Sync now, June Brook’s library</q>, <q>Change key, June Brook’s library</q>, <q>Pause, June Brook’s library</q>, <q>Remove June Brook’s library</q>.</li>
         <li>A library managed by another member (Theo’s, who signs in) is read-only: only the name, host and a <q>Connected</q> chip, with no counts, no last sync and no buttons, since its counts would show that photos exist.</li>
         <li>Form named by its heading <q>Connect an Immich library</q>; fields <q>Whose library</q>, <q>Immich address</q>, <q>API key</q>; <q>Show the key</q> (<code>aria-pressed</code>); <q>Test</q>; <q>Save</q>.</li>
+        <li>The example connects a second library for June, on a different Immich server (<span class="mono">nas.brook.example</span>) from the one her card already shows (<span class="mono">immich.brook.example</span>), so Save is valid. A person can have several libraries, but one address only once: Test or Save for an address already connected to that person answers “This library is already connected.” and Save stays disabled.</li>
         <li>Test result is a <code>role="status"</code> line: <q>Key works. It belongs to the Immich user june@brook.example.</q></li>
         <li>Change key opens the same key field inline in the card; a key for a different Immich user is refused with “This key belongs to another Immich user.”</li>
       </ul></div>
