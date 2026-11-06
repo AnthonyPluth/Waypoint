@@ -176,9 +176,18 @@ class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
         self.deadline = deadline
 
     def connect(self) -> None:
-        idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
+        self.idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
         super().connect()
-        self.sock = _DeadlineSocket(self.sock, self.deadline, idle)
+        self.sock = _DeadlineSocket(self.sock, self.deadline, self.idle)
+
+    def _tunnel(self) -> None:
+        plain = self.sock
+        self.sock = _DeadlineSocket(plain, self.deadline, self.idle)
+        try:
+            super()._tunnel()   # type: ignore[misc]
+        finally:
+            if isinstance(self.sock, _DeadlineSocket):
+                self.sock = plain
 
 
 class _DeadlineHTTPHandler(urllib.request.HTTPHandler):

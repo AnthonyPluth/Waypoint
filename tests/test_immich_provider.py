@@ -1,6 +1,7 @@
 import email.message
 import io
 import json
+import re
 import threading
 import time
 import traceback
@@ -47,6 +48,17 @@ class FakeImmich(ThreadingHTTPServer):
                 code, headers, body = self.server.routes.get(path, (404, {}, b'{"message":"Not Found"}'))   # type: ignore[attr-defined]
                 if callable(body):
                     body = body()
+                if headers.get("_ranges"):
+                    asked = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
+                    headers = {**headers, "Accept-Ranges": "bytes"}
+                    if asked:
+                        first = int(asked.group(1)) if asked.group(1) else len(body) - int(asked.group(2))
+                        last = min(int(asked.group(2)), len(body) - 1) if asked.group(1) and asked.group(2) else len(body) - 1
+                        if first >= len(body):
+                            code, headers, body = 416, {**headers, "Content-Range": f"bytes */{len(body)}"}, b""
+                        else:
+                            code, headers = 206, {**headers, "Content-Range": f"bytes {first}-{last}/{len(body)}"}
+                            body = body[first:last + 1]
                 if headers.get("_trickle_head"):
                     raw = (f"HTTP/1.0 {code} OK\r\nContent-Length: {len(body)}\r\nX-Pad: {'y' * 120}\r\n\r\n").encode() + body
                     for i in range(len(raw)):
@@ -605,8 +617,7 @@ class RequestTests(unittest.TestCase):
 
     def test_refused_and_rate_limited_answers(self):
         for code, headers, kind in ((401, {}, immich.Refused), (403, {}, immich.Refused), (429, {}, immich.RateLimited),
-                                    (500, {}, immich.Unavailable), (502, {}, immich.Unavailable), (410, {}, immich.Unavailable),
-                                    (400, {}, immich.Unavailable)):
+                                    (500, {}, immich.Unavailable), (502, {}, immich.Unavailable), (400, {}, immich.Unavailable)):
             self.fake.routes["/api/search/metadata"] = (code, {**JSON_HEADERS, **headers}, b'{"message": "no"}')
             self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (code, headers, b"no")
             self.fake.routes[f"/api/assets/{ASSET}/original"] = (code, headers, b"no")
@@ -614,6 +625,59 @@ class RequestTests(unittest.TestCase):
                          lambda: immich.open_original(self.fake.source, ASSET)):
                 with self.subTest(code=code), self.assertRaises(kind):
                     call()
+
+    def test_a_gone_rendition_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
+        for route in (f"/api/assets/{ASSET}/thumbnail", "/api/search/metadata", f"/api/assets/{ASSET}/original", "/api/map/markers"):
+            self.fake.routes[route] = (410, {}, b'{"message": "gone"}')
+        for size in ("thumbnail", "preview"):
+            with self.subTest(size=size):
+                self.assertIsNone(immich.thumbnail(self.fake.source, ASSET, size))  # type: ignore[arg-type]
+        for call in (lambda: immich.search(self.fake.source, AFTER, BEFORE), lambda: immich.open_original(self.fake.source, ASSET),
+                     lambda: immich.markers(self.fake.source, AFTER, BEFORE)):
+            with self.subTest(call=call), self.assertRaises(immich.Unavailable) as e:
+                call()
+            self.assertEqual(str(e.exception), immich.UNAVAILABLE)
+
+    def _ranged(self, byte_range):
+        body = bytes(range(256)) + bytes(144)
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_ranges": "1", "Content-Type": "video/mp4"}, body)
+        original = immich.open_original(self.fake.source, ASSET, byte_range=byte_range)
+        assert original
+        with original:
+            data = b""
+            while chunk := original.read():
+                data += chunk
+        return original, data, body, self.fake.calls[-1]["headers"].get("range")
+
+    def test_an_original_forwards_a_single_byte_range_and_passes_on_the_206(self):
+        original, data, body, sent = self._ranged("bytes=10-19")
+        self.assertEqual(sent, "bytes=10-19")
+        self.assertEqual((original.status, original.content_range, original.content_length, original.accept_ranges),
+                         (206, "bytes 10-19/400", 10, "bytes"))
+        self.assertEqual(data, body[10:20])
+        original, data, body, sent = self._ranged("bytes=-5")
+        self.assertEqual((sent, original.status, original.content_range, data), ("bytes=-5", 206, "bytes 395-399/400", body[-5:]))
+
+    def test_a_range_past_the_end_passes_on_the_416(self):
+        original, data, _, sent = self._ranged("bytes=1000-")
+        self.assertEqual(sent, "bytes=1000-")
+        self.assertEqual((original.status, original.content_range, data), (416, "bytes */400", b""))
+
+    def test_a_malformed_or_multi_range_is_not_sent_and_the_whole_original_comes_back(self):
+        for byte_range in (None, "", "bytes=0-1,5-6", "items=0-1", "bytes=9-3", "bytes=-", "bytes=a-b", "bytes=1-2\r\nX-Evil: 1", " bytes=1-2"):
+            with self.subTest(byte_range=byte_range):
+                original, data, body, sent = self._ranged(byte_range)
+                self.assertIsNone(sent)
+                self.assertEqual((original.status, original.content_range, original.content_length, original.accept_ranges, data),
+                                 (200, None, 400, "bytes", body))
+
+    def test_a_206_nobody_asked_for_is_unavailable(self):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (206, {"Content-Range": "bytes 0-1/400"}, b"ab")
+        self.fake.routes["/api/search/metadata"] = (206, JSON_HEADERS, b"{}")
+        with self.assertRaises(immich.Unavailable):
+            immich.open_original(self.fake.source, ASSET)
+        with self.assertRaises(immich.Unavailable):
+            immich.search(self.fake.source, AFTER, BEFORE)
 
     def test_retry_after_is_passed_on(self):
         for value, expected in (("90", 90.0), (None, None), ("tomorrow-ish", None)):

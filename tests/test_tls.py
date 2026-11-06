@@ -1,5 +1,6 @@
 import http.client
 import io
+import socket
 import socketserver
 import ssl
 import threading
@@ -169,6 +170,42 @@ class DeadlineTests(unittest.TestCase):
         with mock.patch.object(urllib.request.OpenerDirector, "open", opened), self.assertRaises(ValueError):
             tls.urlopen("https://example.com/", 5, public_only=True, deadline=time.monotonic() + 5)
         opened.assert_not_called()
+
+    def test_a_proxy_that_trickles_its_connect_answer_is_cut_off_at_the_deadline(self):
+        proxy = self.serve([(b"HTTP/1.1 200 Connection established\r\nX-Pad: " + b"y" * 150 + b"\r\n\r\n", 0.03)])
+        began = time.monotonic()
+        with self.assertRaises(OSError):
+            tls.urlopen("https://photos.example.invalid/", 10, handlers=(urllib.request.ProxyHandler({"https": proxy}),),
+                        deadline=time.monotonic() + 0.5)
+        self.assertLess(time.monotonic() - began, 2.0)
+        self.assertEqual(self.server.connections, 1)
+
+    def test_the_tunnel_hands_the_plain_socket_back_for_the_handshake(self):
+        proxy = self.serve([(b"HTTP/1.1 200 Connection established\r\n\r\n", 0)])
+        context = ssl.create_default_context()
+        wrapped = mock.Mock()
+        conn = tls._DeadlineHTTPSConnection("127.0.0.1", self.server.server_address[1], timeout=5, deadline=time.monotonic() + 5,
+                                            context=context)
+        conn.set_tunnel("photos.example.invalid", 443)
+        with mock.patch.object(context, "wrap_socket", return_value=wrapped) as wrap:
+            conn.connect()
+        [(plain,), kwargs] = wrap.call_args
+        self.assertIsInstance(plain, socket.socket)
+        self.assertEqual(kwargs["server_hostname"], "photos.example.invalid")
+        self.assertIsInstance(conn.sock, tls._DeadlineSocket)
+        self.assertIs(conn.sock.sock, wrapped)
+        plain.close()
+        self.assertTrue(proxy)
+
+    def test_a_proxy_that_refuses_the_tunnel_closes_the_connection(self):
+        proxy = self.serve([(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n", 0)])
+        conn = tls._DeadlineHTTPSConnection("127.0.0.1", self.server.server_address[1], timeout=5, deadline=time.monotonic() + 5,
+                                            context=ssl.create_default_context())
+        conn.set_tunnel("photos.example.invalid", 443)
+        with self.assertRaises(OSError):
+            conn.connect()
+        self.assertIsNone(conn.sock)
+        self.assertTrue(proxy)
 
     def test_https_opens_the_deadline_connection_with_the_shared_context(self):
         deadline = time.monotonic() + 5

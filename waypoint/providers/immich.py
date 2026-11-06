@@ -52,6 +52,8 @@ HOST_LABEL = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")
 LOCAL = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d)", re.ASCII)
 UTC_NAME = re.compile(r"UTC(?:([+-])(\d{1,2})(?::?(\d\d))?)?", re.ASCII)
 DIGITS = re.compile(r"[0-9]{1,10}")
+BYTE_RANGE = re.compile(r"bytes=(?:([0-9]{1,15})-([0-9]{0,15})|-([0-9]{1,15}))")
+RENDITION_MISSING = (404, 410)
 SIGNATURES = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"))
 
 NOT_CONFIGURED = "This Immich library isn’t set up: its address or API key is missing or malformed."
@@ -130,6 +132,13 @@ class Original:
     def __init__(self, response: Any, deadline: float) -> None:
         self._response = response
         self._deadline = deadline
+        status, headers = getattr(response, "status", None), getattr(response, "headers", None)
+        found = headers.get if headers is not None else (lambda name: None)
+        length = _text(found("Content-Length"), 20)
+        self.status = status if isinstance(status, int) else 200
+        self.content_range = _text(found("Content-Range"))
+        self.content_length = int(length) if length is not None and DIGITS.fullmatch(length) else None
+        self.accept_ranges = _text(found("Accept-Ranges"), 40)
 
     def read(self, size: int = CHUNK) -> bytes:
         problem = TOO_SLOW
@@ -214,32 +223,37 @@ def _base(source: Source) -> str:
 
 
 def _request(source: Source, path: str, accept: str, *, query: dict[str, str] | None = None,
-             body: dict[str, Any] | None = None) -> urllib.request.Request:
+             body: dict[str, Any] | None = None, byte_range: str | None = None) -> urllib.request.Request:
     url = _base(source) + path + (f"?{urllib.parse.urlencode(query)}" if query else "")
     headers = {"x-api-key": source.key, "User-Agent": USER_AGENT, "Accept": accept}
+    if byte_range is not None:
+        headers["Range"] = byte_range
     data = None if body is None else json.dumps(body).encode()
     if data is not None:
         headers["Content-Type"] = JSON_TYPE
     return urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
 
 
-def _open(source: Source, req: urllib.request.Request, timeout: float, deadline: float) -> Any | None:
+def _open(source: Source, req: urllib.request.Request, timeout: float, deadline: float, *,
+          missing: tuple[int, ...] = (404,), accepted: tuple[int, ...] = (200,)) -> Any | None:
     code: int | None
     wait: str | None
     slow = False
     try:
         response = tls.urlopen(req, timeout, allow_http=source.allow_http, handlers=(_NoRedirects(),), deadline=deadline)
     except urllib.error.HTTPError as e:
+        if e.code in accepted:
+            return e
         code, wait = e.code, e.headers.get("Retry-After") if e.headers is not None else None
         e.close()
     except tls.NETWORK_ERRORS:
         code, wait, slow = None, None, time.monotonic() >= deadline
     else:
-        if response.status == 200:
+        if response.status in accepted:
             return response
         response.close()
         code, wait = response.status, None
-    if code == 404:
+    if code in missing:
         return None
     raise Unavailable(TOO_SLOW) if slow else _failure(code, wait)
 
@@ -448,7 +462,8 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
     if not ASSET_ID.fullmatch(asset_id) or size not in CAPS:
         return None
     deadline = time.monotonic() + IMAGE_SECONDS
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size}), IMAGE_TIMEOUT, deadline)
+    request = _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size})
+    response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=RENDITION_MISSING)
     if response is None:
         return None
     with response:
@@ -459,9 +474,18 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
     return kind, data
 
 
-def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SECONDS) -> Original | None:
+def single_range(value: str | None) -> str | None:
+    found = BYTE_RANGE.fullmatch(value) if value is not None else None
+    if found is None or (found.group(1) and found.group(2) and int(found.group(2)) < int(found.group(1))):
+        return None
+    return value
+
+
+def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SECONDS, byte_range: str | None = None) -> Original | None:
     if not ASSET_ID.fullmatch(asset_id):
         return None
     deadline = time.monotonic() + seconds
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES), ORIGINAL_TIMEOUT, deadline)
+    asked = single_range(byte_range)
+    request = _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES, byte_range=asked)
+    response = _open(source, request, ORIGINAL_TIMEOUT, deadline, accepted=(200, 206, 416) if asked else (200,))
     return None if response is None else Original(response, deadline)
