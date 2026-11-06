@@ -139,7 +139,7 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
     if declined:
         return _sharing(lambda: photogrants.decline(conn, who, person, trip))
     return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME, window=window, expected_changed=expected,
-                                              sources=sources, audience=audience))
+                                              sources=sources, audience=audience, strict=True))
 
 
 def _ids(value: Any, label: str) -> list[int] | None:
@@ -214,7 +214,7 @@ def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs
     audiences = {str(k): a for k, v in heard.items() if (a := _ids(v, NOT_AUDIENCES)) is not None} if heard is not None else None
     sources = _sources(body.get("sources"))
     try:
-        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows, sources=sources, audiences=audiences), NO_TRIP)
+        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows, sources=sources, audiences=audiences, strict=True), NO_TRIP)
     except photogrants.Stale as e:
         raise ApiError(str(e), 409) from None
 

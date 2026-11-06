@@ -5,7 +5,7 @@ from unittest import mock
 
 from sqlalchemy import delete, insert, select, update
 
-from tests.test_photos_api import SOHO, grant_row, photo_row, source_row
+from tests.test_photos_api import LONDON, SOHO, grant_row, photo_row, source_row, utc
 from tests.test_trips import HOTEL, OUT, Household
 from waypoint.domain import home, people, photogrants, photos, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
@@ -951,6 +951,49 @@ class TripChangeTests(GrantCase):
         now = photos.trip_window(self.c, dated)
         self.assertTrue(now.start <= photos.instant(row.taken_utc) <= now.end)
         self.assertEqual((self.row(row.id).trip_id, self.row(row.id).decided_by), (dated, "auto"))
+
+    def test_a_retained_hand_placement_the_shrunk_window_no_longer_holds_is_re_placed_and_never_returns(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        placed = self.photo(self.b, decided="owner")
+        photogrants.stop(self.c, self.jane, self.jid, self.b, 40.0)
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.b, "owner"))
+        trips.edit_segment(self.c, self.jane, stay, {"end_local": "2026-06-03T20:00"})
+        self.assertFalse(photos.window_holds(self.c, self.b, self.row(placed.id)))
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.a, "auto"))
+        photogrants.grant(self.c, self.jane, self.jid, self.b, "trip", 41.0)
+        self.assertEqual(self.seen(self.jane, self.b), [])
+        photogrants.stop(self.c, self.jane, self.jid, self.b, 42.0)
+        kept = self.photo(self.b, "2026-06-03T16:00", decided="owner")
+        self.c.execute(update(Photo).where(Photo.id == kept.id).values(taken_utc=utc("2026-06-07T12:00", LONDON), taken_local="2026-06-07T12:00"))
+        photogrants.grant(self.c, self.jane, self.jid, self.b, "trip", 43.0)
+        self.assertEqual((self.row(kept.id).trip_id, self.row(kept.id).decided_by), (self.a, "auto"))
+        self.assertEqual(self.seen(self.jane, self.b), [])
+
+    def test_merging_maps_a_removals_hand_placement_to_the_kept_trip_so_put_back_restores_it_there(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        placed = self.photo(self.b, decided="owner")
+        photogrants.exclude(self.c, self.jane, self.b, [placed.id], 45.0)
+        self.assertEqual(self.c.orm.get(PhotoExclusion, (self.jid, placed.asset_id, self.b)).was_trip_id, self.b)
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.a, "auto"))
+        trips.merge(self.c, self.jane, self.a, self.b, confirmed=True)
+        self.c.orm.expire_all()
+        self.assertEqual(self.c.orm.get(PhotoExclusion, (self.jid, placed.asset_id, self.a)).was_trip_id, self.a)
+        self.assertEqual([p.id for p, _ in photos.removed(self.c, self.jane, self.a)], [placed.id])
+        photogrants.put_back(self.c, self.jane, self.a, placed.id)
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.a, "owner"))
+
+    def test_the_re_match_reads_only_rows_on_the_trip_or_in_its_window(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        on_b = self.photo(self.b, INSIDE_B)
+        near = self.photo(self.a, "2026-06-04T13:00")
+        self.photo(self.a, "2026-06-07T12:00")
+        self.photo(None, "2026-06-07T13:00", match="ambiguous")
+        found = photos.trip_window(self.c, self.b)
+        self.assertEqual([r.id for r in photogrants._rows_near(self.c, self.jid, self.b, found)], [on_b.id, near.id])
 
     def test_merging_refreshes_the_kept_trips_dates_before_re_placing_the_other_trips_rows(self):
         first = trips.create_trip(self.c, self.jane, {"name": "First", "people": [self.jid]})["id"]
