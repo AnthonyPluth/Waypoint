@@ -931,3 +931,31 @@ class FifthReviewTests(SyncCase):
         self.c.commit()
         self.sync(NOW + timedelta(hours=1), trips={self.a})
         self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("ok", photosync.TOO_DENSE))
+
+
+class SixthReviewTests(SyncCase):
+    def test_a_rate_limit_does_not_restore_a_status_a_concurrent_test_changed(self):
+        def tested_meanwhile():
+            with db.session() as other:
+                photo_sources.mark(other, self.source, "unreachable", immich.UNREACHABLE)
+            return b'{"message":"slow down"}'
+        self.lib.fake.routes[immich.SEARCH] = (429, {**JSON_HEADERS, "Retry-After": "30"}, tested_meanwhile)
+        got = self.sync()
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("unreachable", immich.UNREACHABLE))
+
+    def test_a_pause_mid_run_stops_the_next_request_and_records_nothing(self):
+        self.lib.items = [asset(n, f"2026-06-02T1{n}:00:00Z", gps=SOHO) for n in range(5)] + [asset(9, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        self.lib.items = self.lib.items[1:]
+        calls = len(self.lib.asked())
+
+        def pause(asked):
+            with db.session() as other:
+                photo_sources.mark(other, self.source, "off")
+        self.lib.on_search = pause
+        got = self.sync(NOW + timedelta(days=8), full=True)
+        self.assertEqual(len(self.lib.asked()) - calls, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_sync"]), ("off", NOW.timestamp()))
+        self.assertEqual(len(self.rows()), 6)
+        self.assertEqual(got.budget_hit, 0)
