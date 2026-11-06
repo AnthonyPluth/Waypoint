@@ -298,7 +298,21 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0037")
         self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
 
-    def test_0039_turns_hidden_photos_into_one_exclusion_each_and_its_downgrade_widens_nothing(self):
+    def test_0039_ties_an_app_session_to_its_grant_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        tables = shape(self.path)
+        self.assertIn("grant_id", [col[0] for col in tables["auth_sessions"]["columns"]])
+        self.assertIn("CASCADE", {fk[0]: fk[4] for fk in tables["auth_sessions"]["fks"]}["fk_auth_sessions_grant_id"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+
+    def test_0040_turns_hidden_photos_into_one_exclusion_each_and_its_downgrade_widens_nothing(self):
         from alembic import command
         old_photos = sa.table("photos", *(sa.column(n) for n in ("id", "source_id", "asset_id", "asset_updated", "kind", "taken_utc", "taken_local", "trip_id", "match", "hidden", "seen")))
         syncs = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end")))

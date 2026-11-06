@@ -1,6 +1,7 @@
 import email.message
 import io
 import json
+import re
 import threading
 import time
 import traceback
@@ -47,10 +48,35 @@ class FakeImmich(ThreadingHTTPServer):
                 code, headers, body = self.server.routes.get(path, (404, {}, b'{"message":"Not Found"}'))   # type: ignore[attr-defined]
                 if callable(body):
                     body = body()
+                if headers.get("_ranges"):
+                    asked = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
+                    headers = {**headers, "Accept-Ranges": "bytes"}
+                    if asked:
+                        first = int(asked.group(1)) if asked.group(1) else len(body) - int(asked.group(2))
+                        last = min(int(asked.group(2)), len(body) - 1) if asked.group(1) and asked.group(2) else len(body) - 1
+                        if first >= len(body):
+                            code, headers, body = 416, {**headers, "Content-Range": f"bytes */{len(body)}"}, b""
+                        else:
+                            code, headers = 206, {**headers, "Content-Range": f"bytes {first}-{last}/{len(body)}"}
+                            body = body[first:last + 1]
+                if headers.get("_trickle_head"):
+                    raw = (f"HTTP/1.0 {code} OK\r\nContent-Length: {len(body)}\r\nX-Pad: {'y' * 120}\r\n\r\n").encode() + body
+                    for i in range(len(raw)):
+                        try:
+                            self.wfile.write(raw[i:i + 1])
+                            self.wfile.flush()
+                        except OSError:
+                            return
+                        time.sleep(float(headers["_trickle_head"]))
+                    return
                 self.send_response(code)
                 for name, value in headers.items():
                     self.send_header(name, value)
-                if "Content-Length" not in headers and not headers.get("_no_length"):
+                if headers.get("_chunked"):
+                    self.send_header("Transfer-Encoding", "chunked")
+                    body = (f"{len(body):x};pad={'x' * 150}\r\n".encode() + body + b"\r\n0\r\n"
+                            + b"".join(f"X-Pad-{i}: {'y' * 40}\r\n".encode() for i in range(4)) + b"\r\n")
+                elif "Content-Length" not in headers and not headers.get("_no_length"):
                     self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 pause = float(headers.get("_trickle") or 0)
@@ -255,7 +281,7 @@ class ParseTests(unittest.TestCase):
                  ("UTC+14", winter, 840), ("UTC-0930", winter, -570), ("Etc/GMT+5", winter, -300),
                  ("Europe/London", datetime(2026, 3, 29, 0, 59, tzinfo=UTC), 0), ("Europe/London", datetime(2026, 3, 29, 1, 0, tzinfo=UTC), 60),
                  ("Mars/Olympus_Mons", winter, None), ("", winter, None), (None, winter, None), (5, winter, None),
-                 ("UTC+19", winter, None), ("UTC+05:60", winter, None), ("../../etc/passwd", winter, None), ("/etc/localtime", winter, None),
+                 ("UTC+19", winter, None), ("UTC+18:30", winter, None), ("UTC-18:01", winter, None), ("UTC+18", winter, 1080), ("UTC-18:00", winter, -1080), ("UTC+05:60", winter, None), ("../../etc/passwd", winter, None), ("/etc/localtime", winter, None),
                  ("x" * 80, winter, None), ("America/New_York\x00", winter, None), ("America/New_York", datetime(9999, 12, 31, 23, tzinfo=UTC), -300)]
         for name, at, offset in cases:
             with self.subTest(name=name, at=at):
@@ -429,7 +455,7 @@ class RequestTests(unittest.TestCase):
         response = mock.Mock()
         response.headers = {"Content-Length": str(immich.CAPS["thumbnail"] + 1)}
         with self.assertRaises(immich.Unavailable) as e:
-            immich._read(response, immich.CAPS["thumbnail"], 5)
+            immich._read(response, immich.CAPS["thumbnail"], time.monotonic() + 5)
         self.assertEqual(str(e.exception), immich.TOO_LARGE)
         response.read1.assert_not_called()
 
@@ -464,12 +490,43 @@ class RequestTests(unittest.TestCase):
         with mock.patch.object(immich, "JSON_SECONDS", 0.5):
             self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
 
+    def test_a_chunked_thumbnail_whose_size_line_and_trailers_trickle_stops_at_its_budget(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_chunked": "1", "_trickle": "0.02"}, JPEG)
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "thumbnail"))
+
+    def test_a_chunked_search_reply_whose_size_line_and_trailers_trickle_stops_at_its_budget(self):
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_chunked": "1", "_trickle": "0.02"},
+                                                    b'{"assets": {"items": [], "nextPage": null}}')
+        with mock.patch.object(immich, "JSON_SECONDS", 0.5):
+            self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
+    def test_a_chunked_reply_that_arrives_in_time_is_read_whole(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_chunked": "1"}, JPEG)
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_chunked": "1"}, fixture("search_page"))
+        self.assertEqual(immich.thumbnail(self.fake.source, ASSET, "thumbnail"), ("image/jpeg", JPEG))
+        self.assertEqual(len(immich.search(self.fake.source, AFTER, BEFORE).assets), 8)
+
+    def test_a_thumbnail_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_trickle_head": "0.03"}, JPEG)
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "preview"))
+
+    def test_a_search_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes["/api/search/metadata"] = (200, {"_trickle_head": "0.03"}, b'{"assets": {"items": [], "nextPage": null}}')
+        with mock.patch.object(immich, "JSON_SECONDS", 0.5):
+            self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
+    def test_an_original_whose_status_line_and_headers_trickle_is_too_slow(self):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_trickle_head": "0.03"}, JPEG)
+        self._slow(lambda: immich.open_original(self.fake.source, ASSET, seconds=0.5))
+
     def test_a_connection_cut_while_reading_is_unreachable(self):
         response = mock.Mock()
         response.headers = {}
         response.read1.side_effect = [b"x", ConnectionResetError(f"reset by {KEY}")]
         with self.assertRaises(immich.Unavailable) as e:
-            immich._read(response, 1000, 5)
+            immich._read(response, 1000, time.monotonic() + 5)
         self.assertEqual(str(e.exception), immich.UNREACHABLE)
         self.assertIsNone(e.exception.__context__)
 
@@ -500,20 +557,67 @@ class RequestTests(unittest.TestCase):
         self.assertIsNone(immich.open_original(self.fake.source, ASSET))
 
     def test_an_original_cut_off_part_way_is_unavailable(self):
+        for error, text in ((ConnectionResetError(f"reset by {KEY}"), immich.UNREACHABLE), (TimeoutError(f"timed out reading from {KEY}"), immich.TOO_SLOW)):
+            response = mock.Mock()
+            response.read1.side_effect = error
+            original = immich.Original(response, time.monotonic() + 5)
+            with self.subTest(error=error), self.assertRaises(immich.Unavailable) as e:
+                original.read()
+            self.assertEqual(str(e.exception), text)
+            self.assertIsNone(e.exception.__context__)
+            original.close()
+            response.close.assert_called_once()
+
+    def test_an_original_past_its_budget_reads_nothing_more(self):
         response = mock.Mock()
-        response.read.side_effect = TimeoutError(f"timed out reading from {KEY}")
-        original = immich.Original(response)
+        original = immich.Original(response, time.monotonic() - 0.001)
         with self.assertRaises(immich.Unavailable) as e:
             original.read()
-        self.assertEqual(str(e.exception), immich.UNREACHABLE)
-        self.assertIsNone(e.exception.__context__)
-        original.close()
-        response.close.assert_called_once()
+        self.assertEqual(str(e.exception), immich.TOO_SLOW)
+        response.read1.assert_not_called()
+
+    def test_an_original_s_budget_defaults_to_ten_minutes(self):
+        self.assertEqual(immich.ORIGINAL_SECONDS, 600.0)
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {}, b"abc")
+        began = time.monotonic()
+        with mock.patch.object(immich, "Original", wraps=immich.Original) as made:
+            original = immich.open_original(self.fake.source, ASSET)
+        assert original
+        with original:
+            self.assertEqual(original.read(), b"abc")
+        [(_, deadline), _] = made.call_args
+        self.assertTrue(began + 599 < deadline <= time.monotonic() + 600)
+
+    def test_an_original_read_returns_what_has_arrived(self):
+        body = b"\x00" * 400
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_trickle": "0.005"}, body)
+        original = immich.open_original(self.fake.source, ASSET)
+        assert original
+        with original:
+            first = original.read(10_000)
+        self.assertGreater(len(first), 0)
+        self.assertLess(len(first), len(body))
+
+    def _original_until_slow(self, headers):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, headers, b"\x00" * 400)
+        began = time.monotonic()
+        original = immich.open_original(self.fake.source, ASSET, seconds=0.5)
+        assert original
+        with original, self.assertRaises(immich.Unavailable) as e:
+            while original.read(10_000):
+                pass
+        self.assertEqual(str(e.exception), immich.TOO_SLOW)
+        self.assertLess(time.monotonic() - began, 2.0)
+
+    def test_an_original_that_trickles_stops_at_the_budget_it_was_given(self):
+        self._original_until_slow({"_trickle": "0.02"})
+
+    def test_a_chunked_original_that_trickles_stops_at_the_budget_it_was_given(self):
+        self._original_until_slow({"_chunked": "1", "_trickle": "0.02"})
 
     def test_refused_and_rate_limited_answers(self):
         for code, headers, kind in ((401, {}, immich.Refused), (403, {}, immich.Refused), (429, {}, immich.RateLimited),
-                                    (500, {}, immich.Unavailable), (502, {}, immich.Unavailable), (410, {}, immich.Unavailable),
-                                    (400, {}, immich.Unavailable)):
+                                    (500, {}, immich.Unavailable), (502, {}, immich.Unavailable), (400, {}, immich.Unavailable)):
             self.fake.routes["/api/search/metadata"] = (code, {**JSON_HEADERS, **headers}, b'{"message": "no"}')
             self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (code, headers, b"no")
             self.fake.routes[f"/api/assets/{ASSET}/original"] = (code, headers, b"no")
@@ -521,6 +625,59 @@ class RequestTests(unittest.TestCase):
                          lambda: immich.open_original(self.fake.source, ASSET)):
                 with self.subTest(code=code), self.assertRaises(kind):
                     call()
+
+    def test_a_gone_rendition_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
+        for route in (f"/api/assets/{ASSET}/thumbnail", "/api/search/metadata", f"/api/assets/{ASSET}/original", "/api/map/markers"):
+            self.fake.routes[route] = (410, {}, b'{"message": "gone"}')
+        for size in ("thumbnail", "preview"):
+            with self.subTest(size=size):
+                self.assertIsNone(immich.thumbnail(self.fake.source, ASSET, size))  # type: ignore[arg-type]
+        for call in (lambda: immich.search(self.fake.source, AFTER, BEFORE), lambda: immich.open_original(self.fake.source, ASSET),
+                     lambda: immich.markers(self.fake.source, AFTER, BEFORE)):
+            with self.subTest(call=call), self.assertRaises(immich.Unavailable) as e:
+                call()
+            self.assertEqual(str(e.exception), immich.UNAVAILABLE)
+
+    def _ranged(self, byte_range):
+        body = bytes(range(256)) + bytes(144)
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_ranges": "1", "Content-Type": "video/mp4"}, body)
+        original = immich.open_original(self.fake.source, ASSET, byte_range=byte_range)
+        assert original
+        with original:
+            data = b""
+            while chunk := original.read():
+                data += chunk
+        return original, data, body, self.fake.calls[-1]["headers"].get("range")
+
+    def test_an_original_forwards_a_single_byte_range_and_passes_on_the_206(self):
+        original, data, body, sent = self._ranged("bytes=10-19")
+        self.assertEqual(sent, "bytes=10-19")
+        self.assertEqual((original.status, original.content_range, original.content_length, original.accept_ranges),
+                         (206, "bytes 10-19/400", 10, "bytes"))
+        self.assertEqual(data, body[10:20])
+        original, data, body, sent = self._ranged("bytes=-5")
+        self.assertEqual((sent, original.status, original.content_range, data), ("bytes=-5", 206, "bytes 395-399/400", body[-5:]))
+
+    def test_a_range_past_the_end_passes_on_the_416(self):
+        original, data, _, sent = self._ranged("bytes=1000-")
+        self.assertEqual(sent, "bytes=1000-")
+        self.assertEqual((original.status, original.content_range, data), (416, "bytes */400", b""))
+
+    def test_a_malformed_or_multi_range_is_not_sent_and_the_whole_original_comes_back(self):
+        for byte_range in (None, "", "bytes=0-1,5-6", "items=0-1", "bytes=9-3", "bytes=-", "bytes=a-b", "bytes=1-2\r\nX-Evil: 1", " bytes=1-2"):
+            with self.subTest(byte_range=byte_range):
+                original, data, body, sent = self._ranged(byte_range)
+                self.assertIsNone(sent)
+                self.assertEqual((original.status, original.content_range, original.content_length, original.accept_ranges, data),
+                                 (200, None, 400, "bytes", body))
+
+    def test_a_206_nobody_asked_for_is_unavailable(self):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (206, {"Content-Range": "bytes 0-1/400"}, b"ab")
+        self.fake.routes["/api/search/metadata"] = (206, JSON_HEADERS, b"{}")
+        with self.assertRaises(immich.Unavailable):
+            immich.open_original(self.fake.source, ASSET)
+        with self.assertRaises(immich.Unavailable):
+            immich.search(self.fake.source, AFTER, BEFORE)
 
     def test_retry_after_is_passed_on(self):
         for value, expected in (("90", 90.0), (None, None), ("tomorrow-ish", None)):

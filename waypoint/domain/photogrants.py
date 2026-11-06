@@ -196,6 +196,16 @@ def lock_trips_of(conn: db.Connection, *person_ids: int) -> list[int]:
     return lock_trips(conn, {t for person_id in person_ids for t in _reachable(conn, person_id)})
 
 
+def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], now: float | None = None) -> None:
+    known = list(dated)
+    lock_trips(conn, known)
+    fresh = [trip_id for trip_id in dated_trips(conn) if trip_id not in before]
+    if fresh:
+        aboard = trippeople.of(conn, fresh)
+        before = {**before, **{trip_id: Before(None, frozenset(aboard[trip_id]), ()) for trip_id in fresh}}
+    trips_changed(conn, [*known, *fresh], before, now)
+
+
 def dated_trips(conn: db.Connection) -> list[int]:
     booked = select(Segment.trip_id)
     return list(conn.execute(select(Trip.id).where(Trip.start_date.is_not(None), Trip.end_date.is_not(None), Trip.id.not_in(booked)).order_by(Trip.id)).scalars())
@@ -637,15 +647,15 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     subs = {g.granted_by for g in every} | {p.set_by for p in standing if p.set_by} | {p.steward_sub for p in stewarded if p.steward_sub}
     gone = {s for s in sorted(subs) if _lapsed(conn, s, stamp)}
     ended = 0
-    lapsed = sorted(((g.trip_id, g.person_id, g.granted_by) for g in every if g.granted_by in gone), key=lambda g: g[:2])
+    lapsed = sorted(((g.person_id, g.trip_id, g.granted_by) for g in every if g.granted_by in gone), key=lambda g: g[:2])
     settings = sorted({p.person_id for p in standing if p.set_by in gone} | {p.person_id for p in stewarded if p.steward_sub in gone})
-    for person in sorted({person for _, person, _ in lapsed} | set(settings)):
+    for person in sorted({person for person, _, _ in lapsed} | set(settings)):
         people.lock(conn, person)
-    lock_trips(conn, [trip for trip, _, _ in lapsed])
+    lock_trips(conn, [trip for _, trip, _ in lapsed])
     for sub in sorted(gone):
         photo_sources.lock_owner(conn, sub)
     gone = {s for s in sorted(gone) if _lapsed(conn, s, stamp)}
-    for trip, person, by in lapsed:
+    for person, trip, by in lapsed:
         conn.orm.expire_all()
         held = lock(conn, person, [trip]).get(trip)
         if held is None or held.granted_by != by or by not in gone:

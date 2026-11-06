@@ -22,6 +22,7 @@ IMAGE_TIMEOUT = 10
 ORIGINAL_TIMEOUT = 30
 JSON_SECONDS = 60.0
 IMAGE_SECONDS = 20.0
+ORIGINAL_SECONDS = 600.0
 MAX_JSON_BYTES = 32_000_000
 CAPS = {"thumbnail": 2_000_000, "preview": 10_000_000}
 CHUNK = 65_536
@@ -38,6 +39,7 @@ SEARCH = "/api/search/metadata"
 MARKERS = "/api/map/markers"
 ASSETS = "/api/assets/"
 
+MAX_OFFSET_MINUTES = 18 * 60
 PAGE_SIZE = 1000
 LAST_PAGE = None
 SEARCH_FILTERS: dict[str, Any] = {"withExif": True, "visibility": "timeline", "order": "asc", "size": PAGE_SIZE}
@@ -50,6 +52,8 @@ HOST_LABEL = re.compile(r"(?!-)[a-z0-9-]{1,63}(?<!-)")
 LOCAL = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d)", re.ASCII)
 UTC_NAME = re.compile(r"UTC(?:([+-])(\d{1,2})(?::?(\d\d))?)?", re.ASCII)
 DIGITS = re.compile(r"[0-9]{1,10}")
+BYTE_RANGE = re.compile(r"bytes=(?:([0-9]{1,15})-([0-9]{0,15})|-([0-9]{1,15}))")
+RENDITION_MISSING = (404, 410)
 SIGNATURES = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"))
 
 NOT_CONFIGURED = "This Immich library isn’t set up: its address or API key is missing or malformed."
@@ -125,16 +129,29 @@ class Page:
 
 
 class Original:
-    def __init__(self, response: Any) -> None:
+    def __init__(self, response: Any, deadline: float) -> None:
         self._response = response
+        self._deadline = deadline
+        status, headers = getattr(response, "status", None), getattr(response, "headers", None)
+        found = headers.get if headers is not None else (lambda name: None)
+        length = _text(found("Content-Length"), 20)
+        self.status = status if isinstance(status, int) else 200
+        self.content_range = _text(found("Content-Range"))
+        self.content_length = int(length) if length is not None and DIGITS.fullmatch(length) else None
+        self.accept_ranges = _text(found("Accept-Ranges"), 40)
 
     def read(self, size: int = CHUNK) -> bytes:
-        try:
-            chunk = self._response.read(size)
-        except tls.NETWORK_ERRORS:
-            chunk = None
+        problem = TOO_SLOW
+        chunk = None
+        if self._deadline - time.monotonic() > 0:
+            try:
+                chunk = self._response.read1(size)
+            except TimeoutError:
+                chunk = None
+            except tls.NETWORK_ERRORS:
+                problem = UNREACHABLE
         if not isinstance(chunk, bytes):
-            raise Unavailable(UNREACHABLE)
+            raise Unavailable(problem)
         return chunk
 
     def close(self) -> None:
@@ -206,44 +223,42 @@ def _base(source: Source) -> str:
 
 
 def _request(source: Source, path: str, accept: str, *, query: dict[str, str] | None = None,
-             body: dict[str, Any] | None = None) -> urllib.request.Request:
+             body: dict[str, Any] | None = None, byte_range: str | None = None) -> urllib.request.Request:
     url = _base(source) + path + (f"?{urllib.parse.urlencode(query)}" if query else "")
     headers = {"x-api-key": source.key, "User-Agent": USER_AGENT, "Accept": accept}
+    if byte_range is not None:
+        headers["Range"] = byte_range
     data = None if body is None else json.dumps(body).encode()
     if data is not None:
         headers["Content-Type"] = JSON_TYPE
     return urllib.request.Request(url, data=data, headers=headers, method="GET" if data is None else "POST")
 
 
-def _open(source: Source, req: urllib.request.Request, timeout: float) -> Any | None:
+def _open(source: Source, req: urllib.request.Request, timeout: float, deadline: float, *,
+          missing: tuple[int, ...] = (404,), accepted: tuple[int, ...] = (200,)) -> Any | None:
     code: int | None
     wait: str | None
+    slow = False
     try:
-        response = tls.urlopen(req, timeout, allow_http=source.allow_http, handlers=(_NoRedirects(),))
+        response = tls.urlopen(req, timeout, allow_http=source.allow_http, handlers=(_NoRedirects(),), deadline=deadline)
     except urllib.error.HTTPError as e:
+        if e.code in accepted:
+            return e
         code, wait = e.code, e.headers.get("Retry-After") if e.headers is not None else None
         e.close()
     except tls.NETWORK_ERRORS:
-        code, wait = None, None
+        code, wait, slow = None, None, time.monotonic() >= deadline
     else:
-        if response.status == 200:
+        if response.status in accepted:
             return response
         response.close()
         code, wait = response.status, None
-    if code == 404:
+    if code in missing:
         return None
-    raise _failure(code, wait)
+    raise Unavailable(TOO_SLOW) if slow else _failure(code, wait)
 
 
-def _wait_at_most(response: Any, seconds: float) -> None:
-    sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
-    settimeout = getattr(sock, "settimeout", None)
-    if callable(settimeout):
-        settimeout(seconds)
-
-
-def _read(response: Any, cap: int, seconds: float) -> bytes:
-    deadline = time.monotonic() + seconds
+def _read(response: Any, cap: int, deadline: float) -> bytes:
     declared = response.headers.get("Content-Length") or ""
     if DIGITS.fullmatch(declared) and int(declared) > cap:
         raise Unavailable(TOO_LARGE)
@@ -251,11 +266,9 @@ def _read(response: Any, cap: int, seconds: float) -> bytes:
     problem = None
     try:
         while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
+            if deadline - time.monotonic() <= 0:
                 problem = TOO_SLOW
                 break
-            _wait_at_most(response, remaining)
             chunk = response.read1(CHUNK)
             if not chunk:
                 break
@@ -273,11 +286,12 @@ def _read(response: Any, cap: int, seconds: float) -> bytes:
 
 
 def _json(source: Source, req: urllib.request.Request) -> Any:
-    response = _open(source, req, TIMEOUT)
+    deadline = time.monotonic() + JSON_SECONDS
+    response = _open(source, req, TIMEOUT, deadline)
     if response is None:
         raise Unavailable(UNAVAILABLE)
     with response:
-        raw = _read(response, MAX_JSON_BYTES, JSON_SECONDS)
+        raw = _read(response, MAX_JSON_BYTES, deadline)
     try:
         return json.loads(raw)
     except (ValueError, RecursionError):
@@ -327,7 +341,7 @@ def zone_offset(name: Any, at: datetime) -> int | None:
     fixed = UTC_NAME.fullmatch(text)
     if fixed:
         sign, hours, minutes = fixed.group(1), int(fixed.group(2) or 0), int(fixed.group(3) or 0)
-        if hours > 18 or minutes > 59:
+        if hours * 60 + minutes > MAX_OFFSET_MINUTES or minutes > 59:
             return None
         return (-1 if sign == "-" else 1) * (hours * 60 + minutes)
     try:
@@ -447,19 +461,31 @@ def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:
 def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | None:
     if not ASSET_ID.fullmatch(asset_id) or size not in CAPS:
         return None
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size}), IMAGE_TIMEOUT)
+    deadline = time.monotonic() + IMAGE_SECONDS
+    request = _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size})
+    response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=RENDITION_MISSING)
     if response is None:
         return None
     with response:
-        data = _read(response, CAPS[size], IMAGE_SECONDS)
+        data = _read(response, CAPS[size], deadline)
     kind = sniff(data)
     if kind is None:
         raise Unavailable(NOT_AN_IMAGE)
     return kind, data
 
 
-def open_original(source: Source, asset_id: str) -> Original | None:
+def single_range(value: str | None) -> str | None:
+    found = BYTE_RANGE.fullmatch(value) if value is not None else None
+    if found is None or (found.group(1) and found.group(2) and int(found.group(2)) < int(found.group(1))):
+        return None
+    return value
+
+
+def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SECONDS, byte_range: str | None = None) -> Original | None:
     if not ASSET_ID.fullmatch(asset_id):
         return None
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES), ORIGINAL_TIMEOUT)
-    return None if response is None else Original(response)
+    deadline = time.monotonic() + seconds
+    asked = single_range(byte_range)
+    request = _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES, byte_range=asked)
+    response = _open(source, request, ORIGINAL_TIMEOUT, deadline, accepted=(200, 206, 416) if asked else (200,))
+    return None if response is None else Original(response, deadline)

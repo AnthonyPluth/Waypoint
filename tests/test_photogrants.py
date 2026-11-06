@@ -1200,6 +1200,18 @@ class LapsedAccessTests(GrantCase):
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "trip", "share_all": False})
         self.assertIsNone(self.c.orm.get(PhotoSharingPrefs, self.mia))
 
+    def test_the_sweep_ends_lapsed_grants_in_person_then_trip_order(self):
+        for person, trip in [(self.sid, self.a), (self.jid, self.b), (self.sid, self.b), (self.jid, self.a)]:
+            self.share(person, trip, by="u-sam")
+        calls: list[tuple[int, list[int]]] = []
+        real = photogrants.lock
+        with mock.patch.dict(os.environ, {**ALLOWED, "OIDC_ALLOWED_GROUPS": "household"}), \
+                mock.patch.object(photogrants, "lock", side_effect=lambda conn, person, trips: calls.append((person, list(trips))) or real(conn, person, trips)):
+            self.lapse("u-sam")
+            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 4)
+        order = [(person, trips[0]) for person, trips in calls if len(trips) == 1]
+        self.assertEqual(list(dict.fromkeys(order)), [(self.jid, self.a), (self.jid, self.b), (self.sid, self.a), (self.sid, self.b)])
+
     def test_the_sweep_rechecks_access_after_its_locks_so_a_member_who_signed_in_meanwhile_keeps_everything(self):
         self.share(self.jid, self.a, by="u-sam")
         self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=5.0, steward_sub=None))
@@ -1419,6 +1431,21 @@ class DecisionTests(GrantCase):
         home.clear(self.c)
         self.assertEqual(photos.trip_window(self.c, dated), was)
         self.assertEqual(self.grant(self.jid, dated), ("only_me", None, "u-jane"))
+
+    def test_a_home_change_asks_again_on_a_dated_trip_created_while_it_was_locking(self):
+        born: list[int] = []
+        real = photogrants.lock_trips
+
+        def create_first(conn, trip_ids):
+            if not born:
+                born.append(0)
+                born[0] = trips.create_trip(self.c, self.jane, {"name": "Raced", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"}, confirmed=True)["id"]
+                self.share(self.jid, born[0])
+            return real(conn, trip_ids)
+        with mock.patch.object(photogrants, "lock_trips", side_effect=create_first):
+            home.save(self.c, {"city": "Denver", "state": "CO", "zip": "", "country": "US"})
+        self.assertEqual(self.grant(self.jid, born[0]), ("only_me", None, "u-jane"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.jid, born[0])).ask_again)
 
     def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
         self.share(self.jid, self.a)
