@@ -1,0 +1,22 @@
+{
+  "name": "cruise-ship",
+  "page": "upcoming",
+  "steps": [
+    { "clock": "2026-08-29T23:00:00Z" },
+    { "reload": true },
+    { "wait_for": "[data-ship]" },
+    { "screenshot": "start" },
+    { "clock": "2026-08-31T07:45:00Z" },
+    { "reload": true },
+    { "wait_for": "[data-ship]" },
+    { "screenshot": "quarter" },
+    { "clock": "2026-09-02T06:15:00Z" },
+    { "reload": true },
+    { "wait_for": "[data-ship]" },
+    { "screenshot": "middle" },
+    { "clock": "2026-09-05T13:29:00Z" },
+    { "reload": true },
+    { "wait_for": "[data-ship]" },
+    { "screenshot": "end" }
+  ]
+}

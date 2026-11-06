@@ -22,7 +22,7 @@
   import KindTile from "$lib/components/KindTile.svelte";
   import TrainFront from "@lucide/svelte/icons/train-front";
   import { duration } from "$lib/stats";
-  import { appWord, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, shipLeft, shipProgress, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -169,10 +169,17 @@
       {:else}
         <div class="flex items-end gap-4" class:line-through={cancelled}>
           <BoardingTime local={s.start_local} zone={s.start_zone} {unknown} label={START_WORD[s.kind]} />
-          <span class="relative mb-5 flex h-7 min-w-8 flex-1 items-center justify-center" aria-hidden="true">
-            <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
-            <span class="relative bg-card px-1"><KindTile kind={s.kind} decorative /></span>
-          </span>
+          {#if s.kind === "cruise"}
+            <span class="relative mb-5 flex h-7 min-w-8 flex-1 items-center" aria-hidden="true" data-progress={shipProgress(s, now)}>
+              <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
+              <span class="absolute top-1/2 -translate-y-1/2 bg-card px-1" style={`left: ${shipLeft(shipProgress(s, now))}`} data-ship><KindTile kind={s.kind} decorative /></span>
+            </span>
+          {:else}
+            <span class="relative mb-5 flex h-7 min-w-8 flex-1 items-center justify-center" aria-hidden="true">
+              <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
+              <span class="relative bg-card px-1"><KindTile kind={s.kind} decorative /></span>
+            </span>
+          {/if}
           <BoardingTime local={s.end_local} zone={s.end_zone} {unknown} align="end" label={END_WORD[s.kind]} />
         </div>
       {/if}
