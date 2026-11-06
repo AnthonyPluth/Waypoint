@@ -235,6 +235,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
+        "tests/test_photos_api.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
@@ -255,6 +256,7 @@
         "tests/test_mcp.py",
         "tests/test_monitoring.py",
         "tests/test_onboarding.py",
+        "tests/test_photos_api.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
@@ -391,6 +393,49 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/trips/{id}/photos",
+      "handler": "waypoint/server/api/photos.py:api_trip_photos",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/photos/review",
+      "handler": "waypoint/server/api/photos.py:api_photo_review",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photos_api.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photos/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_decide",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photos_api.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/segments",
       "handler": "waypoint/server/api/trips.py:api_segment_add",
@@ -523,6 +568,7 @@
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
+        "tests/test_photos_api.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],

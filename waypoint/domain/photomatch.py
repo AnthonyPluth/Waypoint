@@ -137,6 +137,21 @@ def _timed_match(chosen: TripWindow, at: datetime) -> Match:
     return Match("time", chosen.trip_id, point.segment_id if point else None, None)
 
 
+def _kind(distance: float) -> MatchKind:
+    return "place" if distance <= NEAR else "far" if distance > FAR else "time"
+
+
+def settle(photo: PhotoIn, chosen: TripWindow | None) -> Match:
+    if chosen is None:
+        return Match("time")
+    spot = photo.spot
+    near = _nearest(chosen.points, photo.taken, spot) if spot is not None else None
+    if near is None:
+        return _timed_match(chosen, photo.taken)
+    distance, point = near
+    return Match(_kind(distance), chosen.trip_id, point.segment_id, distance)
+
+
 def match(photo: PhotoIn, windows: Sequence[TripWindow], home: HomeIn | None) -> Match:
     at = photo.taken
     inside = [w for w in windows if w.start <= at <= w.end]
@@ -158,5 +173,4 @@ def match(photo: PhotoIn, windows: Sequence[TripWindow], home: HomeIn | None) ->
     if near is None:
         return _timed_match(winner, at)
     distance, point = near
-    kind: MatchKind = "place" if distance <= NEAR else "far" if distance > FAR else "time"
-    return Match(kind, winner.trip_id, point.segment_id, distance)
+    return Match(_kind(distance), winner.trip_id, point.segment_id, distance)

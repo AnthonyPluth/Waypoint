@@ -772,6 +772,108 @@
         }
       }
     },
+    "/api/trips/{id}/photos": {
+      "get": {
+        "operationId": "api_trip_photos",
+        "x-handler": "waypoint/server/api/photos.py:api_trip_photos",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPhotos"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photos/review": {
+      "get": {
+        "operationId": "api_photo_review",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_review",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoReview"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photos/{id}": {
+      "post": {
+        "operationId": "api_photo_decide",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_decide",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPhoto"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/segments": {
       "post": {
         "operationId": "api_segment_add",
@@ -5633,6 +5735,130 @@
         ],
         "additionalProperties": false
       },
+      "PhotoBody": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PhotoCandidate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoCluster": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "first": {
+            "type": "string"
+          },
+          "last": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "integer"
+          },
+          "inferred": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "count",
+          "first",
+          "last",
+          "cover",
+          "inferred"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoCounts": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "located": {
+            "type": "integer"
+          },
+          "inferred": {
+            "type": "integer"
+          },
+          "far": {
+            "type": "integer"
+          },
+          "hidden": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "located",
+          "inferred",
+          "far",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoPerson": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "person_id",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoReview": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReviewPhoto"
+            }
+          }
+        },
+        "required": [
+          "photos"
+        ],
+        "additionalProperties": false
+      },
       "Port": {
         "type": "object",
         "properties": {
@@ -6229,6 +6455,112 @@
           "subject",
           "has_email",
           "received"
+        ],
+        "additionalProperties": false
+      },
+      "ReviewPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "person_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "taken_local": {
+            "type": "string"
+          },
+          "zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "location_source": {
+            "enum": [
+              "exif",
+              "inferred",
+              null
+            ]
+          },
+          "segment_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "match": {
+            "enum": [
+              "place",
+              "time",
+              "far",
+              "ambiguous",
+              "home",
+              "none"
+            ]
+          },
+          "distance_km": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "cluster": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoCandidate"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "trip_id",
+          "kind",
+          "taken_local",
+          "zone",
+          "latitude",
+          "longitude",
+          "location_source",
+          "segment_id",
+          "match",
+          "distance_km",
+          "cluster",
+          "hidden",
+          "candidates"
         ],
         "additionalProperties": false
       },
@@ -8068,6 +8400,138 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "TripPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "person_id": {
+            "type": "integer"
+          },
+          "trip_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "taken_local": {
+            "type": "string"
+          },
+          "zone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "longitude": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "location_source": {
+            "enum": [
+              "exif",
+              "inferred",
+              null
+            ]
+          },
+          "segment_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "match": {
+            "enum": [
+              "place",
+              "time",
+              "far",
+              "ambiguous",
+              "home",
+              "none"
+            ]
+          },
+          "distance_km": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "cluster": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "trip_id",
+          "kind",
+          "taken_local",
+          "zone",
+          "latitude",
+          "longitude",
+          "location_source",
+          "segment_id",
+          "match",
+          "distance_km",
+          "cluster",
+          "hidden"
+        ],
+        "additionalProperties": false
+      },
+      "TripPhotos": {
+        "type": "object",
+        "properties": {
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripPhoto"
+            }
+          },
+          "clusters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoCluster"
+            }
+          },
+          "counts": {
+            "$ref": "#/components/schemas/PhotoCounts"
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoPerson"
+            }
+          }
+        },
+        "required": [
+          "photos",
+          "clusters",
+          "counts",
+          "people"
         ],
         "additionalProperties": false
       },

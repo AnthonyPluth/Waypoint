@@ -31,6 +31,8 @@ from waypoint.storage.models import OAuthGrant, OAuthToken
 from waypoint.providers import flightstatus as flight_service
 from waypoint.server.api import offline as offline_api
 from waypoint.server.api import trips as trips_api
+from waypoint.server.api import photos as photos_api
+from waypoint.storage.models import Photo, PhotoSource
 from waypoint.server.api import loyalty
 from waypoint.server.api import reminders as reminders_api
 from waypoint.server.common import _current
@@ -124,6 +126,7 @@ class Replies(DbCase):
         self.test_reminders()
         self.test_mcp_settings()
         self.test_assistant()
+        self.test_photos()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_offline(self):
@@ -421,6 +424,31 @@ class Replies(DbCase):
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
         self.check("GET /api/airports", trips_api.api_airport_search(self.c, {"q": ["auckland"]}, {}))
 
+    def test_photos(self):
+        _current.user = {"sub": "u7", "name": "Ana Example", "email": "ana7@example.com"}
+        oidc.remember_user(self.c, "u7", "ana7@example.com", "Ana Example")
+        me = people_domain.person_for_sub(self.c, "u7")
+        assert me is not None
+        seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00",
+                                                      "end_local": "2026-06-02T07:10", "travelers": [{"person_id": me}]})
+        source = PhotoSource(person_id=me, owner_sub="u7", url="https://photos.example", immich_user_id="u", api_key=secretbox.encrypt("k") or "", status="ok", created=1.0)
+        self.c.orm.add(source)
+        self.c.orm.flush()
+        placed = Photo(source_id=source.id, asset_id="a1", asset_updated="2026-06-02T00:00:00Z", kind="image", taken_utc="2026-06-02T09:00:00+00:00",
+                       taken_local="2026-06-02T10:00", taken_offset=None, latitude=51.5, longitude=-0.12, location_source="exif", state=None, country=None,
+                       trip_id=seg["trip_id"], segment_id=seg["id"], match="place", distance_km=23.0, decided_by=None, hidden=False, seen=1.0)
+        torn = Photo(source_id=source.id, asset_id="a2", asset_updated="2026-06-02T00:00:00Z", kind="video", taken_utc="2026-06-02T10:00:00+00:00",
+                     taken_local="2026-06-02T11:00", taken_offset=60, latitude=None, longitude=None, location_source=None, state=None, country=None,
+                     trip_id=None, segment_id=None, match="ambiguous", distance_km=None, decided_by=None, hidden=False, seen=1.0)
+        self.c.orm.add_all([placed, torn])
+        self.c.orm.flush()
+        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, str(seg["trip_id"])))
+        self.check("GET /api/photos/review", photos_api.api_photo_review(self.c, {}, {}))
+        self.check("POST /api/photos/{id}", photos_api.api_photo_decide(self.c, {}, {"hidden": True}, str(placed.id)))
+        self.check("POST /api/photos/{id}", photos_api.api_photo_decide(self.c, {}, {"trip_id": seg["trip_id"]}, str(torn.id)))
+        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, str(seg["trip_id"])))
+        self.check("GET /api/photos/review", photos_api.api_photo_review(self.c, {}, {}))
+
     def test_stats(self):
         _current.user = {"name": None, "email": None, "local": True}
         trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR",
@@ -506,7 +534,8 @@ class Generated(unittest.TestCase):
                                      "DELETE /api/mcp-settings/connections/{id}",
                                      "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",
                                      "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create",
-                                     "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email"})
+                                     "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email",
+                                     "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}"})
         self.assertNotIn("GET /api/backup", covered())
         self.assertNotIn("GET /api/mailboxes/callback", covered())
 

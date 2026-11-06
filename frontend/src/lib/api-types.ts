@@ -571,6 +571,43 @@ export interface PersonLink {
   on: string;
 }
 
+export interface PhotoBody {
+  trip_id?: number;
+  hidden?: boolean;
+}
+
+export interface PhotoCandidate {
+  id: number;
+  name: string;
+}
+
+export interface PhotoCluster {
+  latitude: number;
+  longitude: number;
+  count: number;
+  first: string;
+  last: string;
+  cover: number;
+  inferred: boolean;
+}
+
+export interface PhotoCounts {
+  total: number;
+  located: number;
+  inferred: number;
+  far: number;
+  hidden: number;
+}
+
+export interface PhotoPerson {
+  person_id: number;
+  count: number;
+}
+
+export interface PhotoReview {
+  photos: ReviewPhoto[];
+}
+
 export interface Port {
   name: string;
   zone: string;
@@ -704,6 +741,24 @@ export interface ReviewOther {
   subject: string | null;
   has_email: boolean;
   received: string | null;
+}
+
+export interface ReviewPhoto {
+  id: number;
+  person_id: number;
+  trip_id: number | null;
+  kind: "image" | "video";
+  taken_local: string;
+  zone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: "exif" | "inferred" | null;
+  segment_id: number | null;
+  match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
+  distance_km: number | null;
+  cluster: number | null;
+  hidden: boolean;
+  candidates: PhotoCandidate[];
 }
 
 export interface SameBooking {
@@ -1105,6 +1160,30 @@ export interface TripList {
   trips: Trip[];
 }
 
+export interface TripPhoto {
+  id: number;
+  person_id: number;
+  trip_id: number | null;
+  kind: "image" | "video";
+  taken_local: string;
+  zone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: "exif" | "inferred" | null;
+  segment_id: number | null;
+  match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
+  distance_km: number | null;
+  cluster: number | null;
+  hidden: boolean;
+}
+
+export interface TripPhotos {
+  photos: TripPhoto[];
+  clusters: PhotoCluster[];
+  counts: PhotoCounts;
+  people: PhotoPerson[];
+}
+
 export interface TripPlaces {
   home: TripHome | null;
   airports: TripAirportPoint[];
@@ -1186,6 +1265,9 @@ export interface Endpoints {
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };
   "POST /api/trips/{id}/destination/suggest": { body: DestinationBody; reply: DestinationSuggestion };
+  "GET /api/trips/{id}/photos": { body: never; reply: TripPhotos };
+  "GET /api/photos/review": { body: never; reply: PhotoReview };
+  "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };

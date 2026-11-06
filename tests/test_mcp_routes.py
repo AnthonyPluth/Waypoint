@@ -33,8 +33,9 @@ BLOCKED = [
     "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "POST /api/review/{id}/suggest",
     "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
     "GET /api/home", "POST /api/home", "DELETE /api/home", "POST /api/show-costs",
+    "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}",
 ]
-NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|home|show-costs)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)")
+NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|home|show-costs)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)|^/api/photos(/|$)|^/api/trips/\{id\}/photos(/|$)")
 
 
 class RouteTests(unittest.TestCase):
@@ -68,7 +69,8 @@ class RouteTests(unittest.TestCase):
 
     def test_blocked_areas_block_what_is_added_under_them_too(self):
         for path in ("/api/mailboxes/{id}/anything", "/api/review/new/thing", "/api/ai/key", "/api/backup/x", "/api/feed/key",
-                     "/api/reminders/devices/{id}/x", "/api/review/{id}/images/{id}", "/api/segments/{id}/emails/{id}/images/{id}", "/api/segments/{id}/emails/0/images/1", "/api/segments/{id}/code", "/api/segments/{id}/code/anything", "/api/trips/{id}/emails/clear", "/api/trips/{id}/emails/anything", "/api/mcp-settings/x", "/api/flight-status/{id}/x", "/api/import/csv", "/api/loyalty", "/api/loyalty/{id}/reveal", "/api/home", "/api/home/anything"):
+                     "/api/reminders/devices/{id}/x", "/api/review/{id}/images/{id}", "/api/segments/{id}/emails/{id}/images/{id}", "/api/segments/{id}/emails/0/images/1", "/api/segments/{id}/code", "/api/segments/{id}/code/anything", "/api/trips/{id}/emails/clear", "/api/trips/{id}/emails/anything", "/api/mcp-settings/x", "/api/flight-status/{id}/x", "/api/import/csv", "/api/loyalty", "/api/loyalty/{id}/reveal", "/api/home", "/api/home/anything",
+                     "/api/photos", "/api/photos/{id}", "/api/photos/{id}/thumbnail", "/api/photos/review", "/api/trips/{id}/photos", "/api/trips/{id}/photos/anything"):
             self.assertTrue(mcp_access.blocked(path), path)
         for path in ("/api/flight-status", "/api/trips", "/api/people"):
             self.assertFalse(mcp_access.blocked(path), path)

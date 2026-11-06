@@ -1096,7 +1096,8 @@ class VisibilityRouteTests(RouteCase):
         second = self.book("ana", BACK, trip_id=seg["trip_id"])
         mine = self.book("cy", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"})
         trip, segs = seg["trip_id"], [seg["id"], second["id"]]
-        calls = [("GET", f"/api/trips/{trip}", None), ("GET", f"/api/trips/{trip}/places", None), ("POST", f"/api/trips/{trip}", {"name": "Stolen"}),
+        calls = [("GET", f"/api/trips/{trip}", None), ("GET", f"/api/trips/{trip}/places", None), ("GET", f"/api/trips/{trip}/photos", None),
+                 ("POST", f"/api/trips/{trip}", {"name": "Stolen"}),
                  ("DELETE", f"/api/trips/{trip}", None), ("POST", f"/api/trips/{trip}/emails/clear", None),
                  ("POST", f"/api/trips/{trip}/merge", {"merge": mine["trip_id"]}),
                  ("POST", f"/api/trips/{mine['trip_id']}/merge", {"merge": trip}),
@@ -1108,7 +1109,7 @@ class VisibilityRouteTests(RouteCase):
                       ("GET", f"/api/segments/{s}/code", None), ("POST", f"/api/segments/{s}/code", {"email": 0, "image": 0}),
                       ("POST", f"/api/segments/{s}", {"status": "cancelled"}), ("POST", f"/api/segments/{s}/move", {"trip_id": None}),
                       ("DELETE", f"/api/segments/{s}", None)]
-        gone = [(m, p.replace(str(trip), "99999").replace(str(segs[0]), "99998").replace(str(segs[1]), "99997"), b) for m, p, b in calls[:3]]
+        gone = [(m, p.replace(str(trip), "99999").replace(str(segs[0]), "99998").replace(str(segs[1]), "99997"), b) for m, p, b in calls[:4]]
         for who in ("ben",):
             for method, path, body in calls:
                 with self.subTest(who=who, call=f"{method} {path}"):
@@ -1125,7 +1126,7 @@ class VisibilityRouteTests(RouteCase):
         self.assertEqual([t["id"] for t in self.ok("cy", "GET", "/api/trips")["trips"]], [mine["trip_id"]])
 
     def test_every_trip_and_segment_route_with_an_id_is_covered_above(self):
-        covered = {("GET", "/api/trips/{id}"), ("GET", "/api/trips/{id}/places"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
+        covered = {("GET", "/api/trips/{id}"), ("GET", "/api/trips/{id}/places"), ("GET", "/api/trips/{id}/photos"), ("POST", "/api/trips/{id}"), ("DELETE", "/api/trips/{id}"),
                    ("POST", "/api/trips/{id}/emails/clear"), ("POST", "/api/trips/{id}/merge"), ("POST", "/api/trips/{id}/split"), ("POST", "/api/segments"),
                    ("POST", "/api/trips/{id}/destination/suggest"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
