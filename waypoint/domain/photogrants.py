@@ -10,7 +10,6 @@ from .. import oidc
 from ..storage import db
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, User
 from . import people, photos, trippeople, visibility
-from .photos import AMBIGUOUS, ONLY_ME, OWNER, SCOPES, Scope
 from .visibility import Viewer
 
 State = Literal["shared", "declined", "ask", "none"]
@@ -20,13 +19,13 @@ NONE: State = "none"
 
 
 class Prefs(TypedDict):
-    default_scope: Scope
+    default_scope: photos.Scope
     share_all: bool
 
 
 class Sharing(TypedDict):
     state: State
-    scope: Scope | None
+    scope: photos.Scope | None
     count: int
     removed_count: int
     removed: list[photos.TripPhoto]
@@ -38,7 +37,7 @@ class GrantedTrip(TypedDict):
     start_date: str | None
     end_date: str | None
     state: Literal["shared", "declined"]
-    scope: Scope | None
+    scope: photos.Scope | None
     count: int
     removed_count: int
 
@@ -63,7 +62,7 @@ def lock(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> dict[i
 KEY = ["person_id", "trip_id"]
 
 
-def _write(conn: db.Connection, person_id: int, trip_id: int, scope: Scope, by: str, now: float) -> None:
+def _write(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scope, by: str, now: float) -> None:
     lock(conn, person_id, [trip_id])
     db.upsert(conn, PhotoGrant, {"person_id": person_id, "trip_id": trip_id, "scope": scope, "revoked": None, "changed": now, "granted_by": by}, key=KEY)
 
@@ -71,7 +70,7 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: Scope, by: 
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
     on_trips = Photo.trip_id.in_(list(trip_ids)) if trip_ids else Photo.trip_id.is_(None)
     q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == AMBIGUOUS))).order_by(Photo.id)
+        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == photos.AMBIGUOUS))).order_by(Photo.id)
     return list(conn.orm.scalars(q).all())
 
 
@@ -88,7 +87,7 @@ def _drop_derived(conn: db.Connection, person_id: int, trip_id: int) -> None:
 
 def _stop(conn: db.Connection, person_id: int, trip_id: int, by: str, now: float) -> None:
     lock(conn, person_id, [trip_id])
-    db.upsert(conn, PhotoGrant, {"person_id": person_id, "trip_id": trip_id, "scope": ONLY_ME, "revoked": now, "changed": now, "granted_by": by}, key=KEY,
+    db.upsert(conn, PhotoGrant, {"person_id": person_id, "trip_id": trip_id, "scope": photos.ONLY_ME, "revoked": now, "changed": now, "granted_by": by}, key=KEY,
               update=["revoked", "changed", "granted_by"])
     _drop_derived(conn, person_id, trip_id)
 
@@ -122,9 +121,9 @@ def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) 
     return sharing(conn, viewer, person_id, trip_id)
 
 
-def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: Scope, now: float | None = None) -> Sharing | None:
+def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None) -> Sharing | None:
     acting = _acting(conn, viewer, person_id, trip_id)
-    if acting is None or scope not in SCOPES:
+    if acting is None or scope not in photos.SCOPES:
         return None
     trip, by = acting
     if person_id not in trippeople.of(conn, [trip.id])[trip.id]:
@@ -173,7 +172,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -
     photo, person = found
     lock(conn, person, [trip_id])
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.trip_id == trip_id))
-    if not (photo.decided_by == OWNER and photo.trip_id not in (None, trip_id)):
+    if not (photo.decided_by == photos.OWNER and photo.trip_id not in (None, trip_id)):
         photos.re_place(conn, photo, person)
     return sharing(conn, viewer, person, trip_id)
 
@@ -181,7 +180,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -
 def prefs_of(conn: db.Connection, person_id: int) -> Prefs:
     row = conn.orm.get(PhotoSharingPrefs, person_id)
     if row is None:
-        return {"default_scope": ONLY_ME, "share_all": False}
+        return {"default_scope": photos.ONLY_ME, "share_all": False}
     return {"default_scope": row.default_scope, "share_all": row.share_all}  # type: ignore[typeddict-item]
 
 
@@ -190,7 +189,7 @@ def _setter(conn: db.Connection, sub: str | None) -> Viewer | None:
     return Viewer(person) if person is not None else None
 
 
-def _share_all(conn: db.Connection, person_id: int, by: str, scope: Scope, now: float) -> int:
+def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope, now: float) -> int:
     setter = _setter(conn, by)
     if setter is None:
         return 0
@@ -207,16 +206,16 @@ def _share_all(conn: db.Connection, person_id: int, by: str, scope: Scope, now: 
     return written
 
 
-def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope: Scope | None, share_all: bool | None,
+def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope: photos.Scope | None, share_all: bool | None,
               now: float | None = None) -> Prefs | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id):
         return None
     by = photos.viewer_sub(conn, viewer)
-    if by is None or (default_scope is not None and default_scope not in SCOPES):
+    if by is None or (default_scope is not None and default_scope not in photos.SCOPES):
         return None
     row = conn.orm.get(PhotoSharingPrefs, person_id)
     if row is None:
-        row = PhotoSharingPrefs(person_id=person_id, default_scope=ONLY_ME, share_all=False, set_by=None, share_all_since=None, steward_sub=None)
+        row = PhotoSharingPrefs(person_id=person_id, default_scope=photos.ONLY_ME, share_all=False, set_by=None, share_all_since=None, steward_sub=None)
         conn.orm.add(row)
     was_on, stamp = row.share_all, time.time() if now is None else now
     if default_scope is not None:
