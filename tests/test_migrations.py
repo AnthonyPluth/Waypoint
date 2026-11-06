@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 import unittest
@@ -31,6 +32,16 @@ def replay(path):
     from alembic import command
     with db.engine(path).begin() as c:
         command.upgrade(db.alembic_config(c), "head")
+
+
+@contextlib.contextmanager
+def migrating(path):
+    with db.engine(path).connect() as c:
+        if c.dialect.name == "sqlite":
+            c.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            c.commit()
+        with c.begin():
+            yield c
 
 
 def shape(path):
@@ -272,7 +283,7 @@ class MigrationTests(unittest.TestCase):
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
         tables = shape(self.path)
-        self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
+        self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url_user", ("person_id", "url", "immich_user_id"))])
         self.assertEqual(tables["photos"]["uniques"], [("uq_photos_source_asset", ("source_id", "asset_id"))])
         self.assertEqual([i[0] for i in tables["photos"]["indexes"] if not i[2]], ["ix_photos_segment_id", "ix_photos_source_id_taken_utc", "ix_photos_trip_id"])
         self.assertEqual(tables["photo_trip_syncs"]["pk"], ["source_id", "trip_id"])
@@ -295,7 +306,7 @@ class MigrationTests(unittest.TestCase):
         def photo(c, id, source, asset, trip, hidden=False):
             c.execute(old_photos.insert().values(id=id, source_id=source, asset_id=asset, asset_updated="t", kind="image", taken_utc="2026-01-01T00:00:00Z",
                                                  taken_local="2026-01-01T00:00", trip_id=trip, match="time", hidden=hidden, seen=1.0))
-        with db.engine(self.path).begin() as c:
+        with migrating(self.path) as c:
             command.upgrade(db.alembic_config(c), "0038")
             c.execute(insert(schema.people), [{"id": 1, "display_name": "One"}, {"id": 2, "display_name": "Two"}])
             c.execute(insert(schema.trips), [{"id": n, "name": f"Trip {n}", "auto": True} for n in (1, 2, 3)])
@@ -309,6 +320,10 @@ class MigrationTests(unittest.TestCase):
             c.execute(syncs.insert().values(source_id=1, trip_id=1, window_start="a", window_end="b"))
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
+        self.assertEqual(shape(self.path)["photo_sources"]["uniques"], [("uq_photo_sources_person_url_user", ("person_id", "url", "immich_user_id"))])
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.photo_sources), [{"id": s, "person_id": 1, "owner_sub": "sub-x", "url": "https://two-accounts.example", "immich_user_id": u,
+                                                         "api_key": "enc:v1:x", "status": "ok", "created": 1.0} for s, u in ((8, "first-user"), (9, "second-user"))])
         self.assertEqual([r[:3] for r in rows_of(self.path, "photo_exclusions")], [(1, "twice", 1), (2, "theirs", 1)])
         self.assertTrue(all(r[3] > 0 for r in rows_of(self.path, "photo_exclusions")))
         self.assertEqual((rows_of(self.path, "photos"), rows_of(self.path, "photo_trip_syncs")), ([], []))
@@ -336,14 +351,16 @@ class MigrationTests(unittest.TestCase):
                     (6, 3, "stopped", 1), (7, 3, "ok", 3), (8, 3, "ungranted", 2), (9, 3, "left", 4), (10, 1, "members_only", 5)]
             conn.execute(insert(schema.photos), [{"id": id, "source_id": source, "asset_id": asset, "asset_updated": "t", "kind": "image", "taken_utc": "2026-01-01T00:00:00Z",
                                                   "taken_local": "2026-01-01T00:00", "trip_id": trip, "match": "time", "seen": 1.0} for id, source, asset, trip in rows])
-        with db.engine(self.path).begin() as c:
+        with migrating(self.path) as c:
             command.downgrade(db.alembic_config(c), "0038")
         self.assertFalse({"photo_grants", "photo_exclusions", "photo_sharing_prefs"} & set(shape(self.path)))
+        self.assertEqual(shape(self.path)["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
+        self.assertEqual([r[0] for r in rows_of(self.path, "photo_sources") if r[3] == "https://two-accounts.example"], [8])
         columns = [col[0] for col in shape(self.path)["photos"]["columns"]]
         self.assertIn("hidden", columns)
         kept = {r[columns.index("asset_id")]: bool(r[columns.index("hidden")]) for r in rows_of(self.path, "photos")}
         self.assertEqual(kept, {"shown": True, "elsewhere": True, "mine": True, "ok": False, "members_only": False})
-        with db.engine(self.path).begin() as c:
+        with migrating(self.path) as c:
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
         self.assertEqual([r[:3] for r in rows_of(self.path, "photo_exclusions")], [(1, "elsewhere", 1), (1, "mine", 2), (1, "shown", 1)])

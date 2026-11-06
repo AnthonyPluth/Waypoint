@@ -7,7 +7,7 @@ from sqlalchemy import insert, select, update
 
 from tests.test_photos_api import SOHO, grant_row, photo_row, source_row
 from tests.test_trips import HOTEL, OUT, Household
-from waypoint.domain import people, photogrants, photos, trips
+from waypoint.domain import people, photogrants, photos, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.storage import db
@@ -92,6 +92,20 @@ class GrantTests(GrantCase):
             self.assertEqual(self.grant(self.jid, self.a), ("trip", 11.0, "u-jane"))
         self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [(self.a,)])
 
+    def test_a_first_share_that_races_with_leaving_the_trip_writes_nothing(self):
+        real, removed = photogrants._lock_trip, []
+
+        def leave_first(conn, trip_id):
+            if not removed:
+                removed.append(True)
+                trippeople.remove(self.c, self.a, [self.jid])
+                photogrants.trips_changed(self.c, [self.a])
+            return real(conn, trip_id)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=leave_first):
+            self.assertIsNone(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 12.0))
+        self.assertIsNone(self.grant(self.jid, self.a))
+        self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [])
+
     def test_not_now_needs_the_person_on_the_trip_but_stopping_an_old_grant_does_not(self):
         booked = self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, None, self.on(self.sid))["trip_id"]
         self.assertIsNone(photogrants.stop(self.c, self.jane, self.jid, booked, 5.0))
@@ -137,6 +151,22 @@ class GrantTests(GrantCase):
         self.assertEqual(self.seen(self.jane, self.a), [both.id])
         self.assertEqual([p.id for p, _ in photos.removed(self.c, self.jane, self.a)], [only_a.id])
         self.assertEqual(self.c.execute(select(PhotoExclusion.created).order_by(PhotoExclusion.created)).scalars(), [30.0, 31.0])
+
+    def test_removing_sees_a_hand_placement_made_meanwhile_and_writes_nothing(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        both = self.photo(self.b)
+        real, moved = photos.lock_grants, []
+
+        def move_first(conn, person, trip_ids):
+            if not moved:
+                moved.append(True)
+                photos.decide(self.c, self.jane, both.id, self.a, None)
+            return real(conn, person, trip_ids)
+        with mock.patch.object(photos, "lock_grants", side_effect=move_first):
+            self.assertIsNone(photogrants.exclude(self.c, self.jane, self.b, [both.id], 40.0))
+        self.assertEqual((self.row(both.id).trip_id, self.row(both.id).decided_by), (self.a, "owner"))
+        self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
 
     def test_put_back_returns_the_photo_unless_its_person_placed_it_elsewhere_by_hand(self):
         self.share(self.jid, self.a)
@@ -524,6 +554,41 @@ class ClaimTests(GrantCase):
         self.assertEqual(photogrants.reconcile(self.c, self.b, 98.0), 0)
         self.assertEqual(self.grant(self.jid, self.b), ("trip", 20.0, "u-jane"))
 
+    def test_a_guest_library_of_the_same_immich_user_merges_into_the_members_and_keeps_hand_placements(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-sam")
+        self.c.orm.add_all([source_row(self.mia, "u-sam"), PhotoSource(person_id=self.mia, owner_sub="u-sam", url="https://immich-canary-8h2k.example:2283", immich_user_id="other-user",
+                                                                      api_key="enc:v1:x", status="ok", created=1.0)])
+        self.c.orm.flush()
+        same, other = [s.id for s in self.c.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == self.mia).order_by(PhotoSource.id)).all()]
+        mine_a = self.photo(self.b, asset="shared-asset", match="time")
+        mine_b = self.photo(self.b, asset="only-mine")
+        theirs_a = self.photo(self.b, source=same, asset="shared-asset", decided="owner")
+        theirs_c = self.photo(self.b, source=same, asset="only-theirs")
+        elsewhere = self.photo(self.b, source=other, asset="other-user-asset")
+        self.c.execute(insert(PhotoTripSync), [{"source_id": s, "trip_id": self.b, "window_start": "s", "window_end": "e"} for s in (self.janes, same)])
+        self.c.execute(insert(PhotoTripSync).values(source_id=same, trip_id=self.a, window_start="s", window_end="e"))
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertIsNone(self.c.orm.get(PhotoSource, same))
+        self.assertEqual((self.c.orm.get(PhotoSource, other).person_id, self.c.orm.get(PhotoSource, other).owner_sub), (self.jid, "u-jane"))
+        self.assertIsNone(self.row(theirs_a.id))
+        kept = self.row(mine_a.id)
+        self.assertEqual((kept.source_id, kept.decided_by, kept.match), (self.janes, "owner", theirs_a.match))
+        self.assertEqual((self.row(mine_b.id).source_id, self.row(theirs_c.id).source_id, self.row(elsewhere.id).source_id), (self.janes, self.janes, other))
+        self.assertEqual(sorted(self.c.execute(select(PhotoTripSync.source_id, PhotoTripSync.trip_id)).fetchall()), [(self.janes, self.a), (self.janes, self.b)])
+
+    def test_claiming_reconciles_trips_the_member_can_now_see_as_booker_or_recipient(self):
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.joan, default_scope="trip", share_all=True, set_by="u-jane", share_all_since=5.0, steward_sub="u-jane"))
+        self.c.orm.flush()
+        theirs = self.add(Viewer(self.mia), {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.joan))["trip_id"]
+        self.assertIsNone(self.grant(self.joan, theirs))
+        self.assertIsNone(visibility.visible_trip(self.c, self.jane, theirs))
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertIsNotNone(visibility.visible_trip(self.c, self.jane, theirs))
+        self.assertEqual(self.grant(self.joan, theirs), ("trip", None, "u-jane"))
+
     def test_claiming_reconciles_the_trips_the_member_is_now_on(self):
         photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 80.0)
         theirs = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid, self.mia))["trip_id"]
@@ -552,8 +617,9 @@ class ClaimTests(GrantCase):
                          [(self.jid, "x", self.b, 1.0), (self.jid, "y", self.a, 3.0)])
         prefs = self.c.orm.get(PhotoSharingPrefs, self.jid)
         self.assertEqual((prefs.default_scope, prefs.share_all, prefs.set_by, prefs.share_all_since, prefs.steward_sub), ("trip", True, "u-jane", 4.0, None))
-        self.assertEqual(sorted(self.c.execute(select(PhotoSource.person_id, PhotoSource.url, PhotoSource.owner_sub)).fetchall()),
-                         sorted([(self.jid, "https://immich-canary-8h2k.example:2283", "u-jane"), (self.jid, "https://other.example", "u-jane")]))
+        self.assertEqual(sorted(self.c.execute(select(PhotoSource.person_id, PhotoSource.url, PhotoSource.immich_user_id, PhotoSource.owner_sub)).fetchall()),
+                         sorted([(self.jid, "https://immich-canary-8h2k.example:2283", "immich-user-1", "u-jane"), (self.jid, "https://other.example", "u2", "u-jane"),
+                                 (self.jid, "https://other.example", "u3", "u-jane")]))
         self.assertIsNone(self.c.orm.get(Person, self.mia))
 
     def test_a_member_with_preferences_keeps_them(self):

@@ -13,7 +13,7 @@ TRIP = 'trip'
 
 photos = sa.table('photos', sa.column('id', sa.Integer()), sa.column('source_id', sa.Integer()), sa.column('asset_id', sa.Text()),
                   sa.column('trip_id', sa.Integer()), sa.column('hidden', sa.Boolean()))
-sources = sa.table('photo_sources', sa.column('id', sa.Integer()), sa.column('person_id', sa.Integer()))
+sources = sa.table('photo_sources', sa.column('id', sa.Integer()), sa.column('person_id', sa.Integer()), sa.column('url', sa.Text()))
 syncs = sa.table('photo_trip_syncs', sa.column('source_id', sa.Integer()))
 grants = sa.table('photo_grants', sa.column('person_id', sa.Integer()), sa.column('trip_id', sa.Integer()), sa.column('scope', sa.Text()),
                   sa.column('revoked', sa.Float()))
@@ -81,6 +81,9 @@ def upgrade() -> None:
     op.execute(photos.delete())
     op.execute(syncs.delete())
     op.drop_column('photos', 'hidden')
+    with op.batch_alter_table('photo_sources') as batch:
+        batch.drop_constraint('uq_photo_sources_person_url', type_='unique')
+        batch.create_unique_constraint('uq_photo_sources_person_url_user', ['person_id', 'url', 'immich_user_id'])
 
 
 def downgrade() -> None:
@@ -98,6 +101,11 @@ def downgrade() -> None:
     private = sa.select(photos.c.id).join_from(photos, sources, sources.c.id == photos.c.source_id) \
         .where(sa.or_(active.where(grants.c.scope == ONLY_ME).exists(), sa.and_(active.where(grants.c.scope == TRIP).exists(), seen_by_an_outsider)))
     op.execute(photos.update().where(photos.c.id.in_(private)).values(hidden=True))
+    first = sa.select(sa.func.min(sources.c.id)).group_by(sources.c.person_id, sources.c.url)
+    op.execute(sources.delete().where(sources.c.id.not_in(first)))
+    with op.batch_alter_table('photo_sources') as batch:
+        batch.drop_constraint('uq_photo_sources_person_url_user', type_='unique')
+        batch.create_unique_constraint('uq_photo_sources_person_url', ['person_id', 'url'])
     op.drop_table('photo_sharing_prefs')
     op.drop_index('ix_photo_exclusions_trip_id', table_name='photo_exclusions')
     op.drop_table('photo_exclusions')

@@ -8,7 +8,7 @@ from sqlalchemy import and_, delete, or_, select, update
 
 from .. import oidc
 from ..storage import db
-from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Trip, TripPerson, User
+from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
 from . import people, photos, trippeople, visibility
 from .visibility import Viewer
 
@@ -58,6 +58,14 @@ class Grants(TypedDict):
 
 def lock(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> dict[int, PhotoGrant]:
     return photos.lock_grants(conn, person_id, trip_ids)
+
+
+def _lock_trip(conn: db.Connection, trip_id: int) -> bool:
+    return int(conn.execute(update(Trip).where(Trip.id == trip_id).values(name=Trip.name)).rowcount) > 0
+
+
+def _aboard_under_lock(conn: db.Connection, person_id: int, trip_id: int) -> bool:
+    return _lock_trip(conn, trip_id) and person_id in trippeople.of(conn, [trip_id])[trip_id]
 
 
 KEY = ["person_id", "trip_id"]
@@ -139,7 +147,7 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
     if acting is None or scope not in photos.SCOPES:
         return None
     trip, by = acting
-    if person_id not in trippeople.of(conn, [trip.id])[trip.id]:
+    if not _aboard_under_lock(conn, person_id, trip.id):
         return None
     _write(conn, person_id, trip.id, scope, by, time.time() if now is None else now)
     return sharing(conn, viewer, person_id, trip.id)
@@ -150,7 +158,7 @@ def stop(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, now:
     if acting is None:
         return None
     trip, by = acting
-    if conn.orm.get(PhotoGrant, (person_id, trip.id)) is None and person_id not in trippeople.of(conn, [trip.id])[trip.id]:
+    if not _lock_trip(conn, trip.id) or (conn.orm.get(PhotoGrant, (person_id, trip.id)) is None and person_id not in trippeople.of(conn, [trip.id])[trip.id]):
         return None
     _stop(conn, person_id, trip.id, by, time.time() if now is None else now)
     return sharing(conn, viewer, person_id, trip.id)
@@ -181,12 +189,19 @@ def exclude(conn: db.Connection, viewer: Viewer, trip_id: int, photo_ids: Sequen
     stamp = time.time() if now is None else now
     for person in sorted({person for _, person in found}):
         lock(conn, person, [trip_id])
-    for photo, person in found:
+    conn.orm.expire_all()
+    fresh: list[tuple[Photo, int]] = []
+    for photo, _ in found:
+        row = photos.visible_photo(conn, viewer, photo.id)
+        if row is None or row[0].trip_id != trip_id:
+            return None
+        fresh.append(row)
+    for photo, person in fresh:
         db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": trip_id, "created": stamp},
                          key=["person_id", "asset_id", "trip_id"])
-    for photo, person in found:
+    for photo, person in fresh:
         photos.re_place(conn, photo, person)
-    return sharing(conn, viewer, found[0][1], trip_id)
+    return sharing(conn, viewer, fresh[0][1], trip_id)
 
 
 def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -> Sharing | None:
@@ -221,11 +236,12 @@ def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope
         return 0
     seen = visibility.visible_trips(conn, setter)
     aboard = trippeople.of(conn, [t.id for t in seen])
-    mine = [t.id for t in seen if person_id in aboard[t.id]]
-    rows = lock(conn, person_id, mine)
+    mine = sorted(t.id for t in seen if person_id in aboard[t.id])
     written = 0
     for trip_id in mine:
-        row = rows.get(trip_id)
+        if not _aboard_under_lock(conn, person_id, trip_id):
+            continue
+        row = lock(conn, person_id, [trip_id]).get(trip_id)
         if row is None or row.revoked is not None:
             _write(conn, person_id, trip_id, scope, by, now)
             written += 1
@@ -264,7 +280,7 @@ def joined(conn: db.Connection, person_id: int, trip_id: int, now: float | None 
     if row is None or not row.share_all or row.set_by is None:
         return False
     setter = _setter(conn, row.set_by)
-    if setter is None or visibility.visible_trip(conn, setter, trip_id) is None:
+    if setter is None or visibility.visible_trip(conn, setter, trip_id) is None or not _aboard_under_lock(conn, person_id, trip_id):
         return False
     found = lock(conn, person_id, [trip_id]).get(trip_id)
     if found is not None and (found.revoked is None or row.share_all_since is None or found.revoked >= row.share_all_since):
@@ -334,7 +350,7 @@ def _window_changed(conn: db.Connection, trip_id: int, before: TripWindow | None
 
 def trips_changed(conn: db.Connection, trip_ids: Iterable[int], windows: Mapping[int, TripWindow | None] | None = None, now: float | None = None) -> None:
     stamp = time.time() if now is None else now
-    for trip_id in [t for t in sorted(set(trip_ids)) if conn.orm.get(Trip, t) is not None]:
+    for trip_id in [t for t in sorted(set(trip_ids)) if _lock_trip(conn, t)]:
         aboard = set(trippeople.of(conn, [trip_id])[trip_id])
         for person in sorted(_photo_people(conn, trip_id) - aboard):
             left(conn, person, trip_id)
@@ -409,11 +425,55 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
                          key=["person_id", "asset_id", "trip_id"])
     if conn.orm.get(PhotoSharingPrefs, member_id) is None:
         conn.execute(update(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == guest_id).values(person_id=member_id, set_by=sub, steward_sub=None))
-    urls = select(PhotoSource.url).where(PhotoSource.person_id == member_id)
-    conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id, PhotoSource.url.not_in(urls)).values(person_id=member_id, owner_sub=sub))
+    _claim_sources(conn, guest_id, member_id, sub)
     conn.orm.expire_all()
-    for trip_id in list(conn.execute(select(TripPerson.trip_id).where(TripPerson.person_id == member_id).order_by(TripPerson.trip_id)).scalars()):
+    for trip_id in _reachable(conn, member_id):
         reconcile(conn, trip_id)
+
+
+def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -> None:
+    kept = {p.asset_id: p for p in conn.orm.scalars(select(Photo).where(Photo.source_id == mine.id)).all()}
+    for p in conn.orm.scalars(select(Photo).where(Photo.source_id == theirs.id).order_by(Photo.id)).all():
+        twin = kept.get(p.asset_id)
+        if twin is None:
+            p.source_id = mine.id
+            continue
+        if p.decided_by == photos.OWNER and twin.decided_by != photos.OWNER:
+            for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
+                setattr(twin, field, getattr(p, field))
+        conn.orm.delete(p)
+    synced = {s.trip_id for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mine.id)).all()}
+    for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == theirs.id)).all():
+        if s.trip_id in synced:
+            conn.orm.delete(s)
+        else:
+            s.source_id = mine.id
+    conn.orm.flush()
+    conn.orm.delete(theirs)
+    conn.orm.flush()
+
+
+def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
+    mine = {(s.url, s.immich_user_id): s for s in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == member_id)).all()}
+    for theirs in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == guest_id).order_by(PhotoSource.id)).all():
+        twin = mine.get((theirs.url, theirs.immich_user_id))
+        if twin is None:
+            theirs.person_id, theirs.owner_sub = member_id, sub
+            mine[(theirs.url, theirs.immich_user_id)] = theirs
+        else:
+            _merge_source(conn, theirs, twin)
+    conn.orm.flush()
+
+
+def _reachable(conn: db.Connection, person_id: int) -> list[int]:
+    listed = select(TripPerson.trip_id).where(TripPerson.person_id == person_id)
+    booked = select(Trip.id).where(Trip.booked_by == person_id)
+    booked_a_segment = select(Segment.trip_id).where(Segment.booked_by == person_id)
+    received = select(Segment.trip_id).join(SegmentRecipient, SegmentRecipient.segment_id == Segment.id).where(SegmentRecipient.person_id == person_id)
+    found: set[int] = set()
+    for q in (listed, booked, booked_a_segment, received):
+        found |= set(conn.execute(q).scalars())
+    return sorted(found)
 
 
 def grants(conn: db.Connection, viewer: Viewer) -> Grants:

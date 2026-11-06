@@ -478,7 +478,7 @@ photo_sources = Table(
     Column('last_sync', Float, doc='epoch seconds of the last completed sync'),
     Column('last_error', Text, doc='one of a few fixed sentences, never text from Immich'),
     Column('created', Float, nullable=False),
-    UniqueConstraint('person_id', 'url', name='uq_photo_sources_person_url'),
+    UniqueConstraint('person_id', 'url', 'immich_user_id', name='uq_photo_sources_person_url_user'),
     info={'doc': "an Immich library Waypoint reads photos from, for one person in People; the key is encrypted and never leaves the server"},
 )
 

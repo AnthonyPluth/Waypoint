@@ -241,23 +241,25 @@ def lock_grants(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) ->
     return {r.trip_id: r for r in rows}
 
 
-def canonical_ids(conn: db.Connection, persons: Iterable[int]) -> set[int]:
-    ids = sorted(set(persons))
-    if not ids:
+def canonical_ids(conn: db.Connection, keys: Iterable[tuple[int, str]]) -> set[int]:
+    wanted = set(keys)
+    if not wanted:
         return set()
     q = select(Photo.id, Photo.source_id, Photo.asset_id, PhotoSource.person_id, PhotoSource.status).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id.in_(ids))
+        .where(PhotoSource.person_id.in_(sorted({p for p, _ in wanted})), Photo.asset_id.in_(sorted({a for _, a in wanted})))
     best: dict[tuple[int, str], tuple[tuple[bool, int, int], int]] = {}
     for photo_id, source_id, asset_id, person, status in conn.execute(q).fetchall():
-        rank = (status != "ok", source_id, photo_id)
         key = (person, asset_id)
+        if key not in wanted:
+            continue
+        rank = (status != "ok", source_id, photo_id)
         if key not in best or rank < best[key][0]:
             best[key] = (rank, photo_id)
     return {photo_id for _, photo_id in best.values()}
 
 
 def _canonical(conn: db.Connection, rows: Sequence[Found]) -> list[Found]:
-    keep = canonical_ids(conn, {person for _, person in rows})
+    keep = canonical_ids(conn, {(person, photo.asset_id) for photo, person in rows})
     return [(photo, person) for photo, person in rows if photo.id in keep]
 
 
