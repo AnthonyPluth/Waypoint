@@ -26,6 +26,8 @@ See [Putting Waypoint on the internet](https://anthonypluth.github.io/Waypoint/s
 
 **AI assistants** (Claude and the like) connect to `/mcp` with OAuth as the member who approved them. An assistant sees what that member sees, never a loyalty or Known Traveler number, and changes nothing unless the household turned on “Let assistants change trips”. Mailboxes, AI settings, backup and restore, sign-in, the calendar feed and push devices are never reachable from it. Email text is reachable only on a connection the household granted “Read email text”, off by default and warned about in Settings; without it an assistant sees a review item only as the fields Waypoint parsed. A connection ends when its approver can no longer sign in. See the [AI assistants](https://anthonypluth.github.io/Waypoint/start/mcp/) page.
 
+**The iPhone app** signs in through the same OAuth server with a built-in client, an `app` scope and its own resource, so its token works as a Bearer on `/api/` only and an assistant’s token never does. The app trades it for a web session that lasts one day (never past the end of the approver’s sign-in window when sign-in is limited by groups), and the grant ends when its approver can no longer sign in or the app signs out. The client’s redirect is the custom scheme `waypoint://auth`, which another app installed on the phone could also claim; the person still has to approve on Waypoint’s own consent page, and a stolen code is useless without the PKCE verifier. See the [iPhone app](https://anthonypluth.github.io/Waypoint/start/ios/) page.
+
 A report about a way around any of this is as serious as one about sign-in.
 
 ## One household, not one account per person

@@ -189,13 +189,13 @@ def redirect_matches(registered: list[str], given: Any) -> bool:
     return key is not None and any(_loopback(r) == key for r in registered)
 
 
-def parse_scope(value: Any, error: str = "invalid_scope") -> frozenset[str]:
+def parse_scope(value: Any, error: str = "invalid_scope", granted: bool = False) -> frozenset[str]:
     if value is None or (isinstance(value, str) and not value.strip()):
         return frozenset({"read"})
     if not isinstance(value, str):
         raise OAuthError(error, "scope must be a string.")
     parts = set(value.split())
-    unknown = parts - set(SCOPES)
+    unknown = parts - set(SCOPES) - ({APP_SCOPE} if granted else set())
     if unknown:
         raise OAuthError(error, f"Unknown scope {sorted(unknown)[0]!r}: Waypoint has {', '.join(SCOPES)}.")
     return frozenset(parts | {"read"})
@@ -485,7 +485,7 @@ def _refresh(conn, client, form: dict[str, str], canonical: str, now: float) -> 
         raise OAuthError("invalid_grant", "That refresh token was already used; the connection has been revoked.")
     if grant["revoked"] is not None or row["expires"] <= now or grant["resource"] != canonical:
         raise OAuthError("invalid_grant", "That refresh token is no longer valid.")
-    if form.get("scope") and not parse_scope(form.get("scope")) <= set(grant["scope"].split()):
+    if form.get("scope") and not parse_scope(form.get("scope"), granted=APP_SCOPE in grant["scope"].split()) <= set(grant["scope"].split()) | {"read"}:
         raise OAuthError("invalid_scope", "A refresh can't add scopes the person didn't approve.")
     if conn.execute(update(OAuthToken).where(OAuthToken.token_hash == h, OAuthToken.consumed.is_(None))
                     .values(consumed=now)).rowcount != 1:
