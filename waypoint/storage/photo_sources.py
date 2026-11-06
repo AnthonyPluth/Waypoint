@@ -6,7 +6,7 @@ from typing import Literal, TypedDict
 from sqlalchemy import ColumnElement, delete, func, select, true, update
 
 from . import db, secretbox
-from .models import Person, Photo, PhotoSource
+from .models import Person, Photo, PhotoSharingPrefs, PhotoSource
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -64,6 +64,17 @@ def for_person(conn: db.Connection, person_id: int) -> list[Stored]:
 
 def lock_person(conn: db.Connection, person_id: int) -> bool:
     return int(conn.execute(update(Person).where(Person.id == person_id).values(display_name=Person.display_name)).rowcount) > 0
+
+
+def steward_of(conn: db.Connection, person_id: int) -> str | None:
+    found = conn.execute(select(PhotoSharingPrefs.steward_sub).where(PhotoSharingPrefs.person_id == person_id)).scalar()
+    return str(found) if found is not None else None
+
+
+def set_steward(conn: db.Connection, person_id: int, sub: str) -> bool:
+    db.insert_ignore(conn, PhotoSharingPrefs, {"person_id": person_id, "steward_sub": sub}, key=["person_id"])
+    conn.execute(update(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == person_id, PhotoSharingPrefs.steward_sub.is_(None)).values(steward_sub=sub))
+    return steward_of(conn, person_id) == sub
 
 
 def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:

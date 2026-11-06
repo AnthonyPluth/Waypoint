@@ -11,11 +11,12 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 from tests.test_trips import RouteCase, guest
 from waypoint import oidc
-from waypoint.domain import people, photosources
+from waypoint.domain import people, photos, photosources
+from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
 from waypoint.storage import backup, db, photo_sources, secretbox
-from waypoint.storage.models import Photo, PhotoSource
+from waypoint.storage.models import Photo, PhotoSharingPrefs, PhotoSource
 
 URL = "https://immich-canary-8h2k.example:2283"
 LAN = "http://immich.local:2283"
@@ -139,6 +140,38 @@ class SourceRoutes(RouteCase):
         for route, body in (("POST", {"label": "Mia’s"}), ("DELETE", None)):
             self.assertEqual(self.call("ben", route, f"/api/photo-sources/{first['id']}", body), (404, {"error": photosources.NO_SOURCE}))
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{first['id']}", {"label": "Mia’s"})["label"], "Mia’s")
+
+    def steward(self, person_id):
+        with db.session() as conn:
+            row = conn.orm.get(PhotoSharingPrefs, person_id)
+            return None if row is None else (row.steward_sub, row.default_scope, row.share_all)
+
+    def test_connecting_a_childs_first_library_records_their_steward(self):
+        mine = self.connect()
+        self.assertIsNone(self.steward(self.person["ana"]))
+        first = self.connect(url=LAN, person_id=self.guest)
+        self.assertEqual(self.steward(self.guest), ("sub-ana", "only_me", False))
+        self.connect(url="https://second-canary.example", person_id=self.guest)
+        self.assertEqual(self.steward(self.guest), ("sub-ana", "only_me", False))
+        self.assertIsNone(self.steward(self.person["ana"]))
+        with db.session() as conn:
+            self.assertEqual(photos.persons_of(conn, Viewer(self.person["ana"])), [self.person["ana"], self.guest])
+            self.assertEqual(photos.persons_of(conn, Viewer(self.person["ben"])), [self.person["ben"]])
+        self.assertEqual([s["mine"] for s in self.listing("ana")["sources"]], [True, True, True])
+        self.assertEqual((mine["person_id"], first["person_id"]), (self.person["ana"], self.guest))
+
+    def test_the_steward_is_kept_after_the_last_library_is_removed(self):
+        first = self.connect(person_id=self.guest)
+        self.assertEqual(self.ok("ana", "DELETE", f"/api/photo-sources/{first['id']}"), {"ok": True})
+        self.assertEqual(self.steward(self.guest), ("sub-ana", "only_me", False))
+        with ping() as pong:
+            status, got = self.call("ben", "POST", "/api/photo-sources", {"url": LAN, "key": KEY, "person_id": self.guest})
+        self.assertEqual((status, got), (403, {"error": photosources.OTHER_STEWARD}))
+        pong.assert_not_called()
+        self.assertEqual(self.steward(self.guest), ("sub-ana", "only_me", False))
+        again = self.connect(url=LAN, person_id=self.guest)
+        self.assertEqual((again["person_id"], again["mine"]), (self.guest, True))
+        self.assertEqual(self.steward(self.guest), ("sub-ana", "only_me", False))
 
     def test_counts_and_errors_show_only_to_those_acting_for_the_person(self):
         trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
@@ -468,6 +501,18 @@ class Races(DbCase):
         self.assertEqual(str(refused.exception), photosources.OTHER_STEWARD)
         self.c.rollback()
         self.assertEqual([(s["url"], s["owner_sub"]) for s in photo_sources.list_all(self.c)], [(LAN, "sub-ben")])
+        self.assertEqual(photo_sources.steward_of(self.c, self.guest), None)
+
+    def test_a_steward_recorded_at_once_by_another_member_wins_over_a_connect_in_flight(self):
+        def stewarded(conn):
+            photo_sources.set_steward(conn, self.guest, "sub-ben")
+        with self.elsewhere(stewarded):
+            with self.assertRaises(photosources.Refused) as refused:
+                photosources.connect(self.c, self.ana, self.guest, URL, KEY, None)
+        self.assertEqual(str(refused.exception), photosources.OTHER_STEWARD)
+        self.c.rollback()
+        self.assertEqual(photo_sources.list_all(self.c), [])
+        self.assertEqual(photo_sources.steward_of(self.c, self.guest), "sub-ben")
 
     def test_the_same_address_connected_twice_at_once_is_one_library(self):
         with self.elsewhere(lambda conn: photo_sources.save(conn, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)):
@@ -551,7 +596,12 @@ class Claiming(DbCase):
         mine = photo_sources.save(self.c, self.member, "u1", LAN, OTHER.user_id, KEY, None, 1.0)
         self.c.orm.add(photo(dropped, None, 1, "ambiguous"))
         self.c.orm.flush()
+        photo_sources.set_steward(self.c, self.guest, "sub-steward")
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertIsNone(self.c.orm.get(PhotoSharingPrefs, self.guest))
+        prefs = self.c.orm.get(PhotoSharingPrefs, self.member)
+        assert prefs is not None
+        self.assertIsNone(prefs.steward_sub)
         found = {s["id"]: s for s in photo_sources.list_all(self.c)}
         self.assertEqual(sorted(found), [moved, mine])
         self.assertEqual((found[moved]["person_id"], found[moved]["owner_sub"], found[moved]["label"]), (self.member, "u1", "Mia’s"))
