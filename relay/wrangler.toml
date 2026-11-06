@@ -1,0 +1,24 @@
+name = "waypoint-push-relay"
+main = "src/index.js"
+compatibility_date = "2026-01-01"
+
+[vars]
+APNS_TOPIC = "com.anthonypluth.waypoint"
+
+[[kv_namespaces]]
+binding = "DEVICES"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+[[unsafe.bindings]]
+name = "REGISTER_LIMIT"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[unsafe.bindings]]
+name = "WAKE_LIMIT"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 20, period = 60 }
+
+# Secrets, set with `wrangler secret put`: APNS_KEY (the .p8 file's text), APNS_KEY_ID, APNS_TEAM_ID.
