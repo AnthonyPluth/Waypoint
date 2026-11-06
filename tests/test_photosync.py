@@ -881,3 +881,23 @@ class FourthReviewTests(SyncCase):
         self.lib.items = [asset(n, "2026-06-02T12:00:00Z", gps=SOHO) for n in range(3)]
         self.sync()
         self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", photosync.TOO_DENSE, 5.0))
+
+
+class HomeDuringFetchTests(SyncCase):
+    def test_home_saved_while_a_page_is_fetched_discards_the_page_and_the_next_run_places_it_as_home(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        located = mock.patch.object(home, "located", return_value=None)
+        stub = located.start()
+        self.addCleanup(located.stop)
+
+        def home_saved(asked):
+            stub.return_value = HOME_POINT
+        self.lib.on_search = home_saved
+        got = self.sync()
+        self.assertEqual(self.rows(), {})
+        self.assertIsNone(self.stored()["last_sync"])
+        self.assertEqual(got.budget_hit, 0)
+        self.lib.on_search = None
+        self.sync(NOW + timedelta(hours=6))
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.match, row.trip_id), ("home", None))

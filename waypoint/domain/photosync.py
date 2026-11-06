@@ -239,8 +239,8 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
         conn.commit()
         return "gone"
     current = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
-    fetched = run.windows[trip_id]
-    if trip_id not in current or _digest(current[trip_id], run.home) != _digest(fetched, run.home):
+    fetched, at_home = run.windows[trip_id], photos.home_in(conn)
+    if trip_id not in current or _digest(current[trip_id], at_home) != _digest(fetched, run.home):
         conn.commit()
         return "changed"
     windows = [w for t, w in current.items() if t in live]
