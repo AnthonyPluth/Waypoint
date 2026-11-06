@@ -6,7 +6,7 @@ import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
 from sqlalchemy import select
@@ -21,6 +21,7 @@ from . import photogrants, photoqueue, photos, photosources
 from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
+CLOCK_SKEW = timedelta(minutes=10)
 TOO_DENSE = "Some of your library couldn’t be read."
 Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
 PAUSED: Traversal = "paused"
@@ -273,7 +274,7 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     if row.fetch_started is None:
         row.fetch_started, row.resume_after = _iso(run.now), None
         conn.commit()
-    updated = photos.instant(row.cursor) if row.cursor else None
+    updated = photos.instant(row.cursor) - CLOCK_SKEW if row.cursor else None
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     while True:
@@ -298,7 +299,7 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
 
 def _same_person(run: _Run) -> bool:
     current = photo_sources.get(run.conn, run.source_id)
-    return current is not None and current["person_id"] == run.person
+    return current is not None and current["person_id"] == run.person and current["status"] != OFF
 
 
 def _finish_relist(run: _Run, started: float) -> bool:

@@ -779,6 +779,20 @@ class TripChangeTests(GrantCase):
         self.assertEqual(order[0], ("trip", third))
         self.assertLess(order.index(("trip", third)), order.index(("grant", third)))
 
+    def test_merging_or_moving_into_a_lower_trip_locks_the_grants_of_both_in_trip_order(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        order, patches = self.noting_locks()
+        with patches[0], patches[1]:
+            trips.merge(self.c, self.jane, self.a, self.b, confirmed=True)
+        self.assertEqual([t for kind, t in order if kind == "grant"][:2], [self.a, self.b])
+        trip, lone = self.lone()
+        order, patches = self.noting_locks()
+        with patches[0], patches[1]:
+            trips.move_segment(self.c, self.jane, lone["id"], self.a, confirmed=True)
+        self.assertEqual([t for kind, t in order if kind == "grant"][:2], [self.a, trip])
+        self.assertIsNone(self.c.orm.get(Trip, trip))
+
     def test_lock_takes_the_grant_rows_in_trip_order(self):
         self.share(self.jid, self.b)
         self.share(self.jid, self.a)

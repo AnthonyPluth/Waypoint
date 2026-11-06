@@ -155,7 +155,7 @@ class FirstRunTests(SyncCase):
         later = NOW + timedelta(hours=6)
         got = self.sync(later)
         again = self.lib.asked()[calls:]
-        self.assertTrue(again and all(q["updatedAfter"] == "2026-07-01T12:00:00.000Z" for q in again))
+        self.assertTrue(again and all(q["updatedAfter"] == "2026-07-01T11:50:00.000Z" for q in again))
         self.assertEqual({k: (p.trip_id, p.match, p.seen) for k, p in self.rows().items()}, before)
         self.assertEqual((got.new, got.seen), (0, 0))
         self.assertTrue(all(s.cursor == later.isoformat() for s in self.syncs().values()))
@@ -1038,3 +1038,35 @@ class EighthReviewTests(SyncCase):
         self.assertEqual(after, before)
         self.assertEqual(photo_sources.get(self.c, mias)["last_sync"], last)
         self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}"), relisted)
+
+
+class NinthReviewTests(SyncCase):
+    def test_a_pause_during_the_last_page_of_a_relist_deletes_nothing_and_keeps_the_generation(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        relisted = db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}")
+        self.lib.items = self.lib.items[:1]
+        calls = []
+
+        def pause_on_last(asked):
+            calls.append(1)
+            if len(calls) == 2:
+                with db.session() as other:
+                    photo_sources.mark(other, self.source, "off")
+        self.lib.on_search = pause_on_last
+        self.sync(NOW + timedelta(days=8), full=True)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(len(self.rows()), 2)
+        self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"), relisted)
+        self.assertEqual((self.stored()["status"], self.stored()["last_sync"]), ("off", NOW.timestamp()))
+
+    def test_an_edit_stamped_just_before_the_cursor_by_a_slower_immich_clock_is_still_fetched(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        self.sync()
+        edited = (NOW - timedelta(minutes=photosync.CLOCK_SKEW.total_seconds() / 120)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=(51.5, -0.12), updated=edited)]
+        self.sync(NOW + timedelta(hours=6))
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.latitude, row.longitude), (51.5, -0.12))
+        got = self.sync(NOW + timedelta(hours=12))
+        self.assertEqual(got.new, 0)
