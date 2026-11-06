@@ -152,6 +152,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/flightstatus.py"]
 
+  - id: waypoint-immich-hosts
+    message: >-
+      Only waypoint/providers/immich.py talks to Immich, so its endpoints and the per-person API key (sent as
+      x-api-key, never in a URL, a log or an error) stay in one place (AGENTS.md, "Private data in logs"): call it
+      rather than naming Immich's endpoints or its key header elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)(/api/search/metadata|/api/map/markers|/api/assets/|x-api-key)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/immich.py"]
+
   - id: waypoint-mail-image-fetch
     message: >-
       Only waypoint/providers/mailimages.py downloads the images of a kept email, once, when the message is kept, with
