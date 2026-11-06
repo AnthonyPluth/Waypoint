@@ -222,6 +222,6 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     ended = 0
     for s in photo_sources.list_all(conn):
         email = conn.execute(select(User.email).where(User.sub == s["owner_sub"])).scalar()
-        if oidc.access_lapsed(conn, s["owner_sub"], email, now) and photo_sources.remove(conn, s["id"]):
+        if oidc.access_lapsed(conn, s["owner_sub"], email, now) and photo_sources.remove(conn, s["id"], owner=s["owner_sub"]):
             ended += 1
     return ended

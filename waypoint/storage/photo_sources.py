@@ -63,7 +63,7 @@ def for_person(conn: db.Connection, person_id: int) -> list[Stored]:
 
 
 def lock_person(conn: db.Connection, person_id: int) -> bool:
-    return conn.execute(select(Person.id).where(Person.id == person_id).with_for_update()).fetchone() is not None
+    return int(conn.execute(update(Person).where(Person.id == person_id).values(display_name=Person.display_name)).rowcount) > 0
 
 
 def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
