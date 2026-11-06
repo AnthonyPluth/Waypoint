@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import ipaddress
 import json
 import math
@@ -235,11 +236,32 @@ def _open(source: Source, req: urllib.request.Request, timeout: float) -> Any | 
     raise _failure(code, wait)
 
 
-def _wait_at_most(response: Any, seconds: float) -> None:
-    sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
-    settimeout = getattr(sock, "settimeout", None)
-    if callable(settimeout):
-        settimeout(seconds)
+class _Deadline(io.RawIOBase):
+    def __init__(self, buffered: Any, deadline: float) -> None:
+        super().__init__()
+        self._buffered = buffered
+        self._settimeout = getattr(getattr(getattr(buffered, "raw", None), "_sock", None), "settimeout", None)
+        self._deadline = deadline
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: Any) -> int:
+        remaining = self._deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError
+        if callable(self._settimeout):
+            self._settimeout(remaining)
+        return int(self._buffered.readinto1(buffer))
+
+    def close(self) -> None:
+        self._buffered.close()
+        super().close()
+
+
+def _hold_to(response: Any, deadline: float) -> None:
+    if callable(getattr(getattr(response, "fp", None), "readinto1", None)):
+        response.fp = io.BufferedReader(_Deadline(response.fp, deadline))
 
 
 def _read(response: Any, cap: int, seconds: float) -> bytes:
@@ -249,13 +271,12 @@ def _read(response: Any, cap: int, seconds: float) -> bytes:
         raise Unavailable(TOO_LARGE)
     data = bytearray()
     problem = None
+    _hold_to(response, deadline)
     try:
         while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
+            if deadline - time.monotonic() <= 0:
                 problem = TOO_SLOW
                 break
-            _wait_at_most(response, remaining)
             chunk = response.read1(CHUNK)
             if not chunk:
                 break

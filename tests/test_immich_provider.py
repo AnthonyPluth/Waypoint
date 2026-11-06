@@ -50,7 +50,11 @@ class FakeImmich(ThreadingHTTPServer):
                 self.send_response(code)
                 for name, value in headers.items():
                     self.send_header(name, value)
-                if "Content-Length" not in headers and not headers.get("_no_length"):
+                if headers.get("_chunked"):
+                    self.send_header("Transfer-Encoding", "chunked")
+                    body = (f"{len(body):x};pad={'x' * 150}\r\n".encode() + body + b"\r\n0\r\n"
+                            + b"".join(f"X-Pad-{i}: {'y' * 40}\r\n".encode() for i in range(4)) + b"\r\n")
+                elif "Content-Length" not in headers and not headers.get("_no_length"):
                     self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 pause = float(headers.get("_trickle") or 0)
@@ -463,6 +467,41 @@ class RequestTests(unittest.TestCase):
         self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_trickle": "0.02"}, b'{"assets": {"items": [], "nextPage": null}}' + b" " * 400)
         with mock.patch.object(immich, "JSON_SECONDS", 0.5):
             self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
+    def test_a_chunked_thumbnail_whose_size_line_and_trailers_trickle_stops_at_its_budget(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_chunked": "1", "_trickle": "0.02"}, JPEG)
+        with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
+            self._slow(lambda: immich.thumbnail(self.fake.source, ASSET, "thumbnail"))
+
+    def test_a_chunked_search_reply_whose_size_line_and_trailers_trickle_stops_at_its_budget(self):
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_chunked": "1", "_trickle": "0.02"},
+                                                    b'{"assets": {"items": [], "nextPage": null}}')
+        with mock.patch.object(immich, "JSON_SECONDS", 0.5):
+            self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
+
+    def test_a_chunked_reply_that_arrives_in_time_is_read_whole(self):
+        self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_chunked": "1"}, JPEG)
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_chunked": "1"}, fixture("search_page"))
+        self.assertEqual(immich.thumbnail(self.fake.source, ASSET, "thumbnail"), ("image/jpeg", JPEG))
+        self.assertEqual(len(immich.search(self.fake.source, AFTER, BEFORE).assets), 8)
+
+    def test_each_read_below_the_parser_gets_only_the_time_left(self):
+        source = io.BufferedReader(io.BytesIO(b"abcdef"))
+        buffer = bytearray(4)
+        self.assertEqual(immich._Deadline(source, time.monotonic() + 5).readinto(buffer), 4)
+        self.assertEqual(bytes(buffer), b"abcd")
+        with self.assertRaises(TimeoutError):
+            immich._Deadline(source, time.monotonic() - 0.001).readinto(buffer)
+        sock = mock.Mock()
+        raw = mock.Mock(_sock=sock)
+        buffered = mock.Mock(raw=raw)
+        buffered.readinto1.return_value = 2
+        wrapped = immich._Deadline(buffered, time.monotonic() + 3)
+        self.assertEqual(wrapped.readinto(bytearray(2)), 2)
+        [(timeout,), _] = sock.settimeout.call_args
+        self.assertTrue(2 < timeout <= 3)
+        wrapped.close()
+        buffered.close.assert_called_once()
 
     def test_a_connection_cut_while_reading_is_unreachable(self):
         response = mock.Mock()
