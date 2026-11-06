@@ -25,7 +25,7 @@ CLOCK_SKEW = timedelta(minutes=10)
 TOO_DENSE = "Some of your library couldn’t be read."
 Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
 PAUSED: Traversal = "paused"
-Written = Literal["written", "gone", "changed", "moved"]
+Written = Literal["written", "gone", "changed", "moved", "dropped"]
 CHANGED: Traversal = "changed"
 DONE: Traversal = "done"
 STOPPED: Traversal = "stopped"
@@ -260,6 +260,9 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
     excluded = _exclusions(conn, run.person, [a.id for a in assets])
     for asset in assets:
         _upsert(run, asset, existing.get(asset.id), windows, excluded.get(asset.id, set()))
+    if got.dropped:
+        conn.commit()
+        return "dropped"
     if got.next_page is None:
         row.cursor, row.resume_after, row.fetch_started, row.synced = row.fetch_started, None, None, run.now.timestamp()
     elif got.last_taken is not None:
@@ -294,6 +297,8 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
             return CHANGED
         if written == "moved":
             return PAUSED
+        if written == "dropped":
+            return DENSE
         if written == "gone" or got.next_page is None:
             return DONE
         if got.last_taken is None or got.one_instant:
