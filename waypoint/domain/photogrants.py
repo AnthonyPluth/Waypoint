@@ -9,7 +9,7 @@ from sqlalchemy import and_, delete, or_, select, update
 from .. import oidc
 from ..storage import db
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
-from . import people, photos, trippeople, visibility
+from . import people, photos, trippeople, trips, visibility
 from .visibility import Viewer
 
 if TYPE_CHECKING:
@@ -25,6 +25,7 @@ NONE: State = "none"
 STALE_SHARE = "The trip changed. Review who sees your photos under Your photos on this trip."
 STALE_REMOVAL = "The trip changed since that photo was removed. Open the removed list again."
 STALE_SETTING = "Your trips changed. Review them before sharing on all."
+NO_WINDOW = "Give the trip dates or a booking before sharing photos on it"
 
 
 class Stale(Exception):
@@ -187,6 +188,8 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
     trip, by = acting
     if not _aboard_under_lock(conn, person_id, trip.id) or visibility.visible_trip(conn, viewer, trip.id) is None:
         return None
+    if photos.trip_window(conn, trip.id) is None:
+        raise trips.Invalid(NO_WINDOW)
     if window is not None and not _window_matches(conn, trip.id, window):
         raise Stale(STALE_SHARE)
     row = lock(conn, person_id, [trip.id]).get(trip.id)
@@ -239,9 +242,9 @@ def exclude(conn: db.Connection, viewer: Viewer, trip_id: int, photo_ids: Sequen
         lock(conn, person, [trip_id])
     conn.orm.expire_all()
     fresh: list[tuple[Photo, int]] = []
-    for photo, _ in found:
+    for photo, person in found:
         row = photos.visible_photo(conn, viewer, photo.id)
-        if row is None or row[0].trip_id != trip_id or not photos.acts_for(conn, viewer, row[1]):
+        if row is None or row[0].trip_id != trip_id or row[1] != person or not photos.acts_for(conn, viewer, row[1]):
             return None
         fresh.append(row)
     for photo, person in fresh:
@@ -267,7 +270,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int, c
     lock(conn, person, involved)
     conn.orm.expire_all()
     found = next(((p, person) for p, person in photos.removed(conn, viewer, trip_id) if p.id == photo_id), None)
-    if found is None:
+    if found is None or found[1] != person:
         return None
     photo, person = found
     exclusion = conn.orm.get(PhotoExclusion, (person, photo.asset_id, trip_id))
@@ -306,7 +309,7 @@ def _eligible(conn: db.Connection, person_id: int, by: str) -> list[int]:
     aboard = trippeople.of(conn, [t.id for t in seen])
     mine = sorted(t.id for t in seen if person_id in aboard[t.id])
     active = set(conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == person_id, PhotoGrant.trip_id.in_(mine), PhotoGrant.revoked.is_(None))).scalars())
-    return [t for t in mine if t not in active]
+    return [t for t in mine if t not in active and photos.trip_window(conn, t) is not None]
 
 
 def _unshared(conn: db.Connection, person_id: int, by: str) -> list[int]:
@@ -369,7 +372,7 @@ def _prefs_row(conn: db.Connection, person_id: int, for_update: bool = False) ->
 
 
 def joined(conn: db.Connection, person_id: int, trip_id: int, now: float | None = None) -> bool:
-    if not _aboard_under_lock(conn, person_id, trip_id):
+    if not _aboard_under_lock(conn, person_id, trip_id) or photos.trip_window(conn, trip_id) is None:
         return False
     found = lock(conn, person_id, [trip_id]).get(trip_id)
     row = _prefs_row(conn, person_id, for_update=True)
@@ -649,14 +652,20 @@ def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
 
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
     mine = {(s.url, s.immich_user_id): s for s in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == member_id)).all()}
+    kept: list[int] = []
     for theirs in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == guest_id).order_by(PhotoSource.id)).all():
         twin = mine.get((theirs.url, theirs.immich_user_id))
         if twin is None:
             theirs.person_id, theirs.owner_sub = member_id, sub
             mine[(theirs.url, theirs.immich_user_id)] = theirs
+            kept.append(theirs.id)
         else:
             _merge_source(conn, theirs, twin)
     conn.orm.flush()
+    if kept:
+        q = select(Photo).where(Photo.source_id.in_(kept), Photo.decided_by == photos.OWNER).order_by(Photo.id)
+        for row in conn.orm.scalars(q).all():
+            photos.copy_placement(conn, row, member_id)
 
 
 def _reachable(conn: db.Connection, person_id: int) -> list[int]:

@@ -715,7 +715,7 @@ def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip
     lock_grants(conn, person, sorted(locked))
     conn.orm.expire_all()
     found = _own_photo(conn, viewer, photo_id)
-    if found is None or (found[0].trip_id is not None and found[0].trip_id not in locked):
+    if found is None or found[1] != person or (found[0].trip_id is not None and found[0].trip_id not in locked):
         return None
     return found, locked
 

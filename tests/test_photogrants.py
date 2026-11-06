@@ -251,6 +251,41 @@ class GrantTests(GrantCase):
         self.assertLessEqual(windows.call_count, 2)
         self.assertEqual([self.row(r.id).trip_id for r in rows], [self.a] * 3)
 
+    def test_removing_that_races_with_a_claim_of_the_photos_person_writes_nothing(self):
+        self.steward(self.mia, "u-jane")
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-jane")
+        self.c.orm.add(source_row(self.mia, "u-jane"))
+        self.c.orm.flush()
+        mias = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        hers = self.photo(self.b, source=mias)
+        real, claimed = photogrants._lock_trip, []
+
+        def claim_first(conn, trip_id):
+            if not claimed:
+                claimed.append(True)
+                people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+            return real(conn, trip_id)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=claim_first):
+            self.assertIsNone(photogrants.exclude(self.c, self.jane, self.b, [hers.id], 42.0))
+        self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id)).fetchall(), [])
+        self.assertEqual(self.row(hers.id).trip_id, self.b)
+
+    def test_an_undated_trip_without_bookings_cannot_be_shared_and_share_on_all_skips_it(self):
+        bare = trips.create_trip(self.c, self.jane, {"name": "Someday", "people": [self.jid]})["id"]
+        self.assertIsNone(photos.trip_window(self.c, bare))
+        with self.assertRaises(trips.Invalid) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, bare, "trip", 50.0)
+        self.assertEqual(str(refused.exception), photogrants.NO_WINDOW)
+        self.assertIsNone(self.grant(self.jid, bare))
+        photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 51.0)
+        self.assertIsNone(self.grant(self.jid, bare))
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+        self.assertFalse(photogrants.joined(self.c, self.jid, bare, 52.0))
+        self.add(self.jane, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, bare)
+        self.assertIsNotNone(photos.trip_window(self.c, bare))
+        self.assertEqual(self.grant(self.jid, bare), ("trip", None, "u-jane"))
+
     def test_removing_rechecks_who_acts_for_the_person_under_the_locks(self):
         self.steward(self.mia, "u-jane")
         trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
@@ -989,6 +1024,28 @@ class DecisionTests(GrantCase):
             return real(conn, person, trip_ids)
         return mock.patch.object(photos, "lock_grants", side_effect=lock)
 
+    def test_a_decision_that_races_with_a_claim_of_the_photos_person_writes_nothing(self):
+        self.steward(self.mia, "u-jane")
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-jane")
+        self.share(self.jid, self.a)
+        self.c.orm.add(source_row(self.mia, "u-jane"))
+        self.c.orm.flush()
+        mias = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        hers = self.photo(self.b, source=mias, match="time")
+        real, claimed = photos.lock_grants, []
+
+        def claim_first(conn, person, trip_ids):
+            if not claimed:
+                claimed.append(person)
+                people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+            return real(conn, person, trip_ids)
+        with mock.patch.object(photos, "lock_grants", side_effect=claim_first):
+            self.assertIsNone(photos.decide(self.c, self.jane, hers.id, self.a, None))
+        self.assertEqual(claimed, [self.mia])
+        self.assertEqual((self.row(hers.id).trip_id, self.row(hers.id).decided_by, self.row(hers.id).source_id), (self.b, None, self.janes))
+        self.assertIsNone(self.c.orm.get(PhotoSource, mias))
+
     def test_a_decision_that_races_with_stop_sharing_sees_the_stop(self):
         self.share(self.jid, self.a)
         self.share(self.jid, self.b)
@@ -1268,6 +1325,22 @@ class ClaimTests(GrantCase):
         first = self.photo(self.b, asset="shared-asset", match="time")
         theirs = self.photo(self.a, source=theirs_source, asset="shared-asset", decided="owner")
         people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual((self.row(theirs.id).trip_id, self.row(theirs.id).decided_by), (self.a, "owner"))
+        self.assertEqual((self.row(first.id).trip_id, self.row(first.id).decided_by), (self.a, "owner"))
+        self.assertEqual(self.seen(self.jane, self.a), [first.id])
+
+    def test_a_kept_guest_librarys_hand_placement_reaches_the_members_rows_of_the_asset(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-sam")
+        self.c.orm.add(PhotoSource(person_id=self.mia, owner_sub="u-sam", url="https://other.example", immich_user_id="u2", api_key="enc:v1:x", status="ok", created=1.0))
+        self.c.orm.flush()
+        other = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        first = self.photo(self.b, asset="shared-asset", match="time")
+        theirs = self.photo(self.a, source=other, asset="shared-asset", decided="owner")
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual(self.c.orm.get(PhotoSource, other).person_id, self.jid)
         self.assertEqual((self.row(theirs.id).trip_id, self.row(theirs.id).decided_by), (self.a, "owner"))
         self.assertEqual((self.row(first.id).trip_id, self.row(first.id).decided_by), (self.a, "owner"))
         self.assertEqual(self.seen(self.jane, self.a), [first.id])
