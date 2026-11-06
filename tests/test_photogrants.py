@@ -681,6 +681,36 @@ class TripChangeTests(GrantCase):
         trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid]}, confirmed=True)
         self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
 
+    def test_someone_joining_bumps_an_only_me_grants_version_so_a_delayed_widening_is_refused(self):
+        self.share(self.jid, self.a, "only_me")
+        mine = self.photo(self.a, "2026-06-02T12:00")
+        state = photogrants.state_of(self.c, self.jane, self.jid, self.a)
+        self.assertEqual(state["changed"], 1.0)
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid, self.mia]}, confirmed=True)
+        self.assertEqual(photos.window_out(photos.trip_window(self.c, self.a)), state["window"])
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, window=state["window"], expected_changed=state["changed"])
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        self.assertEqual(self.seen(Viewer(self.mia), self.a), [])
+        fresh = photogrants.state_of(self.c, self.jane, self.jid, self.a)
+        self.assertNotEqual(fresh["changed"], 1.0)
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 91.0, window=fresh["window"], expected_changed=fresh["changed"])
+        self.assertEqual(self.seen(Viewer(self.mia), self.a), [mine.id])
+
+    def test_a_home_change_that_moves_a_dated_trips_window_re_matches_automatic_rows_it_now_holds(self):
+        self.share(self.jid, self.a)
+        dated = trips.create_trip(self.c, self.jane, {"name": "Dated", "people": [self.jid], "start_date": "2026-06-05", "end_date": "2026-06-05"}, confirmed=True)["id"]
+        self.share(self.jid, dated)
+        row = photo_row(self.janes, self.a, "2026-06-06T15:00", match="time")
+        self.c.orm.add(row)
+        self.c.orm.flush()
+        was = photos.trip_window(self.c, dated)
+        self.assertFalse(was.start <= photos.instant(row.taken_utc) <= was.end)
+        home.save(self.c, {"city": "Denver", "state": "CO", "zip": "", "country": "US"})
+        now = photos.trip_window(self.c, dated)
+        self.assertTrue(now.start <= photos.instant(row.taken_utc) <= now.end)
+        self.assertEqual((self.row(row.id).trip_id, self.row(row.id).decided_by), (dated, "auto"))
+
     def test_merging_refreshes_the_kept_trips_dates_before_re_placing_the_other_trips_rows(self):
         first = trips.create_trip(self.c, self.jane, {"name": "First", "people": [self.jid]})["id"]
         later = trips.create_trip(self.c, self.jane, {"name": "Later", "people": [self.jid]})["id"]
@@ -872,6 +902,24 @@ class LapsedAccessTests(GrantCase):
         self.assertIsNone(self.grant(self.jid, self.a))
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "trip", "share_all": False})
         self.assertIsNone(self.c.orm.get(PhotoSharingPrefs, self.mia))
+
+    def test_the_sweep_rechecks_access_after_its_locks_so_a_member_who_signed_in_meanwhile_keeps_everything(self):
+        self.share(self.jid, self.a, by="u-sam")
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-sam", share_all_since=5.0, steward_sub=None))
+        self.c.orm.flush()
+        self.steward(self.mia, "u-sam")
+        real = photogrants._lock_trip
+
+        def sign_in_first(conn, trip_id):
+            self.c.execute(update(User).where(User.sub == "u-sam").values(last_seen=time.time()))
+            return real(conn, trip_id)
+        with mock.patch.dict(os.environ, {**ALLOWED, "OIDC_ALLOWED_GROUPS": "household"}), mock.patch.object(photogrants, "_lock_trip", side_effect=sign_in_first):
+            self.lapse("u-sam")
+            self.assertEqual(photogrants.end_lapsed(self.c, time.time()), 0)
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-sam"))
+        self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "trip", "share_all": True})
+        self.c.orm.expire_all()
+        self.assertEqual(self.c.orm.get(PhotoSharingPrefs, self.mia).steward_sub, "u-sam")
 
     def test_the_hourly_sweep_ends_them_too(self):
         self.share(self.jid, self.a, by="u-sam")

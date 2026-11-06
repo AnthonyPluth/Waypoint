@@ -473,11 +473,11 @@ def _re_place_automatic(conn: db.Connection, trip_id: int) -> None:
 
 
 def _ask_again(conn: db.Connection, trip_id: int, now: float) -> None:
-    active = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP)
-                              .order_by(PhotoGrant.person_id)).all()
-    for g in active:
+    for g in _active(conn, trip_id):
         lock(conn, g.person_id, [trip_id])
-        g.scope, g.ask_again, g.changed = photos.ONLY_ME, True, now
+        if g.scope == photos.TRIP:
+            g.scope, g.ask_again = photos.ONLY_ME, True
+        g.changed = now
     conn.orm.flush()
 
 
@@ -500,7 +500,7 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[
     for trip_id, was, after in settled:
         if _shrank(was.window, after):
             _re_place_shrunk(conn, trip_id, after)
-        if was.points != photos.trip_points(conn, trip_id):
+        if was.points != photos.trip_points(conn, trip_id) or was.window != after:
             _re_place_automatic(conn, trip_id)
 
 
@@ -551,10 +551,11 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     for person in sorted({person for _, person, _ in lapsed} | set(settings)):
         people.lock(conn, person)
     lock_trips(conn, [trip for trip, _, _ in lapsed])
+    gone = {s for s in sorted(gone) if _lapsed(conn, s, stamp)}
     for trip, person, by in lapsed:
         conn.orm.expire_all()
         held = lock(conn, person, [trip]).get(trip)
-        if held is None or held.granted_by != by:
+        if held is None or held.granted_by != by or by not in gone:
             continue
         if held.revoked is None:
             _end(conn, person, trip)
