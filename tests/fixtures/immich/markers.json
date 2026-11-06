@@ -1,0 +1,8 @@
+[
+  {"id": "0b000000-0000-4000-8000-000000000001", "lat": 44.3876, "lon": -68.2039, "city": "Exampleport", "state": "Maine", "country": "United States of America"},
+  {"id": "0b000000-0000-4000-8000-000000000002", "lat": 0, "lon": 0, "city": null, "state": null, "country": null},
+  {"id": "0b000000-0000-4000-8000-000000000003", "lat": null, "lon": 10.5, "city": null, "state": null, "country": null},
+  {"id": "0b000000-0000-4000-8000-000000000004", "lat": 95, "lon": 10.5, "city": null, "state": null, "country": null},
+  {"id": "../users/me", "lat": 10, "lon": 10, "city": null, "state": null, "country": null},
+  {"id": "0b000000-0000-4000-8000-000000000005", "lat": -33.8688, "lon": -180, "city": null, "state": null, "country": null}
+]

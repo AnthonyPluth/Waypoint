@@ -691,7 +691,7 @@ class EndToEndTests(OAuthServer):
         self.assertEqual(self.mine(select(OAuthGrant.revoked_reason).where(OAuthGrant.client_id.in_(self.clients))), "refresh_reuse")
 
 
-class SignInTests(OAuthServer):
+class SignedInServer(OAuthServer):
     unset = ()
 
     @classmethod
@@ -720,6 +720,9 @@ class SignInTests(OAuthServer):
         Provider.issued[code] = {"nonce": q["nonce"], "challenge": q["code_challenge"], "email": email}
         done = self.http("GET", f"/auth/callback?code={code}&state={q['state']}", cookies={"waypoint_login": login.cookie("waypoint_login").value})
         return {"waypoint_session": done.cookie("waypoint_session").value}
+
+
+class SignInTests(SignedInServer):
 
     def test_signed_out_goes_to_sign_in_and_back(self):
         c = self.client()

@@ -112,6 +112,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_loyalty.py",
         "tests/test_mcp_routes.py",
         "tests/test_people.py",
@@ -212,6 +213,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_flight_import.py",
         "tests/test_gate_codes.py",
         "tests/test_mail_scan.py",
@@ -233,6 +235,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
         "tests/test_offline.py",
@@ -1478,6 +1481,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_mcp_protocol.py",
         "tests/test_mcp_review.py"
       ],

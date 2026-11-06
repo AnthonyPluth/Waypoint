@@ -122,14 +122,30 @@ def _consent_ask(h: Handler, url, iss: str) -> None:
     name = req.client_name or "An app"
     if target.scheme == "https":
         back = f"https://{target.netloc}"
+    elif target.scheme == "waypoint":
+        back = "waypoint:"
     else:
         back = f"http://{target.hostname}:*" if target.hostname != "::1" else "http:"
     csp = ("default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; "
            f"form-action 'self' {back}; base-uri 'none'; frame-ancestors 'none'")
     cookie = h._cookie_header("waypoint_consent", token, mcp_oauth.CONSENT_TTL, "/oauth")
-    page = h._page_html(f"{name} wants to connect to Waypoint",
-                        consent_page(req.scope, target, token, user, writes_on), center=False)
+    body = (app_consent_page(token, user) if req.client_id == mcp_oauth.APP_CLIENT
+            else consent_page(req.scope, target, token, user, writes_on))
+    page = h._page_html(f"{name} wants to connect to Waypoint", body, center=False)
     h._send(200, page, "text/html; charset=utf-8", extra={"Set-Cookie": cookie}, csp=csp)
+
+
+def app_consent_page(token: str, user: dict) -> str:
+    who = user.get("email") or user.get("name") or user.get("sub")
+    signed_in = (f"You're signed in as <b>{html.escape(who)}</b>." if who
+                 else "This Waypoint has no sign-in of its own, so anyone who can open it can approve apps.")
+    return f"""<p class="help">{signed_in} Approving sends you back to the Waypoint app on your iPhone.</p>
+<form method="post" action="/oauth/authorize">
+<input type="hidden" name="consent" value="{html.escape(token)}">
+<label class="choice"><input type="checkbox" checked disabled><span><b>Use Waypoint as you</b><span class="help">The app can do everything you can do on the web here: see and change your trips, bookings, people and settings. It stops working when you can no longer sign in to Waypoint, or when you sign out in the app.</span></span></label>
+<div class="actions"><button class="btn primary" type="submit" name="decision" value="allow">Allow</button>
+<button class="btn" type="submit" name="decision" value="deny">Deny</button></div>
+</form>"""
 
 
 def consent_page(scope, target, token: str, user: dict, writes_on: bool) -> str:
@@ -178,7 +194,7 @@ def _consent_answer(h: Handler, iss: str) -> None:
             return h._page(400, "Can't connect this app", mcp_oauth.UNKNOWN_APP, cookies=clear)
         decision = form.get("decision")
         if decision == "allow":
-            scope = {"read"}
+            scope = {mcp_oauth.APP_SCOPE} if client["id"] == mcp_oauth.APP_CLIENT else {"read"}
             asked = params["scope"].split()
             if "write" in asked and form.get("write") == "1" and mcp_access.allow_writes(conn):
                 scope.add("write")
