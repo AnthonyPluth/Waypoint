@@ -747,9 +747,9 @@ def copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
     conn.orm.flush()
 
 
-def place_by_hand(conn: db.Connection, photo: Photo, person: int, trip_id: int) -> None:
+def place_by_hand(conn: db.Connection, photo: Photo, person: int, trip_id: int | None) -> None:
     photo.trip_id = trip_id
-    _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip_id), None))
+    _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip_id), None) if trip_id is not None else None)
     copy_placement(conn, photo, person)
 
 

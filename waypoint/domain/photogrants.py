@@ -474,7 +474,7 @@ def trips_changed(conn: db.Connection, trip_ids: Iterable[int], before: Mapping[
                     held = after is not None and after.start <= photos.instant(row.taken_utc) <= after.end
                     if not (row.decided_by == photos.OWNER and held):
                         photos.re_place(conn, row, g.person_id)
-        elif was is not None and was.points != photos.trip_points(conn, trip_id):
+        if was is not None and was.points != photos.trip_points(conn, trip_id):
             _re_place_automatic(conn, trip_id)
 
 
@@ -579,16 +579,14 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
 
 def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -> None:
     kept = {p.asset_id: p for p in conn.orm.scalars(select(Photo).where(Photo.source_id == mine.id)).all()}
-    placed: list[Photo] = []
+    placed: list[tuple[Photo, int | None]] = []
     for p in conn.orm.scalars(select(Photo).where(Photo.source_id == theirs.id).order_by(Photo.id)).all():
         twin = kept.get(p.asset_id)
         if twin is None:
             p.source_id = mine.id
             continue
         if p.decided_by == photos.OWNER and twin.decided_by != photos.OWNER:
-            for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
-                setattr(twin, field, getattr(p, field))
-            placed.append(twin)
+            placed.append((twin, p.trip_id))
         conn.orm.delete(p)
     synced = {s.trip_id for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mine.id)).all()}
     for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == theirs.id)).all():
@@ -599,8 +597,8 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
     conn.orm.flush()
     conn.orm.delete(theirs)
     conn.orm.flush()
-    for twin in placed:
-        photos.copy_placement(conn, twin, mine.person_id)
+    for twin, trip_id in placed:
+        photos.place_by_hand(conn, twin, mine.person_id, trip_id)
 
 
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
