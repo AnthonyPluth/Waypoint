@@ -338,7 +338,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     try:
         unlocked = photosources.unlock(conn, source_id)
     except secretbox.SecretError:
-        photo_sources.mark(conn, source_id, REFUSED, photosources.KEY_LOST)
+        photo_sources.mark(conn, source_id, REFUSED, photosources.KEY_LOST, keep_off=True, sealed=sealed)
         conn.commit()
         summary.failed = 1
         return summary
@@ -373,11 +373,12 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if moved or not summary.pages:
         return summary
-    if trips is None:
-        if started is not None:
-            _finish_relist(job, started)
-        photo_sources.mark(conn, source_id, OK, None, now.timestamp(), keep_off=True, sealed=job.sealed)
-        conn.commit()
+    if trips is None and started is not None:
+        _finish_relist(job, started)
+    if trips is not None and source["status"] != UNREACHABLE:
+        return summary
+    photo_sources.mark(conn, source_id, OK, None, now.timestamp() if trips is None else None, keep_off=True, sealed=job.sealed)
+    conn.commit()
     return summary
 
 

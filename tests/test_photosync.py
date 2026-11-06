@@ -901,3 +901,33 @@ class HomeDuringFetchTests(SyncCase):
         self.sync(NOW + timedelta(hours=6))
         row = self.rows()[self.lib.items[0]["id"]]
         self.assertEqual((row.match, row.trip_id), ("home", None))
+
+
+class FifthReviewTests(SyncCase):
+    def test_a_lost_key_replaced_before_the_refusal_is_written_keeps_the_new_key_healthy(self):
+        self.c.execute(update(PhotoSource).values(api_key="enc:v1:broken"))
+        self.c.commit()
+        real = photosync.photosources.unlock
+
+        def replaced_then_unlock(conn, source_id):
+            try:
+                return real(conn, source_id)
+            finally:
+                with db.session() as other:
+                    photo_sources.set_key(other, source_id, "canary-fresh-key-3n7d")
+                    photo_sources.mark(other, source_id, "ok", None)
+        with mock.patch.object(photosync.photosources, "unlock", side_effect=replaced_then_unlock):
+            got = self.sync()
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("ok", None))
+
+    def test_a_completed_trip_sync_clears_a_stale_unreachable_status_and_keeps_last_sync(self):
+        photo_sources.mark(self.c, self.source, "unreachable", immich.UNREACHABLE, 5.0)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        self.sync(trips={self.a})
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", None, 5.0))
+        photo_sources.mark(self.c, self.source, "ok", photosync.TOO_DENSE, 5.0)
+        self.c.commit()
+        self.sync(NOW + timedelta(hours=1), trips={self.a})
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("ok", photosync.TOO_DENSE))
