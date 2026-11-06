@@ -1,6 +1,7 @@
 import http.client
 import json
 import struct
+import threading
 import time
 import unittest
 import urllib.parse
@@ -13,7 +14,7 @@ from tests.shared import fetch
 from tests.test_every_route import NOT_JSON
 from tests.test_immich_provider import http_error
 from tests.test_photo_access import AccessCase
-from tests.test_photos_api import KEY, photo_row, stored
+from tests.test_photos_api import ASSET, KEY, SOHO, photo_row, stored
 from waypoint import tls
 from waypoint.domain import photoproxy, photos, photosources
 from waypoint.providers import immich
@@ -38,14 +39,18 @@ IMAGE_ROUTES = ("/api/photos/{id}/thumbnail", "/api/photos/{id}/preview", "/api/
 
 
 class Reply:
-    def __init__(self, status, body, headers=None, piece=None, pause=0.0):
+    def __init__(self, status, body, headers=None, piece=None, pause=0.0, gate=None, gate_after=0):
         self.status = status
         self.headers = {"Content-Length": str(len(body)), **(headers or {})}
         self._body, self._at, self._piece, self._pause = body, 0, piece, pause
+        self._gate, self._gate_after, self._reads = gate, gate_after, 0
 
     def read1(self, size=-1):
         if self._pause:
             time.sleep(self._pause)
+        if self._gate is not None and self._reads >= self._gate_after:
+            self._gate.wait(10)
+        self._reads += 1
         take = len(self._body) if size < 0 else size
         if self._piece:
             take = min(take, self._piece)
@@ -154,6 +159,18 @@ class ProxyCase(AccessCase):
     def revoke(self, who):
         with db.session() as conn:
             conn.execute(update(PhotoGrant).where(PhotoGrant.person_id == self.person[who]).values(revoked=5.0))
+
+    def replace_asset(self, photo_id):
+        replacement = f"{ASSET}-replacement-2k9x"
+        with db.session() as conn:
+            old = conn.orm.get(Photo, photo_id)
+            assert old is not None
+            conn.orm.delete(old)
+            conn.orm.flush()
+            row = photo_row(self.sources["ben"], self.trip, "2026-06-02T10:00", where=SOHO, segment_id=self.stay["id"], asset=replacement)
+            row.id = photo_id
+            conn.orm.add(row)
+        return f"/api/assets/{replacement}"
 
     def source_status(self, who):
         with db.session() as conn:
@@ -294,6 +311,17 @@ class RenditionTests(ProxyCase):
         self.missing("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": fresh})
         self.assertEqual(self.immich.calls, [])
 
+    def test_a_photo_id_reused_for_another_asset_with_the_same_revision_never_answers_304(self):
+        headers, _ = self.image("ana", f"/api/photos/{self.mine}/thumbnail")
+        tag = headers["ETag"]
+        replacement = self.replace_asset(self.mine)
+        self.immich.routes[f"{replacement}/thumbnail"] = fixed(200, PNG, {"Content-Type": "image/png"})
+        self.immich.calls.clear()
+        headers, raw = self.image("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": tag})
+        self.assertEqual((raw, headers["Content-Type"]), (PNG, "image/png"))
+        self.assertNotEqual(headers["ETag"], tag)
+        self.assertEqual(self.upstream(), [(f"{replacement}/thumbnail", "size=thumbnail", None)])
+
 
 class DemoTests(ProxyCase):
     def setUp(self):
@@ -355,6 +383,14 @@ class OriginalTests(ProxyCase):
                 self.assertEqual((status, raw, headers.get("Content-Range")), (200, MP4, None))
         self.assertEqual(self.upstream()[-1], (f"{self.asset}/original", "", None))
 
+    def test_a_photo_id_reused_for_another_asset_never_reuses_the_sniffed_type(self):
+        status, _, _ = self.get("ana", f"/api/photos/{self.mine}/original", {"Range": "bytes=10-19"})
+        self.assertEqual(status, 206)
+        replacement = self.replace_asset(self.mine)
+        self.immich.routes[f"{replacement}/original"] = ranged(SVG, "image/svg+xml")
+        self.missing("ana", f"/api/photos/{self.mine}/original", {"Range": "bytes=10-19"})
+        self.assertEqual(self.upstream()[2:], [(f"{replacement}/original", "", "bytes=0-4095")])
+
     def test_a_range_of_a_type_the_prefix_refuses_streams_nothing(self):
         self.immich.routes[f"{self.asset}/original"] = ranged(SVG, "image/svg+xml")
         self.missing("ana", f"/api/photos/{self.mine}/original", {"Range": "bytes=10-19"})
@@ -406,6 +442,26 @@ class OriginalTests(ProxyCase):
         self.assertLess(len(got), len(body))
         self.assertEqual(bytes(got), body[:len(got)])
         self.missing("ana", f"/api/photos/{self.mine}/original")
+
+    def test_nothing_more_is_sent_once_the_photo_is_taken_back_while_a_read_is_blocked(self):
+        body = bytes(MP4) * 4
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, gate=gate, gate_after=4)
+        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 0.0):
+            link = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=20)
+            self.addCleanup(link.close)
+            link.request("GET", f"/api/photos/{self.mine}/original", headers={"X-Waypoint": "1", **self.who["ana"]})
+            reply = link.getresponse()
+            self.assertEqual(reply.status, 200)
+            first = reply.read(4096)
+            self.assertEqual(first, body[:4096])
+            self.revoke("ben")
+            gate.set()
+            rest = bytearray()
+            while piece := reply.read(1024):
+                rest += piece
+        self.assertEqual(bytes(rest), b"")
 
 
 class RouteTests(unittest.TestCase):

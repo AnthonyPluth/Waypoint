@@ -39,6 +39,11 @@ class Served:
     asset_updated: str
     source_id: int
     demo: bool
+    checked: float
+
+    @property
+    def revision(self) -> tuple[int, int, str, str]:
+        return self.photo_id, self.source_id, self.asset_id, self.asset_updated
 
 
 @dataclass(frozen=True)
@@ -62,7 +67,7 @@ class Library:
     sealed: str | None = field(repr=False)
 
 
-_known: dict[tuple[int, str], tuple[str, bool]] = {}
+_known: dict[tuple[int, int, str, str], tuple[str, bool]] = {}
 _lock = threading.Lock()
 
 
@@ -74,11 +79,12 @@ def find(conn: db.Connection, viewer: Viewer, photo_id: int) -> Served | None:
     source = photo_sources.get(conn, photo.source_id)
     if source is None:
         return None
-    return Served(photo.id, photo.asset_id, photo.asset_updated, source["id"], source["url"] == photoqueue.DEMO)
+    return Served(photo.id, photo.asset_id, photo.asset_updated, source["id"], source["url"] == photoqueue.DEMO, time.monotonic())
 
 
 def etag(served: Served, size: Rendition) -> str:
-    digest = hashlib.sha256(f"{served.photo_id}:{size}:{served.asset_updated}".encode()).hexdigest()[:32]
+    photo_id, source_id, asset_id, asset_updated = served.revision
+    digest = hashlib.sha256(f"{photo_id}:{source_id}:{asset_id}:{size}:{asset_updated}".encode()).hexdigest()[:32]
     return f'"{digest}"'
 
 
@@ -167,7 +173,7 @@ def _typed(served: Served, data: bytes) -> tuple[str, bool]:
     with _lock:
         if len(_known) >= KNOWN_TYPES:
             _known.clear()
-        _known[(served.photo_id, served.asset_updated)] = found
+        _known[served.revision] = found
     return found
 
 
@@ -177,22 +183,23 @@ def _still_served(viewer: Viewer, served: Served) -> bool:
 
 
 def _body(viewer: Viewer, served: Served, original: immich.Original, prefix: bytes) -> Body:
-    checked = time.monotonic()
+    checked = served.checked
+    pending = prefix
     try:
-        if prefix:
-            yield prefix
         while True:
+            if not pending:
+                try:
+                    pending = original.read()
+                except immich.ImmichError:
+                    return
+                if not pending:
+                    return
             if time.monotonic() - checked >= RECHECK_SECONDS:
                 if not _still_served(viewer, served):
                     return
                 checked = time.monotonic()
-            try:
-                chunk = original.read()
-            except immich.ImmichError:
-                return
-            if not chunk:
-                return
-            yield chunk
+            yield pending
+            pending = b""
     finally:
         original.close()
 
@@ -224,7 +231,7 @@ def _whole(conn: db.Connection, viewer: Viewer, served: Served, library: Library
 
 
 def _ranged(conn: db.Connection, viewer: Viewer, served: Served, library: Library, asked: str) -> Stream:
-    known = _known.get((served.photo_id, served.asset_updated))
+    known = _known.get(served.revision)
     if known is None:
         with _open(conn, served, library, SNIFF_RANGE) as probe:
             known = _typed(served, _prefix(probe))
