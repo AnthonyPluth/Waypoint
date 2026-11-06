@@ -261,6 +261,7 @@
         "tests/test_monitoring.py",
         "tests/test_onboarding.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
@@ -345,6 +346,7 @@
         "tests/test_mcp_routes.py",
         "tests/test_monitoring.py",
         "tests/test_photo_access.py",
+        "tests/test_photos_api.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
@@ -584,6 +586,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
         "tests/test_trips.py"
       ],
@@ -647,6 +650,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py"
       ],
       "docs": [
@@ -662,6 +666,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py"
       ],
       "docs": [

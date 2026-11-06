@@ -54,7 +54,7 @@ class AccessCase(RouteCase):
         return self.ok(who, "GET", f"/api/trips/{trip or self.trip}/photo-sharing")
 
     def core(self, state):
-        return {k: v for k, v in state.items() if k not in ("window", "changed")}
+        return {k: v for k, v in state.items() if k not in ("window", "changed", "audience", "sources")}
 
     def seen_by(self, who, trip=None):
         got = self.listing(who, trip)

@@ -122,7 +122,7 @@ class PhotoRoutes(RouteCase):
             self.assertEqual([p["cluster"] for p in got["photos"]], [None, 0])
         self.assertEqual(got["photos"][1], {"id": mine, "person_id": self.person["ana"], "trip_id": self.trip, "kind": "image", "taken_local": "2026-06-02T10:00", "zone": LONDON,
                                             "latitude": SOHO[0], "longitude": SOHO[1], "location_source": "exif", "segment_id": self.stay["id"],
-                                            "match": "place", "distance_km": 1.2, "cluster": 0})
+                                            "match": "place", "distance_km": 1.2, "cluster": 0, "removed_at": None})
         stranger = self.call("cy", "GET", f"/api/trips/{self.trip}/photos")
         self.assertEqual(stranger, (404, {"error": "No such trip"}))
         self.assertEqual(self.call("ana", "GET", "/api/trips/99999/photos"), stranger)
@@ -386,6 +386,42 @@ class PhotoRoutes(RouteCase):
         blank = self.photo(self.ana, None, "2027-01-02T12:00", match="ambiguous")
         got = self.ok("ana", "POST", f"/api/photos/{blank}", {"trip_id": later["trip_id"]})
         self.assertEqual((got["match"], got["segment_id"], got["location_source"]), ("time", later["id"], "inferred"))
+
+    def test_a_confirmation_carries_the_audience_and_the_libraries_it_saw_and_a_stale_one_answers_409(self):
+        seen = self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing")
+        self.assertIn(self.person["ana"], seen["audience"])
+        self.assertEqual(seen["audience"], sorted(seen["audience"]))
+        self.assertEqual([s["status"] for s in seen["sources"]], ["ok"])
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "audience": "everyone"})[0], 400)
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "sources": [{"id": "x"}]})[0], 400)
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "audience": [*seen["audience"], 9999]}),
+                         (409, {"error": "The trip changed. Review who sees your photos under Your photos on this trip."}))
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "sources": [{"id": seen["sources"][0]["id"], "status": "off"}]}),
+                         (409, {"error": "Your libraries changed. Review them before sharing."}))
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing")["changed"], seen["changed"])
+        got = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "audience": seen["audience"], "sources": seen["sources"], "window": seen["window"]})
+        self.assertEqual((got["scope"], got["audience"], got["sources"]), ("trip", seen["audience"], seen["sources"]))
+        later = self.later()
+        self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{later['trip_id']}/photo-sharing")["state"], "declined")
+        pending = self.ok("ana", "GET", f"/api/trips/{later['trip_id']}/photo-sharing")
+        prefs = f"/api/photo-sharing-prefs/{self.person['ana']}"
+        self.assertEqual(self.call("ana", "POST", prefs, {"share_all": True, "audiences": [1]})[0], 400)
+        self.assertEqual(self.call("ana", "POST", prefs, {"share_all": True, "audiences": {str(later["trip_id"]): [*pending["audience"], 9999]}}),
+                         (409, {"error": "Your trips changed. Review them before sharing on all."}))
+        self.assertEqual(self.call("ana", "POST", prefs, {"share_all": True, "sources": []}), (409, {"error": "Your libraries changed. Review them before sharing."}))
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{later['trip_id']}/photo-sharing")["state"], "declined")
+        self.assertEqual(self.ok("ana", "POST", prefs, {"share_all": True, "audiences": {str(later["trip_id"]): pending["audience"]}, "sources": seen["sources"]})["share_all"], True)
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{later['trip_id']}/photo-sharing")["state"], "shared")
+
+    def test_a_removed_photo_carries_the_removals_stamp_for_undo(self):
+        mine = self.photo(self.ana, self.trip, "2026-06-02T12:00", where=SOHO)
+        got = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [mine]})
+        stamp = got["removed"][0]["removed_at"]
+        self.assertIsInstance(stamp, float)
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing")["removed"][0]["removed_at"], stamp)
+        self.assertIsNone(self.ok("ana", "GET", f"/api/trips/{self.trip}/photos")["photos"][0]["removed_at"]) if self.ok("ana", "GET", f"/api/trips/{self.trip}/photos")["photos"] else None
+        self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created={stamp + 1}")[0], 409)
+        self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created={stamp}")["removed_count"], 0)
 
     def test_moving_to_a_trip_whose_bookings_are_all_cancelled_is_refused_because_its_sharing_ended(self):
         later = self.later()

@@ -193,6 +193,27 @@ class GrantTests(GrantCase):
             photogrants.decline(self.c, self.jane, self.jid, self.a, 17.0)
         self.assertEqual(order[:2], ["trip", "grant"])
 
+    def test_sharing_a_new_overlapping_trip_re_matches_the_automatic_rows_its_window_holds(self):
+        self.share(self.jid, self.a)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        self.c.execute(update(Segment).where(Segment.id == stay).values(latitude=51.1537, longitude=-0.1821))
+        row = photo_row(self.janes, self.a, INSIDE_B, where=(51.1537, -0.1821), match="time")
+        self.c.orm.add(row)
+        self.c.orm.flush()
+        photogrants.grant(self.c, self.jane, self.jid, self.b, "trip", 36.0)
+        self.assertEqual((self.row(row.id).trip_id, self.row(row.id).match, self.row(row.id).decided_by), (self.b, "place", "auto"))
+
+    def test_stopping_keeps_a_hand_placement_hidden_until_the_trip_is_shared_again(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        placed = self.photo(self.b, decided="owner")
+        photogrants.stop(self.c, self.jane, self.jid, self.b, 30.0)
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.b, "owner"))
+        self.assertEqual((self.seen(self.jane, self.b), self.seen(self.jane, self.a)), ([], []))
+        photogrants.grant(self.c, self.jane, self.jid, self.b, "trip", 31.0)
+        self.assertEqual((self.row(placed.id).trip_id, self.row(placed.id).decided_by), (self.b, "owner"))
+        self.assertEqual(self.seen(self.jane, self.b), [placed.id])
+
     def test_a_first_confirmation_bound_to_the_audience_seen_refuses_when_someone_joined_meanwhile(self):
         seen = photogrants.audience_of(self.c, self.a)
         self.assertEqual(seen, sorted((self.jid, self.sid)))
@@ -744,6 +765,41 @@ class TripChangeTests(GrantCase):
         self.assertIsNotNone(self.row(during.id))
         self.assertEqual(self.row(during.id).trip_id, new)
 
+    def test_editing_a_booking_locks_its_trip_before_the_booking_changes(self):
+        self.share(self.jid, self.b)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        seen: list[str] = []
+        real = photogrants._lock_trip
+
+        def note(conn, trip_id):
+            seen.append(self.c.execute(select(Segment.end_local).where(Segment.id == stay)).scalar())
+            return real(conn, trip_id)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=note):
+            trips.edit_segment(self.c, self.jane, stay, {"end_local": "2026-06-06T10:00"})
+        self.assertEqual(seen[0], "2026-06-05T10:00")
+        self.c.orm.expire_all()
+        self.assertEqual(self.c.orm.get(Segment, stay).end_local, "2026-06-06T10:00")
+
+    def test_moving_a_booking_that_puts_the_person_aboard_the_target_grants_it_before_the_sources_rows_go(self):
+        photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 60.0)
+        theirs = self.add(self.jane, {**OUT, "start_local": "2027-06-01T19:00", "end_local": "2027-06-02T07:10"}, None, self.on(self.sid))["trip_id"]
+        self.assertNotIn(self.jid, trippeople.of(self.c, [theirs])[theirs])
+        source = trips.create_trip(self.c, self.jane, {"name": "Lone", "people": [self.jid]})["id"]
+        self.c.execute(update(Trip).where(Trip.id == source).values(auto=True))
+        hotel = self.add(self.jane, {**HOTEL, "start_local": "2027-06-02T15:00", "end_local": "2027-06-04T10:00"}, source)
+        self.assertEqual(self.grant(self.jid, source), ("trip", None, "u-jane"))
+        self.assertIsNone(self.grant(self.jid, theirs))
+        during = self.photo(source, "2027-06-03T12:00", match="time")
+        trips.move_segment(self.c, self.jane, hotel["id"], theirs, confirmed=True)
+        self.c.orm.expire_all()
+        self.assertEqual(self.c.execute(select(Segment.trip_id).where(Segment.id == hotel["id"])).scalar(), theirs)
+        self.assertEqual(self.c.execute(select(Segment.id).where(Segment.trip_id == source)).fetchall(), [])
+        self.assertIsNone(self.c.orm.get(Trip, source))
+        self.assertIn(self.jid, trippeople.of(self.c, [theirs])[theirs])
+        self.assertEqual(self.grant(self.jid, theirs), ("trip", None, "u-jane"))
+        self.assertIsNotNone(self.row(during.id))
+        self.assertEqual(self.row(during.id).trip_id, theirs)
+
     def test_cancelling_the_last_booking_ends_the_grants_until_the_trip_is_shared_again(self):
         self.share(self.jid, self.a)
         self.share(self.jid, self.b)
@@ -1175,7 +1231,8 @@ class DecisionTests(GrantCase):
         photogrants.stop(self.c, self.jane, self.jid, self.b, 72.0)
         with self.stopping_first(self.a, 73.0):
             self.assertIsNone(photos.decide(self.c, self.jane, both.id, self.a, None))
-        self.assertIsNone(self.row(both.id))
+        self.assertEqual((self.row(both.id).trip_id, self.row(both.id).decided_by), (self.a, "owner"))
+        self.assertEqual(self.seen(self.jane, self.a), [])
 
     def test_a_decision_locks_the_trip_a_concurrent_stop_moved_the_photo_to_before_deciding(self):
         self.share(self.jid, self.a)
