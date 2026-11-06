@@ -25,10 +25,10 @@ SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
 	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
-	fleet-checks fleet-sync api-contract api-contract-check verify-skill verify-skill-print user-feature-map control-smoke
+	fleet-checks relay-test fleet-sync api-contract api-contract-check verify-skill verify-skill-print user-feature-map control-smoke
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
-check: lint feature-map-check api-contract-check fleet-checks test-parallel frontend-check docs-build
+check: lint feature-map-check api-contract-check fleet-checks test-parallel relay-test frontend-check docs-build
 
 # Ruff, mypy and import-linter's boundaries (the contracts in pyproject.toml) for Python, ESLint over the web app and
 # waypoint/static (the same lint CI runs), and Waypoint's own Semgrep rules.
@@ -86,6 +86,9 @@ frontend/node_modules: frontend/package-lock.json
 
 # The web app's type-check, ESLint, Vitest tests (with the coverage floor in frontend/vite.config.ts) and build, as CI
 # runs them.
+relay-test:
+	cd relay && $(NPM) ci && $(NPM) test
+
 frontend-check: frontend-typecheck frontend-lint frontend-test frontend-build
 
 frontend-typecheck: frontend/node_modules

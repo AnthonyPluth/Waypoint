@@ -73,6 +73,7 @@ describe("registering", () => {
   test("refuses a token that is not hex, an unknown environment, a list and an oversized body", async () => {
     assert.equal((await register({ apns_token: "not hex" })).status, 400);
     assert.equal((await register({ environment: "staging" })).status, 400);
+    for (const inherited of ["__proto__", "constructor", "toString"]) assert.equal((await register({ environment: inherited })).status, 400);
     const list = await handle(new Request("https://relay.test/v1/devices", { method: "POST", body: "[]" }), ctx.env, deps());
     assert.equal(list.status, 400);
     const big = await handle(new Request("https://relay.test/v1/devices", { method: "POST", body: "x".repeat(2000) }), ctx.env, deps());
@@ -137,6 +138,7 @@ describe("waking a device", () => {
   test("refuses a kind or collapse id it does not know", async () => {
     const { id, auth } = await registered();
     assert.equal((await handle(post(`/v1/devices/${id}/wake`, { kind: "loud" }, auth), ctx.env, deps())).status, 400);
+    for (const inherited of ["__proto__", "constructor"]) assert.equal((await handle(post(`/v1/devices/${id}/wake`, { kind: inherited }, auth), ctx.env, deps())).status, 400);
     assert.equal((await handle(post(`/v1/devices/${id}/wake`, { collapse_id: "a b" }, auth), ctx.env, deps())).status, 400);
     assert.equal(sent.length, 0);
   });

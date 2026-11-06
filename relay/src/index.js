@@ -116,7 +116,7 @@ async function register(request, env) {
   const token = typeof value.apns_token === "string" ? value.apns_token.toLowerCase() : "";
   const environment = value.environment ?? "production";
   if (!HEX_TOKEN.test(token)) return reply(400, { error: "apns_token must be the device token as hex." });
-  if (!HOSTS[environment]) return reply(400, { error: "environment must be production or development." });
+  if (!Object.hasOwn(HOSTS, environment)) return reply(400, { error: "environment must be production or development." });
   const byToken = `t:${await sha256(`${environment}:${token}`)}`;
   const id = (await env.DEVICES.get(byToken)) || random(12);
   const secret = random(32);
@@ -143,7 +143,7 @@ async function wake(request, env, deps, id) {
   if (tooBig) return reply(413, { error: "Request too large." });
   if (bad) return reply(400, { error: "Send a JSON object." });
   const kind = value.kind ?? "alert";
-  const shape = PAYLOADS[kind];
+  const shape = Object.hasOwn(PAYLOADS, kind) ? PAYLOADS[kind] : undefined;
   if (!shape) return reply(400, { error: "kind must be alert or background." });
   const collapse = value.collapse_id;
   if (collapse !== undefined && !(typeof collapse === "string" && COLLAPSE.test(collapse))) {

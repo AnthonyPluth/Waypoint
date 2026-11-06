@@ -22,7 +22,7 @@ A small Cloudflare Worker that holds the Apple Push Notification key so a self-h
 1. In the Apple developer account, create an APNs key (Keys → Apns) and note its Key ID and your Team ID. Download the `.p8` once.
 2. `npm install`, then `npx wrangler kv namespace create DEVICES` and put the id in `wrangler.toml`.
 3. Set `APNS_TOPIC` in `wrangler.toml` to the app's bundle identifier.
-4. `npx wrangler secret put APNS_KEY` (paste the whole `.p8`), `APNS_KEY_ID`, `APNS_TEAM_ID`. Never commit the key.
+4. `npx wrangler secret put APNS_KEY < AuthKey_XXXXXXXXXX.p8` (the key has to come from stdin: the prompt takes one line, so pasting stores only the first), then `npx wrangler secret put APNS_KEY_ID` and `APNS_TEAM_ID`. Never commit the key.
 5. `npm run deploy`, and give self-hosters the Worker's address.
 
 ## Tests
