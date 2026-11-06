@@ -5,11 +5,18 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from typing import Any
+
 from .. import tls
 
 
 class Gone(Exception):
     pass
+
+
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: urllib.request.Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
 
 
 def wake(base: str, device_id: str, secret: str, collapse_id: str | None = None, timeout: float = 10) -> None:
@@ -20,7 +27,7 @@ def wake(base: str, device_id: str, secret: str, collapse_id: str | None = None,
         f"{base.rstrip('/')}/v1/devices/{urllib.parse.quote(device_id, safe='')}/wake", data=json.dumps(body).encode(), method="POST",
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {secret}", "User-Agent": "Waypoint/0.1"})
     try:
-        with tls.urlopen(req, timeout=timeout) as r:
+        with tls.urlopen(req, timeout=timeout, handlers=(_NoRedirects(),)) as r:
             r.read(1024)
     except urllib.error.HTTPError as e:
         if e.code in (401, 404, 410):

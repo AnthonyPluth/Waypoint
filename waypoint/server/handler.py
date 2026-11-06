@@ -5,6 +5,7 @@ import html
 from http.cookies import SimpleCookie
 import json
 import os
+import re
 import socket
 import sys
 import threading
@@ -402,7 +403,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._feed(method, url.path)
         if url.path not in PUBLIC_FILES:
             api = url.path.startswith("/api/")
-            self.user = (self._app_user() if api and self.headers.get("Authorization") else None) or self._user(renew=api)
+            bearer = api and re.match(r"\s*bearer\s", self.headers.get("Authorization") or "", re.I)
+            self.user = self._app_user() if bearer else self._user(renew=api)
             if not self.user:
                 if url.path.startswith("/api/"):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})

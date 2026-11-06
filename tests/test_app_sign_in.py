@@ -158,6 +158,12 @@ class AppSessionTests(AppSignIn):
         cookie = self.api(t["access_token"], "POST", "/auth/app-session", b"", APP_HEADERS).json["value"]
         return t, {"waypoint_session": cookie}
 
+    def test_a_bearer_that_does_not_check_out_is_not_rescued_by_a_session_cookie(self):
+        _t, cookie = self.minted()
+        for header in ("Bearer wpa_not-a-token", "bearer   wpa_not-a-token"):
+            self.assertEqual(self.http("GET", "/api/trips", headers={"Authorization": header}, cookies=cookie).status, 401)
+        self.assertEqual(self.http("GET", "/api/trips", headers={"Authorization": "Basic dTpw"}, cookies=cookie).status, 200)
+
     def test_using_the_session_does_not_stretch_it(self):
         _t, cookie = self.minted()
         with db.session() as conn:

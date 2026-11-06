@@ -180,6 +180,14 @@ class RelayCallTests(unittest.TestCase):
         self.assertEqual(request.get_header("Authorization"), f"Bearer {SECRET}")
         self.assertEqual(request.data, b'{"kind": "alert", "collapse_id": "check-in-1"}')
 
+    def test_a_redirect_from_the_relay_is_not_followed_so_the_secret_goes_nowhere_else(self):
+        self.assertIsNone(relay._NoRedirects().redirect_request(mock.Mock(), None, 302, "Found", {}, "https://elsewhere.example.com/"))
+        found = urllib.error.HTTPError(RELAY, 302, "Found", {}, io.BytesIO(b""))
+        self.addCleanup(found.close)
+        with mock.patch.object(relay.tls, "urlopen", side_effect=found) as opened, self.assertRaises(RuntimeError):
+            relay.wake(RELAY, DEVICE, SECRET)
+        self.assertTrue(any(isinstance(h, relay._NoRedirects) for h in opened.call_args.kwargs["handlers"]))
+
     def test_what_the_relay_says_decides_whether_the_phone_is_kept(self):
         def says(code):
             error = urllib.error.HTTPError(RELAY, code, "x", {}, io.BytesIO(b""))
