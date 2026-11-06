@@ -99,16 +99,18 @@ def owned(conn: db.Connection, actor: Actor, source_id: int) -> Stored:
     return source
 
 
-def _steward_ok(conn: db.Connection, actor: Actor, person_id: int) -> None:
+def _steward_ok(conn: db.Connection, actor: Actor, person_id: int) -> bool:
     person = conn.execute(select(Person.id, Person.user_sub).where(Person.id == person_id)).fetchone()
     if person is None:
         raise NoSuchPerson()
     if person["user_sub"] is not None:
         if person_id != actor.person_id:
             raise Refused(NOT_YOURS)
-        return
-    if any(s["owner_sub"] != actor.sub for s in photo_sources.for_person(conn, person_id)):
+        return False
+    held = {photo_sources.steward_of(conn, person_id), *(s["owner_sub"] for s in photo_sources.for_person(conn, person_id))}
+    if held - {None, actor.sub}:
         raise Refused(OTHER_STEWARD)
+    return True
 
 
 def provider_source(url: str, key: str, user_id: str | None = None) -> immich.Source:
@@ -125,20 +127,22 @@ def test_new(url: str, key: str) -> Tested:
     return {"name": _ping(provider_source(url, key)).name, "same_account": None}
 
 
-def _not_yet(conn: db.Connection, person_id: int, url: str) -> None:
-    if any(s["url"] == url for s in photo_sources.for_person(conn, person_id)):
+def _not_yet(conn: db.Connection, person_id: int, url: str, user_id: str) -> None:
+    if any(s["url"] == url and s["immich_user_id"] == user_id for s in photo_sources.for_person(conn, person_id)):
         raise Refused(ALREADY)
 
 
 def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: str, label: str | None, now: float | None = None) -> Listed:
-    _steward_ok(conn, actor, person_id)
-    _not_yet(conn, person_id, url)
+    stewarded = _steward_ok(conn, actor, person_id)
     account = _ping(provider_source(url, key))
+    _not_yet(conn, person_id, url, account.user_id)
     if not photo_sources.lock_person(conn, person_id):
         raise NoSuchPerson()
     source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now)
     if source_id is None:
         raise Refused(ALREADY)
+    if stewarded and not photo_sources.set_steward(conn, person_id, actor.sub):
+        raise Refused(OTHER_STEWARD)
     _steward_ok(conn, actor, person_id)
     return listed(conn, actor, source_id)
 

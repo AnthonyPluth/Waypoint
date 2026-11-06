@@ -19,8 +19,8 @@ from .api.assistant import (api_assistant_review, api_assistant_review_create, a
                             api_assistant_review_item, api_assistant_review_match, api_assistant_segment_emails)
 from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.photos import (api_photo_decide, api_photo_exclude, api_photo_grants, api_photo_prefs_set, api_photo_put_back, api_photo_review, api_photo_sharing,
-                         api_photo_sharing_set, api_photo_sharing_stop, api_photo_source_add, api_photo_source_edit, api_photo_source_remove,
-                         api_photo_source_sync, api_photo_source_test, api_photo_source_test_new, api_photo_sources, api_trip_photos)
+                         api_photo_sharing_set, api_photo_sharing_stop, api_photo_source_add, api_photo_source_edit, api_photo_source_remove, api_photo_source_sync,
+                         api_photo_source_test, api_photo_source_test_new, api_photo_sources, api_trip_photos)
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
 from .api.logos import api_loyalty_logo, api_segment_logo

@@ -4,10 +4,9 @@ from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
 from sqlalchemy import ColumnElement, delete, func, select, true, update
-from sqlalchemy.orm import aliased
 
 from . import db, secretbox
-from .models import Person, Photo, PhotoSource
+from .models import Person, Photo, PhotoSharingPrefs, PhotoSource
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -67,6 +66,17 @@ def lock_person(conn: db.Connection, person_id: int) -> bool:
     return int(conn.execute(update(Person).where(Person.id == person_id).values(display_name=Person.display_name)).rowcount) > 0
 
 
+def steward_of(conn: db.Connection, person_id: int) -> str | None:
+    found = conn.execute(select(PhotoSharingPrefs.steward_sub).where(PhotoSharingPrefs.person_id == person_id)).scalar()
+    return str(found) if found is not None else None
+
+
+def set_steward(conn: db.Connection, person_id: int, sub: str) -> bool:
+    db.insert_ignore(conn, PhotoSharingPrefs, {"person_id": person_id, "steward_sub": sub}, key=["person_id"])
+    conn.execute(update(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == person_id, PhotoSharingPrefs.steward_sub.is_(None)).values(steward_sub=sub))
+    return steward_of(conn, person_id) == sub
+
+
 def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
     values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
               "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
@@ -114,9 +124,3 @@ def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
     rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))
                         .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP)).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
-
-
-def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> int:
-    mine = aliased(PhotoSource)
-    twin = select(mine.id).where(mine.person_id == member_id, mine.url == PhotoSource.url, mine.immich_user_id == PhotoSource.immich_user_id).exists()
-    return int(conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id, ~twin).values(person_id=member_id, owner_sub=sub)).rowcount)

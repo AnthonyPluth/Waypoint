@@ -1,6 +1,6 @@
 ---
 title: Photos
-description: "How a trip's photos are read from each member's Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone."
+description: "How a trip’s photos are read from each member’s Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone."
 sidebar:
   order: 6
 ---
@@ -26,7 +26,7 @@ Each library card shows its person, its host and its status: **ok**, **refused**
 
 ### Who connects whose library
 
-A member who signs in connects only their own libraries, so nobody else can attach a library to them. A person in People who has no sign-in of their own (a child) has one steward: the member who connected their first library connects all of them, and another member trying to is refused. When that person later signs in and links the guest entry to themselves, their libraries become their own and the former steward keeps nothing.
+A member who signs in connects only their own libraries, so nobody else can attach a library to them. A person in People who has no sign-in of their own (a child) has one steward: the member who connected their first library, recorded with the child’s sharing settings the moment that library is saved and kept even after their last library is removed, so another member cannot take over by connecting one; the steward connects all of the child’s libraries and shares for them, and another member trying to connect one is refused. The steward’s standing ends with their access (then another member may become steward, starting with nothing shared) or when the child signs in and links the guest entry to themselves: their libraries become their own and the former steward keeps nothing.
 
 ### When someone loses access
 

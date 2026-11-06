@@ -23,7 +23,6 @@ MAX_ID = 10 ** 18
 MAX_REMOVED = 500
 NOT_A_TRIP = "The trip must be a whole number"
 OFF = "Photos are off without sign-in."
-NOT_A_PERSON = "The person must be a whole number"
 BAD_URL = "The Immich address must be a web address, such as https://immich.local:2283, with no path or sign-in in it"
 BAD_KEY = "Enter the API key as Immich shows it"
 KEY_LIMIT = 512
@@ -32,6 +31,7 @@ NOTHING_TO_CHANGE = 'Send "key", "label" or "paused"'
 FAILED = {immich.Refused: 400, immich.NotConfigured: 400, immich.RateLimited: 503, immich.Unavailable: 502}
 REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409}
 _v = validate.Validator(ApiError, not_number=NOT_A_TRIP, too_long="The {label} is too long (at most {limit} characters)")
+NOT_A_PERSON = "The person must be a whole number"
 NOT_A_SCOPE = 'Send "scope" as "only_me" or "trip"'
 NOT_IDS = 'Send "photo_ids" as a list of whole numbers'
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
@@ -93,6 +93,62 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
     if (trip is None and not excluded) or "hidden" in body:
         raise ApiError(NOTHING_TO_DO)
     return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
+
+
+def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:
+    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
+    person = _person(conn, who, (q.get("person_id") or [None])[0])
+    return _sharing(lambda: photogrants.state_of(conn, who, person, trip))
+
+
+def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSharing:
+    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
+    person, scope, declined = _person(conn, who, body.get("person_id")), _scope(body), _flag(body, "declined")
+    if scope is None and not declined:
+        raise ApiError(NOTHING_TO_SHARE)
+    if declined:
+        return _sharing(lambda: photogrants.decline(conn, who, person, trip))
+    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME))
+
+
+def api_photo_sharing_stop(conn, q, _b, trip_id) -> PhotoSharing:
+    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
+    person = _person(conn, who, (q.get("person_id") or [None])[0])
+    return _sharing(lambda: photogrants.stop(conn, who, person, trip))
+
+
+def _seen(conn, who: Viewer, trip: int) -> None:
+    _sharing(lambda: photogrants.state_of(conn, who, _person(conn, who, None), trip))
+
+
+def api_photo_exclude(conn, _q, body: PhotoExclusionsBody, trip_id) -> PhotoSharing:
+    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
+    ids = body.get("photo_ids")
+    if not isinstance(ids, list) or not ids or len(ids) > MAX_REMOVED or any(isinstance(i, bool) or not isinstance(i, int) or i < 1 for i in ids):
+        raise ApiError(NOT_IDS)
+    _seen(conn, who, trip)
+    return _run(lambda: photogrants.exclude(conn, who, trip, ids), NO_PHOTO)
+
+
+def api_photo_put_back(conn, _q, _b, trip_id, photo_id) -> PhotoSharing:
+    who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
+    _seen(conn, who, trip)
+    return _run(lambda: photogrants.put_back(conn, who, trip, this), NO_PHOTO)
+
+
+def api_photo_grants(conn, _q, _b) -> PhotoGrants:
+    return photogrants.grants(conn, _viewer(conn))
+
+
+def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs:
+    who, person = _viewer(conn), row_id(person_id, NO_TRIP)
+    scope = body.get("default_scope")
+    if scope is not None and scope not in photos.SCOPES:
+        raise ApiError('Send "default_scope" as "only_me" or "trip"')
+    share_all = _flag(body, "share_all")
+    if scope is None and share_all is None:
+        raise ApiError('Send "default_scope" or "share_all"')
+    return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all), NO_TRIP)
 
 
 def actor(conn) -> Actor:
@@ -196,59 +252,3 @@ def api_photo_source_sync(conn, _q, _b, source_id) -> SyncStarted:
     me, this = actor(conn), row_id(source_id, photosources.NO_SOURCE)
     _ask(lambda: photosources.owned(conn, me, this))
     return {"started": jobs.sync_photos_now(this)}
-
-
-def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:
-    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
-    person = _person(conn, who, (q.get("person_id") or [None])[0])
-    return _sharing(lambda: photogrants.state_of(conn, who, person, trip))
-
-
-def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSharing:
-    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
-    person, scope, declined = _person(conn, who, body.get("person_id")), _scope(body), _flag(body, "declined")
-    if scope is None and not declined:
-        raise ApiError(NOTHING_TO_SHARE)
-    if declined:
-        return _sharing(lambda: photogrants.decline(conn, who, person, trip))
-    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME))
-
-
-def api_photo_sharing_stop(conn, q, _b, trip_id) -> PhotoSharing:
-    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
-    person = _person(conn, who, (q.get("person_id") or [None])[0])
-    return _sharing(lambda: photogrants.stop(conn, who, person, trip))
-
-
-def _seen(conn, who: Viewer, trip: int) -> None:
-    _sharing(lambda: photogrants.state_of(conn, who, _person(conn, who, None), trip))
-
-
-def api_photo_exclude(conn, _q, body: PhotoExclusionsBody, trip_id) -> PhotoSharing:
-    who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
-    ids = body.get("photo_ids")
-    if not isinstance(ids, list) or not ids or len(ids) > MAX_REMOVED or any(isinstance(i, bool) or not isinstance(i, int) or i < 1 for i in ids):
-        raise ApiError(NOT_IDS)
-    _seen(conn, who, trip)
-    return _run(lambda: photogrants.exclude(conn, who, trip, ids), NO_PHOTO)
-
-
-def api_photo_put_back(conn, _q, _b, trip_id, photo_id) -> PhotoSharing:
-    who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
-    _seen(conn, who, trip)
-    return _run(lambda: photogrants.put_back(conn, who, trip, this), NO_PHOTO)
-
-
-def api_photo_grants(conn, _q, _b) -> PhotoGrants:
-    return photogrants.grants(conn, _viewer(conn))
-
-
-def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs:
-    who, person = _viewer(conn), row_id(person_id, NO_TRIP)
-    scope = body.get("default_scope")
-    if scope is not None and scope not in photos.SCOPES:
-        raise ApiError('Send "default_scope" as "only_me" or "trip"')
-    share_all = _flag(body, "share_all")
-    if scope is None and share_all is None:
-        raise ApiError('Send "default_scope" or "share_all"')
-    return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all), NO_TRIP)
