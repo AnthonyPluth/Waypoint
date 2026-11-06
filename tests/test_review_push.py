@@ -18,7 +18,8 @@ from tests.test_reminders import ENDPOINT, subscription
 from tests.test_webpush import PushService, decrypt, receiver
 from waypoint.domain import app_push, reminders
 from waypoint.domain.mail import ai, review, scan
-from waypoint.providers import apns, webpush
+from waypoint.providers import webpush
+from waypoint import tls
 from waypoint.server import jobs
 from waypoint.storage import db
 from waypoint.storage.models import Mailbox, PushDevice, ReminderSent
@@ -408,7 +409,7 @@ class PrivacyTests(PushCase):
             f.write(ec.generate_private_key(ec.SECP256R1()).private_bytes(
                 serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
         env = {app_push.KEY_FILE_ENV: key_path, app_push.KEY_ID_ENV: "ABC123DEFG", app_push.TEAM_ID_ENV: "TEAM123456", app_push.TOPIC_ENV: "com.example.waypoint"}
-        with mock.patch.dict(os.environ, env), mock.patch.object(apns, "post", return_value=(200, b"")) as posted, \
+        with mock.patch.dict(os.environ, env), mock.patch.object(tls, "post_http2", return_value=(200, b"")) as posted, \
                 no_leaks(self, "CANARY-BODY-INCOMPLETE-4N7P", *canaries, database=self.path):
             self.scan_job()
         posted.assert_called_once()

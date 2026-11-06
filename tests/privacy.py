@@ -10,7 +10,6 @@ from unittest import mock
 from sqlalchemy import MetaData, select
 
 from waypoint import tls
-from waypoint.providers import apns
 from waypoint.storage import db
 
 
@@ -46,7 +45,7 @@ def no_leaks(case, *canaries: str, database: str | None = None, sent_ok: bool = 
     out, err, logged = io.StringIO(), io.StringIO(), io.StringIO()
     sent: list[str] = []
     real_urlopen = tls.urlopen
-    real_post = apns.post
+    real_post = tls.post_http2
 
     def recording_urlopen(req, *args, **kwargs):
         sent.append(_request_text(req, kwargs.get("data")))
@@ -60,7 +59,7 @@ def no_leaks(case, *canaries: str, database: str | None = None, sent_ok: bool = 
     root = logging.getLogger()
     root.addHandler(handler)
     try:
-        with mock.patch.object(tls, "urlopen", recording_urlopen), mock.patch.object(apns, "post", recording_post), \
+        with mock.patch.object(tls, "urlopen", recording_urlopen), mock.patch.object(tls, "post_http2", recording_post), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             yield
     finally:
