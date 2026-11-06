@@ -219,7 +219,7 @@ body.desk .dev.tall { height: 800px; }
 .pin .far { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 99px; background: var(--signal); border: 2px solid var(--map-sea); }
 .pin.tapped { outline: 3px solid var(--ring); outline-offset: 3px; }
 .pin.dim { opacity: 0.45; }
-.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out infinite; }
+.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out 1; }
 @keyframes ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
 .maplabel { position: absolute; left: 8px; top: 8px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 4px 8px; font-size: 12px; line-height: 1.25; box-shadow: var(--shadow); max-width: 11rem; }
 .maplabel b { display: block; }

@@ -219,7 +219,7 @@ body.desk .dev.tall { height: 800px; }
 .pin .far { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 99px; background: var(--signal); border: 2px solid var(--map-sea); }
 .pin.tapped { outline: 3px solid var(--ring); outline-offset: 3px; }
 .pin.dim { opacity: 0.45; }
-.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out infinite; }
+.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out 1; }
 @keyframes ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
 .maplabel { position: absolute; left: 8px; top: 8px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 4px 8px; font-size: 12px; line-height: 1.25; box-shadow: var(--shadow); max-width: 11rem; }
 .maplabel b { display: block; }
@@ -409,7 +409,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <div class="vbar"><button class="btn ghost icon" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><p class="mono t-caption muted">52 of 247</p><span class="ph-only" style="gap:4px"><button class="btn ghost icon" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><button class="btn ghost icon" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></span></div>
           <div class="vstage"><button class="btn outline icon vnav prev" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><div class="vimg g6" role="img" aria-label="Photo"></div><button class="btn outline icon vnav next" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></div>
           <div class="vinfo">
-            <div><p class="mono t-title">10:58 AM</p><p class="t-caption muted">Tue 9 Sep 2026 · Marlow Springs time</p></div>
+            <div><p class="mono t-title">10:58 AM</p><p class="t-caption muted">Tue 9 Sep 2025 · Marlow Springs time</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Near Marlow Springs, Colorado</p><p class="t-caption muted">From the photo’s location</p></div></div>
             <div class="vrow"><span class="avatar sm a2" aria-hidden="true">AB</span><p>From your library</p></div>
             <div class="vacts"><a class="btn outline" href="k-remove-photos.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a><button class="btn ghost" type="button"><svg class="ic" aria-hidden="true"><use href="#i-eyeoff"/></svg>Remove from this trip</button></div>
@@ -445,7 +445,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>Gallery header: <q>Select</q> (<q>Select your photos to remove</q>), shown when you have photos on the trip. In select mode your tiles are checkboxes, <q>Photo, 11:30 AM, near Marlow Springs</q>, checked or not; other people’s tiles are not selectable and are skipped by Tab.</li>
         <li>Selection bar: <q>3 selected</q> (<code>role="status"</code>), <q>Remove from this trip</q>, <q>Cancel</q> (also Escape).</li>
         <li>Toasts: <q>Removed from Four Corners loop.</q> / <q>3 photos removed from Four Corners loop.</q> with <q>Undo</q>.</li>
-        <li>Removed list <q>Photos you removed from this trip</q>; each has <q>Put back the photo from Mon 8 Sep, 4:11 PM</q>.</li>
+        <li>Removed list <q>Photos you removed from this trip</q>; each has <q>Put back the photo from Mon 8 Sep, 3:30 PM</q>.</li>
       </ul></div>
       <div><h3>Tokens and components</h3><ul>
         <li>Selected tile: a <code>--ring</code> outline and a filled <code>bg-primary</code> check; unselected own tile: a hollow white check circle; others’ tiles at 55% opacity.</li>
@@ -522,7 +522,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     var on = !!SEL[i];
     return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
   }).join("");
-  var REMOVED = [P(7, "Mon 8 Sep, 4:11 PM"), P(10, "Mon 8 Sep, 8:05 PM"), P(1, "Wed 10 Sep, 7:44 PM")];
+  var REMOVED = [P(6, "Mon 8 Sep, 3:30 PM"), P(10, "Mon 8 Sep, 8:05 PM"), P(1, "Wed 10 Sep, 7:44 PM")];
   var remEl = document.querySelector("[data-removed]");
   if (remEl) remEl.innerHTML = REMOVED.map(function (t) {
     return '<li><span class="tile g' + t.g + '" role="img" aria-label="Photo, ' + t.time + '"></span><button type="button" class="btn ghost sm" aria-label="Put back the photo from ' + t.time + '">Put back</button></li>';

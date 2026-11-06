@@ -219,7 +219,7 @@ body.desk .dev.tall { height: 800px; }
 .pin .far { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 99px; background: var(--signal); border: 2px solid var(--map-sea); }
 .pin.tapped { outline: 3px solid var(--ring); outline-offset: 3px; }
 .pin.dim { opacity: 0.45; }
-.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out infinite; }
+.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out 1; }
 @keyframes ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
 .maplabel { position: absolute; left: 8px; top: 8px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 4px 8px; font-size: 12px; line-height: 1.25; box-shadow: var(--shadow); max-width: 11rem; }
 .maplabel b { display: block; }
@@ -409,7 +409,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <div class="vbar"><button class="btn ghost icon" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><p class="mono t-caption muted">52 of 248</p><span class="ph-only" style="gap:4px"><button class="btn ghost icon" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><button class="btn ghost icon" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></span></div>
           <div class="vstage"><button class="btn outline icon vnav prev" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><div class="vimg g8" role="img" aria-label="Photo"></div><button class="btn outline icon vnav next" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></div>
           <div class="vinfo">
-            <div><p class="mono t-title">10:42 AM</p><p class="t-caption muted">Tue 9 Sep 2026 · Marlow Springs time</p></div>
+            <div><p class="mono t-title">10:42 AM</p><p class="t-caption muted">Tue 9 Sep 2025 · Marlow Springs time</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Near Marlow Springs, Colorado</p><p class="t-caption muted">From the photo’s location · 3 km from Juniper House</p></div></div>
             <div class="vrow"><span class="avatar sm a2" aria-hidden="true">AB</span><p>From Ada Brook’s library</p></div>
             <div class="vacts"><a class="btn outline" href="b-photo-viewer.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a><button class="btn ghost" type="button"><svg class="ic" aria-hidden="true"><use href="#i-eyeoff"/></svg>Remove from this trip</button></div>
@@ -422,7 +422,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <div class="vbar"><button class="btn ghost icon" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><p class="mono t-caption muted">61 of 248</p><span class="ph-only" style="gap:4px"><button class="btn ghost icon" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><button class="btn ghost icon" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></span></div>
           <div class="vstage"><button class="btn outline icon vnav prev" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><div class="vimg g2" role="img" aria-label="Video still"></div><button class="vplay" type="button" aria-label="Play video, 0:42"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg></button><button class="btn outline icon vnav next" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></div>
           <div class="vinfo">
-            <div><p class="mono t-title">4:18 PM</p><p class="t-caption muted">Wed 10 Sep 2026 · Marlow Springs time · Video, 0:42</p></div>
+            <div><p class="mono t-title">4:18 PM</p><p class="t-caption muted">Wed 10 Sep 2025 · Marlow Springs time · Video, 0:42</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Marlow Springs, Colorado <span class="chip quiet small" style="margin-left:4px">From the itinerary</span></p><p class="t-caption muted">This video has no location. You were staying at Juniper House, Marlow Springs.</p></div></div>
             <div class="vrow"><span class="avatar sm a4" aria-hidden="true">TB</span><p>From Theo Brook’s library</p></div>
             <div class="vacts"><a class="btn outline" href="b-photo-viewer.html"><svg class="ic" aria-hidden="true"><use href="#i-ext"/></svg>Open original</a></div>
@@ -435,7 +435,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <div class="vbar"><button class="btn ghost icon" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><p class="mono t-caption muted">88 of 248</p><span class="ph-only" style="gap:4px"><button class="btn ghost icon" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><button class="btn ghost icon" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></span></div>
           <div class="vstage"><button class="btn outline icon vnav prev" type="button" aria-label="Previous photo"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg></button><div class="vimg g12" role="img" aria-label="Photo"></div><button class="btn outline icon vnav next" type="button" aria-label="Next photo"><svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button></div>
           <div class="vinfo">
-            <div><p class="mono t-title">7:55 AM</p><p class="t-caption muted">Wed 10 Sep 2026 · Saltwick Bay time</p></div>
+            <div><p class="mono t-title">7:55 AM</p><p class="t-caption muted">Wed 10 Sep 2025 · Saltwick Bay time</p></div>
             <div class="vrow"><svg class="ic" aria-hidden="true"><use href="#i-pin"/></svg><div><p>Saltwick Bay, California</p><p class="t-caption muted">From the photo’s location</p></div></div>
             <p class="chip warn">Far: 612 km from every booking</p>
             <div class="vrow"><span class="avatar sm a2" aria-hidden="true">AB</span><p>From Ada Brook’s library</p></div>

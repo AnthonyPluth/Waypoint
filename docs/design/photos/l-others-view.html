@@ -219,7 +219,7 @@ body.desk .dev.tall { height: 800px; }
 .pin .far { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 99px; background: var(--signal); border: 2px solid var(--map-sea); }
 .pin.tapped { outline: 3px solid var(--ring); outline-offset: 3px; }
 .pin.dim { opacity: 0.45; }
-.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out infinite; }
+.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out 1; }
 @keyframes ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
 .maplabel { position: absolute; left: 8px; top: 8px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 4px 8px; font-size: 12px; line-height: 1.25; box-shadow: var(--shadow); max-width: 11rem; }
 .maplabel b { display: block; }
@@ -406,7 +406,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <div class="stage"><div class="frames">
       <figure class="fig"><figcaption>l1 · Ada’s view</figcaption>
         <div class="dev frag"><div class="main">
-          <div class="who" style="display:flex;flex-direction:column;gap:4px"><h2 class="t-title">Four Corners loop</h2><p class="muted">Sat 6 Sep – Sat 20 Sep 2026</p>
+          <div class="who" style="display:flex;flex-direction:column;gap:4px"><h2 class="t-title">Four Corners loop</h2><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p>
             <dl class="sumline" aria-label="Trip summary"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Nights away</dt><dd>14 nights</dd></div><div><dt class="sr">Distance</dt><dd>1,284 mi</dd></div><div><dt class="sr">Places</dt><dd>Colorado, Utah, Arizona</dd></div><div><dt class="sr">Photos</dt><dd>171 photos</dd></div></dl></div>
           <div data-map="ada"></div>
           <section class="photos" aria-labelledby="l1h">
@@ -418,7 +418,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
       </figure>
       <figure class="fig"><figcaption>l2 · Theo’s view of the same trip</figcaption>
         <div class="dev frag"><div class="main">
-          <div class="who" style="display:flex;flex-direction:column;gap:4px"><h2 class="t-title">Four Corners loop</h2><p class="muted">Sat 6 Sep – Sat 20 Sep 2026</p>
+          <div class="who" style="display:flex;flex-direction:column;gap:4px"><h2 class="t-title">Four Corners loop</h2><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p>
             <dl class="sumline" aria-label="Trip summary"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Nights away</dt><dd>14 nights</dd></div><div><dt class="sr">Distance</dt><dd>1,284 mi</dd></div><div><dt class="sr">Places</dt><dd>Colorado, Utah, Arizona, New Mexico</dd></div><div><dt class="sr">Photos</dt><dd>248 photos <span class="muted">(23 placed from the itinerary)</span></dd></div></dl></div>
           <section class="photos" aria-labelledby="l2h">
             <div class="photos-head"><h2 id="l2h" class="t-heading">Photos <span class="muted t-caption">248</span></h2><button class="btn outline sm" type="button" aria-expanded="false">See all 248 photos</button></div>
@@ -563,7 +563,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var LAKE = '<rect width="800" height="500" fill="var(--map-land)"/><path d="M290 210C330 150 470 140 530 186C600 238 568 318 480 324C390 330 320 300 292 254Z" fill="var(--map-sea)" stroke="var(--map-border)" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
     '<g fill="none" stroke="var(--map-border)" stroke-linecap="round" stroke-width="1.6"><path d="M0 120C160 130 260 90 420 110S640 170 800 150"/><path d="M640 0C620 160 660 320 600 500"/></g>';
 
-  var ADA_N = { p1: 4, p2: 25, p4: 50, p9: 3, p5: 30, p10: 8, p8: 51 };
+  var ADA_N = { p1: 4, p2: 31, p4: 60, p9: 3, p5: 35, p10: 8, p8: 30 };
   var ADA = PINS.filter(function (p) { return ADA_N[p.id]; }).map(function (p) { return Object.assign({}, p, { n: ADA_N[p.id] }); });
   function mapHTML(mode, w) {
     var k = 800 / Math.max(280, w);
