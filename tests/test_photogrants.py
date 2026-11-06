@@ -193,6 +193,46 @@ class GrantTests(GrantCase):
             photogrants.decline(self.c, self.jane, self.jid, self.a, 17.0)
         self.assertEqual(order[:2], ["trip", "grant"])
 
+    def test_a_first_confirmation_bound_to_the_audience_seen_refuses_when_someone_joined_meanwhile(self):
+        seen = photogrants.audience_of(self.c, self.a)
+        self.assertEqual(seen, sorted((self.jid, self.sid)))
+        window = photos.window_out(photos.trip_window(self.c, self.a))
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.sid, self.mia]}, confirmed=True)
+        self.assertEqual(photos.window_out(photos.trip_window(self.c, self.a)), window)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, window=window, audience=seen)
+        self.assertEqual(str(refused.exception), photogrants.STALE_SHARE)
+        self.assertIsNone(self.grant(self.jid, self.a))
+        fresh = photogrants.audience_of(self.c, self.a)
+        self.assertEqual(fresh, sorted((self.jid, self.sid, self.mia)))
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 28.0, window=window, audience=fresh)["scope"], "trip")
+
+    def test_a_widening_bound_to_the_libraries_seen_refuses_when_one_was_connected_or_resumed(self):
+        self.share(self.jid, self.a, "only_me")
+        seen = photogrants.sources_of(self.c, self.jid)
+        self.assertEqual(seen, [{"id": self.janes, "status": "ok"}])
+        self.c.orm.add(PhotoSource(person_id=self.jid, owner_sub="u-jane", url="https://second.example", immich_user_id="u", api_key="enc:v1:x", status="off", created=2.0))
+        self.c.orm.flush()
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 21.0, sources=seen)
+        self.assertEqual(str(refused.exception), photogrants.STALE_SOURCES)
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        seen = photogrants.sources_of(self.c, self.jid)
+        self.assertEqual([s["status"] for s in seen], ["ok", "off"])
+        self.c.execute(update(PhotoSource).where(PhotoSource.url == "https://second.example").values(status="ok"))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 22.0, sources=seen)
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 23.0, sources=seen)
+        self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "only_me", "share_all": False})
+        self.assertEqual(self.grant(self.jid, self.b), None)
+        fresh = photogrants.sources_of(self.c, self.jid)
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 24.0, sources=fresh)["scope"], "trip")
+        self.assertEqual(photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 25.0, sources=fresh), {"default_scope": "trip", "share_all": True})
+        self.assertEqual(self.grant(self.jid, self.b), ("trip", None, "u-jane"))
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "only_me", 26.0)["scope"], "only_me")
+
     def test_a_widening_bound_to_a_window_or_a_grant_version_refuses_when_either_changed(self):
         self.share(self.jid, self.a, "only_me")
         state = photogrants.state_of(self.c, self.jane, self.jid, self.a)
@@ -482,6 +522,21 @@ class StandingSettingTests(GrantCase):
         photogrants.set_prefs(self.c, self.jane, self.jid, None, True, 44.0)
         self.assertEqual(self.grant(self.jid, self.b), ("only_me", None, "u-jane"))
 
+    def test_share_on_all_bound_to_each_trips_audience_refuses_when_someone_joined_one(self):
+        seen = {str(t): photogrants.audience_of(self.c, t) for t in (self.a, self.b)}
+        self.assertEqual(seen[str(self.b)], [self.jid])
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 33.0, audiences=seen)
+        self.assertEqual(str(refused.exception), photogrants.STALE_SETTING)
+        self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "only_me", "share_all": False})
+        self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [])
+        with self.assertRaises(photogrants.Stale):
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 34.0, audiences={str(self.a): seen[str(self.a)]})
+        fresh = {str(t): photogrants.audience_of(self.c, t) for t in (self.a, self.b)}
+        self.assertEqual(photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 35.0, audiences=fresh), {"default_scope": "trip", "share_all": True})
+        self.assertEqual(self.grant(self.jid, self.b), ("trip", None, "u-jane"))
+
     def test_share_on_all_reaches_a_trip_joined_while_it_was_being_turned_on(self):
         theirs = self.add(self.sam, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid))["trip_id"]
         real, joined = photogrants._lock_trip, []
@@ -688,6 +743,24 @@ class TripChangeTests(GrantCase):
         self.assertEqual(self.grant(self.jid, new), ("trip", None, "u-jane"))
         self.assertIsNotNone(self.row(during.id))
         self.assertEqual(self.row(during.id).trip_id, new)
+
+    def test_cancelling_the_last_booking_ends_the_grants_until_the_trip_is_shared_again(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        both = self.photo(self.b)
+        self.c.execute(insert(PhotoTripSync).values(source_id=self.janes, trip_id=self.b, window_start="s", window_end="e"))
+        trips.edit_segment(self.c, self.jane, stay, {"status": "cancelled"})
+        self.assertIsNone(photos.trip_window(self.c, self.b))
+        self.assertIsNotNone(self.c.orm.get(Trip, self.b))
+        self.assertIsNone(self.grant(self.jid, self.b))
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.b)["state"], "none")
+        self.assertEqual(self.row(both.id).trip_id, self.a)
+        self.assertEqual(self.c.execute(select(PhotoTripSync.trip_id)).fetchall(), [])
+        trips.edit_segment(self.c, self.jane, stay, {"status": "confirmed"})
+        self.assertIsNotNone(photos.trip_window(self.c, self.b))
+        self.assertIsNone(self.grant(self.jid, self.b))
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
 
     def test_a_home_photo_inside_a_window_that_shrinks_stays_tripless_and_suppressed(self):
         flight = self.only_flight(self.jid, self.sid)
