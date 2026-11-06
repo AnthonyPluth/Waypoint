@@ -95,9 +95,9 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
     return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
 
 
-def api_photo_sharing(conn, _q, _b, trip_id) -> PhotoSharing:
+def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:
     who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
-    person = _person(conn, who, None)
+    person = _person(conn, who, (q.get("person_id") or [None])[0])
     return _sharing(lambda: photogrants.state_of(conn, who, person, trip))
 
 
@@ -107,7 +107,7 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
     if scope is None and not declined:
         raise ApiError(NOTHING_TO_SHARE)
     if declined:
-        return _sharing(lambda: photogrants.stop(conn, who, person, trip))
+        return _sharing(lambda: photogrants.decline(conn, who, person, trip))
     return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME))
 
 

@@ -448,6 +448,7 @@ class PhotoGrant(Base):
     revoked: Mapped[float | None]
     changed: Mapped[float]
     granted_by: Mapped[str]
+    ask_again: Mapped[bool]
 
 
 class PhotoExclusion(Base):

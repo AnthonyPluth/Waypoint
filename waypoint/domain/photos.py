@@ -26,6 +26,7 @@ Found = tuple[Photo, int]
 SHOWN: tuple[MatchKind, ...] = ("place", "time", "far")
 AMBIGUOUS: MatchKind = "ambiguous"
 FAR: MatchKind = "far"
+HOME: MatchKind = "home"
 OWNER = "owner"
 AUTO = "auto"
 INFERRED: LocationSource = "inferred"
@@ -240,12 +241,35 @@ def lock_grants(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) ->
     return {r.trip_id: r for r in rows}
 
 
-def _canonical(rows: Sequence[Found]) -> list[Found]:
-    first: dict[tuple[int, str], int] = {}
-    for photo, person in rows:
-        key = (person, photo.asset_id)
-        first[key] = min(first.get(key, photo.id), photo.id)
-    return [(photo, person) for photo, person in rows if first[(person, photo.asset_id)] == photo.id]
+def canonical_ids(conn: db.Connection, keys: Iterable[tuple[int, str]]) -> set[int]:
+    wanted = set(keys)
+    if not wanted:
+        return set()
+    q = select(Photo.id, Photo.source_id, Photo.asset_id, PhotoSource.person_id, PhotoSource.status).join(PhotoSource, PhotoSource.id == Photo.source_id) \
+        .where(PhotoSource.person_id.in_(sorted({p for p, _ in wanted})), Photo.asset_id.in_(sorted({a for _, a in wanted})))
+    best: dict[tuple[int, str], tuple[tuple[bool, int, int], int]] = {}
+    for photo_id, source_id, asset_id, person, status in conn.execute(q).fetchall():
+        key = (person, asset_id)
+        if key not in wanted:
+            continue
+        rank = (status != "ok", source_id, photo_id)
+        if key not in best or rank < best[key][0]:
+            best[key] = (rank, photo_id)
+    return {photo_id for _, photo_id in best.values()}
+
+
+def _canonical(conn: db.Connection, rows: Sequence[Found]) -> list[Found]:
+    keep = canonical_ids(conn, {(person, photo.asset_id) for photo, person in rows})
+    return [(photo, person) for photo, person in rows if photo.id in keep]
+
+
+def trip_window(conn: db.Connection, trip_id: int) -> TripWindow | None:
+    trip = conn.orm.get(Trip, trip_id)
+    if trip is None:
+        return None
+    live = [s for s in conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id).order_by(Segment.id)).all() if s.status != "cancelled"]
+    placed = segment_points(conn, live)
+    return window(trip, [p for s in live for p in placed[s.id]])
 
 
 def _excluded() -> ColumnElement[bool]:
@@ -267,7 +291,7 @@ def visible(conn: db.Connection, viewer: Viewer) -> ColumnElement[bool]:
 def _query(conn: db.Connection, viewer: Viewer, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).join(Trip, Trip.id == Photo.trip_id) \
         .where(visible(conn, viewer), *where)
-    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
+    return _canonical(conn, sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
 
 
 def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None) -> list[Found]:
@@ -276,11 +300,7 @@ def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None
 
 def visible_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
     found = _query(conn, viewer, Photo.id == photo_id)
-    if not found:
-        return None
-    photo, person = found[0]
-    same = _query(conn, viewer, PhotoSource.person_id == person, Photo.asset_id == photo.asset_id)
-    return found[0] if same and same[0][0].id == photo.id else None
+    return found[0] if found else None
 
 
 def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow], seen: set[int] | None = None) -> list[TripWindow]:
@@ -365,7 +385,7 @@ def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[Segmen
 
 def _rows(conn: db.Connection, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).where(*where)
-    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
+    return _canonical(conn, sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
 
 
 def _wrapped(longitude: float) -> float:
@@ -623,13 +643,40 @@ def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | No
     return found if found is not None and acts_for(conn, viewer, found[1]) else None
 
 
-def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
-    found = _own_photo(conn, viewer, photo_id) if not viewer.household else None
-    if found is None:
-        return None
-    lock_grants(conn, found[1], [t for t in (found[0].trip_id, trip_id) if t is not None])
-    conn.orm.expire_all()
+LOCK_ROUNDS = 3
+
+
+def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None) -> Found | None:
     found = _own_photo(conn, viewer, photo_id)
+    locked: set[int] = set()
+    for _ in range(LOCK_ROUNDS):
+        if found is None:
+            return None
+        wanted = {t for t in (found[0].trip_id, trip_id) if t is not None}
+        if wanted <= locked:
+            return found
+        locked |= wanted
+        lock_grants(conn, found[1], sorted(locked))
+        conn.orm.expire_all()
+        found = _own_photo(conn, viewer, photo_id)
+    return None
+
+
+def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
+    q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
+        .where(PhotoSource.person_id == person, Photo.asset_id == photo.asset_id, Photo.id != photo.id).order_by(Photo.id)
+    return list(conn.orm.scalars(q).all())
+
+
+def _copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
+    for twin in _same_asset(conn, photo, person):
+        for field in ("trip_id", "match", "segment_id", "distance_km", "decided_by", "latitude", "longitude", "location_source"):
+            setattr(twin, field, getattr(photo, field))
+    conn.orm.flush()
+
+
+def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
+    found = _settled_under_lock(conn, viewer, photo_id, trip_id) if not viewer.household else None
     if found is None:
         return None
     photo, person = found
@@ -643,6 +690,7 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
             raise trips.Invalid(PUT_BACK_FIRST)
         photo.trip_id = trip.id
         _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip.id), None))
+        _copy_placement(conn, photo, person)
     if excluded:
         if photo.match != AMBIGUOUS or photo.trip_id is not None:
             raise trips.Invalid(NOT_UNSETTLED)

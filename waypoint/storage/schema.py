@@ -478,7 +478,7 @@ photo_sources = Table(
     Column('last_sync', Float, doc='epoch seconds of the last completed sync'),
     Column('last_error', Text, doc='one of a few fixed sentences, never text from Immich'),
     Column('created', Float, nullable=False),
-    UniqueConstraint('person_id', 'url', name='uq_photo_sources_person_url'),
+    UniqueConstraint('person_id', 'url', 'immich_user_id', name='uq_photo_sources_person_url_user'),
     info={'doc': "an Immich library Waypoint reads photos from, for one person in People; the key is encrypted and never leaves the server"},
 )
 
@@ -518,6 +518,7 @@ photo_grants = Table(
     Column('revoked', Float, doc='null while the grant is active; epoch seconds when sharing was stopped or the prompt declined'),
     Column('changed', Float, nullable=False, doc='epoch seconds of the last grant, scope change or revoke'),
     Column('granted_by', Text, nullable=False, doc='the member accountable for the grant (users.sub): the person, their steward, or who set Share on all my trips'),
+    Column('ask_again', Boolean, nullable=False, server_default=false(), doc="set when someone else's change made the trip longer and dropped this grant from Trip to Only me; the trip asks the person again"),
     CheckConstraint("scope IN ('only_me', 'trip')", name='ck_photo_grants_scope'),
     Index('ix_photo_grants_trip_id', 'trip_id'),
     info={'doc': "whether a person's photos may be used on a trip, and who sees them; a revoked row grants nothing and is kept so the trip shows a reminder instead of the prompt"},
