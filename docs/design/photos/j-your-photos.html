@@ -446,7 +446,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li><code>bg-card</code> card; scope chip <code>StatusChip</code> <code>info</code> for everyone, <code>quiet</code> for Only me.</li>
         <li>Stop sharing: <code>Button</code> outline with <code>text-status-bad-ink</code>; the dialog’s confirm uses <code>bg-destructive</code>. It is <code>ConfirmDialog</code>, centred, at every width.</li>
         <li>Toast: <code>svelte-sonner</code>, as elsewhere in the app.</li>
-        <li>Stopping removes the grant; the photos are no longer matched, shown, counted or pinned for anyone, and Theo’s and June’s open pages drop them as (l) shows. Sharing again later brings them back with any removals kept.</li>
+        <li>Stopping revokes only the grant: the photos are no longer shown, counted or pinned for anyone, and Theo’s and June’s open pages drop them as (l) shows. The trip stays under <q>Trips with your photos</q> as <q>Not shared</q> with <q>Share…</q>, and the person’s removals for it are kept. Sharing again fetches the photos for the trip again, and the removed ones stay removed.</li>
       </ul></div>
     </div>
   </section>
