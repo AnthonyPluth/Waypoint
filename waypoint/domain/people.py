@@ -200,7 +200,6 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     conn.execute(update(LoyaltyId).where(LoyaltyId.person_id == guest_id).values(person_id=member_id))
     if not photo_sources.lock_person(conn, guest_id):
         raise NoSuchGuest()
-    photo_sources.claim(conn, guest_id, member_id, me.user_sub)
     conn.execute(update(Trip).where(Trip.booked_by == guest_id).values(booked_by=member_id))
     conn.execute(update(Segment).where(Segment.booked_by == guest_id).values(booked_by=member_id))
     if not me.legal_name:

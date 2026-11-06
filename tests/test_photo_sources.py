@@ -11,7 +11,7 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
 from tests.test_trips import RouteCase, guest
 from waypoint import oidc
-from waypoint.domain import people, photos, photosources
+from waypoint.domain import people, photogrants, photos, photosources
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
@@ -107,8 +107,17 @@ class SourceRoutes(RouteCase):
         with ping() as pong:
             status, got = self.call("ana", "POST", "/api/photo-sources", {"url": URL + "/", "key": NEW_KEY})
         self.assertEqual((status, got), (409, {"error": photosources.ALREADY}))
-        pong.assert_not_called()
+        self.assertEqual(pong.call_args.args[0], immich.Source(url=URL, key=NEW_KEY, allow_http=False))
         self.assertEqual(len(self.listing("ana")["sources"]), 1)
+
+    def test_the_same_server_holds_one_library_per_immich_account(self):
+        first = self.connect()
+        with ping(OTHER):
+            second = self.ok("ana", "POST", "/api/photo-sources", {"url": URL, "key": NEW_KEY})
+        self.assertEqual([s["id"] for s in self.listing("ana")["sources"]], [first["id"], second["id"]])
+        self.assertEqual((self.raw(first["id"])[3], self.raw(second["id"])[3]), (ACCOUNT.user_id, OTHER.user_id))
+        with ping(OTHER):
+            self.assertEqual(self.call("ana", "POST", "/api/photo-sources", {"url": URL, "key": KEY})[0], 409)
 
     def test_what_immich_answers_decides_whether_the_library_is_saved(self):
         for error, status in ((immich.Refused(immich.REFUSED), 400), (immich.Unavailable(immich.UNREACHABLE), 502),
@@ -289,7 +298,7 @@ class SourceRoutes(RouteCase):
 
         def handed_over(_source):
             with db.session() as conn:
-                photo_sources.claim(conn, self.guest, self.person["ben"], "sub-ben")
+                photogrants.claim(conn, self.guest, self.person["ben"], "sub-ben")
             return ACCOUNT
         with mock.patch.object(immich, "ping", side_effect=handed_over):
             self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY}), (404, {"error": photosources.NO_SOURCE}))
@@ -527,7 +536,7 @@ class Races(DbCase):
         self.c.commit()
 
         def moved(conn):
-            photo_sources.claim(conn, self.guest, self.ben.person_id, "sub-ben")
+            photogrants.claim(conn, self.guest, self.ben.person_id, "sub-ben")
         with self.elsewhere(moved):
             with self.assertRaises(photosources.NoSuchSource):
                 photosources.change_key(self.c, self.ana, source, NEW_KEY)
@@ -540,7 +549,7 @@ class Races(DbCase):
         def owned_then_moved(conn, actor, source_id):
             found = checked(conn, actor, source_id)
             with db.session(self.path) as other:
-                photo_sources.claim(other, self.guest, self.ben.person_id, "sub-ben")
+                photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
             return found
         for change in (lambda: photosources.edit(self.c, self.ana, source, "Stolen", None, True), lambda: photosources.edit(self.c, self.ana, source, None, True, False),
                        lambda: photosources.remove(self.c, self.ana, source), lambda: photosources.test(self.c, self.ana, source, None)):
@@ -559,7 +568,7 @@ class Races(DbCase):
 
         def handed_over(conn, sub, email, now=None):
             with db.session(self.path) as other:
-                photo_sources.claim(other, self.guest, self.ben.person_id, "sub-ben")
+                photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
             return "user_removed" if sub == "sub-ana" else None
         with mock.patch.object(oidc, "access_lapsed", side_effect=handed_over):
             self.assertEqual(photosources.end_lapsed(self.c), 0)
@@ -590,11 +599,14 @@ class Claiming(DbCase):
         self.member = people.person_for_sub(self.c, "u1")
         self.guest = people.add_guest(self.c, guest("J. Doe"))["id"]
 
-    def test_claiming_a_guest_hands_their_libraries_to_the_member(self):
+    def test_claiming_a_guest_hands_their_libraries_to_the_member_one_per_immich_account(self):
         moved = photo_sources.save(self.c, self.guest, "sub-steward", URL, ACCOUNT.user_id, KEY, "Mia’s", 1.0)
-        dropped = photo_sources.save(self.c, self.guest, "sub-steward", LAN, ACCOUNT.user_id, NEW_KEY, None, 1.0)
+        other_user = photo_sources.save(self.c, self.guest, "sub-steward", LAN, ACCOUNT.user_id, NEW_KEY, None, 1.0)
+        merged = photo_sources.save(self.c, self.guest, "sub-steward", "https://third-canary.example", ACCOUNT.user_id, NEW_KEY, None, 1.0)
         mine = photo_sources.save(self.c, self.member, "u1", LAN, OTHER.user_id, KEY, None, 1.0)
-        self.c.orm.add(photo(dropped, None, 1, "ambiguous"))
+        twin = photo_sources.save(self.c, self.member, "u1", "https://third-canary.example", ACCOUNT.user_id, KEY, None, 1.0)
+        assert moved and other_user and merged and mine and twin
+        self.c.orm.add(photo(merged, None, 1, "ambiguous"))
         self.c.orm.flush()
         photo_sources.set_steward(self.c, self.guest, "sub-steward")
         people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
@@ -603,19 +615,20 @@ class Claiming(DbCase):
         assert prefs is not None
         self.assertIsNone(prefs.steward_sub)
         found = {s["id"]: s for s in photo_sources.list_all(self.c)}
-        self.assertEqual(sorted(found), [moved, mine])
-        self.assertEqual((found[moved]["person_id"], found[moved]["owner_sub"], found[moved]["label"]), (self.member, "u1", "Mia’s"))
-        self.assertEqual((found[mine]["person_id"], found[mine]["owner_sub"], found[mine]["immich_user_id"]), (self.member, "u1", OTHER.user_id))
-        self.assertEqual(self.c.execute(select(Photo.id)).scalars(), [])
-        unlocked = photo_sources.source_for_provider(self.c, moved)
-        assert unlocked is not None
-        self.assertEqual(unlocked.key, KEY)
+        self.assertEqual(sorted(found), [moved, other_user, mine, twin])
+        self.assertEqual({(s["person_id"], s["owner_sub"]) for s in found.values()}, {(self.member, "u1")})
+        self.assertEqual((found[moved]["label"], found[other_user]["immich_user_id"], found[mine]["immich_user_id"]), ("Mia’s", ACCOUNT.user_id, OTHER.user_id))
+        self.assertEqual(self.c.execute(select(Photo.source_id)).scalars(), [twin])
+        for source, key in ((moved, KEY), (other_user, NEW_KEY), (twin, KEY)):
+            unlocked = photo_sources.source_for_provider(self.c, source)
+            assert unlocked is not None
+            self.assertEqual(unlocked.key, key)
 
     def test_claiming_locks_the_guest_before_moving_their_libraries(self):
         order = []
-        lock, move = photo_sources.lock_person, photo_sources.claim
+        lock, move = photo_sources.lock_person, photogrants.claim
         with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person: order.append(("lock", person)) or lock(conn, person)), \
-                mock.patch.object(photo_sources, "claim", side_effect=lambda conn, *rest: order.append(("move", rest[0])) or move(conn, *rest)):
+                mock.patch.object(photogrants, "claim", side_effect=lambda conn, *rest: order.append(("move", rest[0])) or move(conn, *rest)):
             people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual(order, [("lock", self.guest), ("move", self.guest)])
 

@@ -127,15 +127,15 @@ def test_new(url: str, key: str) -> Tested:
     return {"name": _ping(provider_source(url, key)).name, "same_account": None}
 
 
-def _not_yet(conn: db.Connection, person_id: int, url: str) -> None:
-    if any(s["url"] == url for s in photo_sources.for_person(conn, person_id)):
+def _not_yet(conn: db.Connection, person_id: int, url: str, user_id: str) -> None:
+    if any(s["url"] == url and s["immich_user_id"] == user_id for s in photo_sources.for_person(conn, person_id)):
         raise Refused(ALREADY)
 
 
 def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: str, label: str | None, now: float | None = None) -> Listed:
     stewarded = _steward_ok(conn, actor, person_id)
-    _not_yet(conn, person_id, url)
     account = _ping(provider_source(url, key))
+    _not_yet(conn, person_id, url, account.user_id)
     if not photo_sources.lock_person(conn, person_id):
         raise NoSuchPerson()
     source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now)

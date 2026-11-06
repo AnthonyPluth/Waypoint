@@ -80,9 +80,10 @@ def set_steward(conn: db.Connection, person_id: int, sub: str) -> bool:
 def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
     values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
               "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
-    if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url"]).rowcount == 0:
+    if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url", "immich_user_id"]).rowcount == 0:
         return None
-    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.owner_sub == owner_sub)).scalar()
+    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.immich_user_id == immich_user_id,
+                                                      PhotoSource.owner_sub == owner_sub)).scalar()
     return int(found) if found is not None else None
 
 
@@ -122,9 +123,3 @@ def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
     rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))
                         .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP)).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
-
-
-def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> int:
-    taken = select(PhotoSource.url).where(PhotoSource.person_id == member_id)
-    conn.execute(delete(PhotoSource).where(PhotoSource.person_id == guest_id, PhotoSource.url.in_(taken)))
-    return int(conn.execute(update(PhotoSource).where(PhotoSource.person_id == guest_id).values(person_id=member_id, owner_sub=sub)).rowcount)
