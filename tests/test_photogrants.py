@@ -330,6 +330,22 @@ class GrantTests(GrantCase):
         self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
         self.assertEqual((got["removed_count"], self.row(both.id).trip_id, self.row(both.id).decided_by), (0, self.a, "owner"))
 
+    def test_a_removed_asset_that_stays_on_another_trip_leaves_the_removed_list_once_sharing_stops(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        both = self.photo(self.b)
+        photogrants.exclude(self.c, self.jane, self.b, [both.id], 44.0)
+        self.assertEqual(self.row(both.id).trip_id, self.a)
+        self.assertEqual([p.id for p, _ in photos.removed(self.c, self.jane, self.b)], [both.id])
+        photogrants.stop(self.c, self.jane, self.jid, self.b, 45.0)
+        self.assertEqual(photos.removed(self.c, self.jane, self.b), [])
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.b)["removed_count"], 0)
+        self.assertIsNone(photogrants.put_back(self.c, self.jane, self.b, both.id))
+        self.assertEqual(self.c.execute(select(PhotoExclusion.trip_id)).fetchall(), [(self.b,)])
+        photogrants.grant(self.c, self.jane, self.jid, self.b, "trip", 46.0)
+        self.assertEqual(self.row(both.id).trip_id, self.a)
+        self.assertEqual([p.id for p, _ in photos.removed(self.c, self.jane, self.b)], [both.id])
+
     def test_the_removed_list_keeps_only_photos_the_trips_current_window_holds(self):
         self.share(self.jid, self.a)
         only_a = self.photo(self.a, ONLY_A)
@@ -823,6 +839,19 @@ class TripChangeTests(GrantCase):
         self.assertEqual([t for kind, t in order if kind == "grant"][:2], [self.a, trip])
         self.assertIsNone(self.c.orm.get(Trip, trip))
 
+    def test_deleting_a_trip_or_its_last_booking_locks_every_applicable_grant_in_trip_order(self):
+        self.share(self.jid, self.a)
+        trip, lone = self.lone()
+        order, patches = self.noting_locks()
+        with patches[0], patches[1]:
+            trips.delete_segment(self.c, self.jane, lone["id"])
+        self.assertEqual([t for kind, t in order if kind == "grant"][:2], [self.a, trip])
+        trip, lone = self.lone()
+        order, patches = self.noting_locks()
+        with patches[0], patches[1]:
+            trips.delete_trip(self.c, self.jane, trip)
+        self.assertEqual([t for kind, t in order if kind == "grant"][:2], [self.a, trip])
+
     def test_lock_takes_the_grant_rows_in_trip_order(self):
         self.share(self.jid, self.b)
         self.share(self.jid, self.a)
@@ -1188,6 +1217,40 @@ class ClaimTests(GrantCase):
         self.assertEqual((kept.trip_id, kept.decided_by, kept.latitude, kept.longitude, kept.location_source), (self.b, "owner", *SOHO, "exif"))
         self.assertEqual((kept.match, kept.segment_id), ("time", stay))
         self.assertGreater(kept.distance_km, 100.0)
+
+    def test_merged_sync_rows_for_one_trip_keep_the_earlier_cursor_and_start_their_next_run_in_full(self):
+        self.share(self.jid, self.b)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-sam")
+        self.c.orm.add(source_row(self.mia, "u-sam"))
+        self.c.orm.flush()
+        same = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        self.c.execute(insert(PhotoTripSync), [
+            {"source_id": self.janes, "trip_id": self.b, "window_start": "s", "window_end": "e", "cursor": "2026-06-05T00:00:00Z", "resume_page": 3,
+             "fetch_started": "2026-06-06T00:00:00Z", "synced": 9.0},
+            {"source_id": same, "trip_id": self.b, "window_start": "s", "window_end": "e", "cursor": "2026-06-04T00:00:00Z", "resume_page": None,
+             "fetch_started": None, "synced": 8.0}])
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.c.orm.expire_all()
+        rows = self.c.orm.scalars(select(PhotoTripSync)).all()
+        self.assertEqual([(s.source_id, s.trip_id) for s in rows], [(self.janes, self.b)])
+        self.assertEqual((rows[0].cursor, rows[0].resume_page, rows[0].fetch_started), ("2026-06-04T00:00:00Z", None, None))
+
+    def test_a_guest_rows_hand_placement_reaches_the_members_other_source_when_the_merged_one_has_no_twin(self):
+        self.share(self.jid, self.a)
+        self.share(self.jid, self.b)
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.share(self.mia, self.b, by="u-sam")
+        self.c.orm.add_all([PhotoSource(person_id=self.jid, owner_sub="u-jane", url="https://second.example", immich_user_id="u", api_key="enc:v1:x", status="ok", created=1.0),
+                            PhotoSource(person_id=self.mia, owner_sub="u-sam", url="https://second.example", immich_user_id="u", api_key="enc:v1:y", status="ok", created=1.0)])
+        self.c.orm.flush()
+        theirs_source = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
+        first = self.photo(self.b, asset="shared-asset", match="time")
+        theirs = self.photo(self.a, source=theirs_source, asset="shared-asset", decided="owner")
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        self.assertEqual((self.row(theirs.id).trip_id, self.row(theirs.id).decided_by), (self.a, "owner"))
+        self.assertEqual((self.row(first.id).trip_id, self.row(first.id).decided_by), (self.a, "owner"))
+        self.assertEqual(self.seen(self.jane, self.a), [first.id])
 
     def test_a_merged_sources_hand_placement_reaches_every_row_of_the_members_asset(self):
         self.share(self.jid, self.a)
