@@ -261,7 +261,7 @@ class LookAndCandidateTests(AccessCase):
     def test_a_photo_moves_only_to_a_trip_its_person_shared_and_was_not_removed_from(self):
         self.share("ana")
         later = self.book("ana", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
-        mine = self.photo("ana")
+        mine = self.photo("ana", local="2027-01-02T09:00")
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": later["trip_id"]}), (400, {"error": "Share your photos on that trip first"}))
         self.share("ana", later["trip_id"])
         with db.session() as conn:

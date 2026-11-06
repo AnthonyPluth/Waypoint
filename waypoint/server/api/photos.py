@@ -92,7 +92,10 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
     excluded = _flag(body, "excluded")
     if (trip is None and not excluded) or "hidden" in body:
         raise ApiError(NOTHING_TO_DO)
-    return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
+    try:
+        return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
+    except photos.OutsideWindow as e:
+        raise ApiError(str(e), 409) from None
 
 
 def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:

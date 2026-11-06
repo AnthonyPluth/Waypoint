@@ -530,6 +530,7 @@ photo_exclusions = Table(
     Column('asset_id', Text, primary_key=True, doc='the Immich asset id, so the exclusion outlives the photo row and a re-sync'),
     Column('trip_id', Integer, refers('photo_exclusions', 'trip_id', 'trips.id', 'CASCADE'), primary_key=True),
     Column('created', Float, nullable=False),
+    Column('was_trip_id', Integer, refers('photo_exclusions', 'was_trip_id', 'trips.id', 'SET NULL'), doc='where the row was when removed, if its person had placed it by hand; Put back restores it there'),
     Index('ix_photo_exclusions_trip_id', 'trip_id'),
     info={'doc': "a photo its person took off a trip (Remove from this trip): never shown, counted or pinned there for anyone, whatever a sync brings back"},
 )

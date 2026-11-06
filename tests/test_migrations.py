@@ -330,13 +330,16 @@ class MigrationTests(unittest.TestCase):
         tables = shape(self.path)
         self.assertNotIn("hidden", [col[0] for col in tables["photos"]["columns"]])
         self.assertIn("ask_again", [col[0] for col in tables["photo_grants"]["columns"]])
+        self.assertIn("was_trip_id", [col[0] for col in tables["photo_exclusions"]["columns"]])
+        self.assertIn("SET NULL", {fk[0]: fk[4] for fk in tables["photo_exclusions"]["fks"]}["fk_photo_exclusions_was_trip_id"])
         self.assertEqual((tables["photo_grants"]["pk"], tables["photo_exclusions"]["pk"], tables["photo_sharing_prefs"]["pk"]),
                          (["person_id", "trip_id"], ["person_id", "asset_id", "trip_id"], ["person_id"]))
         self.assertEqual([i[0] for i in tables["photo_grants"]["indexes"] if not i[2]], ["ix_photo_grants_trip_id"])
         self.assertEqual([i[0] for i in tables["photo_exclusions"]["indexes"] if not i[2]], ["ix_photo_exclusions_trip_id"])
         for table in ("photo_grants", "photo_exclusions", "photo_sharing_prefs"):
             for fk in tables[table]["fks"]:
-                self.assertIn("CASCADE", fk[4], (table, fk[0]))
+                if fk[0] != "fk_photo_exclusions_was_trip_id":
+                    self.assertIn("CASCADE", fk[4], (table, fk[0]))
         with db.session(self.path) as conn:
             conn.execute(insert(schema.trips), [{"id": 4, "name": "Trip 4", "auto": True}, {"id": 5, "name": "Trip 5", "auto": True}])
             conn.execute(update(schema.trips).where(schema.trips.c.id == 1).values(booked_by=2))
@@ -377,9 +380,13 @@ class MigrationTests(unittest.TestCase):
             conn.execute(insert(schema.photo_trip_syncs).values(source_id=1, trip_id=1, window_start="a", window_end="b"))
             conn.execute(insert(schema.photo_grants).values(person_id=1, trip_id=1, scope="trip", changed=1.0, granted_by="sub-a"))
             conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="b", trip_id=1, created=1.0))
+            conn.execute(insert(schema.trips).values(id=2, name="Other", auto=True))
+            conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="c", trip_id=2, created=1.0, was_trip_id=1))
             conn.execute(insert(schema.photo_sharing_prefs).values(person_id=1, default_scope="only_me", share_all=False, steward_sub="sub-b"))
             conn.execute(delete(schema.trips).where(schema.trips.c.id == 1))
             self.assertIsNone(conn.execute(select(schema.photos.c.trip_id)).scalar())
+            self.assertEqual(conn.execute(select(schema.photo_exclusions.c.asset_id, schema.photo_exclusions.c.was_trip_id)).fetchall(), [("c", None)])
+            conn.execute(delete(schema.photo_exclusions))
             for table in ("photo_trip_syncs", "photo_grants", "photo_exclusions"):
                 self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0, table)
             self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.photo_sharing_prefs)).scalar(), 1)

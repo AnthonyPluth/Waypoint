@@ -58,8 +58,10 @@ def upgrade() -> None:
     sa.Column('asset_id', sa.Text(), nullable=False),
     sa.Column('trip_id', sa.Integer(), nullable=False),
     sa.Column('created', sa.Float(), nullable=False),
+    sa.Column('was_trip_id', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['person_id'], ['people.id'], name='fk_photo_exclusions_person_id', ondelete='CASCADE', initially='IMMEDIATE', deferrable=True),
     sa.ForeignKeyConstraint(['trip_id'], ['trips.id'], name='fk_photo_exclusions_trip_id', ondelete='CASCADE', initially='IMMEDIATE', deferrable=True),
+    sa.ForeignKeyConstraint(['was_trip_id'], ['trips.id'], name='fk_photo_exclusions_was_trip_id', ondelete='SET NULL', initially='IMMEDIATE', deferrable=True),
     sa.PrimaryKeyConstraint('person_id', 'asset_id', 'trip_id'),
     )
     op.create_index('ix_photo_exclusions_trip_id', 'photo_exclusions', ['trip_id'], unique=False)
