@@ -196,6 +196,7 @@ class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *args, deadline: float, **kwargs):
         super().__init__(*args, **kwargs)
         self.deadline = deadline
+        self.secure_with: ssl.SSLContext = kwargs.get("context") or ssl_context()
         self._create_connection = self._connect_within
 
     def _connect_within(self, address, timeout=None, source_address=None, *args) -> socket.socket:
@@ -203,8 +204,13 @@ class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
 
     def connect(self) -> None:
         self.idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
-        super().connect()
-        self.sock = _DeadlineSocket(self.sock, self.deadline, self.idle)
+        http.client.HTTPConnection.connect(self)
+        plain = self.sock
+        if plain is None:
+            raise OSError("no connection to secure")
+        plain.settimeout(_bounded(self.idle, self.deadline))
+        secured = self.secure_with.wrap_socket(plain, server_hostname=getattr(self, "_tunnel_host", None) or self.host)
+        self.sock = _DeadlineSocket(secured, self.deadline, self.idle)
 
     def _tunnel(self) -> None:
         plain = self.sock

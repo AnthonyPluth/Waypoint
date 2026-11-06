@@ -80,12 +80,12 @@ class _Scripted(socketserver.ThreadingTCPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, parts: list[tuple[bytes, float]]):
+    def __init__(self, parts: list[tuple[bytes, float]], wait_for_request: bool = True):
         class Handler(socketserver.BaseRequestHandler):
             def handle(self):
                 self.server.connections += 1   # type: ignore[attr-defined]
                 seen = b""
-                while b"\r\n\r\n" not in seen:
+                while self.server.wait_for_request and b"\r\n\r\n" not in seen:   # type: ignore[attr-defined]
                     got = self.request.recv(4096)
                     if not got:
                         return
@@ -102,6 +102,7 @@ class _Scripted(socketserver.ThreadingTCPServer):
                         time.sleep(pause)
         super().__init__(("127.0.0.1", 0), Handler)
         self.parts = parts
+        self.wait_for_request = wait_for_request
         self.connections = 0
 
     def handle_error(self, request, client_address):
@@ -112,8 +113,8 @@ HEAD = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nX-Pad: " + b"y" * 120 + 
 
 
 class DeadlineTests(unittest.TestCase):
-    def serve(self, parts) -> str:
-        server = _Scripted(parts)
+    def serve(self, parts, wait_for_request=True) -> str:
+        server = _Scripted(parts, wait_for_request)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
         self.addCleanup(server.shutdown)
@@ -207,6 +208,19 @@ class DeadlineTests(unittest.TestCase):
         self.assertIsNone(conn.sock)
         self.assertTrue(proxy)
 
+    def handshake_cut_off(self, parts, wait_for_request):
+        port = self.serve(parts, wait_for_request).rsplit(":", 1)[1].rstrip("/")
+        began = time.monotonic()
+        with self.assertRaises(OSError):
+            tls.urlopen(f"https://127.0.0.1:{port}/", 10, handlers=(urllib.request.ProxyHandler({}),), deadline=time.monotonic() + 0.5)
+        self.assertLess(time.monotonic() - began, 2.0)
+
+    def test_a_server_that_never_answers_the_handshake_is_cut_off_at_the_deadline(self):
+        self.handshake_cut_off([(b"", 5)], wait_for_request=True)
+
+    def test_a_server_that_trickles_its_handshake_is_cut_off_at_the_deadline(self):
+        self.handshake_cut_off([(b"\x16\x03\x03\x40\x00" + b"\x02" * 300, 0.03)], wait_for_request=False)
+
     def test_https_opens_the_deadline_connection_with_the_shared_context(self):
         deadline = time.monotonic() + 5
         with mock.patch.object(urllib.request.AbstractHTTPHandler, "do_open", autospec=True) as do_open:
@@ -218,19 +232,29 @@ class DeadlineTests(unittest.TestCase):
         self.assertEqual(req.full_url, "https://example.com/")
 
     def test_an_https_connection_is_bounded_by_the_deadline_and_keeps_its_idle_timeout(self):
-        plain = mock.Mock()
+        plain, secured = mock.Mock(), mock.Mock()
 
         def connected(conn):
             conn.sock = plain
         for timeout in (5, object()):
-            conn = tls._DeadlineHTTPSConnection("example.com", timeout=timeout, deadline=time.monotonic() + 1, context=tls.ssl_context())
-            with self.subTest(timeout=timeout), mock.patch.object(http.client.HTTPSConnection, "connect", connected):
+            context = ssl.create_default_context()
+            conn = tls._DeadlineHTTPSConnection("example.com", timeout=timeout, deadline=time.monotonic() + 1, context=context)
+            with self.subTest(timeout=timeout), mock.patch.object(http.client.HTTPConnection, "connect", connected), \
+                    mock.patch.object(context, "wrap_socket", return_value=secured) as wrap:
                 conn.connect()
                 self.assertLessEqual(conn.timeout, 1)
                 self.assertIsInstance(conn.sock, tls._DeadlineSocket)
-                self.assertIs(conn.sock.sock, plain)
+                self.assertIs(conn.sock.sock, secured)
                 self.assertIs(conn.sock.timeout, timeout)
                 self.assertLessEqual(conn.sock.wait(), 1)
+                wrap.assert_called_once_with(plain, server_hostname="example.com")
+                [(handshake_timeout,), _] = plain.settimeout.call_args
+                self.assertLessEqual(handshake_timeout, 1)
+
+    def test_a_connection_that_ends_up_with_no_socket_is_an_error(self):
+        conn = tls._DeadlineHTTPSConnection("example.com", timeout=5, deadline=time.monotonic() + 1, context=ssl.create_default_context())
+        with mock.patch.object(http.client.HTTPConnection, "connect", lambda conn: None), self.assertRaises(OSError):
+            conn.connect()
 
     def test_without_a_deadline_the_standard_handlers_are_used(self):
         kinds = {type(h) for h in tls.opener(allow_http=True).handlers}
@@ -242,6 +266,7 @@ class _Unanswered:
     made: list[_Unanswered] = []
     answers_at: set[int] = set()
     refuse = False
+    delay = 0.0
 
     def __init__(self, family, kind, proto):
         self.timeout = None
@@ -261,6 +286,7 @@ class _Unanswered:
     def connect(self, address):
         self.address = address
         if address[1] in _Unanswered.answers_at:
+            time.sleep(_Unanswered.delay)
             return
         if _Unanswered.refuse:
             raise ConnectionRefusedError("refused")
@@ -274,8 +300,8 @@ class _Unanswered:
 class ConnectDeadlineTests(unittest.TestCase):
     ADDRESSES = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", port)) for port in range(8001, 8007)]
 
-    def connect(self, cls, answers_at=(), refuse=False, **kwargs):
-        _Unanswered.made, _Unanswered.answers_at, _Unanswered.refuse = [], set(answers_at), refuse
+    def connect(self, cls, answers_at=(), refuse=False, delay=0.0, **kwargs):
+        _Unanswered.made, _Unanswered.answers_at, _Unanswered.refuse, _Unanswered.delay = [], set(answers_at), refuse, delay
         conn = cls("photos.example.invalid", 8000, timeout=10, deadline=time.monotonic() + 0.5, **kwargs)
         with mock.patch.object(socket, "getaddrinfo", return_value=self.ADDRESSES), mock.patch.object(socket, "socket", _Unanswered):
             conn.connect()
@@ -298,6 +324,30 @@ class ConnectDeadlineTests(unittest.TestCase):
         with self.assertRaises(ConnectionRefusedError):
             self.connect(tls._DeadlineHTTPConnection, refuse=True)
         self.assertEqual(len(_Unanswered.made), 6)
+
+    def handshake_after_a_slow_connect(self, delay):
+        context = ssl.create_default_context()
+        seen = []
+
+        def wrap(sock, **kwargs):
+            seen.append((sock.timeout, self.deadline - time.monotonic()))
+            return sock
+        self.deadline = time.monotonic() + 0.5
+        conn = tls._DeadlineHTTPSConnection("photos.example.invalid", 8000, timeout=10, deadline=self.deadline, context=context)
+        _Unanswered.made, _Unanswered.answers_at, _Unanswered.refuse, _Unanswered.delay = [], {8001}, False, delay
+        with mock.patch.object(socket, "getaddrinfo", return_value=self.ADDRESSES), mock.patch.object(socket, "socket", _Unanswered), \
+                mock.patch.object(context, "wrap_socket", side_effect=wrap):
+            conn.connect()
+        return seen
+
+    def test_the_handshake_gets_only_the_time_left_after_a_slow_connect(self):
+        [(timeout, left)] = self.handshake_after_a_slow_connect(0.3)
+        self.assertLessEqual(timeout, left + 0.01)
+        self.assertLess(timeout, 0.3)
+
+    def test_no_handshake_starts_once_a_slow_connect_has_spent_the_deadline(self):
+        with self.assertRaises(TimeoutError):
+            self.handshake_after_a_slow_connect(0.6)
 
     def test_a_source_address_is_bound_before_connecting(self):
         conn = self.connect(tls._DeadlineHTTPConnection, answers_at={8001}, source_address=("127.0.0.1", 0))
