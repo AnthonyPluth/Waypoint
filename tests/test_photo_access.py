@@ -16,7 +16,8 @@ EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inf
 NO_TRIP, NO_PHOTO = {"error": "No such trip"}, {"error": "No such photo"}
 PHOTO_ROUTES = (("GET", "/api/trips/{id}/photos"), ("GET", "/api/photos/review"), ("POST", "/api/photos/{id}"), ("GET", "/api/trips/{id}/photo-sharing"),
                 ("POST", "/api/trips/{id}/photo-sharing"), ("DELETE", "/api/trips/{id}/photo-sharing"), ("POST", "/api/trips/{id}/photo-exclusions"),
-                ("DELETE", "/api/trips/{id}/photo-exclusions/{id}"), ("GET", "/api/photo-grants"), ("POST", "/api/photo-sharing-prefs/{id}"))
+                ("DELETE", "/api/trips/{id}/photo-exclusions/{id}"), ("GET", "/api/photo-grants"), ("POST", "/api/photo-sharing-prefs/{id}"),
+                ("GET", "/api/photos/{id}/thumbnail"), ("GET", "/api/photos/{id}/preview"), ("GET", "/api/photos/{id}/original"))
 
 
 class AccessCase(RouteCase):
@@ -446,7 +447,8 @@ class LocalModeTests(ServerCase):
         calls = [("GET", f"/api/trips/{trip}/photos", None), ("GET", "/api/photos/review", None), ("POST", "/api/photos/1", {"trip_id": trip}),
                  ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
                  ("DELETE", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [1]}),
-                 ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", "/api/photo-grants", None), ("POST", "/api/photo-sharing-prefs/1", {"share_all": True})]
+                 ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", "/api/photo-grants", None), ("POST", "/api/photo-sharing-prefs/1", {"share_all": True}),
+                 ("GET", "/api/photos/1/thumbnail", None), ("GET", "/api/photos/1/preview", None), ("GET", "/api/photos/1/original", None)]
         self.assertEqual(len(calls), len(PHOTO_ROUTES))
         for method, path, body in calls:
             with self.subTest(call=f"{method} {path}"):

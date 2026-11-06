@@ -117,6 +117,7 @@ def local_fetch(path: str, params: dict[str, Any], body: dict | None, access: mc
     query = {k: [str(v)] for k, v in params.items() if v not in (None, "")}
     _current.user = _acting_as(access)
     _current.host = None
+    _current.headers = None
     _current.assistant = True
     try:
         result = routes.dispatch(found, query, body or {})

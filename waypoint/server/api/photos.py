@@ -4,12 +4,12 @@ from collections.abc import Callable
 from typing import Any
 
 from ... import validate
-from ...domain import photogrants, photos, photosources
+from ...domain import photogrants, photoproxy, photos, photosources
 from ...domain.photosources import Actor
 from ...domain.visibility import Viewer
 from ...providers import immich
 from .. import jobs
-from ..common import ApiError, _current, row_id
+from ..common import IMAGE_CSP, NO_IMAGE, ApiError, Response, _current, image_response, request_header, row_id
 from ..contract import (Ok, PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, PhotoSource,
                         PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, SyncStarted, TripPhoto,
                         TripPhotos)
@@ -37,6 +37,8 @@ NOT_IDS = 'Send "photo_ids" as a list of whole numbers'
 NOT_A_WINDOW = 'Send "window" as {"start": …, "end": …} text'
 NOT_WINDOWS = 'Send "windows" as a map of trip ids to windows'
 NOT_A_STAMP = 'Send "expected_changed" as a number'
+RENDITION_CACHE = "private, no-cache"
+ORIGINAL_CACHE = "private, no-store"
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
 
 
@@ -118,6 +120,50 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
         return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
     except (photos.OutsideWindow, photos.Changed) as e:
         raise ApiError(str(e), 409) from None
+
+
+def _served(conn, photo_id) -> tuple[Viewer, photoproxy.Served]:
+    who = _viewer(conn)
+    found = photoproxy.find(conn, who, row_id(photo_id, NO_IMAGE))
+    if found is None:
+        raise ApiError(NO_IMAGE, 404)
+    return who, found
+
+
+def _rendition(conn, photo_id, size: photos.Rendition) -> Response:
+    _, found = _served(conn, photo_id)
+    tag = photoproxy.etag(found, size)
+    if request_header("If-None-Match") == tag:
+        return Response(b"", "image/png", cache=RENDITION_CACHE, etag=tag, csp=IMAGE_CSP)
+    try:
+        picture = photoproxy.rendition(conn, found, size)
+    except photoproxy.Unavailable as e:
+        raise ApiError(str(e), 503) from None
+    if picture is None:
+        raise ApiError(NO_IMAGE, 404)
+    reply = image_response({"type": picture.content_type, "data": picture.data})
+    reply.cache, reply.etag = RENDITION_CACHE, tag
+    return reply
+
+
+def api_photo_thumbnail(conn, _q, _b, photo_id) -> Response:
+    return _rendition(conn, photo_id, "thumbnail")
+
+
+def api_photo_preview(conn, _q, _b, photo_id) -> Response:
+    return _rendition(conn, photo_id, "preview")
+
+
+def api_photo_original(conn, _q, _b, photo_id) -> Response:
+    who, found = _served(conn, photo_id)
+    try:
+        stream = photoproxy.original(conn, who, found, request_header("Range"))
+    except photoproxy.Unavailable as e:
+        raise ApiError(str(e), 503) from None
+    if stream is None:
+        raise ApiError(NO_IMAGE, 404)
+    headers = {**stream.headers, "Content-Disposition": stream.disposition}
+    return Response(b"", stream.content_type, status=stream.status, headers=headers, cache=ORIGINAL_CACHE, csp=IMAGE_CSP, stream=stream.body)
 
 
 def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+import hashlib
 import heapq
 import math
 import time
@@ -14,7 +16,7 @@ from sqlalchemy import ColumnElement, and_, false, or_, select
 
 from ..storage import db, geocode
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
-from . import home, photomatch, place_zones, trippeople, trips, visibility
+from . import home, photomatch, pixels, place_zones, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
 from .stats import EARTH_RADIUS_KM, distance_km
 from .visibility import Viewer
@@ -22,7 +24,9 @@ from .visibility import Viewer
 Located = tuple[float, float, int]
 LocationSource = Literal["exif", "inferred"]
 Scope = Literal["only_me", "trip"]
+Rendition = Literal["thumbnail", "preview"]
 Found = tuple[Photo, int]
+PLACEHOLDER_PX: dict[Rendition, int] = {"thumbnail": 256, "preview": 1280}
 
 SHOWN: tuple[MatchKind, ...] = ("place", "time", "far")
 AMBIGUOUS: MatchKind = "ambiguous"
@@ -358,6 +362,28 @@ def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None
 def visible_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
     found = _query(conn, viewer, Photo.id == photo_id)
     return found[0] if found else None
+
+
+def served(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
+    return visible_photo(conn, viewer, photo_id) or next(((p, person) for p, person, _ in unsettled(conn, viewer, photo_id)), None)
+
+
+def forget(conn: db.Connection, photo_id: int) -> bool:
+    row = conn.orm.get(Photo, photo_id)
+    if row is None:
+        return False
+    conn.orm.delete(row)
+    conn.orm.flush()
+    return True
+
+
+@functools.lru_cache(maxsize=64)
+def placeholder(asset_id: str, size: Rendition) -> tuple[str, bytes]:
+    digest = hashlib.sha256(asset_id.encode()).digest()
+    top = (96 + digest[0] % 128, 96 + digest[1] % 128, 96 + digest[2] % 128)
+    bottom = (24 + digest[3] % 96, 24 + digest[4] % 96, 24 + digest[5] % 96)
+    side = PLACEHOLDER_PX[size]
+    return "image/png", pixels.gradient(side, side, top, bottom)
 
 
 def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow], seen: set[int] | None = None) -> list[TripWindow]:
@@ -712,7 +738,7 @@ def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[T
 
 
 def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
-    found = visible_photo(conn, viewer, photo_id) or next(((p, person) for p, person, _ in unsettled(conn, viewer, photo_id)), None)
+    found = served(conn, viewer, photo_id)
     return found if found is not None and acts_for(conn, viewer, found[1]) else None
 
 

@@ -55,6 +55,26 @@ DIGITS = re.compile(r"[0-9]{1,10}")
 BYTE_RANGE = re.compile(r"bytes=(?:([0-9]{1,15})-([0-9]{0,15})|-([0-9]{1,15}))")
 RENDITION_MISSING = (404, 410)
 SIGNATURES = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"))
+SNIFF_BYTES = 4096
+INLINE = True
+ATTACHMENT = False
+PLAIN_SIGNATURES: tuple[tuple[bytes, str, bool], ...] = (
+    (b"\x89PNG\r\n\x1a\n", "image/png", INLINE), (b"\xff\xd8\xff", "image/jpeg", INLINE), (b"GIF87a", "image/gif", INLINE), (b"GIF89a", "image/gif", INLINE),
+    (b"II*\x00", "image/tiff", ATTACHMENT), (b"MM\x00*", "image/tiff", ATTACHMENT), (b"IIU\x00", "application/octet-stream", ATTACHMENT),
+    (b"IIRO", "application/octet-stream", ATTACHMENT), (b"MMOR", "application/octet-stream", ATTACHMENT), (b"IIRS", "application/octet-stream", ATTACHMENT),
+    (b"FUJIFILMCCD-RAW", "application/octet-stream", ATTACHMENT), (b"FOVb", "application/octet-stream", ATTACHMENT),
+)
+BRANDS: dict[bytes, tuple[str, bool]] = {
+    b"avif": ("image/avif", INLINE), b"avis": ("image/avif", INLINE),
+    b"heic": ("image/heic", ATTACHMENT), b"heix": ("image/heic", ATTACHMENT), b"hevc": ("image/heic", ATTACHMENT), b"hevx": ("image/heic", ATTACHMENT),
+    b"heim": ("image/heic", ATTACHMENT), b"heis": ("image/heic", ATTACHMENT), b"mif1": ("image/heif", ATTACHMENT), b"msf1": ("image/heif", ATTACHMENT),
+    b"qt  ": ("video/quicktime", INLINE),
+    b"isom": ("video/mp4", INLINE), b"iso2": ("video/mp4", INLINE), b"iso4": ("video/mp4", INLINE), b"iso5": ("video/mp4", INLINE), b"iso6": ("video/mp4", INLINE),
+    b"mp41": ("video/mp4", INLINE), b"mp42": ("video/mp4", INLINE), b"mp4v": ("video/mp4", INLINE), b"avc1": ("video/mp4", INLINE), b"dash": ("video/mp4", INLINE),
+    b"M4V ": ("video/mp4", INLINE), b"M4A ": ("video/mp4", INLINE), b"3gp4": ("video/mp4", INLINE), b"3gp5": ("video/mp4", INLINE),
+}
+GENERIC_BRANDS = (b"mif1", b"msf1")
+MATROSKA = b"\x1a\x45\xdf\xa3"
 
 NOT_CONFIGURED = "This Immich library isn’t set up: its address or API key is missing or malformed."
 REFUSED = "Immich didn’t accept this library’s API key (check it, and the permissions it was given)."
@@ -90,6 +110,10 @@ class RateLimited(ImmichError):
 
 
 class Unavailable(ImmichError):
+    pass
+
+
+class NotAnImage(Unavailable):
     pass
 
 
@@ -436,6 +460,27 @@ def sniff(data: bytes) -> str | None:
     return "image/webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else None
 
 
+def _boxed(data: bytes) -> tuple[str, bool] | None:
+    if len(data) < 12 or data[4:8] != b"ftyp":
+        return None
+    size = int.from_bytes(data[:4], "big")
+    end = min(len(data), size) if 16 <= size <= SNIFF_BYTES else min(len(data), 32)
+    brands = [data[8:12], *(data[at:at + 4] for at in range(16, end - 3, 4))]
+    specific = next((BRANDS[b] for b in brands if b in BRANDS and b not in GENERIC_BRANDS), None)
+    return specific or next((BRANDS[b] for b in brands if b in BRANDS), None)
+
+
+def original_type(data: bytes) -> tuple[str, bool] | None:
+    for signature, kind, inline in PLAIN_SIGNATURES:
+        if data.startswith(signature):
+            return kind, inline
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp", INLINE
+    if data.startswith(MATROSKA) and len(data) >= 8:
+        return ("video/webm", INLINE) if b"webm" in data[4:64] else ("video/x-matroska", ATTACHMENT)
+    return _boxed(data)
+
+
 def ping(source: Source) -> Account:
     pong = _json(source, _request(source, PING, JSON_TYPE))
     if not isinstance(pong, dict) or pong.get("res") != "pong":
@@ -475,8 +520,18 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
         data = _read(response, CAPS[size], deadline)
     kind = sniff(data)
     if kind is None:
-        raise Unavailable(NOT_AN_IMAGE)
+        raise NotAnImage(NOT_AN_IMAGE)
     return kind, data
+
+
+def asset_exists(source: Source, asset_id: str) -> bool:
+    if not ASSET_ID.fullmatch(asset_id):
+        return False
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, time.monotonic() + JSON_SECONDS, missing=RENDITION_MISSING)
+    if response is None:
+        return False
+    response.close()
+    return True
 
 
 def single_range(value: str | None) -> str | None:

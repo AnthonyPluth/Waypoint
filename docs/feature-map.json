@@ -465,6 +465,46 @@
     },
     {
       "method": "GET",
+      "path": "/api/photos/{id}/thumbnail",
+      "handler": "waypoint/server/api/photos.py:api_photo_thumbnail",
+      "web": [],
+      "tests": [
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photo_proxy.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/photos/{id}/preview",
+      "handler": "waypoint/server/api/photos.py:api_photo_preview",
+      "web": [],
+      "tests": [
+        "tests/test_photo_access.py",
+        "tests/test_photo_proxy.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/photos/{id}/original",
+      "handler": "waypoint/server/api/photos.py:api_photo_original",
+      "web": [],
+      "tests": [
+        "tests/test_photo_access.py",
+        "tests/test_photo_proxy.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/photo-sources",
       "handler": "waypoint/server/api/photos.py:api_photo_sources",
       "web": [],
