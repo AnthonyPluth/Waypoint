@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import heapq
 import math
+import time
 from collections import Counter
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Literal, TypedDict, cast
 
-from sqlalchemy import ColumnElement, or_, select
+from sqlalchemy import ColumnElement, and_, false, or_, select
 
 from ..storage import db, geocode
-from ..storage.models import Airport, Photo, PhotoSource, Segment
+from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
 from . import photomatch, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
 from .stats import EARTH_RADIUS_KM, distance_km
@@ -19,13 +20,23 @@ from .visibility import Viewer
 
 Located = tuple[float, float, int]
 LocationSource = Literal["exif", "inferred"]
+Scope = Literal["only_me", "trip"]
+Found = tuple[Photo, int]
 
 SHOWN: tuple[MatchKind, ...] = ("place", "time", "far")
-LOOK: tuple[MatchKind, ...] = ("ambiguous", "far")
+AMBIGUOUS: MatchKind = "ambiguous"
+FAR: MatchKind = "far"
 OWNER = "owner"
+AUTO = "auto"
 INFERRED: LocationSource = "inferred"
+ONLY_ME: Scope = "only_me"
+TRIP: Scope = "trip"
+SCOPES: tuple[Scope, ...] = (ONLY_ME, TRIP)
 MAX_CLUSTERS = 400
 NOT_ON_TRIP = "Choose a trip you are on"
+SHARE_FIRST = "Share your photos on that trip first"
+PUT_BACK_FIRST = "Put the photo back on that trip first"
+NOT_UNSETTLED = "Only a photo waiting under Needs a look can be left off"
 CELL = 0.1
 COLUMNS = round(360 / CELL)
 ROWS = round(180 / CELL)
@@ -46,7 +57,6 @@ class TripPhoto(TypedDict):
     match: MatchKind
     distance_km: float | None
     cluster: int | None
-    hidden: bool
 
 
 class PhotoCluster(TypedDict):
@@ -64,7 +74,6 @@ class PhotoCounts(TypedDict):
     located: int
     inferred: int
     far: int
-    hidden: int
 
 
 class PhotoPerson(TypedDict):
@@ -155,9 +164,18 @@ def segment_points(conn: db.Connection, segments: Sequence[Segment]) -> dict[int
     return {s.id: _points(s, airport_at, ports.get(s.id, [])) for s in segments}
 
 
+def granted_trips(conn: db.Connection, person_id: int) -> set[int]:
+    return set(conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == person_id, PhotoGrant.revoked.is_(None))).scalars())
+
+
+def excluded_trips(conn: db.Connection, person_id: int, asset_id: str) -> set[int]:
+    return set(conn.execute(select(PhotoExclusion.trip_id).where(PhotoExclusion.person_id == person_id, PhotoExclusion.asset_id == asset_id)).scalars())
+
+
 def candidate_windows(conn: db.Connection, person_id: int) -> list[TripWindow]:
     viewer = Viewer(person_id)
-    seen = visibility.visible_trips(conn, viewer)
+    granted = granted_trips(conn, person_id)
+    seen = [t for t in visibility.visible_trips(conn, viewer) if t.id in granted]
     aboard = trippeople.of(conn, [t.id for t in seen])
     mine = [t for t in seen if person_id in aboard[t.id]]
     if not mine:
@@ -184,8 +202,120 @@ def offset_label(minutes: int) -> str:
     return f"UTC{'+' if minutes > 0 else '−'}{hours:02d}:{rest:02d}"
 
 
-def _owns(viewer: Viewer, person_id: int) -> bool:
-    return viewer.household or viewer.person_id == person_id
+def viewer_sub(conn: db.Connection, viewer: Viewer) -> str | None:
+    if viewer.person_id is None:
+        return None
+    sub = conn.execute(select(Person.user_sub).where(Person.id == viewer.person_id)).scalar()
+    return str(sub) if sub is not None else None
+
+
+def persons_of(conn: db.Connection, viewer: Viewer) -> list[int]:
+    if viewer.person_id is None:
+        return []
+    sub = viewer_sub(conn, viewer)
+    if sub is None:
+        return [viewer.person_id]
+    stewarded = conn.execute(select(PhotoSharingPrefs.person_id).join(Person, Person.id == PhotoSharingPrefs.person_id)
+                             .where(Person.user_sub.is_(None), PhotoSharingPrefs.steward_sub == sub)).scalars()
+    return [viewer.person_id, *sorted(p for p in stewarded if p != viewer.person_id)]
+
+
+def acts_for(conn: db.Connection, viewer: Viewer, person_id: int) -> bool:
+    return person_id in persons_of(conn, viewer)
+
+
+def _with_me(viewer_person: int) -> ColumnElement[bool]:
+    return select(TripPerson.trip_id).where(TripPerson.trip_id == Photo.trip_id, TripPerson.person_id == viewer_person).exists()
+
+
+def _granted(persons: Sequence[int], viewer_person: int) -> ColumnElement[bool]:
+    return select(PhotoGrant.person_id).where(PhotoGrant.person_id == PhotoSource.person_id, PhotoGrant.trip_id == Photo.trip_id, PhotoGrant.revoked.is_(None),
+                                              or_(and_(PhotoGrant.scope == TRIP, _with_me(viewer_person)), PhotoSource.person_id.in_(list(persons)))).exists()
+
+
+def lock_grants(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> dict[int, PhotoGrant]:
+    ids = sorted(set(trip_ids))
+    rows = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == person_id, PhotoGrant.trip_id.in_(ids))
+                            .order_by(PhotoGrant.trip_id).with_for_update()).all()
+    return {r.trip_id: r for r in rows}
+
+
+def _canonical(rows: Sequence[Found]) -> list[Found]:
+    first: dict[tuple[int, str], int] = {}
+    for photo, person in rows:
+        key = (person, photo.asset_id)
+        first[key] = min(first.get(key, photo.id), photo.id)
+    return [(photo, person) for photo, person in rows if first[(person, photo.asset_id)] == photo.id]
+
+
+def _excluded() -> ColumnElement[bool]:
+    return select(PhotoExclusion.asset_id).where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
+                                                 PhotoExclusion.trip_id == Photo.trip_id).exists()
+
+
+def _aboard() -> ColumnElement[bool]:
+    return select(TripPerson.trip_id).where(TripPerson.trip_id == Photo.trip_id, TripPerson.person_id == PhotoSource.person_id).exists()
+
+
+def visible(conn: db.Connection, viewer: Viewer) -> ColumnElement[bool]:
+    if viewer.person_id is None:
+        return false()
+    return and_(Photo.trip_id.is_not(None), Photo.match.in_(SHOWN), visibility.can_see(viewer), _granted(persons_of(conn, viewer), viewer.person_id), ~_excluded(),
+                _aboard())
+
+
+def _query(conn: db.Connection, viewer: Viewer, *where: ColumnElement[bool]) -> list[Found]:
+    q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).join(Trip, Trip.id == Photo.trip_id) \
+        .where(visible(conn, viewer), *where)
+    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
+
+
+def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None) -> list[Found]:
+    return _query(conn, viewer, *([Photo.trip_id == trip_id] if trip_id is not None else []))
+
+
+def visible_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
+    found = _query(conn, viewer, Photo.id == photo_id)
+    if not found:
+        return None
+    photo, person = found[0]
+    same = _query(conn, viewer, PhotoSource.person_id == person, Photo.asset_id == photo.asset_id)
+    return found[0] if same and same[0][0].id == photo.id else None
+
+
+def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow], seen: set[int] | None = None) -> list[TripWindow]:
+    taken = instant(photo.taken_utc)
+    left_out = excluded_trips(conn, person, photo.asset_id)
+    return [w for w in windows if w.start <= taken <= w.end and w.trip_id not in left_out and (seen is None or w.trip_id in seen)]
+
+
+def _seen(conn: db.Connection, viewer: Viewer) -> set[int]:
+    return {t.id for t in visibility.visible_trips(conn, viewer)}
+
+
+def _with_candidates(conn: db.Connection, viewer: Viewer, rows: Sequence[Found]) -> list[tuple[Photo, int, list[TripWindow]]]:
+    seen = _seen(conn, viewer)
+    windows = {person: candidate_windows(conn, person) for person in sorted({person for _, person in rows})}
+    found = [(p, person, _candidates(conn, p, person, windows[person], seen)) for p, person in rows]
+    return [(p, person, candidates) for p, person, candidates in found if candidates]
+
+
+def unsettled(conn: db.Connection, viewer: Viewer, photo_id: int | None = None) -> list[tuple[Photo, int, list[TripWindow]]]:
+    persons = persons_of(conn, viewer)
+    if not persons:
+        return []
+    where = [PhotoSource.person_id.in_(persons), Photo.match == AMBIGUOUS, Photo.trip_id.is_(None), or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER)]
+    rows = [row for row in _rows(conn, *where) if photo_id is None or row[0].id == photo_id]
+    return _with_candidates(conn, viewer, rows)
+
+
+def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
+    persons = persons_of(conn, viewer)
+    if not persons or visibility.visible_trip(conn, viewer, trip_id) is None:
+        return []
+    left_out = select(PhotoExclusion.asset_id).where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
+                                                     PhotoExclusion.trip_id == trip_id).exists()
+    return _rows(conn, PhotoSource.person_id.in_(persons), left_out)
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:
@@ -223,19 +353,19 @@ def _placed(conn: db.Connection, viewer: Viewer, trip_ids: Sequence[int]) -> dic
     return segment_points(conn, visibility.visible_segments(conn, viewer, ids)) if ids else {}
 
 
-def _out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[SegmentPoint]]) -> TripPhoto:
+def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[SegmentPoint]]) -> TripPhoto:
     return {
         "id": photo.id, "person_id": person_id, "trip_id": photo.trip_id, "kind": cast(Literal["image", "video"], photo.kind),
         "taken_local": photo.taken_local, "zone": _zone(photo, placed),
         "latitude": photo.latitude, "longitude": photo.longitude, "location_source": cast(LocationSource | None, photo.location_source),
         "segment_id": photo.segment_id, "match": cast(MatchKind, photo.match), "distance_km": photo.distance_km,
-        "cluster": None, "hidden": photo.hidden,
+        "cluster": None,
     }
 
 
-def _rows(conn: db.Connection, *where: ColumnElement[bool]) -> list[tuple[Photo, int]]:
+def _rows(conn: db.Connection, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).where(*where)
-    return sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id))
+    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
 
 
 def _wrapped(longitude: float) -> float:
@@ -411,65 +541,113 @@ def clusters(rows: Sequence[TripPhoto]) -> list[PhotoCluster]:
 
 
 def for_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripPhotos | None:
-    trip = visibility.visible_trip(conn, viewer, trip_id)
+    trip = visibility.visible_trip(conn, viewer, trip_id) if not viewer.household else None
     if trip is None:
         return None
-    rows = [(p, person) for p, person in _rows(conn, Photo.trip_id == trip.id, Photo.match.in_(SHOWN)) if not p.hidden or _owns(viewer, person)]
+    rows = visible_rows(conn, viewer, trip.id)
     placed = _placed(conn, viewer, [trip.id])
-    photos = [_out(p, person, placed) for p, person in rows]
+    photos = [photo_out(p, person, placed) for p, person in rows]
     found = clusters(photos)
     by_person = Counter(person for _, person in rows)
     return {
         "photos": photos, "clusters": found,
         "counts": {"total": len(photos), "located": sum(p["location_source"] == "exif" for p in photos),
-                   "inferred": sum(p["location_source"] == INFERRED for p in photos), "far": sum(p["match"] == "far" for p in photos),
-                   "hidden": sum(p["hidden"] for p in photos)},
+                   "inferred": sum(p["location_source"] == INFERRED for p in photos), "far": sum(p["match"] == FAR for p in photos)},
         "people": [{"person_id": person, "count": by_person[person]} for person in sorted(by_person)],
     }
 
 
+def _far_rows(conn: db.Connection, viewer: Viewer) -> list[tuple[Photo, int, list[TripWindow]]]:
+    persons = persons_of(conn, viewer)
+    rows = _query(conn, viewer, PhotoSource.person_id.in_(persons), Photo.match == FAR, or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER))
+    return _with_candidates(conn, viewer, rows)
+
+
 def needs_a_look(conn: db.Connection, viewer: Viewer) -> PhotoReview:
-    if viewer.person_id is None and not viewer.household:
+    if viewer.person_id is None:
         return {"photos": []}
-    whose = [] if viewer.household else [PhotoSource.person_id == viewer.person_id]
-    rows = _rows(conn, *whose, Photo.match.in_(LOOK), or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER))
-    windows = {person: candidate_windows(conn, person) for person in sorted({person for _, person in rows})}
+    rows = sorted([*_far_rows(conn, viewer), *unsettled(conn, viewer)], key=lambda found: (instant(found[0].taken_utc), found[0].id))
     names = {t.id: t.name for t in visibility.visible_trips(conn, viewer)}
-    placed = _placed(conn, viewer, [p.trip_id for p, _ in rows if p.trip_id is not None])
+    placed = _placed(conn, viewer, [p.trip_id for p, _, _ in rows if p.trip_id is not None])
     photos: list[ReviewPhoto] = []
-    for p, person in rows:
-        taken = instant(p.taken_utc)
-        candidates: list[PhotoCandidate] = [{"id": w.trip_id, "name": names[w.trip_id]} for w in windows[person]
-                                            if w.start <= taken <= w.end and w.trip_id in names]
-        photos.append({**_out(p, person, placed), "candidates": candidates})
+    for p, person, windows in rows:
+        candidates: list[PhotoCandidate] = [{"id": w.trip_id, "name": names[w.trip_id]} for w in windows if w.trip_id in names]
+        photos.append({**photo_out(p, person, placed), "candidates": candidates})
     return {"photos": photos}
 
 
-def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
-    taken = instant(photo.taken_utc)
+def _shot(photo: Photo, person: int) -> PhotoIn:
     gps = photo.location_source == "exif"
-    placed = photomatch.settle(PhotoIn(taken, photo.latitude if gps else None, photo.longitude if gps else None, person), chosen)
+    return PhotoIn(instant(photo.taken_utc), photo.latitude if gps else None, photo.longitude if gps else None, person)
+
+
+def _apply(photo: Photo, placed: photomatch.Match, chosen: TripWindow | None, decided: str) -> None:
     photo.match, photo.segment_id, photo.distance_km = placed.match, placed.segment_id, placed.distance_km
-    photo.decided_by = OWNER
-    if gps:
+    photo.decided_by = decided
+    if photo.location_source == "exif":
         return
-    here = where_was(chosen.points, taken) if chosen is not None else None
+    here = where_was(chosen.points, instant(photo.taken_utc)) if chosen is not None else None
     photo.latitude, photo.longitude = (here[0], here[1]) if here else (None, None)
     photo.location_source = INFERRED if here else None
 
 
-def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, hidden: bool | None) -> TripPhoto | None:
-    found = _rows(conn, Photo.id == photo_id)
-    if not found or not _owns(viewer, found[0][1]):
+def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
+    _apply(photo, photomatch.settle(_shot(photo, person), chosen), chosen, OWNER)
+
+
+def re_place(conn: db.Connection, photo: Photo, person: int) -> bool:
+    shot = _shot(photo, person)
+    inside = [w for w in candidate_windows(conn, person) if w.start <= shot.taken <= w.end]
+    left_out = excluded_trips(conn, person, photo.asset_id)
+    candidates = [w for w in inside if w.trip_id not in left_out]
+    placed = photomatch.match(shot, candidates, None)
+    if placed.match == "none":
+        removed_from = sorted((w for w in inside if w.trip_id in left_out), key=lambda w: w.trip_id)
+        if not removed_from:
+            conn.orm.delete(photo)
+            conn.orm.flush()
+            return False
+        photo.trip_id = removed_from[0].trip_id
+        _apply(photo, photomatch.settle(shot, removed_from[0]), removed_from[0], AUTO)
+        conn.orm.flush()
+        return True
+    chosen = next((w for w in candidates if w.trip_id == placed.trip_id), None)
+    photo.trip_id = placed.trip_id
+    _apply(photo, placed, chosen, AUTO)
+    conn.orm.flush()
+    return True
+
+
+def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
+    found = visible_photo(conn, viewer, photo_id) or next(((p, person) for p, person, _ in unsettled(conn, viewer, photo_id)), None)
+    return found if found is not None and acts_for(conn, viewer, found[1]) else None
+
+
+def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
+    found = _own_photo(conn, viewer, photo_id) if not viewer.household else None
+    if found is None:
         return None
-    photo, person = found[0]
+    lock_grants(conn, found[1], [t for t in (found[0].trip_id, trip_id) if t is not None])
+    conn.orm.expire_all()
+    found = _own_photo(conn, viewer, photo_id)
+    if found is None:
+        return None
+    photo, person = found
     if trip_id is not None:
         trip = visibility.visible_trip(conn, viewer, trip_id)
         if trip is None or person not in trippeople.of(conn, [trip.id])[trip.id]:
             raise trips.Invalid(NOT_ON_TRIP)
+        if trip.id not in granted_trips(conn, person):
+            raise trips.Invalid(SHARE_FIRST)
+        if trip.id in excluded_trips(conn, person, photo.asset_id):
+            raise trips.Invalid(PUT_BACK_FIRST)
         photo.trip_id = trip.id
         _place(photo, person, next((w for w in candidate_windows(conn, person) if w.trip_id == trip.id), None))
-    if hidden is not None:
-        photo.hidden = hidden
+    if excluded:
+        if photo.match != AMBIGUOUS or photo.trip_id is not None:
+            raise trips.Invalid(NOT_UNSETTLED)
+        for w in _candidates(conn, photo, person, candidate_windows(conn, person), _seen(conn, viewer)):
+            db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time()},
+                             key=["person_id", "asset_id", "trip_id"])
     conn.orm.flush()
-    return _out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
+    return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))

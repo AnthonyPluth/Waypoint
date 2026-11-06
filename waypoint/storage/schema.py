@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text, true
+from sqlalchemy import Boolean, CheckConstraint, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text, true
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -502,13 +502,47 @@ photos = Table(
     Column('match', Text, nullable=False, doc='place | time | far | ambiguous | home | none'),
     Column('distance_km', Float),
     Column('decided_by', Text, doc='auto | owner; the sync never overwrites the trip of an owner row'),
-    Column('hidden', Boolean, nullable=False, server_default=false(), doc='hidden by the library\'s person; the sync never overwrites it'),
     Column('seen', Float, nullable=False, doc='epoch seconds the sync last saw it in Immich'),
     UniqueConstraint('source_id', 'asset_id', name='uq_photos_source_asset'),
     Index('ix_photos_trip_id', 'trip_id'),
     Index('ix_photos_segment_id', 'segment_id'),
     Index('ix_photos_source_id_taken_utc', 'source_id', 'taken_utc'),
-    info={'doc': "a reference to one Immich asset inside some trip's window and how it matched: no pixels, file names or camera data; the owner's decisions (hidden, moved to another trip) live here"},
+    info={'doc': "a reference to one Immich asset inside a granted trip's window and how it matched: no pixels, file names or camera data; a row exists only for a trip its person shared, and its person's choice of trip lives here"},
+)
+
+photo_grants = Table(
+    'photo_grants', metadata,
+    Column('person_id', Integer, refers('photo_grants', 'person_id', 'people.id', 'CASCADE'), primary_key=True),
+    Column('trip_id', Integer, refers('photo_grants', 'trip_id', 'trips.id', 'CASCADE'), primary_key=True),
+    Column('scope', Text, nullable=False, server_default=text("'only_me'"), doc='only_me | trip: who sees the photos the person shared on this trip'),
+    Column('revoked', Float, doc='null while the grant is active; epoch seconds when sharing was stopped or the prompt declined'),
+    Column('changed', Float, nullable=False, doc='epoch seconds of the last grant, scope change or revoke'),
+    Column('granted_by', Text, nullable=False, doc='the member accountable for the grant (users.sub): the person, their steward, or who set Share on all my trips'),
+    CheckConstraint("scope IN ('only_me', 'trip')", name='ck_photo_grants_scope'),
+    Index('ix_photo_grants_trip_id', 'trip_id'),
+    info={'doc': "whether a person's photos may be used on a trip, and who sees them; a revoked row grants nothing and is kept so the trip shows a reminder instead of the prompt"},
+)
+
+photo_exclusions = Table(
+    'photo_exclusions', metadata,
+    Column('person_id', Integer, refers('photo_exclusions', 'person_id', 'people.id', 'CASCADE'), primary_key=True),
+    Column('asset_id', Text, primary_key=True, doc='the Immich asset id, so the exclusion outlives the photo row and a re-sync'),
+    Column('trip_id', Integer, refers('photo_exclusions', 'trip_id', 'trips.id', 'CASCADE'), primary_key=True),
+    Column('created', Float, nullable=False),
+    Index('ix_photo_exclusions_trip_id', 'trip_id'),
+    info={'doc': "a photo its person took off a trip (Remove from this trip): never shown, counted or pinned there for anyone, whatever a sync brings back"},
+)
+
+photo_sharing_prefs = Table(
+    'photo_sharing_prefs', metadata,
+    Column('person_id', Integer, refers('photo_sharing_prefs', 'person_id', 'people.id', 'CASCADE'), primary_key=True),
+    Column('default_scope', Text, nullable=False, server_default=text("'only_me'"), doc='the scope the prompt preselects and Share on all my trips shares with'),
+    Column('share_all', Boolean, nullable=False, server_default=false(), doc='Share on all my trips: every trip the person is on, including ones joined later, is shared without asking'),
+    Column('set_by', Text, doc='the member who last turned share_all on (users.sub); the setting ends with their access'),
+    Column('share_all_since', Float, doc='epoch seconds share_all was last turned on; null while off. A revoked row older than this was declined before the setting'),
+    Column('steward_sub', Text, doc='for a person without a sign-in, the member who shares for them (users.sub), set with their first library; null for a person with a sign-in'),
+    CheckConstraint("default_scope IN ('only_me', 'trip')", name='ck_photo_sharing_prefs_default_scope'),
+    info={'doc': "a person's photo sharing preferences: the default scope and the standing Share on all my trips setting"},
 )
 
 photo_trip_syncs = Table(

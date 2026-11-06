@@ -573,7 +573,7 @@ export interface PersonLink {
 
 export interface PhotoBody {
   trip_id?: number | null;
-  hidden?: boolean;
+  excluded?: boolean;
 }
 
 export interface PhotoCandidate {
@@ -596,7 +596,31 @@ export interface PhotoCounts {
   located: number;
   inferred: number;
   far: number;
-  hidden: number;
+}
+
+export interface PhotoExclusionsBody {
+  photo_ids: number[];
+}
+
+export interface PhotoGrantPerson {
+  person_id: number;
+  prefs: PhotoPrefs;
+  trips: PhotoGrantTrip[];
+}
+
+export interface PhotoGrantTrip {
+  trip_id: number;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  state: "shared" | "declined";
+  scope: "only_me" | "trip" | null;
+  count: number;
+  removed_count: number;
+}
+
+export interface PhotoGrants {
+  people: PhotoGrantPerson[];
 }
 
 export interface PhotoPerson {
@@ -604,8 +628,32 @@ export interface PhotoPerson {
   count: number;
 }
 
+export interface PhotoPrefs {
+  default_scope: "only_me" | "trip";
+  share_all: boolean;
+}
+
+export interface PhotoPrefsBody {
+  default_scope?: "only_me" | "trip";
+  share_all?: boolean;
+}
+
 export interface PhotoReview {
   photos: ReviewPhoto[];
+}
+
+export interface PhotoSharing {
+  state: "shared" | "declined" | "ask" | "none";
+  scope: "only_me" | "trip" | null;
+  count: number;
+  removed_count: number;
+  removed: TripPhoto[];
+}
+
+export interface PhotoSharingBody {
+  person_id?: number;
+  scope?: "only_me" | "trip";
+  declined?: boolean;
 }
 
 export interface PhotoSource {
@@ -802,7 +850,6 @@ export interface ReviewPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
-  hidden: boolean;
   candidates: PhotoCandidate[];
 }
 
@@ -1233,7 +1280,6 @@ export interface TripPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
-  hidden: boolean;
 }
 
 export interface TripPhotoCounts {
@@ -1353,6 +1399,13 @@ export interface Endpoints {
   "DELETE /api/photo-sources/{id}": { body: never; reply: Ok };
   "POST /api/photo-sources/{id}/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };
   "POST /api/photo-sources/{id}/sync": { body: never; reply: SyncStarted };
+  "GET /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };
+  "POST /api/trips/{id}/photo-sharing": { body: PhotoSharingBody; reply: PhotoSharing };
+  "DELETE /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };
+  "POST /api/trips/{id}/photo-exclusions": { body: PhotoExclusionsBody; reply: PhotoSharing };
+  "DELETE /api/trips/{id}/photo-exclusions/{id}": { body: never; reply: PhotoSharing };
+  "GET /api/photo-grants": { body: never; reply: PhotoGrants };
+  "POST /api/photo-sharing-prefs/{id}": { body: PhotoPrefsBody; reply: PhotoPrefs };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };

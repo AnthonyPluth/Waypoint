@@ -33,7 +33,7 @@ from waypoint.providers import immich
 from waypoint.server.api import offline as offline_api
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import photos as photos_api
-from waypoint.storage.models import Photo, PhotoSource
+from waypoint.storage.models import Photo, PhotoGrant, PhotoSource
 from waypoint.server.api import loyalty
 from waypoint.server.api import reminders as reminders_api
 from waypoint.server.common import _current
@@ -439,18 +439,27 @@ class Replies(DbCase):
         self.c.orm.flush()
         placed = Photo(source_id=source.id, asset_id="a1", asset_updated="2026-06-02T00:00:00Z", kind="image", taken_utc="2026-06-02T09:00:00+00:00",
                        taken_local="2026-06-02T10:00", taken_offset=None, latitude=51.5, longitude=-0.12, location_source="exif", state=None, country=None,
-                       trip_id=seg["trip_id"], segment_id=seg["id"], match="place", distance_km=23.0, decided_by=None, hidden=False, seen=1.0)
+                       trip_id=seg["trip_id"], segment_id=seg["id"], match="place", distance_km=23.0, decided_by=None, seen=1.0)
         torn = Photo(source_id=source.id, asset_id="a2", asset_updated="2026-06-02T00:00:00Z", kind="video", taken_utc="2026-06-02T10:00:00+00:00",
                      taken_local="2026-06-02T11:00", taken_offset=60, latitude=None, longitude=None, location_source=None, state=None, country=None,
-                     trip_id=None, segment_id=None, match="ambiguous", distance_km=None, decided_by=None, hidden=False, seen=1.0)
-        self.c.orm.add_all([placed, torn])
+                     trip_id=None, segment_id=None, match="ambiguous", distance_km=None, decided_by=None, seen=1.0)
+        self.c.orm.add_all([placed, torn, PhotoGrant(person_id=me, trip_id=seg["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="u7")])
         self.c.orm.flush()
-        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, str(seg["trip_id"])))
+        trip = str(seg["trip_id"])
+        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, trip))
         self.check("GET /api/photos/review", photos_api.api_photo_review(self.c, {}, {}))
-        self.check("POST /api/photos/{id}", photos_api.api_photo_decide(self.c, {}, {"hidden": True}, str(placed.id)))
         self.check("POST /api/photos/{id}", photos_api.api_photo_decide(self.c, {}, {"trip_id": seg["trip_id"]}, str(torn.id)))
-        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, str(seg["trip_id"])))
+        self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, trip))
         self.check("GET /api/photos/review", photos_api.api_photo_review(self.c, {}, {}))
+        self.check("GET /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing(self.c, {}, {}, trip))
+        self.check("POST /api/trips/{id}/photo-exclusions", photos_api.api_photo_exclude(self.c, {}, {"photo_ids": [placed.id]}, trip))
+        self.check("DELETE /api/trips/{id}/photo-exclusions/{id}", photos_api.api_photo_put_back(self.c, {}, {}, trip, str(placed.id)))
+        self.check("POST /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_set(self.c, {}, {"scope": "only_me"}, trip))
+        self.check("DELETE /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_stop(self.c, {}, {}, trip))
+        self.check("POST /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_set(self.c, {}, {"declined": True}, trip))
+        self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
+        self.check("POST /api/photo-sharing-prefs/{id}", photos_api.api_photo_prefs_set(self.c, {}, {"default_scope": "trip", "share_all": True}, str(me)))
+        self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
 
     def test_photo_sources(self):
         _current.user = {"sub": "u7", "name": "Ana Example", "email": "ana7@example.com"}
@@ -555,7 +564,10 @@ class Generated(unittest.TestCase):
                                      "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email",
                                      "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}",
                                      "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}",
-                                     "DELETE /api/photo-sources/{id}", "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync"})
+                                     "DELETE /api/photo-sources/{id}", "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync",
+                                     "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
+                                     "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/photo-grants",
+                                     "POST /api/photo-sharing-prefs/{id}"})
         self.assertNotIn("GET /api/backup", covered())
         self.assertNotIn("GET /api/mailboxes/callback", covered())
 

@@ -13,7 +13,7 @@ from sqlalchemy import delete, select, update
 from .. import dates
 from ..storage import db, gate_codes, geocode, reference, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip
-from . import airports, links, logos, money, people, place_zones, regions, trippeople, visibility
+from . import airports, links, logos, money, people, photogrants, place_zones, regions, trippeople, visibility
 from .visibility import Viewer
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
@@ -1394,6 +1394,7 @@ def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return False
+    photogrants.trip_deleted(conn, trip.id)
     conn.execute(delete(Trip).where(Trip.id == trip.id))
     stored_mail.prune(conn)
     return True

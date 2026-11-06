@@ -6,15 +6,14 @@ from datetime import date, timedelta
 from functools import cache
 from typing import TypedDict
 
-from sqlalchemy import false, or_, select
+from sqlalchemy import select
 
 from ..storage import db, geocode, reference
-from ..storage.models import Airport, Photo, PhotoSource, Segment
-from . import place_zones, stats, tripmap, trips, visibility
+from ..storage.models import Airport, Segment
+from . import photos, place_zones, stats, tripmap, trips, visibility
 from .visibility import Viewer
 
 KM_PER_MILE = 1.609344
-SHOWN_MATCHES = ("place", "time", "far")
 UNSURE_MATCH = "far"
 OWNER = "owner"
 INFERRED = "inferred"
@@ -141,13 +140,8 @@ def _state_name(text: str | None) -> str | None:
 
 
 def _photos(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[PlacedPhoto]:
-    own = PhotoSource.person_id == viewer.person_id if viewer.person_id is not None else false()
-    rows = conn.execute(select(Photo.state, Photo.country, Photo.location_source, Photo.match, Photo.decided_by)
-                        .join(PhotoSource, PhotoSource.id == Photo.source_id)
-                        .where(Photo.trip_id == trip_id, or_(Photo.match.in_(SHOWN_MATCHES), Photo.decided_by == OWNER),
-                               or_(Photo.hidden.is_(false()), own))).fetchall()
-    return [{"state": state, "country": country, "inferred": source == INFERRED, "counts_place": match != UNSURE_MATCH or decided == OWNER}
-            for state, country, source, match, decided in rows]
+    return [{"state": p.state, "country": p.country, "inferred": p.location_source == INFERRED, "counts_place": p.match != UNSURE_MATCH or p.decided_by == OWNER}
+            for p, _ in photos.visible_rows(conn, viewer, trip_id)]
 
 
 def _places(conn: db.Connection, live: Sequence[Segment], airport_countries: Iterable[str], photos: Sequence[PlacedPhoto]) -> tuple[list[str], list[str]]:
