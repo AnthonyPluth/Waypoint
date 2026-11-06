@@ -301,6 +301,20 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0039")
         self.assertNotIn("app_devices", shape(self.path))
 
+    def test_0039_ties_an_app_session_to_its_grant_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        tables = shape(self.path)
+        self.assertIn("grant_id", [col[0] for col in tables["auth_sessions"]["columns"]])
+        self.assertIn("CASCADE", {fk[0]: fk[4] for fk in tables["auth_sessions"]["fks"]}["fk_auth_sessions_grant_id"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

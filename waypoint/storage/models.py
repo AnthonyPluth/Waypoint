@@ -31,6 +31,7 @@ class AuthSession(Base):
     created: Mapped[float | None]
     expires: Mapped[float | None]
     id_token: Mapped[str | None]
+    grant_id: Mapped[int | None]
 
 
 class User(Base):
