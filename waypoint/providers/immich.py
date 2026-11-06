@@ -124,6 +124,7 @@ class Page:
     next_page: int | None
     last_taken: datetime | None = None
     one_instant: bool = False
+    dropped: int = 0
 
 
 class Original:
@@ -389,10 +390,11 @@ def parse_page(body: Any, page: int, owner: str) -> Page:
     if not isinstance(assets, dict) or not isinstance(items, list) or "nextPage" not in assets:
         raise Unavailable(UNREADABLE)
     found = tuple(a for item in items if (a := parse_asset(item, owner)))
+    owned = sum(1 for item in items if isinstance(item, dict) and item.get("ownerId") == owner)
     taken = [_instant(item.get("fileCreatedAt")) if isinstance(item, dict) else None for item in items]
     known = [at.astimezone(UTC) for at in taken if at is not None]
     return Page(assets=found, next_page=next_page(assets.get("nextPage"), page), last_taken=max(known) if len(known) == len(taken) and known else None,
-                one_instant=bool(known) and len(known) == len(taken) and len(set(known)) == 1)
+                one_instant=bool(known) and len(known) == len(taken) and len(set(known)) == 1, dropped=owned - len(found))
 
 
 def parse_markers(body: Any) -> list[Marker]:

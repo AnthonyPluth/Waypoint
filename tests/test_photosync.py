@@ -1070,3 +1070,45 @@ class NinthReviewTests(SyncCase):
         self.assertEqual((row.latitude, row.longitude), (51.5, -0.12))
         got = self.sync(NOW + timedelta(hours=12))
         self.assertEqual(got.new, 0)
+
+
+class TenthReviewTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.share(self.other)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO),
+                          asset(3, "2026-08-01T22:00:00Z", gps=SOHO)]
+        self.sync()
+        self.assertEqual(len(self.rows()), 3)
+
+    def windows_asked(self, since):
+        return [q["takenBefore"] for q in self.lib.asked()[since:]]
+
+    def test_a_tight_budget_works_through_every_window_in_turn(self):
+        seen = set()
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            for n in range(3):
+                calls = len(self.lib.asked())
+                self.sync(NOW + timedelta(hours=6 * (n + 1)))
+                seen.update(self.windows_asked(calls))
+        self.assertEqual(len(seen), 3)
+
+    def test_a_pending_relist_finishes_across_budget_stopped_runs(self):
+        self.lib.items = self.lib.items[1:]
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            for n in range(4):
+                self.sync(NOW + timedelta(days=8, hours=n))
+        self.assertEqual(sorted(self.rows()), sorted(a["id"] for a in self.lib.items))
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_a_malformed_owned_item_during_a_relist_deletes_nothing_and_a_clean_relist_finishes(self):
+        broken = {**self.lib.items[0], "localDateTime": "not a time"}
+        self.lib.items = [broken, *self.lib.items[1:]]
+        self.sync(NOW + timedelta(days=8))
+        self.assertEqual(len(self.rows()), 3)
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        self.lib.items = self.lib.items[1:]
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertEqual(sorted(self.rows()), sorted(a["id"] for a in self.lib.items))
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"))
