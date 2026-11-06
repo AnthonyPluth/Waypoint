@@ -4,10 +4,10 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
-from ...domain import reminders
+from ...domain import app_push, reminders
 from ...providers import webpush
 from ..common import ApiError, row_id
-from ..contract import DeviceBody, FeedMade, Ok, ReminderDevice, Reminders, RemindersBody
+from ..contract import AppDeviceBody, AppPush, DeviceBody, FeedMade, Ok, ReminderDevice, Reminders, RemindersBody
 from .mailboxes import owner, public_base
 
 NO_DEVICE = "No such device"
@@ -64,4 +64,28 @@ def api_feed_make(conn, _q, _b) -> FeedMade:
 
 def api_feed_off(conn, _q, _b) -> Ok:
     reminders.feed_off(conn, owner())
+    return {"ok": True}
+
+
+def api_app_push(conn, _q, _b) -> AppPush:
+    return {"relay": app_push.relay_url(), "devices": [ReminderDevice(**d) for d in app_push.devices(conn, owner())]}
+
+
+def api_app_device_add(conn, _q, body: AppDeviceBody) -> ReminderDevice:
+    if app_push.relay_url() is None:
+        raise ApiError("This Waypoint has no push relay set up, so the app can't be sent notifications.")
+    texts = []
+    for key in ("device_id", "secret"):
+        if not isinstance(body.get(key), str):
+            raise ApiError(f'Send "{key}" as text')
+        texts.append(body[key])
+    try:
+        return ReminderDevice(**app_push.add_device(conn, owner(), texts[0], texts[1], time.time()))
+    except app_push.Invalid as e:
+        raise ApiError(str(e)) from None
+
+
+def api_app_device_remove(conn, _q, _b, device_id) -> Ok:
+    if not app_push.remove_device(conn, owner(), row_id(device_id, NO_DEVICE)):
+        raise ApiError(NO_DEVICE, 404)
     return {"ok": True}

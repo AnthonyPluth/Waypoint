@@ -21,6 +21,14 @@ To get them on a phone or computer, open Settings there and choose **Register th
 
 Notifications go through your browser’s own push service (Google’s, Apple’s or Mozilla’s), which sees that a notification was sent to that browser, with its text encrypted so only your browser can read it.
 
+## On the iPhone app
+
+The iPhone app gets the same three reminders through a push relay, if the person who runs this Waypoint sets `WAYPOINT_PUSH_RELAY_URL` (see [Configuration](/Waypoint/reference/configuration/)). It is off until then, and the app is told there is nothing to turn on.
+
+Apple only accepts pushes signed by the app’s publisher, so the relay holds that key. Waypoint tells the relay only the phone’s id and its secret, and the relay sends Apple a fixed “Open Waypoint to see an update.” with the reminder’s tag, which is a short label such as `check-in-12`. The text of the reminder never leaves this server: the app opens, asks this Waypoint what is due and shows it. The relay can’t read your trips, and it doesn’t know this server’s address.
+
+The phone’s secret is kept encrypted, an iPhone ends when its owner can no longer sign in, and none of it is in a backup. The relay forgets a phone Apple says is gone, and Waypoint forgets one the relay says it doesn’t know.
+
 ## Calendar feed
 
 **Make my calendar address** gives you a private address that your calendar app (Apple Calendar, Google Calendar, Outlook, …) can subscribe to. It holds the trips you can see, with each flight, stay, car, train, cruise and parking booking as an event. A flight booked on two reservations is one event, listing both confirmation codes. Calendar apps poll the address on their own schedule, often every few hours.

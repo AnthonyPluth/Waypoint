@@ -1094,6 +1094,16 @@ class DeviceBody(TypedDict):
     auth: str
 
 
+class AppDeviceBody(TypedDict):
+    device_id: str
+    secret: str
+
+
+class AppPush(TypedDict):
+    relay: str | None
+    devices: list[ReminderDevice]
+
+
 class FeedMade(TypedDict):
     url: str
 

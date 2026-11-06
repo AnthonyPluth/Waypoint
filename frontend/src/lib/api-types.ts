@@ -57,6 +57,16 @@ export interface AirportMatches {
   airports: Airport[];
 }
 
+export interface AppDeviceBody {
+  device_id: string;
+  secret: string;
+}
+
+export interface AppPush {
+  relay: string | null;
+  devices: ReminderDevice[];
+}
+
 export interface Asked {
   ok: boolean;
   dismissed: string | null;
@@ -1337,6 +1347,9 @@ export interface Endpoints {
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
   "DELETE /api/reminders/devices/{id}": { body: never; reply: Ok };
+  "GET /api/reminders/app": { body: never; reply: AppPush };
+  "POST /api/reminders/app/devices": { body: AppDeviceBody; reply: ReminderDevice };
+  "DELETE /api/reminders/app/devices/{id}": { body: never; reply: Ok };
   "POST /api/feed": { body: never; reply: FeedMade };
   "DELETE /api/feed": { body: never; reply: Ok };
   "GET /api/review": { body: never; reply: Review };

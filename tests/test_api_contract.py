@@ -1,6 +1,7 @@
 import ast
 import importlib.util
 import json
+import os
 import unittest
 from datetime import date
 from pathlib import Path
@@ -330,6 +331,11 @@ class Replies(DbCase):
         self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
         self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
+        with mock.patch.dict(os.environ, {"WAYPOINT_PUSH_RELAY_URL": "https://relay.example.com"}):
+            phone = reminders_api.api_app_device_add(self.c, {}, {"device_id": "dev_abcdefgh12345", "secret": "s" * 43})
+            self.check("POST /api/reminders/app/devices", phone)
+            self.check("GET /api/reminders/app", reminders_api.api_app_push(self.c, {}, {}))
+            self.check("DELETE /api/reminders/app/devices/{id}", reminders_api.api_app_device_remove(self.c, {}, {}, str(phone["id"])))
 
     def test_mcp_settings(self):
         _current.host = "localhost:8765"
@@ -531,6 +537,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
+                                     "GET /api/reminders/app", "POST /api/reminders/app/devices", "DELETE /api/reminders/app/devices/{id}",
                                      "GET /api/mcp-settings", "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail",
                                      "DELETE /api/mcp-settings/connections/{id}",
                                      "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",
