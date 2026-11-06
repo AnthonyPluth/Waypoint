@@ -25,7 +25,7 @@ Notifications go through your browser’s own push service (Google’s, Apple’
 
 The iPhone app gets the same three reminders through a push relay, if the person who runs this Waypoint sets `WAYPOINT_PUSH_RELAY_URL` (see [Configuration](/Waypoint/reference/configuration/)). It is off until then, and the app is told there is nothing to turn on.
 
-Apple only accepts pushes signed by the app’s publisher, so the relay holds that key. Waypoint tells the relay only the phone’s id and its secret, and the relay sends Apple a fixed “Open Waypoint to see an update.” with the reminder’s tag, which is a short label such as `check-in-12`. The text of the reminder never leaves this server: the app opens, asks this Waypoint what is due and shows it. The relay can’t read your trips, and it doesn’t know this server’s address.
+Apple only accepts pushes signed by the app’s publisher, so the relay holds that key. Waypoint tells the relay only the phone’s id and its secret, and the relay sends Apple a fixed “Open Waypoint to see an update.” with the reminder’s tag, a short label such as `check-in-12` (a booking’s number), `day-of-2026-11-20` (the date) or `review`. The text of the reminder never leaves this server: the app opens, asks this Waypoint what is due and shows it. The relay and Apple can’t read your trips, but the tag and the time of each wake show that a member has a flight within a day, or something starting today, and the number of that booking. The relay doesn’t know this server’s address.
 
 The phone’s secret is kept encrypted, an iPhone ends when its owner can no longer sign in, and none of it is in a backup. The relay forgets a phone Apple says is gone, and Waypoint forgets one the relay says it doesn’t know.
 

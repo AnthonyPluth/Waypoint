@@ -97,6 +97,13 @@ class SendingTests(Relay):
     def due(self, now=FLIGHT_DAY, hour=3):
         return reminders.run_due(self.c, now, date(2026, 11, 20), hour, self.send)
 
+    def test_a_phone_alone_is_woken_for_the_day_of_summary_with_a_tag_of_the_date_alone(self):
+        self.phone()
+        self.assertEqual(self.due(hour=8), 2)
+        self.assertEqual([c.args[3] for c in self.wake.call_args_list], [f"check-in-{self.out['id']}", "day-of-2026-11-20"])
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.due(hour=8), 0)
+
     def test_a_phone_alone_is_woken_for_check_in_with_the_reminders_tag_and_nothing_else(self):
         self.phone()
         self.assertEqual(self.due(), 1)

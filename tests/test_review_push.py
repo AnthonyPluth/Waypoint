@@ -13,9 +13,9 @@ from tests.test_mail_ai import GOOD, ScanAiCase
 from tests.test_mail_scan import NOW, eml
 from tests.test_reminders import ENDPOINT, subscription
 from tests.test_webpush import PushService, decrypt, receiver
-from waypoint.domain import reminders
+from waypoint.domain import app_push, reminders
 from waypoint.domain.mail import ai, review, scan
-from waypoint.providers import webpush
+from waypoint.providers import relay, webpush
 from waypoint.server import jobs
 from waypoint.storage import db
 from waypoint.storage.models import Mailbox, PushDevice, ReminderSent
@@ -387,6 +387,25 @@ class PrivacyTests(PushCase):
         for canary in canaries:
             self.assertNotIn(canary, wire)
         self.assertEqual(len(self.items()), 1)
+
+    def test_a_phone_alone_is_woken_after_a_scan_with_the_review_tag_and_nothing_of_the_email(self):
+        canaries = (self.SUBJECT, self.SENDER, self.CODE, self.NAME)
+        with db.session() as conn:
+            app_push.add_device(conn, "u-jane", "dev_abcdefgh12345", "s" * 43, time.time())
+        mail = (eml("incomplete")
+                .replace(b"From: Example Air", f"From: Example Air {self.SENDER}".encode())
+                .replace(b"Subject: Your itinerary (partial)", f"Subject: Your itinerary (partial) {self.SUBJECT}".encode())
+                .replace(b"<p>CANARY", f"<p>{self.NAME} CANARY".encode())
+                .replace(b"AB1CD2", self.CODE.encode()))
+        self.add_mail("m-canary", mail)
+        with mock.patch.dict(os.environ, {app_push.RELAY_ENV: "https://relay.example.com"}), \
+                mock.patch.object(relay, "wake") as wake, \
+                no_leaks(self, "CANARY-BODY-INCOMPLETE-4N7P", *canaries, database=self.path):
+            self.scan_job()
+        wake.assert_called_once_with("https://relay.example.com", "dev_abcdefgh12345", "s" * 43, "review")
+        for canary in canaries:
+            self.assertNotIn(canary, repr(wake.call_args))
+        self.assertEqual(self.sent, [])
 
     def real_sender(self, conn, subject):
         vapid, _public = webpush.vapid_keys(conn)
