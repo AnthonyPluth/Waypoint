@@ -784,3 +784,47 @@ class SecondReviewTests(SyncCase):
         new = trips.split(self.c, self.jane, self.a, [hotel.id])["id"]
         self.assertEqual(self.c.execute(select(PhotoExclusion.asset_id).where(PhotoExclusion.trip_id == new)).scalars(), ["removed-anywhere"])
         self.assertIsNotNone(self.c.orm.get(PhotoGrant, (self.jid, new)))
+
+
+class ThirdReviewTests(SyncCase):
+    def test_a_page_fetched_under_a_window_that_moved_meanwhile_writes_nothing(self):
+        self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO)]
+        moved = []
+
+        def move_b(asked):
+            if moved:
+                return
+            moved.append(1)
+            with db.session() as other:
+                other.execute(update(trips.Segment).where(trips.Segment.trip_id == self.b).values(start_local="2026-07-03T15:00", end_local="2026-07-05T10:00"))
+        self.lib.on_search = move_b
+        got = self.sync()
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
+        self.assertIsNone(self.stored()["last_sync"])
+        self.assertIsNone(self.syncs()[self.b].cursor)
+        self.assertEqual(got.budget_hit, 0)
+        self.sync(NOW + timedelta(hours=6))
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
+        self.assertEqual(self.stored()["last_sync"], (NOW + timedelta(hours=6)).timestamp())
+
+    def test_a_refusal_for_a_key_that_was_replaced_meanwhile_leaves_the_new_key_healthy(self):
+        def replaced():
+            with db.session() as other:
+                photo_sources.set_key(other, self.source, "canary-new-key-8c2v")
+                photo_sources.mark(other, self.source, "ok", None)
+            return b'{"message":"no"}'
+        self.lib.fake.routes[immich.SEARCH] = (401, JSON_HEADERS, replaced)
+        got = self.sync()
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"]), ("ok", None))
+        self.lib.fail(401)
+        self.sync(NOW + timedelta(hours=6))
+        self.assertEqual(self.stored()["status"], "refused")
+
+    def test_a_run_that_reads_nothing_from_immich_changes_no_status(self):
+        photo_sources.mark(self.c, self.source, "unreachable", immich.UNREACHABLE, 5.0)
+        self.c.execute(update(PhotoGrant).values(revoked=9.0))
+        self.c.commit()
+        self.sync()
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("unreachable", immich.UNREACHABLE, 5.0))
+        self.assertEqual(self.lib.asked(), [])

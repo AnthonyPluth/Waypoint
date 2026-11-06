@@ -100,12 +100,18 @@ def set_label(conn: db.Connection, source_id: int, label: str | None, owner: str
 
 
 def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None,
-         owner: str | None = None, *, keep_off: bool = False) -> bool:
+         owner: str | None = None, *, keep_off: bool = False, sealed: str | None = None) -> bool:
     values: dict[str, object] = {"status": status, "last_error": error}
     if synced is not None:
         values["last_sync"] = synced
     paused = [PhotoSource.status != OFF] if keep_off else []
-    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused).values(**values)).rowcount) > 0
+    same_key = [PhotoSource.api_key == sealed] if sealed is not None else []
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused, *same_key).values(**values)).rowcount) > 0
+
+
+def sealed_key(conn: db.Connection, source_id: int) -> str | None:
+    found = conn.execute(select(PhotoSource.api_key).where(PhotoSource.id == source_id)).scalar()
+    return str(found) if found is not None else None
 
 
 def remove(conn: db.Connection, source_id: int, owner: str | None = None) -> bool:
