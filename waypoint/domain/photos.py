@@ -4,7 +4,7 @@ import heapq
 import math
 import time
 from collections import Counter
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Literal, TypedDict, cast
@@ -224,9 +224,28 @@ def acts_for(conn: db.Connection, viewer: Viewer, person_id: int) -> bool:
     return person_id in persons_of(conn, viewer)
 
 
-def _granted(persons: Sequence[int]) -> ColumnElement[bool]:
+def _with_me(viewer_person: int) -> ColumnElement[bool]:
+    return select(TripPerson.trip_id).where(TripPerson.trip_id == Photo.trip_id, TripPerson.person_id == viewer_person).exists()
+
+
+def _granted(persons: Sequence[int], viewer_person: int) -> ColumnElement[bool]:
     return select(PhotoGrant.person_id).where(PhotoGrant.person_id == PhotoSource.person_id, PhotoGrant.trip_id == Photo.trip_id, PhotoGrant.revoked.is_(None),
-                                              or_(PhotoGrant.scope == TRIP, PhotoSource.person_id.in_(list(persons)))).exists()
+                                              or_(and_(PhotoGrant.scope == TRIP, _with_me(viewer_person)), PhotoSource.person_id.in_(list(persons)))).exists()
+
+
+def lock_grants(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> dict[int, PhotoGrant]:
+    ids = sorted(set(trip_ids))
+    rows = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == person_id, PhotoGrant.trip_id.in_(ids))
+                            .order_by(PhotoGrant.trip_id).with_for_update()).all()
+    return {r.trip_id: r for r in rows}
+
+
+def _canonical(rows: Sequence[Found]) -> list[Found]:
+    first: dict[tuple[int, str], int] = {}
+    for photo, person in rows:
+        key = (person, photo.asset_id)
+        first[key] = min(first.get(key, photo.id), photo.id)
+    return [(photo, person) for photo, person in rows if first[(person, photo.asset_id)] == photo.id]
 
 
 def _excluded() -> ColumnElement[bool]:
@@ -241,13 +260,14 @@ def _aboard() -> ColumnElement[bool]:
 def visible(conn: db.Connection, viewer: Viewer) -> ColumnElement[bool]:
     if viewer.person_id is None:
         return false()
-    return and_(Photo.trip_id.is_not(None), Photo.match.in_(SHOWN), visibility.can_see(viewer), _granted(persons_of(conn, viewer)), ~_excluded(), _aboard())
+    return and_(Photo.trip_id.is_not(None), Photo.match.in_(SHOWN), visibility.can_see(viewer), _granted(persons_of(conn, viewer), viewer.person_id), ~_excluded(),
+                _aboard())
 
 
 def _query(conn: db.Connection, viewer: Viewer, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).join(Trip, Trip.id == Photo.trip_id) \
         .where(visible(conn, viewer), *where)
-    return sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id))
+    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
 
 
 def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None) -> list[Found]:
@@ -256,7 +276,11 @@ def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None
 
 def visible_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
     found = _query(conn, viewer, Photo.id == photo_id)
-    return found[0] if found else None
+    if not found:
+        return None
+    photo, person = found[0]
+    same = _query(conn, viewer, PhotoSource.person_id == person, Photo.asset_id == photo.asset_id)
+    return found[0] if same and same[0][0].id == photo.id else None
 
 
 def _candidates(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow], seen: set[int] | None = None) -> list[TripWindow]:
@@ -281,7 +305,8 @@ def unsettled(conn: db.Connection, viewer: Viewer, photo_id: int | None = None) 
     if not persons:
         return []
     where = [PhotoSource.person_id.in_(persons), Photo.match == AMBIGUOUS, Photo.trip_id.is_(None), or_(Photo.decided_by.is_(None), Photo.decided_by != OWNER)]
-    return _with_candidates(conn, viewer, _rows(conn, *where, *([Photo.id == photo_id] if photo_id is not None else [])))
+    rows = [row for row in _rows(conn, *where) if photo_id is None or row[0].id == photo_id]
+    return _with_candidates(conn, viewer, rows)
 
 
 def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
@@ -340,7 +365,7 @@ def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[Segmen
 
 def _rows(conn: db.Connection, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).where(*where)
-    return sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id))
+    return _canonical(sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
 
 
 def _wrapped(longitude: float) -> float:
@@ -600,6 +625,11 @@ def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | No
 
 def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
     found = _own_photo(conn, viewer, photo_id) if not viewer.household else None
+    if found is None:
+        return None
+    lock_grants(conn, found[1], [t for t in (found[0].trip_id, trip_id) if t is not None])
+    conn.orm.expire_all()
+    found = _own_photo(conn, viewer, photo_id)
     if found is None:
         return None
     photo, person = found
