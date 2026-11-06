@@ -393,7 +393,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <div class="sechead"><span class="letter">h</span><h2 id="h-title">Needs a look</h2></div>
     <p class="lede">Photos that fit two trips equally (<code>ambiguous</code>, on no trip yet) and photos far from every booking (<code>far</code>, already on the trip with a flag). Only the library’s person sees this list (for a library whose person has no sign-in, the member who connected it, its steward, sees it and makes these decisions for them), in their own source card; the trip page points here when the trip has far photos of theirs. <b>Pick a trip</b> opens a Sheet; <b>Remove from this trip</b> takes a far photo off the trip for everyone, as in (k); <b>Leave off</b> keeps an ambiguous photo off both trips.</p>
     <div class="stage"><div class="frames">
-      <figure class="fig"><figcaption>h1 · In the source card</figcaption>
+      <figure class="fig"><figcaption>h1 · In the source card, and the two toasts after Leave off and Remove</figcaption>
         <div class="dev frag"><div class="main"><div class="rows"><div class="src">
           <div class="src-top"><span class="avatar a2" aria-hidden="true">AB</span><div class="txt"><p class="t-heading">Ada Brook</p><p class="mono t-caption muted">immich.brook.example</p><p class="t-caption muted">Last synced Fri 6 Nov, 6:12 AM · 1,904 photos on 12 trips</p></div><span class="chip ok">Up to date</span></div>
           <details class="looks" open>
@@ -406,6 +406,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
             </ul>
             <button class="btn ghost sm" type="button">Show 2 more</button>
           </details>
+          <div class="toast inline" role="status"><span>Left off both trips.</span><button class="btn ghost sm" type="button" aria-label="Undo leaving the photo from Sat 13 Sep, 5:40 PM off both trips">Undo</button></div>
+          <div class="toast inline" role="status"><span>Removed from Four Corners loop.</span><button class="btn ghost sm" type="button" aria-label="Undo removing the photo from Wed 10 Sep, 7:55 AM">Undo</button></div>
         </div></div></div></div>
       </figure>
       <figure class="fig"><figcaption>h2 · Pick a trip (Sheet)</figcaption>
@@ -414,6 +416,8 @@ details.looks > summary::-webkit-details-marker { display: none; }
           <main class="main" aria-hidden="true"><h1 class="t-display">Settings</h1><h2 class="eyebrow">Photos</h2><div class="rows"><div class="src"><div class="src-top"><span class="avatar a2">AB</span><div class="txt"><p class="t-heading">Ada Brook</p><p class="mono t-caption muted">immich.brook.example</p></div><span class="chip ok">Up to date</span></div></div></div></main>
           <nav class="tabs" data-tabs="more" aria-label="Main"></nav>
         </div></div>
+      </figure>
+    </div></div>
         <div class="dim"></div>
         <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="h2t" aria-describedby="h2d">
           <div class="grip"><span></span></div>
@@ -435,7 +439,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
         <li>Disclosure: native <code>details</code>, summary <q>Needs a look, 5 photos</q>; list <q>Photos that need a look</q>.</li>
         <li>Per photo, naming its time: <q>Pick a trip for the photo from Sat 13 Sep, 5:40 PM</q>, <q>Leave the photo from … off both trips</q>, and for far photos <q>Remove the photo from … from this trip</q> (the visible label is <q>Remove from this trip</q>) and <q>Keep the photo from … on Four Corners loop</q>.</li>
         <li>Sheet: dialog <q>Pick a trip for this photo</q>, described by <q>Waypoint won’t move it again by itself.</q>; radio group <q>Trips it could belong to</q>; <q>Cancel</q>; the confirm button names the choice, <q>Put on Canyon weekend</q>; <q>Close</q>.</li>
-        <li>Remove from this trip and Leave off show the undo toast from (k).</li>
+        <li>Remove from this trip shows the toast from (k), <q>Removed from Four Corners loop.</q> Leave off shows its own, <q>Left off both trips.</q>, because the photo was on neither trip; its <q>Undo</q> is named <q>Undo leaving the photo from Sat 13 Sep, 5:40 PM off both trips</q> and returns the photo to Needs a look, as it was. Undo on the Remove toast puts the far photo back on its trip and keeps it in Needs a look. Both toasts are <code>role="status"</code>.</li>
       </ul></div>
       <div><h3>Tokens and components</h3><ul>
         <li><code>details</code> pattern of Gmail’s Ignored senders; <code>StatusChip</code> <code>warn</code> <q>Needs a look</q>.</li>
@@ -509,7 +513,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var SEL = { 3: 1, 5: 1, 9: 1 };
   var selEl = document.querySelector("[data-sel]");
   if (selEl) selEl.innerHTML = GROUPS.d3.map(function (t, i) {
-    if (t.who !== A) return '<span class="tile locked g' + t.g + '" aria-hidden="true"></span>';
+    if (t.who !== A) return '<span class="tile locked g' + t.g + '" role="img" aria-label="Photo by ' + t.who + ', ' + t.time + ', not yours to remove"></span>';
     var on = !!SEL[i];
     return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
   }).join("");

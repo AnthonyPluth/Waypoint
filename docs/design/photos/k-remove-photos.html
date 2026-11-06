@@ -431,7 +431,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
     <div class="spec">
       <div><h3>Accessible names</h3><ul>
         <li>Viewer: <q>Remove from this trip</q>, only on your own photos. The viewer moves to the next photo and the counter drops (<q>52 of 247</q>).</li>
-        <li>Gallery header: <q>Select</q> (<q>Select your photos to remove</q>), shown when you have photos on the trip. In select mode your tiles are checkboxes, <q>Photo, 11:30 AM, near Marlow Springs</q>, checked or not; other people’s tiles are not selectable and are skipped by Tab.</li>
+        <li>Gallery header: <q>Select</q> (<q>Select your photos to remove</q>), shown when you have photos on the trip. In select mode your tiles are checkboxes, <q>Photo, 11:30 AM, near Marlow Springs</q>, checked or not; other people’s tiles are not selectable and are skipped by Tab, but stay in the accessibility tree as labelled images, <q>Photo by Theo, 4:11 PM, not yours to remove</q>, so a day’s photo count matches what a screen reader perceives.</li>
         <li>Selection bar: <q>3 selected</q> (<code>role="status"</code>), <q>Remove from this trip</q>, <q>Cancel</q> (also Escape).</li>
         <li>Toasts: <q>Removed from Four Corners loop.</q> / <q>3 photos removed from Four Corners loop.</q> with <q>Undo</q>.</li>
         <li>For a person with no sign-in, the library’s steward gets the same remove, bulk-remove and Put back actions for that person’s photos, with labels naming the person.</li>
@@ -508,7 +508,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var SEL = { 3: 1, 5: 1, 9: 1 };
   var selEl = document.querySelector("[data-sel]");
   if (selEl) selEl.innerHTML = GROUPS.d3.map(function (t, i) {
-    if (t.who !== A) return '<span class="tile locked g' + t.g + '" aria-hidden="true"></span>';
+    if (t.who !== A) return '<span class="tile locked g' + t.g + '" role="img" aria-label="Photo by ' + t.who + ', ' + t.time + ', not yours to remove"></span>';
     var on = !!SEL[i];
     return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
   }).join("");

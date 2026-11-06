@@ -519,7 +519,7 @@ details.looks > summary::-webkit-details-marker { display: none; }
   var SEL = { 3: 1, 5: 1, 9: 1 };
   var selEl = document.querySelector("[data-sel]");
   if (selEl) selEl.innerHTML = GROUPS.d3.map(function (t, i) {
-    if (t.who !== A) return '<span class="tile locked g' + t.g + '" aria-hidden="true"></span>';
+    if (t.who !== A) return '<span class="tile locked g' + t.g + '" role="img" aria-label="Photo by ' + t.who + ', ' + t.time + ', not yours to remove"></span>';
     var on = !!SEL[i];
     return '<label class="tile g' + t.g + (on ? " sel" : "") + '"><input class="sr" type="checkbox"' + (on ? " checked" : "") + ' aria-label="Photo, ' + t.time + ', near ' + t.place + '"><span class="chk" aria-hidden="true">' + ic("i-check") + "</span></label>";
   }).join("");
