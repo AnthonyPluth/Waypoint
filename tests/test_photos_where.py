@@ -1,11 +1,12 @@
 import unittest
 from datetime import timedelta
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from waypoint.domain import photos, trips, visibility
 from waypoint.domain.photomatch import GAP, PAD
-from waypoint.storage.models import Segment, SegmentRecipient
+from waypoint.storage import db
+from waypoint.storage.models import PhotoGrant, Segment, SegmentRecipient, TripPerson
 from tests.test_photomatch import DENVER, PUEBLO, SALT_LAKE, at, point
 from tests.test_trips import CRUISE, HOTEL, OUT, PORTS, Household
 
@@ -57,8 +58,22 @@ class CandidateWindows(Household):
         super().setUp()
         self.jid, self.sid = self.jane.person_id, self.sam.person_id
 
+    def share(self, person_id, revoked=None):
+        for trip_id in self.c.execute(select(TripPerson.trip_id).where(TripPerson.person_id == person_id)).scalars():
+            db.insert_ignore(self.c, PhotoGrant, {"person_id": person_id, "trip_id": trip_id, "scope": "only_me", "revoked": revoked, "changed": 1.0, "granted_by": "u-x"},
+                             key=["person_id", "trip_id"])
+
     def windows(self, person_id):
+        self.share(person_id)
         return {w.trip_id: w for w in photos.candidate_windows(self.c, person_id)}
+
+    def test_only_the_trips_the_person_shared_are_candidates(self):
+        own = self.add(self.jane, OUT, None, self.on(self.jid))
+        self.assertEqual(photos.candidate_windows(self.c, self.jid), [])
+        self.share(self.jid, revoked=5.0)
+        self.assertEqual(photos.candidate_windows(self.c, self.jid), [])
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.person_id == self.jid).values(revoked=None))
+        self.assertEqual([w.trip_id for w in photos.candidate_windows(self.c, self.jid)], [own["trip_id"]])
 
     def test_a_flight_is_placed_at_its_airports_and_a_stay_at_its_stored_point(self):
         flight = self.add(self.jane, OUT, None, self.on(self.jid))
