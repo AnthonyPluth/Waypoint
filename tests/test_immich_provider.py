@@ -259,7 +259,7 @@ class ParseTests(unittest.TestCase):
                  ("UTC+14", winter, 840), ("UTC-0930", winter, -570), ("Etc/GMT+5", winter, -300),
                  ("Europe/London", datetime(2026, 3, 29, 0, 59, tzinfo=UTC), 0), ("Europe/London", datetime(2026, 3, 29, 1, 0, tzinfo=UTC), 60),
                  ("Mars/Olympus_Mons", winter, None), ("", winter, None), (None, winter, None), (5, winter, None),
-                 ("UTC+19", winter, None), ("UTC+05:60", winter, None), ("../../etc/passwd", winter, None), ("/etc/localtime", winter, None),
+                 ("UTC+19", winter, None), ("UTC+18:30", winter, None), ("UTC-18:01", winter, None), ("UTC+18", winter, 1080), ("UTC-18:00", winter, -1080), ("UTC+05:60", winter, None), ("../../etc/passwd", winter, None), ("/etc/localtime", winter, None),
                  ("x" * 80, winter, None), ("America/New_York\x00", winter, None), ("America/New_York", datetime(9999, 12, 31, 23, tzinfo=UTC), -300)]
         for name, at, offset in cases:
             with self.subTest(name=name, at=at):
@@ -539,15 +539,63 @@ class RequestTests(unittest.TestCase):
         self.assertIsNone(immich.open_original(self.fake.source, ASSET))
 
     def test_an_original_cut_off_part_way_is_unavailable(self):
+        for error, text in ((ConnectionResetError(f"reset by {KEY}"), immich.UNREACHABLE), (TimeoutError(f"timed out reading from {KEY}"), immich.TOO_SLOW)):
+            response = mock.Mock()
+            response.read1.side_effect = error
+            original = immich.Original(response, time.monotonic() + 5)
+            with self.subTest(error=error), self.assertRaises(immich.Unavailable) as e:
+                original.read()
+            self.assertEqual(str(e.exception), text)
+            self.assertIsNone(e.exception.__context__)
+            original.close()
+            response.close.assert_called_once()
+
+    def test_an_original_past_its_budget_reads_nothing_more(self):
         response = mock.Mock()
-        response.read.side_effect = TimeoutError(f"timed out reading from {KEY}")
-        original = immich.Original(response)
+        original = immich.Original(response, time.monotonic() - 0.001)
         with self.assertRaises(immich.Unavailable) as e:
             original.read()
-        self.assertEqual(str(e.exception), immich.UNREACHABLE)
-        self.assertIsNone(e.exception.__context__)
-        original.close()
-        response.close.assert_called_once()
+        self.assertEqual(str(e.exception), immich.TOO_SLOW)
+        response.read1.assert_not_called()
+
+    def test_an_original_s_budget_defaults_to_ten_minutes(self):
+        self.assertEqual(immich.ORIGINAL_SECONDS, 600.0)
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {}, b"abc")
+        began = time.monotonic()
+        with mock.patch.object(immich, "Original", wraps=immich.Original) as made:
+            original = immich.open_original(self.fake.source, ASSET)
+        assert original
+        with original:
+            self.assertEqual(original.read(), b"abc")
+        [(_, deadline), _] = made.call_args
+        self.assertTrue(began + 599 < deadline <= time.monotonic() + 600)
+
+    def test_an_original_read_returns_what_has_arrived(self):
+        body = b"\x00" * 400
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, {"_trickle": "0.005"}, body)
+        original = immich.open_original(self.fake.source, ASSET)
+        assert original
+        with original:
+            first = original.read(10_000)
+        self.assertGreater(len(first), 0)
+        self.assertLess(len(first), len(body))
+
+    def _original_until_slow(self, headers):
+        self.fake.routes[f"/api/assets/{ASSET}/original"] = (200, headers, b"\x00" * 400)
+        began = time.monotonic()
+        original = immich.open_original(self.fake.source, ASSET, seconds=0.5)
+        assert original
+        with original, self.assertRaises(immich.Unavailable) as e:
+            while original.read(10_000):
+                pass
+        self.assertEqual(str(e.exception), immich.TOO_SLOW)
+        self.assertLess(time.monotonic() - began, 2.0)
+
+    def test_an_original_that_trickles_stops_at_the_budget_it_was_given(self):
+        self._original_until_slow({"_trickle": "0.02"})
+
+    def test_a_chunked_original_that_trickles_stops_at_the_budget_it_was_given(self):
+        self._original_until_slow({"_chunked": "1", "_trickle": "0.02"})
 
     def test_refused_and_rate_limited_answers(self):
         for code, headers, kind in ((401, {}, immich.Refused), (403, {}, immich.Refused), (429, {}, immich.RateLimited),

@@ -23,6 +23,7 @@ IMAGE_TIMEOUT = 10
 ORIGINAL_TIMEOUT = 30
 JSON_SECONDS = 60.0
 IMAGE_SECONDS = 20.0
+ORIGINAL_SECONDS = 600.0
 MAX_JSON_BYTES = 32_000_000
 CAPS = {"thumbnail": 2_000_000, "preview": 10_000_000}
 CHUNK = 65_536
@@ -39,6 +40,7 @@ SEARCH = "/api/search/metadata"
 MARKERS = "/api/map/markers"
 ASSETS = "/api/assets/"
 
+MAX_OFFSET_MINUTES = 18 * 60
 PAGE_SIZE = 1000
 LAST_PAGE = None
 SEARCH_FILTERS: dict[str, Any] = {"withExif": True, "visibility": "timeline", "order": "asc", "size": PAGE_SIZE}
@@ -126,16 +128,22 @@ class Page:
 
 
 class Original:
-    def __init__(self, response: Any) -> None:
+    def __init__(self, response: Any, deadline: float) -> None:
         self._response = response
+        self._deadline = deadline
 
     def read(self, size: int = CHUNK) -> bytes:
-        try:
-            chunk = self._response.read(size)
-        except tls.NETWORK_ERRORS:
-            chunk = None
+        problem = TOO_SLOW
+        chunk = None
+        if self._deadline - time.monotonic() > 0:
+            try:
+                chunk = self._response.read1(size)
+            except TimeoutError:
+                chunk = None
+            except tls.NETWORK_ERRORS:
+                problem = UNREACHABLE
         if not isinstance(chunk, bytes):
-            raise Unavailable(UNREACHABLE)
+            raise Unavailable(problem)
         return chunk
 
     def close(self) -> None:
@@ -348,7 +356,7 @@ def zone_offset(name: Any, at: datetime) -> int | None:
     fixed = UTC_NAME.fullmatch(text)
     if fixed:
         sign, hours, minutes = fixed.group(1), int(fixed.group(2) or 0), int(fixed.group(3) or 0)
-        if hours > 18 or minutes > 59:
+        if hours * 60 + minutes > MAX_OFFSET_MINUTES or minutes > 59:
             return None
         return (-1 if sign == "-" else 1) * (hours * 60 + minutes)
     try:
@@ -479,8 +487,12 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
     return kind, data
 
 
-def open_original(source: Source, asset_id: str) -> Original | None:
+def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SECONDS) -> Original | None:
     if not ASSET_ID.fullmatch(asset_id):
         return None
+    deadline = time.monotonic() + seconds
     response = _open(source, _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES), ORIGINAL_TIMEOUT)
-    return None if response is None else Original(response)
+    if response is None:
+        return None
+    _hold_to(response, deadline)
+    return Original(response, deadline)
