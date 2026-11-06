@@ -24,6 +24,7 @@ PUBLIC_FILES = {"/page.css", "/logo.svg", "/logo-180.png", "/fonts/Geist-Variabl
                 "/icon-192.png", "/icon-512.png", "/icon-maskable-512.png"}
 
 MAX_JSON_BODY = 1024 * 1024
+APP_SESSION_SECONDS = 86400
 REQUEST_TIMEOUT = 60
 HEADER_DEADLINE = 30
 MIN_BODY_RATE = 16 * 1024
@@ -238,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
         if user is None:
             return self._json(401, {"error": "Sign in to Waypoint again.", "login": "/auth/login"})
         with db.session() as conn:
-            token, max_age = oidc.create_session(conn, user["sub"], user["email"], user["name"])
+            token, max_age = oidc.create_session(conn, user["sub"], user["email"], user["name"], APP_SESSION_SECONDS)
         self._json(200, {"name": "waypoint_session", "value": token, "max_age": max_age,
                          "secure": bool(oidc.config()["secure_cookie"])})
 

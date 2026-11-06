@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from tests import test_mcp_oauth_http as base
 from waypoint.server import mcp_oauth
 from waypoint.storage import db
-from waypoint.storage.models import OAuthClient, OAuthGrant
+from waypoint.storage.models import OAuthClient, OAuthGrant, User
 
 APP = {"client_id": mcp_oauth.APP_CLIENT, "redirect_uris": [mcp_oauth.APP_REDIRECT]}
 APP_HEADERS = {"X-Waypoint": "1"}
@@ -124,6 +124,14 @@ class BearerTests(AppSignIn):
         self.assertEqual(self.api(t["access_token"]).status, 401)
 
 
+    def test_a_refresh_may_repeat_the_app_scope(self):
+        t = self.app_tokens()
+        r = self.form("/oauth/token", {"grant_type": "refresh_token", "refresh_token": t["refresh_token"],
+                                       "client_id": mcp_oauth.APP_CLIENT, "scope": "app",
+                                       "resource": self.app_resource})
+        self.assertEqual(r.status, 200, r.body)
+
+
 class AppSessionTests(AppSignIn):
 
     def test_the_app_gets_a_web_session_for_its_web_view(self):
@@ -132,8 +140,18 @@ class AppSessionTests(AppSignIn):
         self.assertEqual(r.status, 200, r.body)
         cookie = r.json
         self.assertEqual(cookie["name"], "waypoint_session")
-        self.assertGreater(cookie["max_age"], 86400)
+        self.assertEqual(cookie["max_age"], 86400)
         self.assertEqual(self.http("GET", "/api/trips", cookies={"waypoint_session": cookie["value"]}).status, 200)
+
+    def test_with_groups_the_session_ends_with_the_last_sign_in_window(self):
+        t = self.app_tokens()["access_token"]
+        groups = {"OIDC_ALLOWED_GROUPS": "household", "WAYPOINT_SESSION_DAYS": "14"}
+        with mock.patch.dict(os.environ, groups):
+            with db.session() as conn:
+                conn.execute(update(User).where(User.sub == "user-1").values(last_seen=time.time() - 13.5 * 86400))
+            r = self.api(t, "POST", "/auth/app-session", b"", APP_HEADERS)
+        self.assertEqual(r.status, 200, r.body)
+        self.assertLessEqual(r.json["max_age"], 12 * 3600 + 5)
 
     def test_it_needs_the_app_header_and_a_valid_app_token(self):
         t = self.app_tokens()["access_token"]

@@ -212,10 +212,15 @@ def user_name(conn, sub: str | None) -> str | None:
     return conn.execute(select(User.name).where(User.sub == sub)).scalar() if sub else None
 
 
-def create_session(conn, sub: str | None, email: str | None, name: str | None) -> tuple[str, int]:
+def create_session(conn, sub: str | None, email: str | None, name: str | None, max_life: int | None = None) -> tuple[str, int]:
     token = secrets.token_urlsafe(32)
     now = time.time()
     life = config()["session_days"] * 86400
+    if max_life is not None:
+        life = min(life, max_life)
+    if known_only_at_sign_in():
+        seen = conn.execute(select(User.last_seen).where(User.sub == sub)).scalar() if sub else None
+        life = min(life, max(0, (seen or 0) + config()["session_days"] * 86400 - now))
     conn.execute(insert(AuthSession).values(token_hash=_hash(token), sub=sub, email=email, name=name, created=now, expires=now + life,
                                             id_token=None))
     return token, int(life)
