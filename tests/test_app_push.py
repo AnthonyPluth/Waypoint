@@ -210,6 +210,7 @@ class AppleCallTests(unittest.TestCase):
         self.assertEqual(url, f"https://api.sandbox.push.apple.com/3/device/{TOKEN}")
         self.assertEqual((headers["apns-topic"], headers["apns-push-type"], headers["apns-collapse-id"]), (TOPIC, "alert", "check-in-1"))
         self.assertTrue(headers["authorization"].startswith("bearer "))
+        self.assertAlmostEqual(int(headers["apns-expiration"]), time.time() + apns.TTL, delta=60)
         self.assertEqual(json.loads(content)["aps"]["alert"]["body"], "Open Waypoint to see an update.")
         self.assertEqual(posted.call_args_list[1].args[0], f"https://api.push.apple.com/3/device/{TOKEN}")
         self.assertNotIn("apns-collapse-id", posted.call_args_list[1].args[1])

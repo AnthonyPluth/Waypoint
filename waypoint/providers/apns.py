@@ -17,6 +17,7 @@ from .. import tls
 HOSTS = {"production": "https://api.push.apple.com", "sandbox": "https://api.sandbox.push.apple.com"}
 BODY = json.dumps({"aps": {"alert": {"title": "Waypoint", "body": "Open Waypoint to see an update."}, "sound": "default"}}).encode()
 JWT_LIFETIME = 40 * 60
+TTL = 86400
 GONE_REASONS = {"Unregistered"}
 
 _lock = threading.Lock()
@@ -62,7 +63,7 @@ def post(url: str, headers: dict[str, str], content: bytes, timeout: float) -> t
 def push(creds: Credentials, token: str, environment: str, collapse_id: str | None = None, timeout: float = 10) -> None:
     headers = {
         "authorization": f"bearer {provider_token(creds, time.time())}", "apns-topic": creds.topic, "apns-push-type": "alert",
-        "apns-priority": "10", "content-type": "application/json"}
+        "apns-priority": "10", "apns-expiration": str(int(time.time()) + TTL), "content-type": "application/json"}
     if collapse_id:
         headers["apns-collapse-id"] = collapse_id
     try:
