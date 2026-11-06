@@ -387,12 +387,12 @@ class PhotoRoutes(RouteCase):
         got = self.ok("ana", "POST", f"/api/photos/{blank}", {"trip_id": later["trip_id"]})
         self.assertEqual((got["match"], got["segment_id"], got["location_source"]), ("time", later["id"], "inferred"))
 
-    def test_moving_to_a_trip_whose_bookings_are_all_cancelled_keeps_the_time_match(self):
+    def test_moving_to_a_trip_whose_bookings_are_all_cancelled_is_refused_as_outside_its_dates(self):
         later = self.later()
         self.ok("ana", "POST", f"/api/segments/{later['id']}", {"status": "cancelled"})
         mine = self.photo(self.ana, self.trip, "2027-01-02T09:00", where=SOHO, segment_id=self.stay["id"], distance=1.0)
-        got = self.ok("ana", "POST", f"/api/photos/{mine}", {"trip_id": later["trip_id"]})
-        self.assertEqual((got["match"], got["segment_id"], got["distance_km"], got["latitude"], got["location_source"], got["zone"]), ("time", None, None, SOHO[0], "exif", None))
+        self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": later["trip_id"]}), (409, {"error": "That trip’s dates don’t cover this photo"}))
+        self.assertEqual((stored(mine)["trip_id"], stored(mine)["decided_by"]), (self.trip, None))
 
     def test_needs_a_look_lists_the_persons_unsettled_photos_with_the_trips_they_could_join(self):
         week = self.own_trip("ana", "Zoë’s week in Montréal")

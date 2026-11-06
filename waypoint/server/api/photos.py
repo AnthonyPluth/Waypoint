@@ -20,6 +20,9 @@ NOT_A_TRIP = "The trip must be a whole number"
 NOT_A_PERSON = "The person must be a whole number"
 NOT_A_SCOPE = 'Send "scope" as "only_me" or "trip"'
 NOT_IDS = 'Send "photo_ids" as a list of whole numbers'
+NOT_A_WINDOW = 'Send "window" as {"start": …, "end": …} text'
+NOT_WINDOWS = 'Send "windows" as a map of trip ids to windows'
+NOT_A_STAMP = 'Send "expected_changed" as a number'
 _v = validate.Validator(ApiError, not_number=NOT_A_TRIP)
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
 
@@ -59,7 +62,26 @@ def _person(conn, who: Viewer, value: Any) -> int:
 
 
 def _sharing(make: Callable[[], PhotoSharing | None]) -> PhotoSharing:
-    return _run(make, NO_TRIP)
+    try:
+        return _run(make, NO_TRIP)
+    except photogrants.Stale as e:
+        raise ApiError(str(e), 409) from None
+
+
+def _window(value: Any, label: str = "window") -> dict[str, str] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict) or any(not isinstance(value.get(k), str) for k in ("start", "end")):
+        raise ApiError(NOT_A_WINDOW)
+    return {"start": value["start"], "end": value["end"]}
+
+
+def _stamp(value: Any, label: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ApiError(label)
+    return float(value)
 
 
 def api_trip_photos(conn, _q, _b, trip_id) -> TripPhotos:
@@ -81,7 +103,7 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
         raise ApiError(NOTHING_TO_DO)
     try:
         return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
-    except photos.OutsideWindow as e:
+    except (photos.OutsideWindow, photos.Changed) as e:
         raise ApiError(str(e), 409) from None
 
 
@@ -96,9 +118,10 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
     person, scope, declined = _person(conn, who, body.get("person_id")), _scope(body), _flag(body, "declined")
     if scope is None and not declined:
         raise ApiError(NOTHING_TO_SHARE)
+    window, expected = _window(body.get("window")), _stamp(body.get("expected_changed"), NOT_A_STAMP)
     if declined:
         return _sharing(lambda: photogrants.decline(conn, who, person, trip))
-    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME))
+    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME, window=window, expected_changed=expected))
 
 
 def api_photo_sharing_stop(conn, q, _b, trip_id) -> PhotoSharing:
@@ -120,10 +143,18 @@ def api_photo_exclude(conn, _q, body: PhotoExclusionsBody, trip_id) -> PhotoShar
     return _run(lambda: photogrants.exclude(conn, who, trip, ids), NO_PHOTO)
 
 
-def api_photo_put_back(conn, _q, _b, trip_id, photo_id) -> PhotoSharing:
+def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
     who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
+    given = (q.get("created") or [None])[0]
+    try:
+        created = float(given) if given is not None else None
+    except ValueError:
+        raise ApiError('Send "created" as a number') from None
     _seen(conn, who, trip)
-    return _run(lambda: photogrants.put_back(conn, who, trip, this), NO_PHOTO)
+    try:
+        return _run(lambda: photogrants.put_back(conn, who, trip, this, created), NO_PHOTO)
+    except photogrants.Stale as e:
+        raise ApiError(str(e), 409) from None
 
 
 def api_photo_grants(conn, _q, _b) -> PhotoGrants:
@@ -138,4 +169,11 @@ def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs
     share_all = _flag(body, "share_all")
     if scope is None and share_all is None:
         raise ApiError('Send "default_scope" or "share_all"')
-    return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all), NO_TRIP)
+    given = body.get("windows")
+    if given is not None and not isinstance(given, dict):
+        raise ApiError(NOT_WINDOWS)
+    windows = {str(k): w for k, v in given.items() if (w := _window(v)) is not None} if given is not None else None
+    try:
+        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows), NO_TRIP)
+    except photogrants.Stale as e:
+        raise ApiError(str(e), 409) from None

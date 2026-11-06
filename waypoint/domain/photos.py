@@ -44,6 +44,22 @@ NOT_IN_WINDOW = "That trip’s dates don’t cover this photo"
 
 class OutsideWindow(Exception):
     pass
+
+
+CHANGED = "Your trips changed meanwhile; try again"
+
+
+class Changed(Exception):
+    pass
+
+
+class WindowOut(TypedDict):
+    start: str
+    end: str
+
+
+def window_out(found: TripWindow | None) -> WindowOut | None:
+    return {"start": found.start.isoformat(), "end": found.end.isoformat()} if found is not None else None
 CELL = 0.1
 COLUMNS = round(360 / CELL)
 ROWS = round(180 / CELL)
@@ -187,11 +203,14 @@ def candidate_windows(conn: db.Connection, person_id: int) -> list[TripWindow]:
     mine = [t for t in seen if person_id in aboard[t.id]]
     if not mine:
         return []
-    live = [s for s in visibility.visible_segments(conn, viewer, [t.id for t in mine]) if s.status != "cancelled"]
+    booked = visibility.visible_segments(conn, viewer, [t.id for t in mine])
+    live = [s for s in booked if s.status != "cancelled"]
     placed = segment_points(conn, live)
     windows: list[TripWindow] = []
     for trip in mine:
-        found = window(trip, [p for s in live if s.trip_id == trip.id for p in placed[s.id]])
+        points = [p for s in live if s.trip_id == trip.id for p in placed[s.id]]
+        unbooked = not any(s.trip_id == trip.id for s in booked)
+        found = window(trip, points) if points else _dated_window(conn, trip) if unbooked else None
         if found is not None:
             windows.append(found)
     return windows
@@ -291,9 +310,10 @@ def trip_window(conn: db.Connection, trip_id: int) -> TripWindow | None:
     trip = conn.orm.get(Trip, trip_id)
     if trip is None:
         return None
-    live = [s for s in conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id).order_by(Segment.id)).all() if s.status != "cancelled"]
+    booked = list(conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id).order_by(Segment.id)).all())
+    live = [s for s in booked if s.status != "cancelled"]
     if not live:
-        return _dated_window(conn, trip)
+        return _dated_window(conn, trip) if not booked else None
     placed = segment_points(conn, live)
     return window(trip, [p for s in live for p in placed[s.id]])
 
@@ -683,7 +703,7 @@ def _own_photo(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | No
     return found if found is not None and acts_for(conn, viewer, found[1]) else None
 
 
-def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None) -> Found | None:
+def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None) -> tuple[Found, set[int]] | None:
     found = _own_photo(conn, viewer, photo_id)
     if found is None:
         return None
@@ -694,7 +714,7 @@ def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip
     found = _own_photo(conn, viewer, photo_id)
     if found is None or (found[0].trip_id is not None and found[0].trip_id not in locked):
         return None
-    return found
+    return found, locked
 
 
 def _same_asset(conn: db.Connection, photo: Photo, person: int) -> list[Photo]:
@@ -721,10 +741,10 @@ def place_by_hand(conn: db.Connection, photo: Photo, person: int, trip_id: int) 
 
 
 def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, excluded: bool | None) -> TripPhoto | None:
-    found = _settled_under_lock(conn, viewer, photo_id, trip_id) if not viewer.household else None
-    if found is None:
+    settled = _settled_under_lock(conn, viewer, photo_id, trip_id) if not viewer.household else None
+    if settled is None:
         return None
-    photo, person = found
+    (photo, person), locked = settled
     if trip_id is not None:
         trip = visibility.visible_trip(conn, viewer, trip_id)
         if trip is None or person not in trippeople.of(conn, [trip.id])[trip.id]:
@@ -739,13 +759,12 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
     if excluded:
         if photo.match != AMBIGUOUS or photo.trip_id is not None:
             raise trips.Invalid(NOT_UNSETTLED)
-        candidates = _candidates(conn, photo, person, candidate_windows(conn, person), _seen(conn, viewer))
-        lock_grants(conn, person, sorted(w.trip_id for w in candidates))
-        conn.orm.expire_all()
         fresh = next(((p, c) for p, _, c in unsettled(conn, viewer, photo_id)), None)
         if fresh is None:
             return None
         photo, candidates = fresh
+        if any(w.trip_id not in locked for w in candidates):
+            raise Changed(CHANGED)
         for w in candidates:
             db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time(), "was_trip_id": None},
                              key=["person_id", "asset_id", "trip_id"])

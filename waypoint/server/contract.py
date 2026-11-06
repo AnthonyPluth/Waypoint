@@ -635,18 +635,27 @@ class PhotoBody(TypedDict):
     excluded: NotRequired[bool]
 
 
+class PhotoWindow(TypedDict):
+    start: str
+    end: str
+
+
 class PhotoSharing(TypedDict):
     state: Literal["shared", "declined", "ask", "none"]
     scope: Literal["only_me", "trip"] | None
     count: int
     removed_count: int
     removed: list[TripPhoto]
+    window: PhotoWindow | None
+    changed: float | None
 
 
 class PhotoSharingBody(TypedDict):
     person_id: NotRequired[int]
     scope: NotRequired[Literal["only_me", "trip"]]
     declined: NotRequired[bool]
+    window: NotRequired[PhotoWindow]
+    expected_changed: NotRequired[float]
 
 
 class PhotoExclusionsBody(TypedDict):
@@ -661,6 +670,7 @@ class PhotoPrefs(TypedDict):
 class PhotoPrefsBody(TypedDict):
     default_scope: NotRequired[Literal["only_me", "trip"]]
     share_all: NotRequired[bool]
+    windows: NotRequired[dict[str, PhotoWindow]]
 
 
 class PhotoGrantTrip(TypedDict):

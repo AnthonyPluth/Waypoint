@@ -636,6 +636,7 @@ export interface PhotoPrefs {
 export interface PhotoPrefsBody {
   default_scope?: "only_me" | "trip";
   share_all?: boolean;
+  windows?: Record<string, PhotoWindow>;
 }
 
 export interface PhotoReview {
@@ -648,12 +649,21 @@ export interface PhotoSharing {
   count: number;
   removed_count: number;
   removed: TripPhoto[];
+  window: PhotoWindow | null;
+  changed: number | null;
 }
 
 export interface PhotoSharingBody {
   person_id?: number;
   scope?: "only_me" | "trip";
   declined?: boolean;
+  window?: PhotoWindow;
+  expected_changed?: number;
+}
+
+export interface PhotoWindow {
+  start: string;
+  end: string;
 }
 
 export interface Port {
