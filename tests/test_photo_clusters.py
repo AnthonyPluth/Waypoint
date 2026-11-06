@@ -1,3 +1,4 @@
+import math
 import unittest
 from unittest import mock
 
@@ -150,6 +151,14 @@ class ClusterTests(unittest.TestCase):
         self.assertEqual([c["count"] for c in found], [3, 3, 2])
         self.assertAlmostEqual(found[0]["latitude"], (89.5 * 2 + 90.0) / 3, places=6)
         self.assertAlmostEqual(found[1]["latitude"], (85.0 * 2 - 90.0) / 3, places=6)
+
+    def test_the_cap_of_cells_around_a_pin_covers_every_column_once_it_reaches_a_pole(self):
+        rows, across = photos._cap((0.0, 0.0), 20.0)
+        self.assertEqual((list(rows), list(across)), ([-2, -1, 0, 1], [-3, -2, -1, 0, 1, 2, 3]))
+        rows, across = photos._cap((89.0, 10.0), 200.0)
+        self.assertEqual((rows.start, rows.stop, list(across)), (872, photos.ROWS // 2, list(range(photos.COLUMNS))))
+        rows, across = photos._cap((60.0, 10.0), 2000.0)
+        self.assertEqual((rows.start, rows.stop, len(across)), (420, 780, 2 * (math.ceil(math.degrees(math.asin(math.sin(math.radians(17.987)) / 0.5)) / 0.1) + 1) + 1))
 
     def test_the_cap_scans_neighbours_through_the_grid_rather_than_every_cluster(self):
         rows = [row(r * 50 + c, (r * 10.0 / KM_PER_DEGREE, -20.0 + c * 10.0 / KM_PER_DEGREE)) for r in range(60) for c in range(50)]
