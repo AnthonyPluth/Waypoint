@@ -236,3 +236,81 @@ class DeadlineTests(unittest.TestCase):
         kinds = {type(h) for h in tls.opener(allow_http=True).handlers}
         self.assertIn(urllib.request.HTTPSHandler, kinds)
         self.assertIn(urllib.request.HTTPHandler, kinds)
+
+
+class _Unanswered:
+    made: list[_Unanswered] = []
+    answers_at: set[int] = set()
+    refuse = False
+
+    def __init__(self, family, kind, proto):
+        self.timeout = None
+        self.address = None
+        self.bound = None
+        _Unanswered.made.append(self)
+
+    def bind(self, address):
+        self.bound = address
+
+    def settimeout(self, timeout):
+        self.timeout = timeout
+
+    def setsockopt(self, *args):
+        pass
+
+    def connect(self, address):
+        self.address = address
+        if address[1] in _Unanswered.answers_at:
+            return
+        if _Unanswered.refuse:
+            raise ConnectionRefusedError("refused")
+        time.sleep(self.timeout)
+        raise TimeoutError("timed out")
+
+    def close(self):
+        pass
+
+
+class ConnectDeadlineTests(unittest.TestCase):
+    ADDRESSES = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", port)) for port in range(8001, 8007)]
+
+    def connect(self, cls, answers_at=(), refuse=False, **kwargs):
+        _Unanswered.made, _Unanswered.answers_at, _Unanswered.refuse = [], set(answers_at), refuse
+        conn = cls("photos.example.invalid", 8000, timeout=10, deadline=time.monotonic() + 0.5, **kwargs)
+        with mock.patch.object(socket, "getaddrinfo", return_value=self.ADDRESSES), mock.patch.object(socket, "socket", _Unanswered):
+            conn.connect()
+        return conn
+
+    def test_several_unanswered_addresses_together_stay_inside_the_deadline(self):
+        began = time.monotonic()
+        with self.assertRaises(TimeoutError):
+            self.connect(tls._DeadlineHTTPConnection)
+        self.assertLess(time.monotonic() - began, 1.5)
+        self.assertTrue(all(s.timeout <= 0.5 for s in _Unanswered.made))
+
+    def test_the_first_address_that_answers_inside_the_deadline_is_used(self):
+        conn = self.connect(tls._DeadlineHTTPConnection, answers_at={8003}, refuse=True)
+        self.assertIsInstance(conn.sock, tls._DeadlineSocket)
+        self.assertEqual(conn.sock.sock.address, ("192.0.2.1", 8003))
+        self.assertEqual(len(_Unanswered.made), 3)
+
+    def test_when_every_address_refuses_the_last_failure_is_raised(self):
+        with self.assertRaises(ConnectionRefusedError):
+            self.connect(tls._DeadlineHTTPConnection, refuse=True)
+        self.assertEqual(len(_Unanswered.made), 6)
+
+    def test_a_source_address_is_bound_before_connecting(self):
+        conn = self.connect(tls._DeadlineHTTPConnection, answers_at={8001}, source_address=("127.0.0.1", 0))
+        self.assertEqual(conn.sock.sock.bound, ("127.0.0.1", 0))
+
+    def test_no_address_at_all_is_an_error(self):
+        conn = tls._DeadlineHTTPConnection("photos.example.invalid", 8000, timeout=10, deadline=time.monotonic() + 5)
+        with mock.patch.object(socket, "getaddrinfo", return_value=[]), self.assertRaises(OSError):
+            conn.connect()
+
+    def test_an_https_connection_tries_its_addresses_inside_the_deadline_too(self):
+        context = ssl.create_default_context()
+        with mock.patch.object(context, "wrap_socket", side_effect=lambda sock, **kwargs: sock):
+            conn = self.connect(tls._DeadlineHTTPSConnection, answers_at={8002}, refuse=True, context=context)
+        self.assertEqual(conn.sock.sock.address, ("192.0.2.1", 8002))
+        self.assertEqual(len(_Unanswered.made), 2)

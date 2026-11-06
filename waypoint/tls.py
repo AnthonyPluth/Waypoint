@@ -159,21 +159,47 @@ def _bounded(timeout, deadline: float) -> float:
     return min(timeout, left) if isinstance(timeout, int | float) else left
 
 
+def _connect_within(address, idle, deadline: float, source_address=None) -> socket.socket:
+    failure: OSError | None = None
+    host, port = address
+    for family, kind, proto, _, sockaddr in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+        wait = _bounded(idle, deadline)
+        sock = socket.socket(family, kind, proto)
+        try:
+            sock.settimeout(wait)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(sockaddr)
+            return sock
+        except OSError as e:
+            sock.close()
+            failure = e
+    raise failure or OSError("no address to connect to")
+
+
 class _DeadlineHTTPConnection(http.client.HTTPConnection):
     def __init__(self, *args, deadline: float, **kwargs):
         super().__init__(*args, **kwargs)
         self.deadline = deadline
+        self._create_connection = self._connect_within
+
+    def _connect_within(self, address, timeout=None, source_address=None, *args) -> socket.socket:
+        return _connect_within(address, self.idle, self.deadline, source_address)
 
     def connect(self) -> None:
-        idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
+        self.idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
         super().connect()
-        self.sock = _DeadlineSocket(self.sock, self.deadline, idle)
+        self.sock = _DeadlineSocket(self.sock, self.deadline, self.idle)
 
 
 class _DeadlineHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *args, deadline: float, **kwargs):
         super().__init__(*args, **kwargs)
         self.deadline = deadline
+        self._create_connection = self._connect_within
+
+    def _connect_within(self, address, timeout=None, source_address=None, *args) -> socket.socket:
+        return _connect_within(address, self.idle, self.deadline, source_address)
 
     def connect(self) -> None:
         self.idle, self.timeout = self.timeout, _bounded(self.timeout, self.deadline)
