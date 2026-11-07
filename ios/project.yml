@@ -1,0 +1,52 @@
+name: Waypoint
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+options:
+  bundleIdPrefix: com.anthonypluth
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  Capacitor:
+    url: https://github.com/ionic-team/capacitor-swift-pm.git
+    exactVersion: 8.6.0
+targets:
+  Waypoint:
+    type: application
+    platform: iOS
+    sources:
+      - path: Waypoint
+        excludes:
+          - public
+    resources:
+      - path: Waypoint/public
+        type: folder
+      - path: capacitor.config.json
+    dependencies:
+      - package: Capacitor
+        product: Capacitor
+      - package: Capacitor
+        product: Cordova
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(WAYPOINT_BUNDLE_ID)
+        INFOPLIST_FILE: Waypoint/Info.plist
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+  WaypointTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Waypoint
+schemes:
+  Waypoint:
+    build:
+      targets:
+        Waypoint: all
+        WaypointTests: [test]
+    test:
+      targets:
+        - WaypointTests

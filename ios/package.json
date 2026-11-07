@@ -1,0 +1,13 @@
+{
+  "name": "waypoint-ios",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Capacitor runtime for the Waypoint iPhone app. The app loads the web app from the person's own Waypoint server.",
+  "dependencies": {
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}
