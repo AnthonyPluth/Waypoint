@@ -150,6 +150,7 @@ class Route:
     parts: tuple[str | None, ...]
     upload: int | None = None
     own_session: bool = False
+    keep_blank: bool = False
 
 
 @dataclass(frozen=True)
@@ -166,7 +167,7 @@ class Table:
 
     def __init__(self, routes):
         self.routes = [Route(m, pattern, fn, tuple(None if s == "{id}" else s for s in _segments(pattern)),
-                             getattr(fn, "upload", None), getattr(fn, "own_session", False))
+                             getattr(fn, "upload", None), getattr(fn, "own_session", False), getattr(fn, "keep_blank", False))
                        for m, pattern, fn in routes]
         self._by_shape: dict[tuple[str | None, int], list[Route]] = {}
         for r in self.routes:

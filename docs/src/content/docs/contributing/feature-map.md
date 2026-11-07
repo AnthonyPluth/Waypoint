@@ -60,7 +60,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/airports/{id}` | `trips.py:api_airport` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
-| `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
+| `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_photos_api.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |

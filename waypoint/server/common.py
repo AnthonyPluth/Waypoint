@@ -69,6 +69,11 @@ def own_session(fn):
     return fn
 
 
+def keep_blank(fn):
+    fn.keep_blank = True
+    return fn
+
+
 _ID = re.compile(r"[0-9]{1,18}")
 _query = validate.Validator(ApiError, drop="", not_number="The {label} must be a whole number")
 

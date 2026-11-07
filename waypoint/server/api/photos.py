@@ -6,7 +6,7 @@ from typing import Any
 from ... import validate
 from ...domain import photogrants, photos
 from ...domain.visibility import Viewer
-from ..common import ApiError, row_id
+from ..common import ApiError, keep_blank, row_id
 from ..contract import PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, TripPhoto, TripPhotos
 from .trips import NO_TRIP, _run, viewer
 
@@ -165,6 +165,7 @@ def api_photo_exclude(conn, _q, body: PhotoExclusionsBody, trip_id) -> PhotoShar
     return _run(lambda: photogrants.exclude(conn, who, trip, ids), NO_PHOTO)
 
 
+@keep_blank
 def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
     who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
     given = (q.get("created") or [None])[0]
