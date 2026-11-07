@@ -135,7 +135,11 @@ class CleanUrlTests(unittest.TestCase):
             "https://photos.example.com.": "https://photos.example.com",
             "http://[fd00::20]:2283": "http://[fd00::20]:2283",
             "http://[FD00:0:0::20]": "http://[fd00::20]",
-            "https://photos.example.com:443": "https://photos.example.com:443",
+            "https://photos.example.com:443": "https://photos.example.com",
+            "http://photos.example.com:80/": "http://photos.example.com",
+            "https://photos.example.com:80": "https://photos.example.com:80",
+            "http://photos.example.com:443": "http://photos.example.com:443",
+            "http://[fd00::20]:80": "http://[fd00::20]",
         }
         for text, cleaned in cases.items():
             with self.subTest(text=text):
