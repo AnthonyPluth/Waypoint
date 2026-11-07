@@ -46,4 +46,4 @@ Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholde
 - Sign out in Settings (the code, `ServerSession.signOut`, exists but nothing calls it from the web UI).
 - Servers behind a forward-auth proxy, and self-signed certificates (App Transport Security only relaxes local-network addresses).
 - File picker, downloads and `webcal://` handling in the web view.
-- CI: no macOS job runs `xcodegen` and `xcodebuild test` yet.
+- Running the app on a simulator or device in CI (the iOS workflow builds it and runs the unit tests only).
