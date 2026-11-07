@@ -1,5 +1,5 @@
 #!/bin/bash
-# vendored from fleet v2.2.0 (shim/fleet) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v2.3.0 (shim/fleet) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 # The fleet command at the commit in .fleet/version (line 1 the version, line 2 the commit its tag points at, the same
 # the workflow pins carry), run through uvx from fleet's repository, so the app runs exactly the tools its pins name
 # and a moved tag can't change what runs. uv is installed the way the session-start hook does when it's missing.
