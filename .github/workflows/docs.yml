@@ -7,15 +7,17 @@ name: Docs
 # demo is built and verified, the site is built, and then the demo is copied into it (the site build empties docs/dist,
 # so the copy comes last). The statuses are "docs / build" and "docs / deploy"; the merge gate counts this workflow,
 # "Docs". The calling job grants all three permissions, since a called workflow can't be given more than its caller has
-# (on a pull request the deploy job is skipped).
+# (on a pull request the deploy job is skipped). The grant is a ceiling, not what runs with it: fleet's workflow (at
+# v3.0.0) starts from `permissions: {}`; its build job has `contents: read` only (line 78), and its deploy job, which
+# alone has `pages: write` and `id-token: write` (line 126), runs only on main and never for a pull request (line 123).
 # Needs Settings → Pages → Build and deployment → Source: "GitHub Actions" once.
 on:
   push:
     branches: [main]
-    paths: [docs/**, demo/**, frontend/**, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
+    paths: [docs/**, demo/**, frontend/**, Makefile, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
   pull_request:
     branches: [main]
-    paths: [docs/**, demo/**, frontend/**, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
+    paths: [docs/**, demo/**, frontend/**, Makefile, waypoint/static/fonts/**, waypoint/static/logo.svg, .github/workflows/docs.yml]
   workflow_dispatch:
 
 permissions:

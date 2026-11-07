@@ -296,8 +296,10 @@ jobs:
   # passed (push, tag, Release, then the cleanup of untagged leftovers). Only main is ever released: fleet's publish
   # also refuses a pull request, so a mistake here can't publish one. Both calls grant contents: write and packages:
   # write, because GitHub checks every job of the called workflow against the calling job's grant, even the jobs the
-  # inputs skip; each of fleet's jobs takes only what it needs. The statuses are "build / Build", "publish / Publish"
-  # and "publish / Cleanup"; the merge gate counts this workflow, "Docker image", not its jobs.
+  # inputs skip; each of fleet's jobs takes only what it needs. At v3.0.0 its workflow starts from `permissions: {}`:
+  # build has `contents: read` (line 117); publish has `contents: write` and `packages: write` (line 240) and runs only
+  # on main, never for a pull request or pull_request_target (line 237); cleanup has `packages: write` alone (line 334).
+  # The statuses are "build / Build", "publish / Publish" and "publish / Cleanup"; the merge gate counts this workflow, "Docker image", not its jobs.
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     permissions:
