@@ -7048,6 +7048,9 @@
             "items": {
               "$ref": "#/components/schemas/PhotoSourceVersion"
             }
+          },
+          "home": {
+            "type": "string"
           }
         },
         "required": [],
@@ -7089,13 +7092,17 @@
             "items": {
               "$ref": "#/components/schemas/PhotoSourceVersion"
             }
+          },
+          "home": {
+            "type": "string"
           }
         },
         "required": [
           "asks",
           "count",
           "grants",
-          "sources"
+          "sources",
+          "home"
         ],
         "additionalProperties": false
       },

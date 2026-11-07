@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -24,7 +25,7 @@ ALREADY = "That library is already connected for this person."
 OTHER_ACCOUNT = "That key belongs to a different Immich account; remove this library and connect it again."
 KEY_LOST = secretbox.KEY_LOST
 HTTPS_ONLY = "Use https:// for an Immich server outside your own network."
-NEEDS_RESUME_SNAPSHOT = 'Send the "grants" and "sources" the confirmation showed'
+NEEDS_RESUME_SNAPSHOT = 'Send the "grants", "sources" and "home" the confirmation showed'
 STALE_GRANTS = photos.CHANGED
 STALE_SOURCES = photogrants.STALE_SOURCES
 TOO_DENSE = "Some of your library couldn’t be read."
@@ -80,6 +81,7 @@ class Resume(TypedDict):
     count: int
     grants: list[ResumeGrant]
     sources: list[photogrants.SourceVersion]
+    home: str
 
 
 class Tested(TypedDict):
@@ -268,6 +270,10 @@ def _shown(asset: immich.Asset, person_id: int, windows: Sequence[photomatch.Tri
     return placed.trip_id if placed.match in SHOWN else None
 
 
+def home_state(conn: db.Connection) -> str:
+    return hashlib.sha256(repr(photos.home_in(conn)).encode()).hexdigest()
+
+
 def _assets(source: immich.Source, window: photomatch.TripWindow, deadline: float) -> list[immich.Asset]:
     found: dict[str, immich.Asset] = {}
     after, page = window.start, 1
@@ -275,6 +281,8 @@ def _assets(source: immich.Source, window: photomatch.TripWindow, deadline: floa
         if time.monotonic() >= deadline:
             raise immich.Unavailable(immich.TOO_SLOW)
         got = immich.search(source, after, window.end, page=page)
+        if got.dropped:
+            raise immich.Unavailable(TOO_DENSE)
         found.update((a.id, a) for a in got.assets)
         if got.next_page is None:
             return list(found.values())
@@ -312,11 +320,11 @@ def resume_check(conn: db.Connection, actor: Actor, source_id: int) -> Resume:
     shared = trip_grants(conn, source["person_id"])
     asks = source["status"] == OFF and bool(shared)
     return {"asks": asks, "count": _count(conn, source, shared) if asks else 0, "grants": shared,
-            "sources": photogrants.sources_of(conn, source["person_id"])}
+            "sources": photogrants.sources_of(conn, source["person_id"]), "home": home_state(conn)}
 
 
 def _resume(conn: db.Connection, actor: Actor, source: Stored, grants: Sequence[Mapping[str, object]] | None,
-            sources: Sequence[Mapping[str, object]] | None) -> bool:
+            sources: Sequence[Mapping[str, object]] | None, home: str | None) -> bool:
     person_id = source["person_id"]
     photogrants.lock_home(conn)
     if not people.lock(conn, person_id) or not photo_sources.lock(conn, source["id"]):
@@ -331,8 +339,10 @@ def _resume(conn: db.Connection, actor: Actor, source: Stored, grants: Sequence[
     photos.lock_grants(conn, person_id, photos.granted_trips(conn, person_id) | seen)
     conn.orm.expire_all()
     shared = trip_grants(conn, person_id)
-    if (shared or grants is not None or sources is not None) and (grants is None or sources is None):
+    if (shared or grants is not None or sources is not None or home is not None) and (grants is None or sources is None or home is None):
         raise Refused(NEEDS_RESUME_SNAPSHOT)
+    if home is not None and home != home_state(conn):
+        raise Stale(STALE_GRANTS)
     if grants is not None and not _grants_match(conn, person_id, grants):
         raise Stale(STALE_GRANTS)
     if sources is not None and not photogrants.sources_match(conn, person_id, sources):
@@ -341,14 +351,15 @@ def _resume(conn: db.Connection, actor: Actor, source: Stored, grants: Sequence[
 
 
 def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool,
-         grants: Sequence[Mapping[str, object]] | None = None, sources: Sequence[Mapping[str, object]] | None = None) -> Listed:
+         grants: Sequence[Mapping[str, object]] | None = None, sources: Sequence[Mapping[str, object]] | None = None,
+         home: str | None = None) -> Listed:
     source = owned(conn, actor, source_id)
     if had_label and not photo_sources.set_label(conn, source_id, label, owner=source["owner_sub"]):
         raise NoSuchSource()
     if paused is True and source["status"] != OFF:
         changed = photo_sources.mark(conn, source_id, OFF, None, owner=source["owner_sub"])
     elif paused is False and source["status"] == OFF:
-        changed = _resume(conn, actor, source, grants, sources)
+        changed = _resume(conn, actor, source, grants, sources, home)
     else:
         changed = True
     if not changed:

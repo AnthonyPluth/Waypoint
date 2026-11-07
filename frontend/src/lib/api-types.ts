@@ -710,6 +710,7 @@ export interface PhotoSourceEdit {
   paused?: boolean;
   grants?: PhotoResumeGrant[];
   sources?: PhotoSourceVersion[];
+  home?: string;
 }
 
 export interface PhotoSourceNewTestBody {
@@ -722,6 +723,7 @@ export interface PhotoSourceResume {
   count: number;
   grants: PhotoResumeGrant[];
   sources: PhotoSourceVersion[];
+  home: string;
 }
 
 export interface PhotoSourceTest {

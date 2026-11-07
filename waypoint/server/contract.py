@@ -743,6 +743,7 @@ class PhotoSourceEdit(TypedDict):
     paused: NotRequired[bool]
     grants: NotRequired[list[PhotoResumeGrant]]
     sources: NotRequired[list[PhotoSourceVersion]]
+    home: NotRequired[str]
 
 
 class PhotoSourceResume(TypedDict):
@@ -750,6 +751,7 @@ class PhotoSourceResume(TypedDict):
     count: int
     grants: list[PhotoResumeGrant]
     sources: list[PhotoSourceVersion]
+    home: str
 
 
 class PhotoSourceNewTestBody(TypedDict):
