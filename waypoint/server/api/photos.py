@@ -169,7 +169,7 @@ def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
     who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
     given = (q.get("created") or [None])[0]
     try:
-        created = float(given) if given is not None else None
+        created = validate.parse_number(given, "") if given is not None else None
     except ValueError:
         raise ApiError('Send "created" as a number') from None
     _seen(conn, who, trip)
