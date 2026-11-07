@@ -1212,6 +1212,17 @@ class DeviceBody(TypedDict):
     auth: str
 
 
+class AppDeviceBody(TypedDict):
+    token: str
+    environment: str
+    replaces: NotRequired[str]
+
+
+class AppPush(TypedDict):
+    enabled: bool
+    devices: list[ReminderDevice]
+
+
 class FeedMade(TypedDict):
     url: str
 

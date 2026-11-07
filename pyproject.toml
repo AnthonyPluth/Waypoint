@@ -11,6 +11,7 @@ dependencies = [
     "pyjwt[crypto] (>=2.15.1,<3.0)",        # verifying sign-in (OIDC) ID tokens
     "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
     "python-dateutil (>=2.9,<3.0)",      # month arithmetic (waypoint/dates.py)
+    "httpx[http2] (>=0.28.1,<0.29.0)",
 ]
 
 [tool.poetry]
@@ -84,7 +85,7 @@ name = "Only waypoint.tls opens outbound connections"
 type = "protected"
 # Squashed to the top-level package (import-linter can't tell urllib.request from urllib.parse), so urllib isn't here:
 # Semgrep's waypoint-raw-urlopen keeps urlopen and build_opener in waypoint/tls.py.
-protected_modules = ["ssl", "socket", "http", "requests", "pywebpush"]
+protected_modules = ["ssl", "socket", "http", "requests", "pywebpush", "httpx"]
 allowed_importers = ["waypoint.tls"]
 ignore_imports = [
     "waypoint.server.handler -> socket",                 # the web server itself: it accepts connections, it doesn't open them

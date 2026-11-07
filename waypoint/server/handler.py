@@ -402,7 +402,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._feed(method, url.path)
         if url.path not in PUBLIC_FILES:
             api = url.path.startswith("/api/")
-            self.user = (self._app_user() if api and self.headers.get("Authorization") else None) or self._user(renew=api)
+            scheme = (self.headers.get("Authorization") or "").split(None, 1)
+            bearer = api and len(scheme) == 2 and scheme[0].lower() == "bearer" and scheme[1].startswith(mcp_oauth.ACCESS_PREFIX)
+            self.user = self._app_user() if bearer else self._user(renew=api)
             if not self.user:
                 if url.path.startswith("/api/"):
                     return self._json(401, {"error": "You've been signed out.", "login": "/auth/login"})
@@ -434,7 +436,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "Bad JSON"})
         if hit is None:
             return self._json(404, {"error": "Not found"})
-        q = urllib.parse.parse_qs(url.query)
+        q = urllib.parse.parse_qs(url.query, keep_blank_values=hit.route.keep_blank)
         _current.user = getattr(self, "user", None)
         _current.host = self.headers.get("Host")
         _current.headers = self.headers

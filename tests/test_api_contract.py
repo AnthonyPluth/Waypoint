@@ -1,6 +1,8 @@
 import ast
 import importlib.util
 import json
+import os
+import tempfile
 import unittest
 from datetime import date
 from pathlib import Path
@@ -11,6 +13,8 @@ from waypoint.storage.models import IgnoredSender, LoyaltyId, Mailbox
 from waypoint.storage import settings_keys as sk
 from unittest import mock
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from sqlalchemy import insert, select
 
 from waypoint import oidc
@@ -332,6 +336,18 @@ class Replies(DbCase):
         self.check("GET /api/reminders", reminders_api.api_reminders(self.c, {}, {}))
         self.check("DELETE /api/reminders/devices/{id}", reminders_api.api_device_remove(self.c, {}, {}, str(added["id"])))
         self.check("DELETE /api/feed", reminders_api.api_feed_off(self.c, {}, {}))
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        key_path = os.path.join(folder.name, "AuthKey.p8")
+        with open(key_path, "wb") as f:
+            f.write(ec.generate_private_key(ec.SECP256R1()).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        env = {"WAYPOINT_APNS_KEY_FILE": key_path, "WAYPOINT_APNS_KEY_ID": "ABC123DEFG", "WAYPOINT_APNS_TEAM_ID": "TEAM123456", "WAYPOINT_APNS_TOPIC": "com.example.waypoint"}
+        with mock.patch.dict(os.environ, env):
+            phone = reminders_api.api_app_device_add(self.c, {}, {"token": "ab12" * 16, "environment": "production"})
+            self.check("POST /api/reminders/app/devices", phone)
+            self.check("GET /api/reminders/app", reminders_api.api_app_push(self.c, {}, {}))
+            self.check("DELETE /api/reminders/app/devices/{id}", reminders_api.api_app_device_remove(self.c, {}, {}, str(phone["id"])))
 
     def test_mcp_settings(self):
         _current.host = "localhost:8765"
@@ -559,6 +575,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
+                                     "GET /api/reminders/app", "POST /api/reminders/app/devices", "DELETE /api/reminders/app/devices/{id}",
                                      "GET /api/mcp-settings", "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail",
                                      "DELETE /api/mcp-settings/connections/{id}",
                                      "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",

@@ -333,7 +333,8 @@ def session_user(conn, token: str | None) -> dict | None:
     row = conn.execute(select(AuthSession).where(AuthSession.token_hash == _hash(token))).fetchone()
     if not row:
         return None
-    if row["expires"] < time.time() or not still_allowed(row["email"]) or not _grant_live(conn, row["grant_id"]):
+    if row["expires"] < time.time() or not still_allowed(row["email"]) or not _grant_live(conn, row["grant_id"]) \
+            or (row["grant_id"] is not None and access_lapsed(conn, row["sub"], row["email"])):
         conn.execute(delete(AuthSession).where(AuthSession.token_hash == row["token_hash"]))
         return None
     return {"sub": row["sub"], "email": row["email"], "name": row["name"]}

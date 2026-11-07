@@ -15,8 +15,8 @@ from sqlalchemy import delete, select
 from .. import monitoring, oidc
 from ..providers import webpush
 from ..storage import db
-from ..storage.models import CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, User
-from . import calendar, people, trips
+from ..storage.models import AppDevice, CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, User
+from . import app_push, calendar, people, trips
 from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
@@ -71,6 +71,7 @@ def lapsed(conn: db.Connection, owner: str, now: float) -> bool:
 
 def _forget(conn: db.Connection, owner: str) -> None:
     conn.execute(delete(PushDevice).where(PushDevice.owner_sub == owner))
+    app_push.forget(conn, owner)
     conn.execute(delete(CalendarFeed).where(CalendarFeed.owner_sub == owner))
     conn.execute(delete(ReminderPrefs).where(ReminderPrefs.owner_sub == owner))
     conn.execute(delete(ReminderSent).where(ReminderSent.owner_sub == owner))
@@ -78,7 +79,8 @@ def _forget(conn: db.Connection, owner: str) -> None:
 
 def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     now = time.time() if now is None else now
-    owners = set(conn.execute(select(PushDevice.owner_sub)).scalars()) | set(conn.execute(select(CalendarFeed.owner_sub)).scalars())
+    owners = (set(conn.execute(select(PushDevice.owner_sub)).scalars()) | set(conn.execute(select(CalendarFeed.owner_sub)).scalars())
+              | set(conn.execute(select(AppDevice.owner_sub)).scalars()))
     gone = [o for o in sorted(owners) if lapsed(conn, o, now)]
     for owner in gone:
         _forget(conn, owner)
@@ -234,7 +236,8 @@ def _deliver(conn: db.Connection, owner: str, message: dict[str, Any], send: Sen
             tried -= 1
         except Exception as e:
             monitoring.report(e, values=False)
-    return reached > 0 or tried == 0
+    app_reached, app_tried = app_push.wake(conn, owner, str(message.get("tag", "")))
+    return reached + app_reached > 0 or tried + app_tried == 0
 
 
 def _record(conn: db.Connection, owner: str, kind: Kind, ref: str, now: float) -> None:
@@ -255,7 +258,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
     stamp = now.timestamp()
     end_lapsed(conn, stamp)
     sent = 0
-    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars())):
+    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
         chosen = prefs(conn, owner)
         if not (chosen["check_in"] or chosen["day_of"]):
             continue
@@ -281,7 +284,7 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
 def review_due(conn: db.Connection, since: float, now: float, send: Send, mailbox_ids: Collection[int]) -> int:
     end_lapsed(conn, now)
     sent = 0
-    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars())):
+    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
         if not prefs(conn, owner)["review"]:
             continue
         arrived = review.arrived(conn, owner, since, mailbox_ids)

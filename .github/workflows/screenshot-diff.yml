@@ -28,6 +28,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write     # the comment
-    uses: AnthonyPluth/fleet/.github/workflows/screenshot-diff.yml@e46ed57c9783080142e148121176bd7d4a321a8a   # v2.3.0
+    uses: AnthonyPluth/fleet/.github/workflows/screenshot-diff.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
     with:
       dir: docs/src/assets/screenshots/

@@ -393,6 +393,20 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(len(inserts), 1)
         self.assertIn("CAST(%(param_1)s AS FLOAT)", str(inserts[0]))
 
+    def test_0041_adds_the_app_devices_table_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        table = shape(self.path)["app_devices"]
+        self.assertEqual(table["uniques"], [("uq_app_devices_token", ("token",))])
+        self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+
     def test_0042_pages_photo_syncs_by_capture_time_and_restarts_a_traversal_in_progress(self):
         from alembic import command
         old = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end", "cursor", "resume_page", "fetch_started")))
@@ -408,7 +422,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(drift(self.path), [])
         self.assertEqual([r[:7] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1", None, None), (1, 2, "a", "b", None, None, None)])
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0040")
+            command.downgrade(db.alembic_config(c), "0041")
             names = [col["name"] for col in sa.inspect(c).get_columns("photo_trip_syncs")]
         self.assertIn("resume_page", names)
         self.assertFalse({"resume_after", "inputs"} & set(names))

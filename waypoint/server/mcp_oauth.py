@@ -24,6 +24,7 @@ APP_CLIENT = "wpc_waypoint_ios"
 APP_NAME = "Waypoint for iPhone"
 APP_REDIRECT = "waypoint://auth"
 APP_SCOPE = "app"
+ACCESS_PREFIX = "wpa_"
 CONSENT = {
     "write": ("Change trips",
               "Add, change and remove trips, bookings, travellers, people and guests, settle or dismiss Review items, and the distance unit. "
@@ -422,7 +423,7 @@ def _grant(conn, grant_id: int):
 
 
 def _issue(conn, grant, now: float) -> tuple[dict, str]:
-    access, refresh = "wpa_" + secrets.token_urlsafe(32), "wpr_" + secrets.token_urlsafe(32)
+    access, refresh = ACCESS_PREFIX + secrets.token_urlsafe(32), "wpr_" + secrets.token_urlsafe(32)
     conn.execute(insert(OAuthToken), [
         {"token_hash": _hash(access), "kind": "access", "grant_id": grant["id"], "created": now, "expires": now + ACCESS_TTL},
         {"token_hash": _hash(refresh), "kind": "refresh", "grant_id": grant["id"], "created": now, "expires": now + REFRESH_TTL}])
@@ -530,7 +531,7 @@ def set_scope(conn, grant_id: int, scope: str, on: bool, approver: str | None) -
 
 def access_grant(conn, presented: str, canonical: str, now: float | None = None):
     now = time.time() if now is None else now
-    if not presented.startswith("wpa_"):
+    if not presented.startswith(ACCESS_PREFIX):
         return None
     h = _hash(presented)
     row = conn.execute(select(OAuthToken.token_hash, OAuthToken.expires, OAuthGrant.id, OAuthGrant.client_id, OAuthGrant.scope,

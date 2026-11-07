@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-114 routes; 0 have no test yet.
+117 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -70,7 +70,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/airports/{id}` | `trips.py:api_airport` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/import/preview` | `flight_import.py:api_import_preview` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
 | `POST /api/import` | `flight_import.py:api_import` | `lib/components/settings/ImportSection.svelte` | `test_api_contract.py`, `test_flight_import.py` | [start/import](/Waypoint/start/import/) |
-| `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
+| `GET /api/stats` | `stats.py:api_stats` | `lib/components/YearInReview.svelte` | `test_api_contract.py`, `test_photos_api.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
@@ -101,6 +101,9 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `DELETE /api/reminders/devices/{id}` | `reminders.py:api_device_remove` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
+| `GET /api/reminders/app` | `reminders.py:api_app_push` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |
+| `POST /api/reminders/app/devices` | `reminders.py:api_app_device_add` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |
+| `DELETE /api/reminders/app/devices/{id}` | `reminders.py:api_app_device_remove` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/feed` | `reminders.py:api_feed_make` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `DELETE /api/feed` | `reminders.py:api_feed_off` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_ai.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |

@@ -6,6 +6,7 @@ from unittest import mock
 from sqlalchemy import select, update
 
 from tests import test_mcp_oauth_http as base
+from tests.shared import ServerCase
 from waypoint.server import mcp_oauth
 from waypoint.storage import db
 from waypoint.storage.models import AuthSession, OAuthClient, OAuthGrant, User
@@ -158,6 +159,16 @@ class AppSessionTests(AppSignIn):
         cookie = self.api(t["access_token"], "POST", "/auth/app-session", b"", APP_HEADERS).json["value"]
         return t, {"waypoint_session": cookie}
 
+    def test_a_waypoint_token_that_does_not_check_out_is_not_rescued_by_a_session_cookie(self):
+        _t, cookie = self.minted()
+        for header in ("Bearer wpa_not-a-token", "bearer   wpa_not-a-token"):
+            self.assertEqual(self.http("GET", "/api/trips", headers={"Authorization": header}, cookies=cookie).status, 401)
+
+    def test_a_bearer_or_basic_header_that_is_not_waypoints_leaves_the_session_cookie_in_charge(self):
+        _t, cookie = self.minted()
+        for header in ("Bearer proxy-issued-token", "Basic dTpw"):
+            self.assertEqual(self.http("GET", "/api/trips", headers={"Authorization": header}, cookies=cookie).status, 200)
+
     def test_using_the_session_does_not_stretch_it(self):
         _t, cookie = self.minted()
         with db.session() as conn:
@@ -179,6 +190,15 @@ class AppSessionTests(AppSignIn):
             conn.execute(update(OAuthGrant).where(OAuthGrant.client_id == mcp_oauth.APP_CLIENT).values(revoked=time.time()))
         self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
 
+    def test_a_session_ends_when_the_sign_in_window_it_was_minted_under_lapses(self):
+        _t, cookie = self.minted()
+        self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 200)
+        groups = {"OIDC_ALLOWED_GROUPS": "household", "WAYPOINT_SESSION_DAYS": "14"}
+        with mock.patch.dict(os.environ, groups):
+            with db.session() as conn:
+                conn.execute(update(User).where(User.sub == "user-1").values(last_seen=time.time() - 20 * 86400))
+            self.assertEqual(self.http("GET", "/api/trips", cookies=cookie).status, 401)
+
     def test_it_needs_the_app_header_and_a_valid_app_token(self):
         t = self.app_tokens()["access_token"]
         self.assertEqual(self.api(t, "POST", "/auth/app-session", b"").status, 403)
@@ -187,6 +207,13 @@ class AppSessionTests(AppSignIn):
         assistant = self.tokens(self.client())["access_token"]
         self.assertEqual(self.api(assistant, "POST", "/auth/app-session", b"", APP_HEADERS).status, 401)
         self.assertEqual(self.api(t, "GET", "/auth/app-session").status, 405)
+
+
+class BehindASignInProxy(ServerCase):
+    unset = ("OIDC_ISSUER",)
+
+    def test_a_bearer_header_the_proxy_adds_does_not_stop_the_api(self):
+        self.assertEqual(self.req("GET", "/api/trips", headers={"Authorization": "Bearer proxy-issued-token"})[0], 200)
 
 
 if __name__ == "__main__":

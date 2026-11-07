@@ -24,7 +24,7 @@ PG_JOBS ?= $(shell tools/test_jobs.sh)
 SEMGREP ?= pipx run semgrep==1.146.0
 
 .PHONY: setup check lint python-lint frontend-lint semgrep test test-parallel test-pg test-timings fix \
-	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build verify feature-map feature-map-check \
+	frontend-check frontend-typecheck frontend-test frontend-build docs docs-build docs-site verify feature-map feature-map-check \
 	fleet-checks fleet-sync api-contract api-contract-check verify-skill verify-skill-print user-feature-map control-smoke
 
 # frontend-lint is a prerequisite of both lint and frontend-check, and make runs it once.
@@ -111,6 +111,15 @@ docs: docs/node_modules
 # Builds the site into docs/dist and checks every link between its pages, as docs.yml does.
 docs-build: docs/node_modules
 	cd docs && $(NPM) run build
+
+# What docs.yml builds and publishes: the standalone demo (built, then verified with Playwright's browser), the site,
+# and the demo copied into it. The copy comes last because the site build empties docs/dist.
+docs-site: frontend/node_modules
+	cd frontend && $(NPM) run build:demo
+	node demo/verify.mjs
+	$(MAKE) docs-build
+	mkdir -p docs/dist/demo
+	cp -R frontend/demo-dist/. docs/dist/demo/
 
 # Runs the real app on made-up demo data and drives it with Playwright: each page at phone and desktop widths, plus
 # the scripted flows in frontend/verify/flows, under libfaketime so the clock is fixed. Full-page images at phone and

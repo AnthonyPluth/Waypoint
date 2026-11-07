@@ -26,7 +26,7 @@ from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, a
                           api_person_edit, api_person_remove)
 from .api.logos import api_loyalty_logo, api_segment_logo
 from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailbox_connect, api_mailbox_disconnect, api_mailbox_ignored, api_mailbox_labels, api_mailbox_labels_save, api_mailbox_reread, api_mailbox_review_glance, api_mailbox_scan, api_mailbox_share, api_mailbox_unignore, api_mailboxes
-from .api.reminders import (api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
+from .api.reminders import (api_app_device_add, api_app_device_remove, api_app_push, api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
 from .api.review import (api_review, api_review_attach, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
                          api_review_same, api_review_suggest, api_review_who)
@@ -125,6 +125,9 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/reminders", api_reminders_set),
     ("POST", "/api/reminders/devices", api_device_add),
     ("DELETE", "/api/reminders/devices/{id}", api_device_remove),
+    ("GET", "/api/reminders/app", api_app_push),
+    ("POST", "/api/reminders/app/devices", api_app_device_add),
+    ("DELETE", "/api/reminders/app/devices/{id}", api_app_device_remove),
     ("POST", "/api/feed", api_feed_make),
     ("DELETE", "/api/feed", api_feed_off),
     ("GET", "/api/review", api_review),
@@ -162,6 +165,7 @@ class Route:
     parts: tuple[str | None, ...]
     upload: int | None = None
     own_session: bool = False
+    keep_blank: bool = False
 
 
 @dataclass(frozen=True)
@@ -178,7 +182,7 @@ class Table:
 
     def __init__(self, routes):
         self.routes = [Route(m, pattern, fn, tuple(None if s == "{id}" else s for s in _segments(pattern)),
-                             getattr(fn, "upload", None), getattr(fn, "own_session", False))
+                             getattr(fn, "upload", None), getattr(fn, "own_session", False), getattr(fn, "keep_blank", False))
                        for m, pattern, fn in routes]
         self._by_shape: dict[tuple[str | None, int], list[Route]] = {}
         for r in self.routes:
