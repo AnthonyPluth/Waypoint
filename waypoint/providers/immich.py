@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.message import Message
 from email.utils import parsedate_to_datetime
-from typing import IO, Any, Literal
+from typing import IO, Any, Literal, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .. import tls
@@ -26,6 +26,7 @@ ORIGINAL_SECONDS = 600.0
 MAX_JSON_BYTES = 32_000_000
 CAPS = {"thumbnail": 2_000_000, "preview": 10_000_000}
 CHUNK = 65_536
+POLL_FLOOR = 0.01
 MAX_URL = 200
 
 USER_AGENT = "Waypoint/1"
@@ -55,6 +56,26 @@ DIGITS = re.compile(r"[0-9]{1,10}")
 BYTE_RANGE = re.compile(r"bytes=(?:([0-9]{1,15})-([0-9]{0,15})|-([0-9]{1,15}))")
 RENDITION_MISSING = (404, 410)
 SIGNATURES = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"))
+SNIFF_BYTES = 4096
+INLINE = True
+ATTACHMENT = False
+PLAIN_SIGNATURES: tuple[tuple[bytes, str, bool], ...] = (
+    (b"\x89PNG\r\n\x1a\n", "image/png", INLINE), (b"\xff\xd8\xff", "image/jpeg", INLINE), (b"GIF87a", "image/gif", INLINE), (b"GIF89a", "image/gif", INLINE),
+    (b"II*\x00", "image/tiff", ATTACHMENT), (b"MM\x00*", "image/tiff", ATTACHMENT), (b"IIU\x00", "application/octet-stream", ATTACHMENT),
+    (b"IIRO", "application/octet-stream", ATTACHMENT), (b"MMOR", "application/octet-stream", ATTACHMENT), (b"IIRS", "application/octet-stream", ATTACHMENT),
+    (b"FUJIFILMCCD-RAW", "application/octet-stream", ATTACHMENT), (b"FOVb", "application/octet-stream", ATTACHMENT),
+)
+BRANDS: dict[bytes, tuple[str, bool]] = {
+    b"avif": ("image/avif", INLINE), b"avis": ("image/avif", INLINE),
+    b"heic": ("image/heic", ATTACHMENT), b"heix": ("image/heic", ATTACHMENT), b"hevc": ("image/heic", ATTACHMENT), b"hevx": ("image/heic", ATTACHMENT),
+    b"heim": ("image/heic", ATTACHMENT), b"heis": ("image/heic", ATTACHMENT), b"mif1": ("image/heif", ATTACHMENT), b"msf1": ("image/heif", ATTACHMENT),
+    b"qt  ": ("video/quicktime", INLINE),
+    b"isom": ("video/mp4", INLINE), b"iso2": ("video/mp4", INLINE), b"iso4": ("video/mp4", INLINE), b"iso5": ("video/mp4", INLINE), b"iso6": ("video/mp4", INLINE),
+    b"mp41": ("video/mp4", INLINE), b"mp42": ("video/mp4", INLINE), b"mp4v": ("video/mp4", INLINE), b"avc1": ("video/mp4", INLINE), b"dash": ("video/mp4", INLINE),
+    b"M4V ": ("video/mp4", INLINE), b"M4A ": ("video/mp4", INLINE), b"3gp4": ("video/mp4", INLINE), b"3gp5": ("video/mp4", INLINE),
+}
+GENERIC_BRANDS = (b"mif1", b"msf1")
+MATROSKA = b"\x1a\x45\xdf\xa3"
 
 NOT_CONFIGURED = "This Immich library isn’t set up: its address or API key is missing or malformed."
 REFUSED = "Immich didn’t accept this library’s API key (check it, and the permissions it was given)."
@@ -90,6 +111,10 @@ class RateLimited(ImmichError):
 
 
 class Unavailable(ImmichError):
+    pass
+
+
+class NotAnImage(Unavailable):
     pass
 
 
@@ -142,19 +167,38 @@ class Original:
         self.content_range = _text(found("Content-Range"))
         self.content_length = int(length) if length is not None and DIGITS.fullmatch(length) else None
         self.accept_ranges = _text(found("Accept-Ranges"), 40)
+        self._fed = time.monotonic()
 
-    def read(self, size: int = CHUNK) -> bytes:
+    def _poll(self, size: int, wait: float) -> bytes | None:
+        owner = getattr(getattr(getattr(self._response, "fp", None), "raw", None), "_owner", None)
+        if owner is None:
+            return cast(bytes, self._response.read1(size))
+        idle = owner.timeout
+        owner.timeout = max(min(wait, idle) if isinstance(idle, int | float) else wait, POLL_FLOOR)
+        try:
+            return cast(bytes, self._response.read1(size))
+        except TimeoutError:
+            return None
+        finally:
+            owner.timeout = idle
+
+    def read(self, size: int = CHUNK, wait: float | None = None) -> bytes | None:
         problem = TOO_SLOW
         chunk = None
-        if self._deadline - time.monotonic() > 0:
+        now = time.monotonic()
+        if self._deadline > now and self._fed + ORIGINAL_TIMEOUT > now:
             try:
-                chunk = self._response.read1(size)
+                chunk = self._response.read1(size) if wait is None else self._poll(size, wait)
             except TimeoutError:
                 chunk = None
             except tls.NETWORK_ERRORS:
                 problem = UNREACHABLE
+            else:
+                if wait is not None and chunk is None:
+                    return None
         if not isinstance(chunk, bytes):
             raise Unavailable(problem)
+        self._fed = time.monotonic()
         return chunk
 
     def close(self) -> None:
@@ -439,6 +483,27 @@ def sniff(data: bytes) -> str | None:
     return "image/webp" if data[:4] == b"RIFF" and data[8:12] == b"WEBP" else None
 
 
+def _boxed(data: bytes) -> tuple[str, bool] | None:
+    if len(data) < 12 or data[4:8] != b"ftyp":
+        return None
+    size = int.from_bytes(data[:4], "big")
+    end = min(len(data), size) if 16 <= size <= SNIFF_BYTES else min(len(data), 32)
+    brands = [data[8:12], *(data[at:at + 4] for at in range(16, end - 3, 4))]
+    specific = next((BRANDS[b] for b in brands if b in BRANDS and b not in GENERIC_BRANDS), None)
+    return specific or next((BRANDS[b] for b in brands if b in BRANDS), None)
+
+
+def original_type(data: bytes) -> tuple[str, bool] | None:
+    for signature, kind, inline in PLAIN_SIGNATURES:
+        if data.startswith(signature):
+            return kind, inline
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp", INLINE
+    if data.startswith(MATROSKA) and len(data) >= 8:
+        return ("video/webm", INLINE) if b"webm" in data[4:64] else ("video/x-matroska", ATTACHMENT)
+    return _boxed(data)
+
+
 def ping(source: Source) -> Account:
     pong = _json(source, _request(source, PING, JSON_TYPE))
     if not isinstance(pong, dict) or pong.get("res") != "pong":
@@ -466,10 +531,10 @@ def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:
     return parse_markers(_json(source, _request(source, MARKERS, JSON_TYPE, query=query)))
 
 
-def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | None:
+def thumbnail(source: Source, asset_id: str, size: Size, *, seconds: float | None = None) -> tuple[str, bytes] | None:
     if not ASSET_ID.fullmatch(asset_id) or size not in CAPS:
         return None
-    deadline = time.monotonic() + IMAGE_SECONDS
+    deadline = time.monotonic() + (IMAGE_SECONDS if seconds is None else seconds)
     request = _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size})
     response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=RENDITION_MISSING)
     if response is None:
@@ -478,8 +543,19 @@ def thumbnail(source: Source, asset_id: str, size: Size) -> tuple[str, bytes] | 
         data = _read(response, CAPS[size], deadline)
     kind = sniff(data)
     if kind is None:
-        raise Unavailable(NOT_AN_IMAGE)
+        raise NotAnImage(NOT_AN_IMAGE)
     return kind, data
+
+
+def asset_exists(source: Source, asset_id: str, *, seconds: float | None = None) -> bool:
+    if not ASSET_ID.fullmatch(asset_id):
+        return False
+    deadline = time.monotonic() + (JSON_SECONDS if seconds is None else seconds)
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, deadline, missing=RENDITION_MISSING)
+    if response is None:
+        return False
+    response.close()
+    return True
 
 
 def single_range(value: str | None) -> str | None:

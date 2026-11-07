@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-111 routes; 0 have no test yet.
+114 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -39,6 +39,9 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/trips/{id}/photos` | `photos.py:api_trip_photos` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/photos/review` | `photos.py:api_photo_review` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photos/{id}` | `photos.py:api_photo_decide` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photos/{id}/thumbnail` | `photos.py:api_photo_thumbnail` | - | `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photos/{id}/preview` | `photos.py:api_photo_preview` | - | `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photos/{id}/original` | `photos.py:api_photo_original` | - | `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/photo-sources` | `photos.py:api_photo_sources` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources` | `photos.py:api_photo_source_add` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/test` | `photos.py:api_photo_source_test_new` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
