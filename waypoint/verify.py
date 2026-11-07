@@ -29,6 +29,10 @@ FAKETIME_LIBRARIES = (
     "/usr/local/lib/faketime/libfaketime.so.1",
 )
 FAKETIME_INSTALL = "sudo apt-get install libfaketime"
+SIGNED_IN_AS = ("jane", "sam")
+SIGNED_IN_ENV = "WAYPOINT_VERIFY_AS"
+DEMO_MARKER = ".waypoint-verify-demo"
+FLOWS = os.path.join(ROOT, "frontend", "verify", "flows")
 
 
 MAX_JOBS = 4
@@ -53,6 +57,38 @@ def clean_env(data: str, base: dict[str, str] | None = None) -> dict[str, str]:
     env = {k: v for k, v in (os.environ if base is None else base).items() if k in KEPT_ENV or k.startswith(KEPT_ENV_PREFIXES)}
     env.update(WAYPOINT_DATA=data, PYTHONUNBUFFERED="1", RAPIDAPI_KEY=DEMO_KEY, HTTPS_PROXY=NO_OUTSIDE, https_proxy=NO_OUTSIDE)
     return env
+
+
+def signed_in_env(env: dict[str, str], who: str | None) -> dict[str, str]:
+    if who is None:
+        return env
+    if who not in SIGNED_IN_AS:
+        raise ValueError(f"signed in as {who!r}: choose one of {', '.join(SIGNED_IN_AS)}")
+    return {**env, SIGNED_IN_ENV: who}
+
+
+def flows_need_signed_in(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
+    try:
+        names = sorted(n for n in os.listdir(folder) if n.endswith(".json"))
+    except OSError:
+        return False
+    for name in names:
+        try:
+            with open(os.path.join(folder, name)) as f:
+                flow = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(flow, dict) or flow.get("signed_in") is not True:
+            continue
+        if only:
+            selected = flow.get("name") in only
+        elif pages:
+            selected = flow.get("page", "upcoming") in pages
+        else:
+            selected = True
+        if selected:
+            return True
+    return False
 
 
 def find_faketime(candidates: tuple[str, ...] = FAKETIME_LIBRARIES) -> str | None:
@@ -90,10 +126,12 @@ def resolve_jobs(flag: int | None, env: Mapping[str, str] | None = None, cpus: i
     return jobs
 
 
-def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str]) -> list[str]:
+def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str], signed_url: str | None = None) -> list[str]:
     command = [node, os.path.join(frontend, "verify", "verify.mjs")]
     for url in urls:
         command += ["--url", url]
+    if signed_url:
+        command += ["--signed-url", signed_url]
     for flow in flows:
         command += ["--flow", flow]
     return [*command, "--out", OUT, "--images", IMAGES, "--now", FROZEN_NOW_ISO, *pages]
@@ -141,21 +179,28 @@ def seed_demo(folder: str, library: str) -> subprocess.CompletedProcess[str]:
                           capture_output=True, text=True)
 
 
-def start_instances(root: str, jobs: int, library: str) -> list[Instance]:
-    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs)]
+def mark_demo(folder: str) -> None:
+    with open(os.path.join(folder, DEMO_MARKER), "w"):
+        pass
+
+
+def start_instances(root: str, jobs: int, library: str, signed_in: str | None = None) -> list[Instance]:
+    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs + (signed_in is not None))]
     os.mkdir(folders[0])
     seeded = seed_demo(folders[0], library)
     if seeded.returncode:
         raise RuntimeError(f"couldn't fill the demo database:\n{seeded.stdout}{seeded.stderr}")
+    mark_demo(folders[0])
     for folder in folders[1:]:
         shutil.copytree(folders[0], folder)
     started: list[Instance] = []
     try:
-        for folder in folders:
+        for i, folder in enumerate(folders):
             port = free_port()
             log = os.path.join(folder, "server.log")
+            env = signed_in_env(frozen_env(clean_env(folder), library), signed_in if i == jobs else None)
             with open(log, "w") as out:
-                server = subprocess.Popen(server_command(port), env=frozen_env(clean_env(folder), library), cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
+                server = subprocess.Popen(server_command(port), env=env, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
             started.append(Instance(folder, f"http://127.0.0.1:{port}", server, log))
         for instance in started:
             try:
@@ -192,14 +237,17 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     root = tempfile.mkdtemp(prefix="waypoint-verify-")
     instances: list[Instance] = []
     try:
+        signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) else None
         try:
-            instances = start_instances(root, count, library)
+            instances = start_instances(root, count, library, signed)
         except RuntimeError as e:
             print(f"verify: {e}", file=sys.stderr)
             return 2
-        urls = [i.url for i in instances]
-        print(f"verify: demo data served at {', '.join(urls)}" + (f" ({count} servers, each with its own copy of the data)" if count > 1 else ""))
-        code = subprocess.run(node_command(node, frontend, urls, pages, flows or []), cwd=frontend, env=clean_env(instances[0].data)).returncode
+        urls = [i.url for i in instances[:count]]
+        signed_url = instances[count].url if signed else None
+        print(f"verify: demo data served at {', '.join(urls)}" + (f" ({count} servers, each with its own copy of the data)" if count > 1 else "")
+              + (f"; signed in as {signed} at {signed_url} for the flows that ask for it" if signed_url else ""))
+        code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
         for instance in instances:
             if instance.server.poll() is not None:
                 print(f"verify: the server at {instance.url} exited with code {instance.server.returncode}\n{log_tail(instance.log)}", file=sys.stderr)
@@ -235,6 +283,7 @@ def seed(argv: list[str]) -> int:
         shutil.rmtree(a.data, ignore_errors=True)
         print(f"verify: couldn't fill the demo database:\n{done.stdout}{done.stderr}", file=sys.stderr)
         return 2
+    mark_demo(a.data)
     return 0
 
 
@@ -244,6 +293,7 @@ def serve(argv: list[str]) -> int:
     p.add_argument("--seed", required=True)
     p.add_argument("--data", required=True)
     p.add_argument("--port", type=int, required=True)
+    p.add_argument("--signed-in", choices=SIGNED_IN_AS)
     a = p.parse_args(argv)
     made = [False]
 
@@ -271,7 +321,7 @@ def serve(argv: list[str]) -> int:
     os.close(log)
     os.chdir(ROOT)
     command = server_command(a.port)
-    os.execve(command[0], command, frozen_env(clean_env(a.data), library))
+    os.execve(command[0], command, signed_in_env(frozen_env(clean_env(a.data), library), a.signed_in))
     return 1
 
 
@@ -318,5 +368,5 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["status"]:
         print(json.dumps(status()))
         sys.exit(0)
-    sys.exit("usage: python -m waypoint.verify serve --parent PID --seed S --data D --port P (make verify runs it), "
+    sys.exit("usage: python -m waypoint.verify serve --parent PID --seed S --data D --port P [--signed-in jane|sam] (make verify runs it), "
              "or seed --data D, or status (frontend/verify/control.mjs runs those)")

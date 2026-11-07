@@ -248,6 +248,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Stats`.
 - **Drive it:** `tools/control flow past-trip-countries`; or `poetry run python run.py verify --flow past-trip-countries`.
 
+#### `photos-signed-in`
+
+- **Starts at:** `#trips`; goes to: `/api/photos/15/thumbnail`, `/api/photo-sources`, `/api/trips/3/photos`.
+- **Widths:** desktop.
+- **Expects to see:** `Trips`, `Demo library`, `"match": "place"`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-signed-in`; or `poetry run python run.py verify --flow photos-signed-in`.
+
 #### `seats`
 
 - **Starts at:** `#trips`.

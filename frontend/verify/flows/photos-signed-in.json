@@ -1,0 +1,17 @@
+{
+  "name": "photos-signed-in",
+  "page": "trips",
+  "signed_in": true,
+  "viewports": ["desktop"],
+  "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "goto": "/api/photos/15/thumbnail" },
+    { "wait_for": "img" },
+    { "screenshot": "thumbnail" },
+    { "goto": "/api/photo-sources" },
+    { "expect_text": { "selector": "body", "text": "Demo library" } },
+    { "goto": "/api/trips/3/photos" },
+    { "expect_text": { "selector": "body", "text": "\"match\": \"place\"" } }
+  ]
+}

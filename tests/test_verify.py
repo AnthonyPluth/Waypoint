@@ -330,5 +330,74 @@ class ControlSessionTests(unittest.TestCase):
         self.assertIn("usage: python -m waypoint.verify serve", usage.stderr)
 
 
+class SignedInTests(unittest.TestCase):
+    def test_the_names_and_the_marker_are_the_ones_the_server_checks(self):
+        from waypoint import oidc
+        self.assertEqual((verify.SIGNED_IN_ENV, verify.DEMO_MARKER, set(verify.SIGNED_IN_AS)), (oidc.VERIFY_AS, oidc.VERIFY_MARKER, set(oidc.VERIFY_SUBS)))
+
+    def test_nothing_signs_in_unless_asked(self):
+        env = verify.frozen_env(verify.clean_env("/tmp/demo", {"PATH": "/bin"}), "/lib/f.so")
+        self.assertEqual(verify.signed_in_env(env, None), env)
+        self.assertNotIn(verify.SIGNED_IN_ENV, env)
+
+    def test_the_setting_in_the_callers_environment_never_reaches_a_server(self):
+        env = verify.clean_env("/tmp/demo", {"PATH": "/bin", verify.SIGNED_IN_ENV: "jane"})
+        self.assertNotIn(verify.SIGNED_IN_ENV, env)
+
+    def test_a_named_member_is_set_and_any_other_name_is_refused(self):
+        self.assertEqual(verify.signed_in_env({"A": "1"}, "sam"), {"A": "1", verify.SIGNED_IN_ENV: "sam"})
+        for who in ("admin", "demo-jane", ""):
+            with self.assertRaises(ValueError):
+                verify.signed_in_env({}, who)
+
+    def test_serve_signs_in_only_with_the_option_and_only_for_a_known_member(self):
+        def served(*extra):
+            with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                    mock.patch.object(verify, "die_with_parent"), mock.patch("os.execve") as execve, mock.patch("os.chdir"), \
+                    mock.patch("os.dup2"), mock.patch("signal.signal"), mock.patch.dict("os.environ", {verify.SIGNED_IN_ENV: "jane"}):
+                seed = os.path.join(tmp, "seed")
+                os.mkdir(seed)
+                verify.serve(["--parent", "42", "--seed", seed, "--data", os.path.join(tmp, "data"), "--port", "9200", *extra])
+                return execve.call_args.args[2]
+        self.assertNotIn(verify.SIGNED_IN_ENV, served())
+        self.assertEqual(served("--signed-in", "sam")[verify.SIGNED_IN_ENV], "sam")
+        with mock.patch("sys.stderr"), self.assertRaises(SystemExit):
+            served("--signed-in", "root")
+
+    def test_seeded_data_carries_the_marker_that_lets_the_server_honour_the_setting(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), \
+                mock.patch("subprocess.run", return_value=mock.Mock(returncode=0)):
+            data = os.path.join(tmp, "seed")
+            self.assertEqual(verify.seed(["--data", data]), 0)
+            self.assertTrue(os.path.isfile(os.path.join(data, verify.DEMO_MARKER)))
+
+    def test_a_signed_in_server_is_started_only_when_a_selected_flow_asks_for_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, body in (("a.json", {"name": "a", "steps": []}), ("b.json", {"name": "b", "signed_in": False, "steps": []}), ("bad.json", "[")):
+                with open(os.path.join(tmp, name), "w") as f:
+                    f.write(body if isinstance(body, str) else json.dumps(body))
+            need = lambda pages=None, only=None: verify.flows_need_signed_in(pages, only, tmp)
+            self.assertFalse(need())
+            with open(os.path.join(tmp, "c.json"), "w") as f:
+                json.dump({"name": "c", "page": "trips", "signed_in": True, "steps": []}, f)
+            with open(os.path.join(tmp, "d.json"), "w") as f:
+                json.dump({"name": "d", "signed_in": True, "steps": []}, f)
+            self.assertTrue(need())
+            self.assertTrue(need(None, ["c"]))
+            self.assertFalse(need(None, ["a"]))
+            self.assertTrue(need(["trips"]))
+            self.assertTrue(need(["upcoming"]))
+            self.assertFalse(need(["settings"]))
+            self.assertFalse(need(["settings"], ["a"]))
+            self.assertTrue(need(["settings"], ["c"]))
+        self.assertFalse(verify.flows_need_signed_in(None, None, "/no/such/folder"))
+
+    def test_the_node_command_names_the_signed_in_server_only_when_there_is_one(self):
+        plain = verify.node_command("node", "/f", ["http://a"], [], [])
+        self.assertNotIn("--signed-url", plain)
+        both = verify.node_command("node", "/f", ["http://a"], [], [], "http://b")
+        self.assertEqual(both[both.index("--signed-url") + 1], "http://b")
+
+
 if __name__ == "__main__":
     unittest.main()

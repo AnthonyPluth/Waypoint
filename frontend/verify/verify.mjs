@@ -83,6 +83,7 @@ export function flowProblems(flow) {
   if (flow?.host !== undefined && !/^[\w.-]+$/.test(flow.host)) out.push("host is a host name such as localhost");
   if (flow?.allow_console !== undefined && !(Array.isArray(flow.allow_console) && flow.allow_console.every((t) => typeof t === "string"))) out.push("allow_console is a list of texts");
   if (flow?.phone_agent !== undefined && typeof flow.phone_agent !== "boolean") out.push("phone_agent is true or false");
+  if (flow?.signed_in !== undefined && typeof flow.signed_in !== "boolean") out.push("signed_in is true or false");
   if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
 }
@@ -205,7 +206,7 @@ export async function runStep(page, step, shot, saveDownload) {
       await route.fulfill({ response, json: lengthenNames(await response.json(), step.long_names) });
     });
   } else if ("goto" in step) {
-    await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto);
+    await page.goto(step.goto.startsWith("#") ? `${page.url().split("#")[0]}${step.goto}` : step.goto.startsWith("/") ? new URL(step.goto, page.url()).href : step.goto);
   } else if ("click" in step) {
     await page.locator(step.click).first().click({ timeout });
   } else if ("click_if_present" in step) {
@@ -279,6 +280,8 @@ export async function settlePage(page, name, where, notes, scrollToTop = true) {
   await page.waitForTimeout(SETTLE_MS);
 }
 
+export const auditable = (contentType) => contentType === undefined || /^\s*(text\/html|application\/xhtml\+xml)\b/i.test(contentType);
+
 async function visit(env, label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
   const { browser, now, images, out } = env;
   const ctx = await browser.newContext(contextOptions(viewport, { reducedMotion, phoneAgent }));
@@ -291,6 +294,8 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
     page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
+    let documentType;
+    page.on("response", (r) => { if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) documentType = r.headers()["content-type"]; });
     page.on("response", (r) => { if (r.status() >= 500) problems.push(`${where}: ${r.status()} from ${r.request().method()} ${new URL(r.url()).pathname}`); });
     page.on("requestfailed", (r) => { if (r.failure()?.errorText !== "net::ERR_ABORTED") notes.push(`${where}: request failed (${r.failure()?.errorText}) ${new URL(r.url()).pathname}`); });
     const files = [];
@@ -313,7 +318,7 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     };
     try {
       await work(page, shot, saveDownload);
-      if (audit) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
+      if (audit && auditable(documentType)) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`, out).catch(() => {});
@@ -323,11 +328,18 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
   } finally { await ctx.close(); }
 }
 
+export function baseFor(env, flow) {
+  if (flow?.signed_in !== true) return env.base;
+  if (!env.signedBase) throw new Error(`flow ${flow.name} needs the signed-in demo server, which this run didn't start (make verify starts it for a flow that sets signed_in)`);
+  return env.signedBase;
+}
+
 export function runVisit(env, v) {
-  const { base, approveUrl } = env;
+  const { approveUrl } = env;
   if (v.kind === "flow") {
     const { flow } = v;
     return visit(env, `flow ${flow.name}`, v.viewport, async (page, shot, saveDownload) => {
+      const base = baseFor(env, flow);
       await page.goto(`${flow.host ? base.replace("127.0.0.1", flow.host) : base}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
       let checks = [];
       const shotChecked = async (file) => {
@@ -345,11 +357,12 @@ export function runVisit(env, v) {
   }
   if (v.kind === "reduced") {
     return visit(env, `reduced motion ${v.name}`, v.viewport, async (page) => {
-      await page.goto(`${base}/#${v.name}`, { waitUntil: "networkidle" });
+      await page.goto(`${env.base}/#${v.name}`, { waitUntil: "networkidle" });
       const moving = await animationsRunning(page);
       if (moving.length) throw new Error(`animations still run under prefers-reduced-motion: ${moving.slice(0, 5).join(", ")}`);
     }, { audit: false, reducedMotion: "reduce" });
   }
+  const { base } = env;
   return visit(env, v.name, v.viewport, async (page, shot) => {
     if (OWN_PAGES.includes(v.name)) {
       if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
@@ -389,6 +402,7 @@ async function main() {
   const now = new Date(opt("--now", process.env.WAYPOINT_VERIFY_NOW ?? FROZEN_NOW));
   const flowsDir = opt("--flows", join(here, "flows"));
   const only = optAll("--flow").flatMap(urlsOf);
+  const signedBase = opt("--signed-url", undefined);
   if (!urls.length) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
   const unknown = unknownPages(args);
   if (unknown.length) { console.error(`verify: no such page: ${unknown.join(", ")} (pages: ${PAGES.join(", ")})`); process.exit(2); }
@@ -417,7 +431,7 @@ async function main() {
       catch (e) { startup.push({ worker, reason: `seeding the demo assistants: ${String(e.message).split("\n")[0]}` }); }
       try { await warmMaps(browser, base); }
       catch (e) { startup.push({ worker, reason: `warming the map data: ${String(e.message).split("\n")[0]}` }); }
-      return { browser, base, approveUrl, now, images, out };
+      return { browser, base, signedBase, approveUrl, now, images, out };
     },
     work: (v, env) => runVisit(env, v),
     release: (env) => env.browser.close(),
