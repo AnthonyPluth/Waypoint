@@ -13,6 +13,7 @@ actor ServerSession {
     private var tokens: Tokens?
     private var open = false
     private var webSessionExpiresAt: Date?
+    private let renewals = SingleFlight<String>()
 
     init() {
         if let data = Keychain.get(Self.serverKey), let text = String(data: data, encoding: .utf8) {
@@ -42,15 +43,22 @@ actor ServerSession {
     }
 
     func accessToken() async throws -> String {
+        guard server != nil, let current = tokens else { throw ServerError.signedOut }
+        if current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
+        return try await renewals.run { [self] in try await renewAccessToken() }
+    }
+
+    private func renewAccessToken() async throws -> String {
         guard let server, let current = tokens else { throw ServerError.signedOut }
         if current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
         let endpoints = try await ServerClient.endpoints(server)
         do {
             let renewed = try await ServerClient.refresh(current.refreshToken, endpoints: endpoints)
+            guard self.server == server, tokens == current else { throw ServerError.signedOut }
             keep(server: server, tokens: renewed)
             return renewed.accessToken
         } catch ServerError.signedOut {
-            forgetTokens()
+            if self.server == server, tokens == current { forgetTokens() }
             throw ServerError.signedOut
         }
     }
@@ -85,17 +93,14 @@ actor ServerSession {
     }
 
     func retryPendingRevocations() async {
-        var remaining: [PendingRevocation] = []
         for pending in pendingRevocations() {
             guard let server = URL(string: pending.server), let endpoints = try? await ServerClient.endpoints(server) else {
-                remaining.append(pending)
                 continue
             }
-            if await !ServerClient.revoke(pending.refreshToken, endpoints: endpoints) {
-                remaining.append(pending)
+            if await ServerClient.revoke(pending.refreshToken, endpoints: endpoints) {
+                savePending(PendingRevocation.removing(pending, from: pendingRevocations()))
             }
         }
-        savePending(remaining)
     }
 
     private func pendingRevocations() -> [PendingRevocation] {
@@ -162,6 +167,22 @@ struct PendingRevocation: Codable, Equatable {
 
     static func adding(_ new: PendingRevocation, to list: [PendingRevocation]) -> [PendingRevocation] {
         list.contains(new) ? list : list + [new]
+    }
+
+    static func removing(_ done: PendingRevocation, from list: [PendingRevocation]) -> [PendingRevocation] {
+        list.filter { $0 != done }
+    }
+}
+
+actor SingleFlight<Value: Sendable> {
+    private var inFlight: Task<Value, Error>?
+
+    func run(_ work: @escaping @Sendable () async throws -> Value) async throws -> Value {
+        if let inFlight { return try await inFlight.value }
+        let task = Task { try await work() }
+        inFlight = task
+        defer { inFlight = nil }
+        return try await task.value
     }
 }
 
