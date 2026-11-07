@@ -12,6 +12,7 @@ dependencies = [
     "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
     "python-dateutil (>=2.9,<3.0)",      # month arithmetic (waypoint/dates.py)
     "httpx[http2] (>=0.28.1,<0.29.0)",
+    "tzdata (>=2026.4)",                 # zoneinfo falls back to this when the host lacks a zone
 ]
 
 [tool.poetry]

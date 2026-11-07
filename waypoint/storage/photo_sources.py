@@ -116,6 +116,10 @@ def mark(conn: db.Connection, source_id: int, status: Status, error: str | None 
     return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused, *same_key, *unchanged).values(**values)).rowcount) > 0
 
 
+def lock(conn: db.Connection, source_id: int) -> bool:
+    return int(conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(status=PhotoSource.status)).rowcount) > 0
+
+
 def status(conn: db.Connection, source_id: int) -> Status | None:
     found = conn.execute(select(PhotoSource.status).where(PhotoSource.id == source_id)).scalar()
     return found if found in STATUSES else None
@@ -139,9 +143,9 @@ def source_for_provider(conn: db.Connection, source_id: int) -> Unlocked | None:
 
 
 def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
-    removed = exists().where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
+    removed = exists().where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,   # nosemgrep: waypoint-photo-access -- the per-source counts, which domain/photosources.py shows only to those who act for the source's person
                              PhotoExclusion.trip_id == Photo.trip_id)
-    rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))
+    rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))   # nosemgrep: waypoint-photo-access -- the per-source counts, which domain/photosources.py shows only to those who act for the source's person
                         .join(PhotoSource, PhotoSource.id == Photo.source_id)
                         .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP), ~removed).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
