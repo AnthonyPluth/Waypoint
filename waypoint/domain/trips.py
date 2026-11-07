@@ -5,7 +5,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Literal, NotRequired, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import delete, select, update
@@ -13,8 +13,11 @@ from sqlalchemy import delete, select, update
 from .. import dates
 from ..storage import db, gate_codes, geocode, reference, stored_mail
 from ..storage.models import Segment, SegmentPort, SegmentRecipient, SegmentTraveler, Trip
-from . import airports, links, logos, money, people, place_zones, regions, trippeople, visibility
+from . import airports, links, logos, money, people, photogrants, place_zones, regions, trippeople, visibility
 from .visibility import Viewer
+
+if TYPE_CHECKING:
+    pass
 
 Kind = Literal["flight", "hotel", "car", "train", "cruise", "parking", "visit"]
 Status = Literal["confirmed", "changed", "cancelled"]
@@ -812,6 +815,10 @@ def destination_facts(conn: db.Connection, viewer: Viewer, trip_id: int, name: s
     return {"name": name or trip.name, "stops": stops}
 
 
+def _before(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, photogrants.Before]:
+    return photogrants.snapshot(conn, trip_ids)
+
+
 def refresh(conn: db.Connection, trip: Trip) -> None:
     segs = list(conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id)).all())
     live = [s for s in segs if s.status != "cancelled"] or segs
@@ -876,11 +883,16 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
         trip = visibility.visible_trip(conn, viewer, trip_id)
         if trip is None:
             return None
+        photogrants.lock_trips(conn, [trip.id])
+        windows = _before(conn, [trip.id])
     else:
         first, last = _dates(values["start_local"] or "", values["end_local"] or "")
         leg = (values["origin"], values["destination"]) if values["kind"] in ("flight", "train") else None
         found = choose_trip(_candidates(conn, viewer), Facts(first, last, _involves(travelers, viewer.person_id), leg))
         trip = visibility.visible_trip(conn, viewer, found) if found is not None else None
+        if trip is not None:
+            photogrants.lock_trips(conn, [trip.id])
+        windows = _before(conn, [trip.id]) if trip is not None else {}
         if trip is None:
             place = _headline(conn, values)
             trip = Trip(name=_name_for(place, values["start_local"] or ""), destination=place, auto=True,
@@ -907,6 +919,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
     refresh(conn, trip)
     if before is not None and trip.name == before and (renamed := _auto_name(conn, trip)):
         trip.name = renamed
+    photogrants.trips_changed(conn, [trip.id], windows)
     return _after_change(conn, seg, viewer)
 
 
@@ -924,6 +937,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
         return None
+    photogrants.lock_trips(conn, [seg.trip_id])
+    windows = _before(conn, [seg.trip_id])
     old = effective_travelers(conn, seg)
     ports_before = ports_of(conn, [seg.id]).get(seg.id, [])
     before = _current(seg, old, ports_before)
@@ -976,6 +991,7 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     trip = conn.orm.get(Trip, seg.trip_id)
     if trip:
         refresh(conn, trip)
+    photogrants.trips_changed(conn, [seg.trip_id], windows)
     return _after_change(conn, seg, viewer)
 
 
@@ -1166,6 +1182,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             touched.append(added["id"])
         return "added"
     seg = found[0]
+    photogrants.lock_trips(conn, [seg.trip_id])
+    windows = _before(conn, [seg.trip_id])
     if touched is not None:
         touched.append(seg.id)
     filled_times = _stored_dated_only(seg) and not _incoming_dated_only(values, fields.get("details") or {}) and _same_days(seg, values)
@@ -1236,6 +1254,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     trip = conn.orm.get(Trip, seg.trip_id)
     if trip:
         refresh(conn, trip)
+    photogrants.trips_changed(conn, [seg.trip_id], windows)
     return "updated" if changed else "unchanged"
 
 
@@ -1282,15 +1301,19 @@ def delete_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> bool
     if seg is None:
         return False
     trip_id = seg.trip_id
+    photogrants.lock_trips(conn, [trip_id])
+    windows = _before(conn, [trip_id])
     conn.execute(delete(Segment).where(Segment.id == seg.id))
     stored_mail.prune(conn)
     trip = conn.orm.get(Trip, trip_id)
     if trip:
         left = conn.orm.scalars(select(Segment.id).where(Segment.trip_id == trip_id)).first()
         if left is None and trip.auto:
+            photogrants.trip_deleted(conn, trip_id)
             conn.execute(delete(Trip).where(Trip.id == trip_id))
         else:
             refresh(conn, trip)
+            photogrants.trips_changed(conn, [trip_id], windows)
     return True
 
 
@@ -1367,6 +1390,7 @@ def create_trip(conn: db.Connection, viewer: Viewer, fields: TripIn, confirmed: 
     conn.orm.add(trip)
     conn.orm.flush()
     trippeople.add(conn, trip.id, wanted)
+    photogrants.trips_changed(conn, [trip.id])
     return _trip_outs(conn, viewer, [trip])[0]
 
 
@@ -1376,6 +1400,8 @@ def edit_trip(conn: db.Connection, viewer: Viewer, trip_id: int, fields: TripIn,
         return None
     if "start_date" in fields or "end_date" in fields:
         raise Invalid("A trip’s dates come from its segments")
+    photogrants.lock_trips(conn, [trip.id])
+    windows = _before(conn, [trip.id])
     if "people" in fields:
         _set_people(conn, viewer, trip, fields["people"], confirmed)
     if "name" in fields:
@@ -1387,6 +1413,7 @@ def edit_trip(conn: db.Connection, viewer: Viewer, trip_id: int, fields: TripIn,
         trip.notes = fields["notes"]
     conn.orm.flush()
     refresh(conn, trip)
+    photogrants.trips_changed(conn, [trip.id], windows)
     return _trip_outs(conn, viewer, [trip])[0]
 
 
@@ -1394,6 +1421,7 @@ def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return False
+    photogrants.trip_deleted(conn, trip.id)
     conn.execute(delete(Trip).where(Trip.id == trip.id))
     stored_mail.prune(conn)
     return True
@@ -1422,6 +1450,9 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
         return None
     if not viewer.household and not confirmed:
         _merge_needs_confirmation(conn, trip, other)
+    photogrants.lock_trips(conn, [trip.id, other.id])
+    photogrants.lock_grants_for(conn, [trip.id, other.id])
+    windows = _before(conn, [trip.id])
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))
@@ -1437,9 +1468,11 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     trip.notes = trip.notes or other.notes
     trip.booked_by = trip.booked_by if trip.booked_by is not None else other.booked_by
     conn.orm.flush()
+    refresh(conn, trip)
+    photogrants.merged(conn, trip.id, other.id)
     conn.execute(delete(Trip).where(Trip.id == other.id))
     conn.orm.expire(trip)
-    refresh(conn, trip)
+    photogrants.trips_changed(conn, [trip.id], windows)
     return _trip_outs(conn, viewer, [trip])[0]
 
 
@@ -1453,6 +1486,8 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
         raise Invalid("Choose segments of this trip to move to a new trip")
     if moving == mine:
         raise Invalid("Leave at least one segment in this trip")
+    photogrants.lock_trips(conn, [trip.id])
+    windows = _before(conn, [trip.id])
     new = Trip(name=f"{trip.name} (split)", destination=None, auto=False, booked_by=viewer.person_id)
     conn.orm.add(new)
     conn.orm.flush()
@@ -1470,6 +1505,8 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     conn.orm.expire_all()
     refresh(conn, trip)
     refresh(conn, new)
+    photogrants.split(conn, trip.id, new.id)
+    photogrants.trips_changed(conn, [trip.id, new.id], windows)
     return _trip_outs(conn, viewer, [new])[0]
 
 
@@ -1502,6 +1539,9 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
     if trip_id == seg.trip_id:
         raise Invalid("It’s already in that trip")
     source = conn.orm.get(Trip, seg.trip_id)
+    photogrants.lock_trips(conn, [seg.trip_id, *([trip_id] if trip_id is not None else [])])
+    photogrants.lock_grants_for(conn, [seg.trip_id, *([trip_id] if trip_id is not None else [])])
+    windows = _before(conn, [seg.trip_id, *([trip_id] if trip_id is not None else [])])
     target: Trip | None
     if trip_id is None:
         if conn.orm.scalars(select(Segment.id).where(Segment.trip_id == seg.trip_id, Segment.id != seg.id)).first() is None:
@@ -1526,12 +1566,15 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
     conn.orm.expire_all()
     trippeople.keep_lists_inside(conn, target.id)
     refresh(conn, target)
+    photogrants.trips_changed(conn, [target.id], windows)
     left = conn.orm.scalars(select(Segment.id).where(Segment.trip_id == source.id)).first() if source else None
     if source is not None:
         if left is None:
+            photogrants.trip_deleted(conn, source.id)
             conn.execute(delete(Trip).where(Trip.id == source.id))
         else:
             refresh(conn, source)
+            photogrants.trips_changed(conn, [source.id], windows)
     return _trip_outs(conn, viewer, [conn.orm.get(Trip, target.id) or target])[0]
 
 
@@ -1556,6 +1599,9 @@ def name_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int, person_
     same = [t for t in visibility.visible_unmatched(conn, viewer) if people.normalize(t.name or "") == people.normalize(printed)] or [row]
     done = 0
     trip_ids: set[int] = set()
+    touched_trips = [s.trip_id for s in conn.orm.scalars(select(Segment).where(Segment.id.in_([t.segment_id for t in same]))).all()]
+    photogrants.lock_trips(conn, touched_trips)
+    windows = _before(conn, touched_trips)
     for t in same:
         owner = conn.orm.get(Segment, t.segment_id)
         if owner is not None:
@@ -1570,6 +1616,7 @@ def name_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int, person_
     conn.orm.flush()
     for trip_id in sorted(trip_ids):
         trippeople.keep_lists_inside(conn, trip_id)
+    photogrants.trips_changed(conn, trip_ids, windows)
     if printed:
         people.add_alias(conn, person_id, printed)
     return done
