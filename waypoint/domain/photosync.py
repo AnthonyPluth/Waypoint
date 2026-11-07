@@ -159,10 +159,13 @@ def _syncs(conn: db.Connection, source_id: int) -> dict[int, PhotoTripSync]:
     return {s.trip_id: s for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == source_id)).all()}
 
 
-def _prepare(run: _Run, restart: bool, started: float | None = None) -> None:
+def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
     conn = run.conn
     conn.orm.expire_all()
     photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
+    if not _same_person(run):
+        conn.commit()
+        return False
     conn.orm.expire_all()
     run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
     if restart and run.windows:
@@ -200,6 +203,7 @@ def _prepare(run: _Run, restart: bool, started: float | None = None) -> None:
         if (taken_away or moved) and not photos.re_place(conn, p, run.person, windows, left_out, run.home):
             run.summary.deleted += 1
     conn.commit()
+    return True
 
 
 def _upsert(run: _Run, asset: immich.Asset, row: Photo | None, windows: list[TripWindow], left_out: set[int]) -> None:
@@ -384,7 +388,8 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, photos.home_in(conn), {}, summary, sealed)
     started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
-    _prepare(job, fresh, started if not fresh else None)
+    if not _prepare(job, fresh, started if not fresh else None):
+        return summary
     if fresh and not job.windows:
         started = None
     windows = job.windows
