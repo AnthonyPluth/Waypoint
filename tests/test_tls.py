@@ -452,7 +452,7 @@ class DnsDeadlineTests(unittest.TestCase):
         self.assertIsInstance(caught.exception.reason, socket.gaierror)
 
     def test_lookups_at_the_cap_fail_at_once_with_a_message_of_their_own(self):
-        resolver, started, _ = self.blocked_resolver()
+        resolver, started, release = self.blocked_resolver()
         with mock.patch.object(socket, "getaddrinfo", resolver), mock.patch.object(tls, "_LOOKUPS", threading.BoundedSemaphore(1)):
             first = threading.Thread(target=lambda: self.open_quietly(time.monotonic() + 3), daemon=True)
             first.start()
@@ -463,6 +463,7 @@ class DnsDeadlineTests(unittest.TestCase):
             self.assertLess(time.monotonic() - began, 1.0)
             self.assertIsInstance(caught.exception.reason, TimeoutError)
             self.assertEqual(str(caught.exception.reason), "too many name lookups are waiting")
+        release.set()
         first.join(5)
         self.assertFalse(first.is_alive())
 
