@@ -35,7 +35,7 @@ BLOCKED = [
     "GET /api/home", "POST /api/home", "DELETE /api/home", "POST /api/show-costs",
     "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}", "GET /api/photos/{id}/thumbnail", "GET /api/photos/{id}/preview", "GET /api/photos/{id}/original",
     "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}", "DELETE /api/photo-sources/{id}",
-    "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync",
+    "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync", "GET /api/photo-sources/{id}/resume",
     "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
     "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/photo-grants", "POST /api/photo-sharing-prefs/{id}",
 ]

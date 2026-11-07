@@ -25,7 +25,29 @@ KEY = "canary-immich-key-5m7p2w"
 NEW_KEY = "canary-immich-key-second-x1"
 ACCOUNT = immich.Account(user_id="immich-user-canary-1", name="Ana Example", email="ana@immich.example")
 OTHER = immich.Account(user_id="immich-user-canary-2", name="Someone Else", email=None)
-PATTERNS = ("/api/photo-sources", "/api/photo-sources/test", "/api/photo-sources/{id}", "/api/photo-sources/{id}/test", "/api/photo-sources/{id}/sync")
+PATTERNS = ("/api/photo-sources", "/api/photo-sources/test", "/api/photo-sources/{id}", "/api/photo-sources/{id}/test", "/api/photo-sources/{id}/sync",
+            "/api/photo-sources/{id}/resume")
+LATER = {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}
+CANARY_ASSET = "0a000000-0000-4000-8000-00000000c4a1"
+
+
+def item(number, taken="2026-06-02T09:00:00.000Z", owner=ACCOUNT.user_id, gps=None, ident=None):
+    lat, lon = gps or (None, None)
+    return {"id": ident or f"0a000000-0000-4000-8000-{number:012d}", "type": "IMAGE", "ownerId": owner, "localDateTime": taken, "fileCreatedAt": taken,
+            "updatedAt": "2026-06-20T00:00:00.000Z", "exifInfo": {"timeZone": None, "latitude": lat, "longitude": lon, "state": None, "country": None}}
+
+
+def library(*pages):
+    asked = []
+
+    def search(source, taken_after, taken_before, *, updated_after=None, page=1):
+        asked.append((source, taken_after, taken_before, page))
+        index = min(len(asked), len(pages)) - 1
+        items = pages[index]
+        return immich.parse_page({"assets": {"items": items, "nextPage": str(page + 1) if index < len(pages) - 1 else None}}, page, source.user_id)
+    patched = mock.patch.object(immich, "search", side_effect=search)
+    patched.asked = asked
+    return patched
 
 
 def ping(result=ACCOUNT):
@@ -362,8 +384,8 @@ class SourceRoutes(RouteCase):
             self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
         self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
 
-    def shared(self, who, scope="trip", revoked=None):
-        trip = self.book(who, travelers=[{"person_id": self.person[who]}])["trip_id"]
+    def shared(self, who, scope="trip", revoked=None, segment=None):
+        trip = self.book(who, segment or OUT, travelers=[{"person_id": self.person[who]}])["trip_id"]
         with db.session() as conn:
             conn.orm.add(PhotoGrant(person_id=self.person[who], trip_id=trip, scope=scope, revoked=revoked, changed=1.0, granted_by=f"sub-{who}"))
             conn.orm.flush()
@@ -382,17 +404,143 @@ class SourceRoutes(RouteCase):
             self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
         self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
 
-    def test_resuming_under_an_active_trip_grant_waits_for_a_confirmation_that_is_not_here_yet(self):
+    def resume(self, source_id, seen, who="ana"):
+        return self.call(who, "POST", f"/api/photo-sources/{source_id}", {"paused": False, "grants": seen["grants"], "sources": seen["sources"]})
+
+    def check(self, source_id, *pages, who="ana"):
+        patched = library(*pages)
+        with patched:
+            got = self.call(who, "GET", f"/api/photo-sources/{source_id}/resume")
+        self.asked = patched.asked
+        return got
+
+    def test_resuming_under_an_active_trip_grant_shows_the_count_and_needs_the_snapshot(self):
         made = self.connect()
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
-        self.shared("ana")
-        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (409, {"error": photosources.RESUME_ASKS}))
+        trip = self.shared("ana")
+        quiet = self.shared("ana", scope="only_me", segment=LATER)
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ana"], asset_id=item(3)["id"], trip_id=trip, created=2.0, was_trip_id=None))
+            conn.orm.flush()
+            window = photos.window_out(photos.trip_window(conn, trip))
+        status, seen = self.check(made["id"], [item(1), item(2), item(2), item(3), item(4, owner="partner-canary"), item(5, taken="2026-03-01T09:00:00.000Z")])
+        self.assertEqual(status, 200, seen)
+        self.assertEqual(seen, {"asks": True, "count": 2, "grants": [{"trip_id": trip, "changed": 1.0, "window": window}],
+                                "sources": [{"id": made["id"], "status": "off"}]})
+        self.assertNotIn(quiet, [g["trip_id"] for g in seen["grants"]])
+        self.assertEqual(len(self.asked), 1)
+        self.assertEqual(self.asked[0][0], immich.Source(url=URL, key=KEY, allow_http=False, user_id=ACCOUNT.user_id))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (400, {"error": photosources.NEEDS_RESUME_SNAPSHOT}))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False, "grants": seen["grants"]}),
+                         (400, {"error": photosources.NEEDS_RESUME_SNAPSHOT}))
+        for bad in ({"grants": "x"}, {"grants": [{"trip_id": True, "changed": 1.0}]}, {"grants": [{"trip_id": trip, "changed": "1"}]},
+                    {"grants": [{"trip_id": trip, "changed": 1.0, "window": "x"}]}, {"sources": [{"id": "x"}]}):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False, **bad})[0], 400)
         self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True, "label": "Still off"})["status"], "off")
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"label": "Named"})["status"], "off")
+        status, got = self.resume(made["id"], seen)
+        self.assertEqual((status, got["status"], got["label"]), (200, "ok", "Named"))
+        self.assertEqual(self.check(made["id"]), (200, {"asks": False, "count": 0, "grants": seen["grants"], "sources": [{"id": made["id"], "status": "ok"}]}))
+        self.assertEqual(self.asked, [])
         theirs = self.connect(who="ben")
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": True})["status"], "off")
+        self.assertEqual(self.check(theirs["id"], who="ben"), (200, {"asks": False, "count": 0, "grants": [], "sources": [{"id": theirs["id"], "status": "off"}]}))
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": False})["status"], "ok")
+
+    def test_a_connection_under_a_trip_grant_asks_even_when_it_would_add_no_photos(self):
+        trip = self.shared("ana")
+        made = self.connect()
+        self.assertEqual(made["status"], "off")
+        status, seen = self.check(made["id"], [])
+        self.assertEqual((status, seen["asks"], seen["count"], [g["trip_id"] for g in seen["grants"]]), (200, True, 0, [trip]))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (400, {"error": photosources.NEEDS_RESUME_SNAPSHOT}))
+        self.assertEqual(self.resume(made["id"], seen)[1]["status"], "ok")
+
+    def test_a_count_is_walked_page_by_page_and_a_page_on_one_instant_fails_it(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        status, seen = self.check(made["id"], [item(1, "2026-06-02T08:00:00.000Z"), item(2, "2026-06-02T09:00:00.000Z")],
+                                  [item(2, "2026-06-02T09:00:00.000Z"), item(3, "2026-06-02T10:00:00.000Z")])
+        self.assertEqual((status, seen["count"]), (200, 3))
+        self.assertEqual([(a[1].isoformat(), a[3]) for a in self.asked][1], ("2026-06-02T09:00:00+00:00", 1))
+        status, got = self.check(made["id"], [item(1), item(2)], [item(3)])
+        self.assertEqual((status, got), (502, {"error": photosources.TOO_DENSE}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.TOO_DENSE))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (400, {"error": photosources.NEEDS_RESUME_SNAPSHOT}))
+
+    def test_a_count_immich_refuses_or_runs_out_of_time_shows_no_number(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        with mock.patch.object(immich, "search", side_effect=immich.Refused(immich.REFUSED)):
+            self.assertEqual(self.call("ana", "GET", f"/api/photo-sources/{made['id']}/resume"), (400, {"error": immich.REFUSED}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", immich.REFUSED))
+        with mock.patch.object(photosources, "COUNT_SECONDS", 0.0), library([item(1)]) as searched:
+            self.assertEqual(self.call("ana", "GET", f"/api/photo-sources/{made['id']}/resume"), (502, {"error": immich.TOO_SLOW}))
+        searched.assert_not_called()
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(api_key="enc:v1:not-a-token"))
+        self.assertEqual(self.check(made["id"], [item(1)]), (400, {"error": photosources.KEY_LOST}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+
+    def test_a_snapshot_taken_before_the_trip_grants_or_libraries_changed_is_refused(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        trip = self.shared("ana")
+        fresh = lambda: self.check(made["id"], [item(1)])[1]
+        seen = fresh()
+        other = self.shared("ana", segment=LATER)
+        self.assertEqual(self.resume(made["id"], seen), (409, {"error": photosources.STALE_GRANTS}))
+        with db.session() as conn:
+            conn.execute(delete(PhotoGrant).where(PhotoGrant.trip_id == other))
+        self.assertEqual(self.resume(made["id"], {**seen, "grants": []}), (409, {"error": photosources.STALE_GRANTS}))
+        with db.session() as conn:
+            conn.execute(update(PhotoGrant).where(PhotoGrant.trip_id == trip).values(changed=5.0))
+        self.assertEqual(self.resume(made["id"], seen), (409, {"error": photosources.STALE_GRANTS}))
+        seen = fresh()
+        self.book("ana", BACK, trip_id=trip, travelers=[{"person_id": self.person["ana"]}])
+        self.assertEqual(self.resume(made["id"], seen), (409, {"error": photosources.STALE_GRANTS}))
+        seen = fresh()
+        with ping(OTHER):
+            self.ok("ana", "POST", "/api/photo-sources", {"url": LAN, "key": NEW_KEY})
+        self.assertEqual(self.resume(made["id"], seen), (409, {"error": photosources.STALE_SOURCES}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.resume(made["id"], fresh())[1]["status"], "ok")
+
+    def test_only_the_libraries_owner_asks_for_its_count(self):
+        made = self.connect(person_id=self.guest)
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        for who in ("ben", "cy"):
+            with self.subTest(who=who):
+                self.assertEqual(self.check(made["id"], [item(1)], who=who), (404, {"error": photosources.NO_SOURCE}))
+                self.assertEqual(self.asked, [])
+        self.assertEqual(self.check(99999, [item(1)]), (404, {"error": photosources.NO_SOURCE}))
+        self.assertEqual(self.check(made["id"], [item(1)])[0], 200)
+
+    def test_a_demo_library_is_counted_without_asking_immich(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(url=photosources.photoqueue.DEMO))
+        status, seen = self.check(made["id"], [item(1)])
+        self.assertEqual((status, seen["asks"], seen["count"], self.asked), (200, True, 0, []))
+        self.assertEqual(self.resume(made["id"], seen)[1]["status"], "ok")
+
+    def test_the_count_says_nothing_of_the_key_or_the_photos(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        with no_leaks(self, KEY, CANARY_ASSET, database=self.path):
+            status, seen = self.check(made["id"], [item(1, ident=CANARY_ASSET)])
+            self.assertEqual((status, seen["count"]), (200, 1))
+            with mock.patch.object(immich, "search", side_effect=immich.Unavailable(immich.UNREACHABLE)):
+                self.assertEqual(self.call("ana", "GET", f"/api/photo-sources/{made['id']}/resume")[0], 502)
+            self.assertEqual(self.resume(made["id"], seen)[1]["status"], "ok")
+        self.assertNotIn(CANARY_ASSET, json.dumps(seen))
 
     def test_a_key_that_can_no_longer_be_unlocked_asks_to_be_entered_again(self):
         made = self.connect()
@@ -511,7 +659,7 @@ class SnapshotRoutes(RouteCase):
         self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **stale}), (409, {"error": photogrants.STALE_SOURCES}))
         self.assertEqual(self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **self.snapshot(self.sharing())})["state"], "shared")
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": True})["status"], "off")
-        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": False}), (409, {"error": photosources.RESUME_ASKS}))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": False}), (400, {"error": photosources.NEEDS_RESUME_SNAPSHOT}))
 
     def test_share_on_all_confirmed_before_someone_joined_a_pending_trip_is_refused_by_the_route(self):
         seen = self.sharing()

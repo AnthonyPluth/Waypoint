@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-117 routes; 0 have no test yet.
+118 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -49,6 +49,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `DELETE /api/photo-sources/{id}` | `photos.py:api_photo_source_remove` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photo-sources/{id}/resume` | `photos.py:api_photo_source_resume` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_set` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_stop` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |

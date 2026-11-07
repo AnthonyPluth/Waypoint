@@ -69,7 +69,7 @@ def _audience_matches(conn: db.Connection, trip_id: int, seen: Sequence[object])
     return wanted == set(audience_of(conn, trip_id))
 
 
-def _sources_match(conn: db.Connection, person_id: int, seen: Sequence[Mapping[str, object]]) -> bool:
+def sources_match(conn: db.Connection, person_id: int, seen: Sequence[Mapping[str, object]]) -> bool:
     try:
         wanted = {(int(str(s["id"])), str(s["status"])) for s in seen}
     except (KeyError, TypeError, ValueError):
@@ -265,7 +265,7 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
         raise trips.Invalid(NEEDS_VERSION)
     if expected_changed is not None and (row is None or row.changed != expected_changed):
         raise Stale(STALE_SHARE)
-    if sources is not None and not _sources_match(conn, person_id, sources):
+    if sources is not None and not sources_match(conn, person_id, sources):
         raise Stale(STALE_SOURCES)
     _write(conn, person_id, trip.id, scope, by, time.time() if now is None else now)
     _re_place_automatic(conn, trip.id, person_id)
@@ -432,7 +432,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
         raise Stale(STALE_SETTING)
     if audiences is not None and any(str(t) not in audiences or not _audience_matches(conn, t, audiences[str(t)]) for t in pending):
         raise Stale(STALE_SETTING)
-    if sources is not None and share_all and not was_on and not _sources_match(conn, person_id, sources):
+    if sources is not None and share_all and not was_on and not sources_match(conn, person_id, sources):
         raise Stale(STALE_SOURCES)
     db.insert_ignore(conn, PhotoSharingPrefs, {"person_id": person_id, "default_scope": photos.ONLY_ME, "share_all": False, "set_by": None, "share_all_since": None,
                                                "steward_sub": None}, key=["person_id"])

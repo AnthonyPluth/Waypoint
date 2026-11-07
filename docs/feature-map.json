@@ -608,6 +608,19 @@
     },
     {
       "method": "GET",
+      "path": "/api/photo-sources/{id}/resume",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_resume",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing",
       "web": [],
