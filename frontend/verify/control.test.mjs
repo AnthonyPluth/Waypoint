@@ -17,6 +17,8 @@ describe("parseArgs", () => {
     expect(c.parseArgs(["click", "button", "Save", "--nth", "2"])).toEqual({ command: "click", args: ["button", "Save"], options: { nth: 2, timeout: 10000 }, text: false, help: false });
     expect(c.parseArgs(["start", "--viewport=desktop", "--anyway", "--text"]).options).toMatchObject({ viewport: "desktop", anyway: true, "idle-minutes": 30 });
     expect(c.parseArgs(["start", "--text"]).text).toBe(true);
+    expect(c.parseArgs(["start", "--signed-in", "jane"]).options).toMatchObject({ "signed-in": "jane" });
+    expect(c.parseArgs(["start"]).options["signed-in"]).toBeUndefined();
   });
 
   it("passes everything after -- as arguments", () => {
@@ -40,6 +42,7 @@ describe("parseArgs", () => {
     expect(usage(["goto", "a", "b"])?.message).toMatch(/goto takes <route>/);
     expect(usage(["viewport", "tablet"])?.message).toBe("viewport takes phone or desktop or laptop or wide or zoomed, not \"tablet\"");
     expect(usage(["start", "--viewport", "tablet"])?.message).toMatch(/--viewport is phone or desktop/);
+    expect(usage(["start", "--signed-in", "admin"])?.message).toMatch(/--signed-in is jane or sam/);
     expect(usage(["click", "x", "--nth", "two"])?.message).toMatch(/--nth is a number/);
     expect(usage(["click", "x", "--nth"])?.message).toBe("--nth needs a value");
     expect(usage(["stop", "--dry-run=yes"])?.message).toBe("--dry-run takes no value");

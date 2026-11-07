@@ -213,7 +213,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _user(self, renew: bool = False) -> dict | None:
         if not oidc.enabled():
-            return {"name": None, "email": None, "local": True}
+            return oidc.verify_user() or {"name": None, "email": None, "local": True}
         token = self._cookie("waypoint_session")
         with db.session() as conn:
             user = oidc.session_user(conn, token)

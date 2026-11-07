@@ -74,6 +74,20 @@ def enabled() -> bool:
     return bool(os.environ.get("OIDC_ISSUER"))
 
 
+VERIFY_AS = "WAYPOINT_VERIFY_AS"
+VERIFY_MARKER = ".waypoint-verify-demo"
+VERIFY_SUBS = {"jane": "demo-jane", "sam": "demo-sam"}
+
+
+def verify_user() -> dict | None:
+    sub = VERIFY_SUBS.get(os.environ.get(VERIFY_AS, ""))
+    if not sub or enabled() or db.using_postgres() or not os.path.isfile(os.path.join(db.data_dir(), VERIFY_MARKER)):
+        return None
+    with db.session() as conn:
+        row = conn.execute(select(User.email, User.name).where(User.sub == sub)).fetchone()
+    return {"sub": sub, "email": row["email"], "name": row["name"]} if row else None
+
+
 def check_config() -> list[str]:
     c = config()
     problems = []

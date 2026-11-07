@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -227,5 +227,26 @@ describe("the assertions a screenshot must not undo", () => {
     const lost = await recheck(pageShowing("Settings"), [expectText], 1);
     expect(lost).toContain("no longer holds after the screenshot");
     expect(lost).toContain('expected "Trips" in h1, found "Settings"');
+  });
+});
+
+describe("signed_in flows", () => {
+  const ok = { name: "photos", steps: [{ goto: "#settings" }] };
+  it("takes true or false", () => {
+    expect(flowProblems({ ...ok, signed_in: true })).toEqual([]);
+    expect(flowProblems({ ...ok, signed_in: "yes" })).toEqual(["signed_in is true or false"]);
+  });
+  it("takes audit as true or false", () => {
+    expect(flowProblems({ ...ok, audit: false })).toEqual([]);
+    expect(flowProblems({ ...ok, audit: 0 })).toEqual(["audit is true or false"]);
+  });
+  it("runs a flow on the signed-in server and everything else on the local one", () => {
+    const env = { base: "http://127.0.0.1:1", signedBase: "http://127.0.0.1:2" };
+    expect(baseFor(env, { ...ok, signed_in: true })).toBe("http://127.0.0.1:2");
+    expect(baseFor(env, ok)).toBe("http://127.0.0.1:1");
+    expect(baseFor(env, { ...ok, signed_in: false })).toBe("http://127.0.0.1:1");
+  });
+  it("refuses a signed-in flow when no signed-in server was started", () => {
+    expect(() => baseFor({ base: "http://127.0.0.1:1" }, { ...ok, signed_in: true })).toThrow(/needs the signed-in demo server/);
   });
 });

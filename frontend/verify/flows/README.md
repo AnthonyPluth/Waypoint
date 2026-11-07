@@ -21,6 +21,8 @@ Each `*.json` file here is a flow that `make verify` runs after visiting the pag
 - `viewports` defaults to phone and desktop. `laptop` (1024 px), `wide` (1440 px) and `zoomed` (853 px, a 1280 px window at 150% zoom) are there for a flow that lists them. The app is dark only, so every flow runs in the dark colour scheme.
 - `host` (default the server’s own address, 127.0.0.1) opens the flow on another name for the same server. Passkeys need a host name such as `localhost`, not an IP address.
 - `phone_agent` (true) makes the phone-width visit look like an iPhone to the page, for features that only show on a phone (the app’s own `isMobile()` reads the user agent). Desktop visits are unchanged.
+- `signed_in` (true) runs the flow on a demo server where every request is the signed-in demo member Jane, so the photo routes answer (in the default local mode they answer 404). make verify starts that server, with its own copy of the data, only when a flow asks for it; `tools/control flow` needs a session started with `start --signed-in jane`. Flows that set it share one server, so keep them from depending on each other's changes. The flow's images go to `artifacts/verify/`, like any flow's.
+- `audit` (false) skips the accessibility audit of the page the flow ends on, for a flow that ends on something that isn't an app page (a JSON reply or an image). Leave it out for every flow that ends in the app.
 - `allow_console` (a list of texts) names console errors a flow expects, such as the browser’s own “net::ERR_INTERNET_DISCONNECTED” while it is offline on purpose.
 
 A flow ends with a screenshot, and fails the run on a failed step, a console error or a 5xx response.
@@ -31,7 +33,7 @@ A step has one action and an optional `timeout` in milliseconds (default 10000).
 
 **Moving around and interacting**
 
-- `{"goto": "#route"}` opens a route of the app (or a full URL).
+- `{"goto": "#route"}` opens a route of the app, `{"goto": "/api/…"}` a path of the same server (a JSON reply or an image shows as the browser shows it), or a full URL.
 - `{"click": selector}`, `{"fill": {"selector": …, "text": …}}` and `{"press": {"selector": …, "key": "Enter"}}`.
 - `{"hover": selector}` moves the pointer over it; the hover state shows in the next screenshot.
 - `{"select": {"selector": "label:has-text('What is it') select", "index": 1}}` chooses an option of a `<select>` by its position.

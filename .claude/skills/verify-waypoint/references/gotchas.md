@@ -51,3 +51,9 @@ What usually goes wrong when driving Waypoint with `tools/control`, and what to 
 - More than one visible match is an error that lists them. Pick one with `--nth`, or name it more exactly.
 - Text that starts with `-` goes after `--`: `type textbox Amount -- -5`.
 - The flows use Playwright selectors (`a[href^='#trip/'] >> visible=true`); a target that starts like a selector (`#id`, `.class`, `[attr]`, `tag[attr]`, `css=`, `text=`) is used as one.
+
+## Photos need a signed-in session
+
+- The default session is the local user, and the photo routes (`/api/trips/{id}/photos`, `/api/photos/…`, `/api/photo-sources`) answer 404 "Photos are off without sign-in" there, by design. To drive them on the demo photos, `tools/control start --signed-in jane` (or `sam`): every request on that session's demo server is that member. `flow photos-signed-in` needs it and says so when the session isn't.
+- It is for the verify tooling only: the server honours it only on demo data the tool seeded, with no sign-in configured and no Postgres, so it does nothing in a real run. Don't copy a signed-in session's data anywhere else.
+- The web app has no photo screens yet, so a signed-in session drives the API in the browser (`goto /api/…`, `eval --write` for a POST such as `/api/photo-sources/{id}/test`).
