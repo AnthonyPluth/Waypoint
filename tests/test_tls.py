@@ -413,6 +413,16 @@ class DnsDeadlineTests(unittest.TestCase):
         self.addCleanup(server.shutdown)
         return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", server.server_address)]
 
+    def wait_for_lookup_slots(self):
+        held = 0
+        try:
+            while held < tls.MAX_LOOKUPS:
+                self.assertTrue(tls._LOOKUPS.acquire(timeout=5))
+                held += 1
+        finally:
+            for _ in range(held):
+                tls._LOOKUPS.release()
+
     def test_a_late_answer_never_reaches_a_later_request(self):
         accepted: list = []
         late = self.serving(b"late", accepted)
@@ -432,7 +442,7 @@ class DnsDeadlineTests(unittest.TestCase):
             self.assertIsInstance(caught.exception.reason, TimeoutError)
             release.set()
             self.assertTrue(finished.wait(2))
-            time.sleep(0.1)
+            self.wait_for_lookup_slots()
         with mock.patch.object(socket, "getaddrinfo", return_value=own), self.open(time.monotonic() + 5) as reply:
             self.assertEqual(reply.read(), b"own")
         self.assertEqual(accepted, [b"own"])
