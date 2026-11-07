@@ -37,6 +37,31 @@ ignored = db.insert_ignore(conn, Photo, rows)
 # ruleid: waypoint-photo-access
 added = conn.orm.add(Photo(asset_id=asset_id, source_id=source_id))
 
+# ruleid: waypoint-photo-access
+counted_where = select(func.count()).filter(Photo.trip_id == trip_id)
+
+# ruleid: waypoint-photo-access
+grouped = select(PhotoSource.id).group_by(Photo.source_id)
+
+# ruleid: waypoint-photo-access
+ordered = select(PhotoSource.id).order_by(Photo.taken_utc)
+
+# ruleid: waypoint-photo-access
+having = select(PhotoSource.id).group_by(PhotoSource.id).having(func.count(Photo.id) > 1)
+
+# ruleid: waypoint-photo-access
+distinct = select(PhotoSource.id).distinct(Photo.trip_id)
+
+# ruleid: waypoint-photo-access
+orm_filtered = conn.orm.query(PhotoSource).filter(Photo.source_id == PhotoSource.id).all()
+
+# ruleid: waypoint-photo-access
+row = Photo(asset_id=asset_id, source_id=source_id)
+conn.orm.add(row)
+
+# ruleid: waypoint-photo-access
+rows = [Photo(asset_id=a, source_id=source_id) for a in assets]
+
 # ok: waypoint-photo-access
 sources = select(PhotoSource.id).where(PhotoSource.person_id == person_id)
 
