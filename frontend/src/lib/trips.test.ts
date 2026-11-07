@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -473,6 +473,36 @@ describe("the route progress", () => {
   it("keeps the plane at the origin for a segment with no times", () => {
     expect(routeProgress(segment({ details: { time_unknown: "yes" } }), dep + 3_600_000)).toBe(0);
     expect(routeProgress(segment({ start_local: "soon" }), dep)).toBe(0);
+  });
+});
+
+describe("shipProgress and shipLeft", () => {
+  const ship = segment({ kind: "cruise", origin: "Miami", destination: "Miami", start_local: "2026-11-21T16:00", start_zone: NY, end_local: "2026-11-28T07:00", end_zone: NY });
+  const from = at("2026-11-21T16:00", NY), to = at("2026-11-28T07:00", NY);
+  it("keeps the ship at the dock before embarking, moves it with elapsed time and rests it at the end", () => {
+    expect(shipProgress(ship, from - 3_600_000)).toBe(0);
+    expect(shipProgress(ship, from + (to - from) / 2)).toBe(0.5);
+    expect(shipProgress(ship, to + 3_600_000)).toBe(1);
+  });
+  it("keeps a cancelled or untimed cruise at the start", () => {
+    expect(shipProgress({ ...ship, status: "cancelled" }, from + (to - from) / 2)).toBe(0);
+    expect(shipProgress({ ...ship, details: { time_unknown: "yes" } }, from + (to - from) / 2)).toBe(0);
+  });
+  it("puts the tile's left edge at the line's start and its right edge at the line's end", () => {
+    expect(shipLeft(0)).toBe("calc((100% - 2.25rem) * 0)");
+    expect(shipLeft(0.5)).toBe("calc((100% - 2.25rem) * 0.5)");
+    expect(shipLeft(1)).toBe("calc((100% - 2.25rem) * 1)");
+  });
+  it("runs the solid part from the line's start to the middle of the tile", () => {
+    expect(shipTrail(0.5)).toBe("calc((100% - 2.25rem) * 0.5 + 1.125rem)");
+    expect(shipTrail(1)).toBe("calc((100% - 2.25rem) * 1 + 1.125rem)");
+    expect(shipTrail(7)).toBe(shipTrail(1));
+    expect(shipTrail(Number.NaN)).toBe(shipTrail(0));
+  });
+  it("clamps a progress outside 0 to 1 and one that isn't a number", () => {
+    expect(shipLeft(-1)).toBe(shipLeft(0));
+    expect(shipLeft(3)).toBe(shipLeft(1));
+    expect(shipLeft(Number.NaN)).toBe(shipLeft(0));
   });
 });
 

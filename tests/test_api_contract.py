@@ -458,7 +458,9 @@ class Replies(DbCase):
         self.check("DELETE /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_stop(self.c, {}, {}, trip))
         self.check("POST /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_set(self.c, {}, {"declined": True}, trip))
         self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
-        self.check("POST /api/photo-sharing-prefs/{id}", photos_api.api_photo_prefs_set(self.c, {}, {"default_scope": "trip", "share_all": True}, str(me)))
+        seen = photos_api.api_photo_sharing(self.c, {}, {}, trip)
+        self.check("POST /api/photo-sharing-prefs/{id}", photos_api.api_photo_prefs_set(self.c, {}, {"default_scope": "trip", "share_all": True, "windows": {trip: seen["window"]},
+                                                                                                    "audiences": {trip: seen["audience"]}, "sources": seen["sources"]}, str(me)))
         self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
 
     def test_photo_sources(self):

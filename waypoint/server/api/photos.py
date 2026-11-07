@@ -29,7 +29,7 @@ KEY_LIMIT = 512
 LABEL_LIMIT = 100
 NOTHING_TO_CHANGE = 'Send "key", "label" or "paused"'
 FAILED = {immich.Refused: 400, immich.NotConfigured: 400, immich.RateLimited: 503, immich.Unavailable: 502}
-REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409}
+REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409, photosources.RESUME_ASKS: 409}
 _v = validate.Validator(ApiError, not_number=NOT_A_TRIP, too_long="The {label} is too long (at most {limit} characters)")
 NOT_A_PERSON = "The person must be a whole number"
 NOT_A_SCOPE = 'Send "scope" as "only_me" or "trip"'
@@ -39,6 +39,9 @@ NOT_WINDOWS = 'Send "windows" as a map of trip ids to windows'
 NOT_A_STAMP = 'Send "expected_changed" as a number'
 RENDITION_CACHE = "private, no-cache"
 ORIGINAL_CACHE = "private, no-store"
+NOT_AN_AUDIENCE = 'Send "audience" as a list of person ids'
+NOT_AUDIENCES = 'Send "audiences" as a map of trip ids to lists of person ids'
+NOT_SOURCES = 'Send "sources" as a list of {id, status}'
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
 
 
@@ -178,9 +181,28 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
     if scope is None and not declined:
         raise ApiError(NOTHING_TO_SHARE)
     window, expected = _window(body.get("window")), _stamp(body.get("expected_changed"), NOT_A_STAMP)
+    audience, sources = _ids(body.get("audience"), NOT_AN_AUDIENCE), _sources(body.get("sources"))
     if declined:
         return _sharing(lambda: photogrants.decline(conn, who, person, trip))
-    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME, window=window, expected_changed=expected))
+    return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME, window=window, expected_changed=expected,
+                                              sources=sources, audience=audience, strict=True))
+
+
+def _ids(value: Any, label: str) -> list[int] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or any(isinstance(v, bool) or not isinstance(v, int) for v in value):
+        raise ApiError(label)
+    return [int(v) for v in value]
+
+
+def _sources(value: Any) -> list[dict[str, object]] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or any(not isinstance(s, dict) or isinstance(s.get("id"), bool) or not isinstance(s.get("id"), int)
+                                          or not isinstance(s.get("status"), str) for s in value):
+        raise ApiError(NOT_SOURCES)
+    return [{"id": int(s["id"]), "status": str(s["status"])} for s in value]
 
 
 def api_photo_sharing_stop(conn, q, _b, trip_id) -> PhotoSharing:
@@ -206,7 +228,7 @@ def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
     who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
     given = (q.get("created") or [None])[0]
     try:
-        created = float(given) if given is not None else None
+        created = validate.parse_number(given, "") if given is not None else None
     except ValueError:
         raise ApiError('Send "created" as a number') from None
     _seen(conn, who, trip)
@@ -232,8 +254,13 @@ def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs
     if given is not None and not isinstance(given, dict):
         raise ApiError(NOT_WINDOWS)
     windows = {str(k): w for k, v in given.items() if (w := _window(v)) is not None} if given is not None else None
+    heard = body.get("audiences")
+    if heard is not None and not isinstance(heard, dict):
+        raise ApiError(NOT_AUDIENCES)
+    audiences = {str(k): a for k, v in heard.items() if (a := _ids(v, NOT_AUDIENCES)) is not None} if heard is not None else None
+    sources = _sources(body.get("sources"))
     try:
-        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows), NO_TRIP)
+        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows, sources=sources, audiences=audiences, strict=True), NO_TRIP)
     except photogrants.Stale as e:
         raise ApiError(str(e), 409) from None
 

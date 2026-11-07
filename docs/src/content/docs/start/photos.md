@@ -22,6 +22,7 @@ Each library card shows its person, its host and its status: **ok**, **refused**
 - **Test** asks Immich again with the saved key and records the outcome, so a library marked refused clears once the key works.
 - **Change key** replaces the key only when the new one belongs to the same Immich account as the old one. A key for a different account is refused: remove the library and connect it again, so one person’s photos can never be re-attributed by swapping keys.
 - **Pause** stops reading the library until it is resumed; **Remove** deletes the library and the photo references Waypoint kept from it. Nothing changes in Immich.
+- A library connected while its person already shares photos with everyone on some trip starts paused, because that sharing was agreed for the libraries that were reading at the time; resuming it (or any paused library of theirs while such sharing is on) asks first, and until that confirmation exists in Waypoint the resume is refused, so no library joins a shared trip unseen.
 - **Sync now** starts a read of the library.
 
 ### Who connects whose library

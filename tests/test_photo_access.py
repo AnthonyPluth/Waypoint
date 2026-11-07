@@ -54,8 +54,24 @@ class AccessCase(RouteCase):
     def sharing(self, who, trip=None):
         return self.ok(who, "GET", f"/api/trips/{trip or self.trip}/photo-sharing")
 
+    def confirm(self, who, trip=None, person=None, scope="trip"):
+        trip = self.trip if trip is None else trip
+        query = f"?person_id={person}" if person is not None else ""
+        seen = self.ok(who, "GET", f"/api/trips/{trip}/photo-sharing{query}")
+        body = {"scope": scope, "window": seen["window"], "audience": seen["audience"], "sources": seen["sources"]}
+        if person is not None:
+            body["person_id"] = person
+        if seen["changed"] is not None:
+            body["expected_changed"] = seen["changed"]
+        return self.ok(who, "POST", f"/api/trips/{trip}/photo-sharing", body)
+
+    def setting_snapshots(self, who, trip_ids):
+        seen = {str(t): self.ok(who, "GET", f"/api/trips/{t}/photo-sharing") for t in trip_ids}
+        sources = next(iter(seen.values()))["sources"] if seen else []
+        return {"windows": {t: s["window"] for t, s in seen.items() if s["window"] is not None}, "audiences": {t: s["audience"] for t, s in seen.items()}, "sources": sources}
+
     def core(self, state):
-        return {k: v for k, v in state.items() if k not in ("window", "changed")}
+        return {k: v for k, v in state.items() if k not in ("window", "changed", "audience", "sources")}
 
     def seen_by(self, who, trip=None):
         got = self.listing(who, trip)
@@ -214,7 +230,7 @@ class RemovalTests(AccessCase):
             kept = conn.execute(select(PhotoExclusion.person_id, PhotoExclusion.trip_id)).fetchall()
         self.assertEqual(kept, [(self.person["ben"], self.trip)])
         self.assertEqual(self.ok("ben", "GET", "/api/photo-grants")["people"][0]["trips"][0]["state"], "declined")
-        again = self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip"})
+        again = self.confirm("ben")
         self.assertEqual((again["state"], again["scope"], again["count"]), ("shared", "trip", 0))
         with db.session() as conn:
             asset = conn.execute(select(PhotoExclusion.asset_id)).scalar()
@@ -228,7 +244,7 @@ class RemovalTests(AccessCase):
         self.assertEqual(self.seen_by("ana"), [self.hers])
         self.assertEqual(self.seen_by("ben"), [self.mine, self.hers])
         self.assertEqual(stored(self.mine)["trip_id"], self.trip)
-        self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip"})
+        self.confirm("ben")
         self.assertEqual(self.seen_by("ana"), [self.mine, self.hers])
         for bad in ({"scope": "everyone"}, {"scope": 1}, {}, {"declined": "yes"}, {"person_id": "x", "scope": "trip"}, {"person_id": True, "scope": "trip"}):
             self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", bad)[0], 400, bad)
@@ -239,11 +255,12 @@ class RemovalTests(AccessCase):
         self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "only_me"})
         state = self.sharing("ben")
         self.assertEqual(sorted(state["window"]), ["end", "start"])
-        stale = {"scope": "trip", "window": {"start": state["window"]["start"], "end": "2030-01-01T00:00:00+00:00"}}
+        shown = {"scope": "trip", "audience": state["audience"], "sources": state["sources"], "expected_changed": state["changed"]}
+        stale = {**shown, "window": {"start": state["window"]["start"], "end": "2030-01-01T00:00:00+00:00"}}
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", stale), (409, {"error": "The trip changed. Review who sees your photos under Your photos on this trip."}))
-        self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "expected_changed": state["changed"] + 1})[0], 409)
+        self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "window": state["window"], "expected_changed": state["changed"] + 1})[0], 409)
         self.assertEqual(self.seen_by("ana"), [self.hers])
-        got = self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", "window": state["window"], "expected_changed": state["changed"]})
+        got = self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "window": state["window"]})
         self.assertEqual(got["scope"], "trip")
         for bad in ({"scope": "trip", "window": "x"}, {"scope": "trip", "window": {"start": 1}}, {"scope": "trip", "expected_changed": "x"}, {"scope": "trip", "expected_changed": True}):
             self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", bad)[0], 400, bad)
@@ -263,7 +280,7 @@ class RemovalTests(AccessCase):
         trip = later["trip_id"]
         got = self.ok("ben", "POST", f"/api/trips/{trip}/photo-sharing", {"declined": True})
         self.assertEqual((got["state"], got["scope"]), ("declined", None))
-        self.assertEqual(self.ok("ben", "POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"})["state"], "shared")
+        self.assertEqual(self.confirm("ben", trip)["state"], "shared")
 
 
 class LookAndCandidateTests(AccessCase):
@@ -329,7 +346,7 @@ class StewardTests(AccessCase):
         self.assertEqual(self.seen_by("ana"), [])
         with db.session() as conn:
             self.assertEqual(conn.execute(select(PhotoExclusion.person_id)).scalar(), self.kid)
-        got = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.kid, "scope": "trip"})
+        got = self.confirm("ana", person=self.kid)
         self.assertEqual(got["count"], 0)
         self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{theirs}")
         self.assertEqual(self.seen_by("ben"), [theirs])
@@ -391,7 +408,8 @@ class PreferenceTests(AccessCase):
         later = self.book("ana", {**OUT, "start_local": "2027-01-01T19:00", "end_local": "2027-01-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
         booked = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])
         self.share("ana", later["trip_id"], revoked=5.0)
-        got = self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"default_scope": "trip", "share_all": True})
+        got = self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}",
+                      {"default_scope": "trip", "share_all": True, **self.setting_snapshots("ana", [self.trip, later["trip_id"]])})
         self.assertEqual(got, {"default_scope": "trip", "share_all": True})
         mine = self.ok("ana", "GET", "/api/photo-grants")["people"][0]
         self.assertEqual(mine["prefs"], got)
@@ -400,7 +418,7 @@ class PreferenceTests(AccessCase):
         with db.session() as conn:
             self.assertEqual(set(conn.execute(select(PhotoGrant.granted_by)).scalars()), {"sub-ana"})
         self.ok("ana", "DELETE", f"/api/trips/{later['trip_id']}/photo-sharing")
-        self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"share_all": True})
+        self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"share_all": True, **self.setting_snapshots("ana", [self.trip, later["trip_id"]])})
         self.assertEqual(self.sharing("ana", later["trip_id"])["state"], "declined")
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"share_all": False}), {"default_scope": "trip", "share_all": False})
         self.assertEqual(self.sharing("ana")["state"], "shared")

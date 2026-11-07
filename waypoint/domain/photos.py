@@ -84,6 +84,7 @@ class TripPhoto(TypedDict):
     match: MatchKind
     distance_km: float | None
     cluster: int | None
+    removed_at: float | None
 
 
 class PhotoCluster(TypedDict):
@@ -415,10 +416,11 @@ def removed(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Found]:
         return []
     left_out = select(PhotoExclusion.asset_id).where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
                                                      PhotoExclusion.trip_id == trip_id).exists()
+    shared = select(PhotoGrant.person_id).where(PhotoGrant.person_id == PhotoSource.person_id, PhotoGrant.trip_id == trip_id, PhotoGrant.revoked.is_(None)).exists()
     found = trip_window(conn, trip_id)
     if found is None:
         return []
-    return [(p, person) for p, person in _rows(conn, PhotoSource.person_id.in_(persons), left_out) if found.start <= instant(p.taken_utc) <= found.end]
+    return [(p, person) for p, person in _rows(conn, PhotoSource.person_id.in_(persons), left_out, shared) if found.start <= instant(p.taken_utc) <= found.end]
 
 
 def _zone_by_place(points: Sequence[SegmentPoint], at: datetime, spot: Point) -> str | None:
@@ -462,7 +464,7 @@ def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[Segmen
         "taken_local": photo.taken_local, "zone": _zone(photo, placed),
         "latitude": photo.latitude, "longitude": photo.longitude, "location_source": cast(LocationSource | None, photo.location_source),
         "segment_id": photo.segment_id, "match": cast(MatchKind, photo.match), "distance_km": photo.distance_km,
-        "cluster": None,
+        "cluster": None, "removed_at": None,
     }
 
 
@@ -711,6 +713,8 @@ def keep_on(photo: Photo, person: int, chosen: TripWindow) -> None:
 
 def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow] | None = None,
              left_out: set[int] | None = None, home: photomatch.HomeIn | None = None) -> bool:
+    if photo.match == HOME and photo.trip_id is None and home is None:
+        return True
     shot = _shot(photo, person)
     inside = [w for w in (candidate_windows(conn, person) if windows is None else windows) if w.start <= shot.taken <= w.end]
     if left_out is None:
@@ -748,7 +752,7 @@ def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip
     lock_grants(conn, person, sorted(locked))
     conn.orm.expire_all()
     found = _own_photo(conn, viewer, photo_id)
-    if found is None or (found[0].trip_id is not None and found[0].trip_id not in locked):
+    if found is None or found[1] != person or (found[0].trip_id is not None and found[0].trip_id not in locked):
         return None
     return found, locked
 

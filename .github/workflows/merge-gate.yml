@@ -18,7 +18,7 @@ name: Merge gate
 on:  # zizmor: ignore[dangerous-triggers]
   # Each of the pull request's own workflows finishing (the last one to finish decides).
   workflow_run:
-    workflows: [Docker image, Security scans, Docs, Control smoke]
+    workflows: [Docker image, Security scans, Docs, Control smoke, iOS]
     types: [completed]
   # Other apps' checks finishing (CodeQL, Codecov); GitHub doesn't send this for Actions' own.
   check_suite:
@@ -56,7 +56,7 @@ jobs:
       statuses: write          # the "Merge gate" status
       actions: write           # read the pull request's workflow runs, and start main's release after a merge
       checks: read             # other apps' check runs
-    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@e46ed57c9783080142e148121176bd7d4a321a8a   # v2.3.0
     with:
       sha: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha }}
       pr: ${{ inputs.pr }}

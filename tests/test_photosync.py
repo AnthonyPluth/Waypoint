@@ -1112,3 +1112,70 @@ class TenthReviewTests(SyncCase):
         self.sync(NOW + timedelta(days=8, hours=1))
         self.assertEqual(sorted(self.rows()), sorted(a["id"] for a in self.lib.items))
         self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"))
+
+
+class EleventhReviewTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        self.broken = {**self.lib.items[0], "localDateTime": "not a time"}
+
+    def test_a_dropped_item_then_a_failing_window_leaves_no_generation_to_finish(self):
+        self.lib.items = [self.broken, self.lib.items[1]]
+        asked = []
+
+        def fail_second(q):
+            asked.append(1)
+            if len(asked) == 1:
+                self.lib.fail(500)
+        self.lib.on_search = fail_second
+        self.assertEqual(self.sync(NOW + timedelta(days=8)).failed, 1)
+        self.assertEqual(len(asked), 1)
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        self.lib.heal()
+        self.lib.on_search = None
+        photo_sources.mark(self.c, self.source, "ok", None)
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertIn(self.broken["id"], self.rows())
+
+    def test_a_relist_that_dropped_an_item_records_no_success(self):
+        self.lib.items = [self.broken, self.lib.items[1]]
+        got = self.sync(NOW + timedelta(days=8))
+        self.assertEqual(got.failed, 1)
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", photosync.TOO_DENSE, NOW.timestamp()))
+        self.lib.items = [{**self.broken, "localDateTime": self.lib.items[1]["localDateTime"].replace("06-04", "06-02")}, self.lib.items[1]]
+        self.sync(NOW + timedelta(days=8, hours=1))
+        self.assertEqual((self.stored()["status"], self.stored()["last_error"], self.stored()["last_sync"]), ("ok", None, (NOW + timedelta(days=8, hours=1)).timestamp()))
+
+
+class TwelfthReviewTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+
+    def test_an_item_whose_owner_is_missing_or_corrupt_during_a_relist_deletes_nothing(self):
+        for broken in ({k: v for k, v in self.lib.items[0].items() if k != "ownerId"}, {**self.lib.items[0], "ownerId": 7}, {**self.lib.items[0], "ownerId": "not an id!"}):
+            with self.subTest(broken=broken.get("ownerId")):
+                self.lib.items = [broken, asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+                self.sync(NOW + timedelta(days=8))
+                self.assertEqual(len(self.rows()), 2)
+                self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_a_partner_item_is_not_counted_as_dropped(self):
+        audio = {**asset(8, "2026-06-02T12:00:00Z"), "type": "AUDIO"}
+        page = immich.parse_page({"assets": {"items": [asset(9, "2026-06-02T12:00:00Z", owner=PARTNER), audio, "junk", {"id": "x"}], "nextPage": None}}, 1, OWNER)
+        self.assertEqual(page.dropped, 2)
+
+    def test_an_incremental_page_that_drops_an_item_keeps_the_cursor_until_a_clean_read(self):
+        cursor = self.syncs()[self.a].cursor
+        fixed = asset(1, "2026-06-02T12:00:00Z", gps=(51.5, -0.12), updated="2026-07-01T13:00:00.000Z")
+        self.lib.items = [{**fixed, "localDateTime": "broken"}, asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        got = self.sync(NOW + timedelta(hours=6))
+        self.assertEqual((got.failed, self.syncs()[self.a].cursor, self.stored()["last_error"]), (1, cursor, photosync.TOO_DENSE))
+        self.lib.items = [fixed, asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync(NOW + timedelta(hours=12))
+        self.assertEqual((self.rows()[fixed["id"]].latitude, self.stored()["last_error"]), (51.5, None))
+        self.assertEqual(self.syncs()[self.a].cursor, (NOW + timedelta(hours=6)).isoformat())

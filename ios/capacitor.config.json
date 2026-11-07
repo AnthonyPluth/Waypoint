@@ -1,0 +1,8 @@
+{
+  "appId": "com.anthonypluth.waypoint",
+  "appName": "Waypoint",
+  "webDir": "Waypoint/public",
+  "ios": {
+    "contentInset": "always"
+  }
+}

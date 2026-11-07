@@ -1,0 +1,63 @@
+name: iOS
+
+# The iPhone app shell (ios/): XcodeGen writes the project from ios/project.yml, then xcodebuild builds the app and runs
+# the unit tests on an iPhone simulator, unsigned. It runs only for changes to the app and to this workflow, on GitHub's
+# macOS runner (the app needs Xcode, which only runs on a Mac). The job's name is the status the merge gate lists.
+on:
+  push:
+    branches: [main]
+    paths: [ios/**, .github/workflows/ios.yml]
+  pull_request:
+    branches: [main]
+    paths: [ios/**, .github/workflows/ios.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: iOS build and tests
+    runs-on: macos-15   # hosted: Xcode only runs on macOS
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ios/package-lock.json
+      - name: Install the packages
+        working-directory: ios
+        run: npm ci --no-audit --no-fund
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: xcodegen
+      - name: Pick an iPhone simulator
+        run: |
+          xcrun simctl list devices available
+          udid=$(xcrun simctl list devices available iPhone -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+      - name: Build and test
+        working-directory: ios
+        run: |
+          xcodebuild test \
+            -project Waypoint.xcodeproj \
+            -scheme Waypoint \
+            -destination "id=$SIMULATOR_UDID" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
