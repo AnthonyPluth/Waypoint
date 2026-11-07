@@ -7,10 +7,12 @@ actor ServerSession {
     private static let serverKey = "server"
     private static let tokensKey = "tokens"
     private static let openKey = "open"
+    private static let revocationsKey = "pending-revocations"
 
     private(set) var server: URL?
     private var tokens: Tokens?
     private var open = false
+    private var webSessionExpiresAt: Date?
 
     init() {
         if let data = Keychain.get(Self.serverKey), let text = String(data: data, encoding: .utf8) {
@@ -58,12 +60,18 @@ actor ServerSession {
         if open { return server }
         let cookie = try await ServerClient.webCookie(server, accessToken: try await accessToken())
         try await Self.install(cookie, for: server)
+        webSessionExpiresAt = Date().addingTimeInterval(TimeInterval(cookie.maxAge))
         return server
     }
 
+    func webSessionNeedsRenewal(now: Date = Date()) -> Bool {
+        guard server != nil, !open else { return false }
+        return WebSessionClock.needsRenewal(expiresAt: webSessionExpiresAt, now: now)
+    }
+
     func signOut() async {
-        if let server, let current = tokens, let endpoints = try? await ServerClient.endpoints(server) {
-            await ServerClient.revoke(current.refreshToken, endpoints: endpoints)
+        if let server, let current = tokens {
+            savePending(PendingRevocation.adding(PendingRevocation(server: server.absoluteString, refreshToken: current.refreshToken), to: pendingRevocations()))
         }
         let host = server?.host
         server = nil
@@ -71,7 +79,36 @@ actor ServerSession {
         forgetTokens()
         Keychain.remove(Self.openKey)
         Keychain.remove(Self.serverKey)
+        webSessionExpiresAt = nil
+        Task { await retryPendingRevocations() }
         await Self.clearWebData(host: host)
+    }
+
+    func retryPendingRevocations() async {
+        var remaining: [PendingRevocation] = []
+        for pending in pendingRevocations() {
+            guard let server = URL(string: pending.server), let endpoints = try? await ServerClient.endpoints(server) else {
+                remaining.append(pending)
+                continue
+            }
+            if await !ServerClient.revoke(pending.refreshToken, endpoints: endpoints) {
+                remaining.append(pending)
+            }
+        }
+        savePending(remaining)
+    }
+
+    private func pendingRevocations() -> [PendingRevocation] {
+        guard let data = Keychain.get(Self.revocationsKey) else { return [] }
+        return (try? JSONDecoder().decode([PendingRevocation].self, from: data)) ?? []
+    }
+
+    private func savePending(_ list: [PendingRevocation]) {
+        if list.isEmpty {
+            Keychain.remove(Self.revocationsKey)
+        } else if let data = try? JSONEncoder().encode(list) {
+            Keychain.set(data, for: Self.revocationsKey)
+        }
     }
 
     private func keep(server: URL, tokens: Tokens?) {
@@ -116,5 +153,23 @@ enum WebDataScope {
         let host = host.lowercased()
         guard !name.isEmpty, !host.isEmpty else { return false }
         return name == host || host.hasSuffix("." + name) || name.hasSuffix("." + host)
+    }
+}
+
+struct PendingRevocation: Codable, Equatable {
+    var server: String
+    var refreshToken: String
+
+    static func adding(_ new: PendingRevocation, to list: [PendingRevocation]) -> [PendingRevocation] {
+        list.contains(new) ? list : list + [new]
+    }
+}
+
+enum WebSessionClock {
+    static let margin: TimeInterval = 300
+
+    static func needsRenewal(expiresAt: Date?, now: Date) -> Bool {
+        guard let expiresAt else { return true }
+        return expiresAt.timeIntervalSince(now) <= margin
     }
 }

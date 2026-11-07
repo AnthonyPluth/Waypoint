@@ -6,8 +6,8 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
     private var session: ASWebAuthenticationSession?
 
     func run(endpoints: Endpoints) async throws -> Tokens {
-        let verifier = PKCE.random()
-        let state = PKCE.random()
+        let verifier = try PKCE.random()
+        let state = try PKCE.random()
         guard var parts = URLComponents(url: endpoints.authorizationEndpoint, resolvingAgainstBaseURL: false) else {
             throw ServerError.notWaypoint
         }

@@ -27,6 +27,28 @@ struct Endpoints: Decodable {
     }
 
     var resource: String { issuer + "/app" }
+
+    func validate(for server: URL) throws {
+        guard let issuerURL = URL(string: issuer), Endpoints.canonical(issuerURL) == Endpoints.canonical(server) else {
+            throw ServerError.notWaypoint
+        }
+        let owned = [authorizationEndpoint, tokenEndpoint] + (revocationEndpoint.map { [$0] } ?? [])
+        guard owned.allSatisfy({ Endpoints.origin($0) == Endpoints.origin(issuerURL) }) else {
+            throw ServerError.notWaypoint
+        }
+    }
+
+    static func canonical(_ url: URL) -> String {
+        var path = url.path
+        while path.hasSuffix("/") { path.removeLast() }
+        return origin(url) + path
+    }
+
+    static func origin(_ url: URL) -> String {
+        let scheme = url.scheme?.lowercased() ?? ""
+        let port = url.port ?? (scheme == "https" ? 443 : scheme == "http" ? 80 : 0)
+        return "\(scheme)://\(url.host?.lowercased() ?? ""):\(port)"
+    }
 }
 
 enum ServerError: LocalizedError {
@@ -132,6 +154,7 @@ enum ServerClient {
         guard response.statusCode == 200, let found = try? JSONDecoder().decode(Endpoints.self, from: data) else {
             throw ServerError.notWaypoint
         }
+        try found.validate(for: server)
         return found
     }
 
@@ -183,8 +206,11 @@ enum ServerClient {
         return cookie
     }
 
-    static func revoke(_ refreshToken: String, endpoints: Endpoints) async {
-        guard let url = endpoints.revocationEndpoint else { return }
-        _ = try? await send(form(url, ["token": refreshToken, "client_id": AppClient.clientID]))
+    static func revoke(_ refreshToken: String, endpoints: Endpoints) async -> Bool {
+        guard let url = endpoints.revocationEndpoint else { return true }
+        guard let (_, response) = try? await send(form(url, ["token": refreshToken, "client_id": AppClient.clientID])) else {
+            return false
+        }
+        return (200..<300).contains(response.statusCode)
     }
 }
