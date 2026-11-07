@@ -652,6 +652,12 @@ export interface PhotoPrefsBody {
   sources?: PhotoSourceVersion[];
 }
 
+export interface PhotoResumeGrant {
+  trip_id: number;
+  changed: number;
+  window: PhotoWindow | null;
+}
+
 export interface PhotoReview {
   photos: ReviewPhoto[];
 }
@@ -702,11 +708,20 @@ export interface PhotoSourceEdit {
   key?: string;
   label?: string | null;
   paused?: boolean;
+  grants?: PhotoResumeGrant[];
+  sources?: PhotoSourceVersion[];
 }
 
 export interface PhotoSourceNewTestBody {
   url: string;
   key: string;
+}
+
+export interface PhotoSourceResume {
+  asks: boolean;
+  count: number;
+  grants: PhotoResumeGrant[];
+  sources: PhotoSourceVersion[];
 }
 
 export interface PhotoSourceTest {
@@ -1433,6 +1448,7 @@ export interface Endpoints {
   "DELETE /api/photo-sources/{id}": { body: never; reply: Ok };
   "POST /api/photo-sources/{id}/test": { body: PhotoSourceTestBody; reply: PhotoSourceTest };
   "POST /api/photo-sources/{id}/sync": { body: never; reply: SyncStarted };
+  "GET /api/photo-sources/{id}/resume": { body: never; reply: PhotoSourceResume };
   "GET /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };
   "POST /api/trips/{id}/photo-sharing": { body: PhotoSharingBody; reply: PhotoSharing };
   "DELETE /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };

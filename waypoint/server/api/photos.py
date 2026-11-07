@@ -11,7 +11,7 @@ from ...providers import immich
 from .. import jobs
 from ..common import IMAGE_CSP, NO_IMAGE, ApiError, Response, _current, image_response, keep_blank, request_header, row_id
 from ..contract import (Ok, PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, PhotoSource,
-                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, SyncStarted, TripPhoto,
+                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSourceResume, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, SyncStarted, TripPhoto,
                         TripPhotos)
 from .trips import NO_TRIP, _run, viewer
 
@@ -29,7 +29,7 @@ KEY_LIMIT = 512
 LABEL_LIMIT = 100
 NOTHING_TO_CHANGE = 'Send "key", "label" or "paused"'
 FAILED = {immich.Refused: 400, immich.NotConfigured: 400, immich.RateLimited: 503, immich.Unavailable: 502}
-REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409, photosources.RESUME_ASKS: 409}
+REFUSALS = {photosources.NOT_YOURS: 403, photosources.OTHER_STEWARD: 403, photosources.ALREADY: 409}
 _v = validate.Validator(ApiError, not_number=NOT_A_TRIP, too_long="The {label} is too long (at most {limit} characters)")
 NOT_A_PERSON = "The person must be a whole number"
 NOT_A_SCOPE = 'Send "scope" as "only_me" or "trip"'
@@ -42,6 +42,7 @@ ORIGINAL_CACHE = "private, no-store"
 NOT_AN_AUDIENCE = 'Send "audience" as a list of person ids'
 NOT_AUDIENCES = 'Send "audiences" as a map of trip ids to lists of person ids'
 NOT_SOURCES = 'Send "sources" as a list of {id, status}'
+NOT_GRANTS = 'Send "grants" as a list of {trip_id, changed, window}'
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
 
 
@@ -309,6 +310,8 @@ def _ask[T](make: Callable[[], T]) -> T:
         raise ApiError(photosources.NO_PERSON, 404) from None
     except photosources.Refused as e:
         raise ApiError(str(e), REFUSALS.get(str(e), 400)) from None
+    except photosources.Stale as e:
+        raise ApiError(str(e), 409) from None
     except immich.ImmichError as e:
         raise ApiError(str(e), next((status for kind, status in FAILED.items() if isinstance(e, kind)), 502)) from None
 
@@ -352,9 +355,27 @@ def api_photo_source_edit(conn, _q, body: PhotoSourceEdit, source_id) -> PhotoSo
     label = _text(body, "label", "label", LABEL_LIMIT)
     if key is None and paused is None and "label" not in body:
         raise ApiError(NOTHING_TO_CHANGE)
+    grants, sources = _grants(body.get("grants")), _sources(body.get("sources"))
     if key is not None:
         _ask(lambda: photosources.change_key(conn, me, this, key))
-    return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body)))
+    return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body, grants, sources)))
+
+
+def _grants(value: Any) -> list[dict[str, object]] | None:
+    if value is None:
+        return None
+    if not isinstance(value, list) or any(not isinstance(g, dict) or isinstance(g.get("trip_id"), bool) or not isinstance(g.get("trip_id"), int)
+                                          or isinstance(g.get("changed"), bool) or not isinstance(g.get("changed"), (int, float)) for g in value):
+        raise ApiError(NOT_GRANTS)
+    try:
+        return [{"trip_id": int(g["trip_id"]), "changed": float(g["changed"]), "window": _window(g.get("window"))} for g in value]
+    except ApiError:
+        raise ApiError(NOT_GRANTS) from None
+
+
+def api_photo_source_resume(conn, _q, _b, source_id) -> PhotoSourceResume:
+    me, this = actor(conn), row_id(source_id, photosources.NO_SOURCE)
+    return _ask(lambda: photosources.resume_check(conn, me, this))
 
 
 def api_photo_source_remove(conn, _q, _b, source_id) -> Ok:
