@@ -308,7 +308,8 @@ rules:
       A photo is read for a request only through the one access predicate in waypoint/domain/photos.py (visible, and
       unsettled and removed for the photo's own person), so nothing shows, counts, pins or sums a photo its person hasn't
       shared with the viewer (AGENTS.md, "Photos are shared by their person"); photogrants.py's grants and removals and
-      photosync.py's writes are the other places that touch the rows. Ask photos.visible_rows instead of querying Photo.
+      photosync.py's writes are the other places that touch the rows, and in waypoint/storage/ only models.py (the table's mapping) and photo_sources.py (its counts, which
+      domain/photosources.py shows only to those who act for the source's person) may name the table. Ask photos.visible_rows instead of querying Photo.
     severity: ERROR
     languages: [python]
     pattern-either:
@@ -324,8 +325,9 @@ rules:
       - pattern: schema.photos
       - pattern-regex: (?i)\b(from|join|update|into)\s+"?photos\b
     paths:
-      include: ["/waypoint/server/", "/waypoint/domain/"]
-      exclude: ["/waypoint/domain/photos.py", "/waypoint/domain/photogrants.py", "/waypoint/domain/photosync.py"]
+      include: ["/waypoint/server/", "/waypoint/domain/", "/waypoint/storage/"]
+      exclude: ["/waypoint/domain/photos.py", "/waypoint/domain/photogrants.py", "/waypoint/domain/photosync.py",
+                "/waypoint/storage/models.py", "/waypoint/storage/photo_sources.py"]
 
   - id: waypoint-naive-now
     message: >-

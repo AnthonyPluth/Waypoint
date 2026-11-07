@@ -277,7 +277,7 @@ Every path below is built from the rows this predicate returns for the viewer, a
 
 So two people on the same trip can see different photos, different counts and a different set of places, and neither reply hints at the difference: the reply has the same shape and wording whether or not photos they can't see exist. A photo id the viewer may not see answers exactly like one that does not exist.
 
-A Semgrep rule, `waypoint-photo-access`, fails a `select(Photo…)` or `Photo.` query in `waypoint/server/` or `waypoint/domain/` outside `photos.py`'s three helpers (`visible`, `unsettled`, `removed`), `photogrants.py`'s grants and removals and `photosync.py`'s writes, like `waypoint-trip-visibility` does for trips; `tripstats.py` asks `photos.visible_rows(conn, viewer, trip_id)` instead of its own query.
+A Semgrep rule, `waypoint-photo-access`, fails a `select(Photo…)` or `Photo.` query in `waypoint/server/`, `waypoint/domain/` or `waypoint/storage/` outside `photos.py`'s three helpers (`visible`, `unsettled`, `removed`), `photogrants.py`'s grants and removals and `photosync.py`'s writes (in `waypoint/storage/`, only `models.py`'s table mapping and `photo_sources.py`'s per-source counts, which `domain/photosources.py` shows only to those who act for the source's person), like `waypoint-trip-visibility` does for trips; `tripstats.py` asks `photos.visible_rows(conn, viewer, trip_id)` instead of its own query.
 
 ### Routes
 
