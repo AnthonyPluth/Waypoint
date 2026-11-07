@@ -457,7 +457,7 @@ def _photo(conn: db.Connection, trip_id: int, shot: _Shot, source_id: int, numbe
     where = _spot(conn, trip_id, shot.spot) if shot.spot else None
     placed = taken.astimezone(ZoneInfo(zone))
     offset = placed.utcoffset()
-    return Photo(source_id=source_id, asset_id=f"demo-{number:04d}", asset_updated=taken.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+    return Photo(source_id=source_id, asset_id=f"demo-{number:04d}", asset_updated=taken.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),   # nosemgrep: waypoint-photo-access -- the demo library's seed rows, which no request reads and which photos.visible still gates
                  kind="image", taken_utc=taken.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
                  taken_local=f"{placed:%Y-%m-%dT%H:%M}", taken_offset=int(offset.total_seconds() // 60) if offset else None,
                  latitude=where[0] if where else None, longitude=where[1] if where else None, location_source="exif" if where else None, state=None, country=None,
