@@ -34,7 +34,7 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
             throw ServerError.signInFailed(value("error_description") ?? error)
         }
         guard value("state") == state else { throw ServerError.signInFailed("the reply didn't match this sign-in") }
-        if let iss = value("iss"), iss != issuer { throw ServerError.signInFailed("the reply came from a different server") }
+        guard value("iss") == issuer else { throw ServerError.signInFailed("the reply came from a different server") }
         guard let code = value("code"), !code.isEmpty else { throw ServerError.signInFailed("the reply had no code") }
         return code
     }
