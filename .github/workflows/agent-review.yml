@@ -50,19 +50,23 @@ jobs:
       # A change to one of these files is risky and gets the second review, beside the labels (safety-critical,
       # security) and .github/** and .claude/**, which always count. The list is short on purpose (#518): the exact
       # files that directly implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty
-      # numbers, the offline copy and its encrypted store, log scrubbing), the mail review and assist modules and the
-      # two handlers that serve a kept message (server/api/review.py, server/api/trips.py), the assistant's mail-scope
-      # gate (server/mcp_access.py, MAIL_READABLE), the Semgrep rules, SECURITY.md and the image's Dockerfile. It
-      # doesn't name every file a promise depends on: every other mail module, handler, provider and the storage layer
-      # rely on Codex's review and the CI checks, and a pull request touching one gets the second review only when
-      # labelled. The full set of invariants, and the checks that hold each, is in .github/agent-review/invariants.md,
-      # which the second review reads. tests/test_agent_review_paths.py checks each file listed here exists.
+      # numbers, a trip's photos and their grants and proxy, the offline copy and its encrypted store, log scrubbing),
+      # the mail review and assist modules and the two handlers that serve a kept message (server/api/review.py,
+      # server/api/trips.py), the assistant's mail-scope gate (server/mcp_access.py, MAIL_READABLE), the Semgrep rules,
+      # SECURITY.md and the image's Dockerfile. It doesn't name every file a promise depends on: every other mail
+      # module, handler, provider and the storage layer rely on Codex's review and the CI checks, and a pull request
+      # touching one gets the second review only when labelled. The full set of invariants, and the checks that hold
+      # each, is in .github/agent-review/invariants.md, which the second review reads. tests/test_agent_review_paths.py
+      # checks each file listed here exists.
       second-review-paths: |
         waypoint/oidc.py
         waypoint/tls.py
         waypoint/domain/visibility.py
         waypoint/domain/trippeople.py
         waypoint/domain/loyalty.py
+        waypoint/domain/photos.py
+        waypoint/domain/photogrants.py
+        waypoint/domain/photoproxy.py
         waypoint/domain/offline.py
         waypoint/server/api/review.py
         waypoint/server/api/trips.py

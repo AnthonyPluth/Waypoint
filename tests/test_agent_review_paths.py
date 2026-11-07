@@ -40,6 +40,11 @@ class SecondReviewPaths(unittest.TestCase):
         self.assertIn("frontend/src/lib/offline-vault.ts", paths)
         self.assertTrue(all(paths))
 
+    def test_the_photo_access_files_are_risky(self):
+        paths = second_review_paths()
+        for name in ("photos.py", "photogrants.py", "photoproxy.py"):
+            self.assertIn(f"waypoint/domain/{name}", paths)
+
     def test_globs_match_like_fleet_s(self):
         self.assertTrue(glob_to_regex(".semgrep/**").match(".semgrep/waypoint.yml"))
         self.assertTrue(glob_to_regex("Dockerfile*").match("Dockerfile"))
