@@ -53,6 +53,11 @@ final class SignInReplyTests: XCTestCase {
         XCTAssertThrowsError(try SignIn.code(from: url, state: "s1", issuer: issuer))
     }
 
+    func testRefusesAReplyWithNoIssuer() {
+        let url = URL(string: "waypoint://auth?code=wpo_abc&state=s1")!
+        XCTAssertThrowsError(try SignIn.code(from: url, state: "s1", issuer: issuer))
+    }
+
     func testReportsADeniedSignIn() {
         let url = URL(string: "waypoint://auth?error=access_denied&error_description=No&state=s1")!
         XCTAssertThrowsError(try SignIn.code(from: url, state: "s1", issuer: issuer))
@@ -131,5 +136,73 @@ final class WebSessionClockTests: XCTestCase {
     func testRenewsWithinTheMarginAndAfterExpiry() {
         XCTAssertTrue(WebSessionClock.needsRenewal(expiresAt: now.addingTimeInterval(120), now: now))
         XCTAssertTrue(WebSessionClock.needsRenewal(expiresAt: now.addingTimeInterval(-10), now: now))
+    }
+}
+
+final class PendingRevocationTests: XCTestCase {
+    private let a = PendingRevocation(server: "https://a.example", refreshToken: "wpr_a")
+    private let b = PendingRevocation(server: "https://b.example", refreshToken: "wpr_b")
+
+    func testRemovingKeepsRecordsAddedSinceTheSnapshot() {
+        let latest = PendingRevocation.adding(b, to: [a])
+        XCTAssertEqual(PendingRevocation.removing(a, from: latest), [b])
+    }
+
+    func testRemovingARecordThatIsGoneChangesNothing() {
+        XCTAssertEqual(PendingRevocation.removing(a, from: [b]), [b])
+    }
+}
+
+final class SingleFlightTests: XCTestCase {
+    private actor Counter {
+        var count = 0
+        func next() -> Int { count += 1; return count }
+    }
+
+    func testOverlappingCallersShareOneRun() async throws {
+        let flight = SingleFlight<Int>()
+        let counter = Counter()
+        let work: @Sendable () async throws -> Int = {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            return await counter.next()
+        }
+        async let first = flight.run(work)
+        async let second = flight.run(work)
+        let results = try await [first, second]
+        let runs = await counter.count
+        XCTAssertEqual(results, [1, 1])
+        XCTAssertEqual(runs, 1)
+    }
+
+    func testALaterCallerStartsANewRun() async throws {
+        let flight = SingleFlight<Int>()
+        let counter = Counter()
+        let first = try await flight.run { await counter.next() }
+        let second = try await flight.run { await counter.next() }
+        XCTAssertEqual([first, second], [1, 2])
+    }
+}
+
+final class LocalNetworkRetryTests: XCTestCase {
+    func testRetriesAConnectionRefusedWhileThePermissionIsPending() {
+        XCTAssertTrue(ServerClient.shouldRetry(.notConnectedToInternet, attempt: 0))
+        XCTAssertTrue(ServerClient.shouldRetry(.cannotConnectToHost, attempt: 1))
+    }
+
+    func testGivesUpAfterTwoRetries() {
+        XCTAssertFalse(ServerClient.shouldRetry(.notConnectedToInternet, attempt: 2))
+    }
+
+    func testNeverRetriesAFailureThatMayHaveReachedTheServer() {
+        XCTAssertFalse(ServerClient.shouldRetry(.timedOut, attempt: 0))
+        XCTAssertFalse(ServerClient.shouldRetry(.networkConnectionLost, attempt: 0))
+    }
+}
+
+final class ConnectFormTests: XCTestCase {
+    func testStaysDisabledWhileWorkingOrEmpty() {
+        XCTAssertFalse(ConnectView.canConnect(address: "https://x.example", working: true))
+        XCTAssertFalse(ConnectView.canConnect(address: "  \n", working: false))
+        XCTAssertTrue(ConnectView.canConnect(address: "https://x.example", working: false))
     }
 }

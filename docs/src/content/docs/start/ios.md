@@ -21,4 +21,4 @@ The app's web view is given a normal web session by `POST /auth/app-session`, wh
 
 ## Ending it
 
-The app's access ends when you can no longer sign in to Waypoint (you are taken off `OIDC_ALLOWED_EMAILS`, or, with groups, your last sign-in is older than `WAYPOINT_SESSION_DAYS`), or when you sign out in the app. Unlike an assistant, the app does not appear under **Settings → Assistants**.
+The app's access ends when you can no longer sign in to Waypoint (you are taken off `OIDC_ALLOWED_EMAILS`, or, with groups, your last sign-in is older than `WAYPOINT_SESSION_DAYS`), or when the app drops the connection: it does so by itself when the server says the sign-in is no longer valid, and **Use another Waypoint** on its error screen signs out and asks for a new address. There is no sign-out button in Settings yet. Unlike an assistant, the app does not appear under **Settings → Assistants**.
