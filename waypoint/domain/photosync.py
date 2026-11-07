@@ -249,7 +249,7 @@ def _digest(window: TripWindow, at_home: HomeIn | None) -> str:
     return hashlib.sha256(repr((window.start, window.end, window.points, at_home)).encode()).hexdigest()
 
 
-def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
+def _write(run: _Run, trip_id: int, got: immich.Page, stepped: bool = False) -> Written:
     conn = run.conn
     grants = _hold(run)
     if grants is None:
@@ -278,8 +278,10 @@ def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
         conn.commit()
         return "dropped"
     if got.next_page is None:
-        row.cursor, row.resume_after, row.fetch_started, row.synced = row.fetch_started, None, None, run.now.timestamp()
-    elif got.last_taken is not None:
+        unsure = stepped and _stamp(conn, sk.PHOTOS_RELIST_STARTED, run.source_id) is not None
+        row.cursor, row.resume_after, row.fetch_started = row.fetch_started, None, None
+        row.synced = row.synced if unsure else run.now.timestamp()
+    elif got.last_taken is not None and not stepped:
         row.resume_after = _utc(got.last_taken)
     conn.commit()
     return "written"
@@ -300,14 +302,15 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     updated = photos.instant(row.cursor) - CLOCK_SKEW if row.cursor else None
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
-    page = 1
+    page, stepped = 1, False
     while True:
         if photo_sources.status(conn, run.source_id) in (OFF, None):
             conn.commit()
             return PAUSED
         got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=page)
         run.summary.pages += 1
-        written = _write(run, trip_id, got)
+        stepped = stepped or page > 1
+        written = _write(run, trip_id, got, stepped)
         if written == "changed":
             return CHANGED
         if written == "moved":

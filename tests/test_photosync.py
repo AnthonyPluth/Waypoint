@@ -1348,3 +1348,23 @@ class ReconcileLockOrderTests(SyncCase):
         self.assertIn(self.a, taken[:first])
         self.assertLessEqual(set(taken[first:]) - {None}, set(taken[:first]))
         self.assertIsNone(self.c.orm.get(PhotoGrant, (self.mia, self.a)))
+
+
+class SteppedInstantTests(SyncCase):
+    def test_an_asset_shifted_into_a_page_already_read_inside_one_instant_is_never_deleted_by_the_relist(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", owner=PARTNER), asset(2, "2026-06-02T12:00:00Z", owner=PARTNER),
+                          asset(3, "2026-06-02T12:00:00Z", gps=SOHO), asset(4, "2026-06-02T18:00:00Z", gps=SOHO)]
+        self.sync()
+        shifted = self.lib.items[2]["id"]
+        self.assertIn(shifted, self.rows())
+
+        def removed_before_the_boundary(asked):
+            if asked["page"] == 2 and self.lib.items[0]["ownerId"] == PARTNER and len(self.lib.items) == 4:
+                del self.lib.items[0]
+        self.lib.on_search = removed_before_the_boundary
+        for n in range(3):
+            self.sync(NOW + timedelta(days=8, hours=n), full=n == 0)
+            self.assertIn(shifted, self.rows())
+        self.lib.on_search = None
+        self.assertIn(self.lib.items[-1]["id"], self.rows())
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
