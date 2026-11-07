@@ -626,7 +626,7 @@ class RequestTests(unittest.TestCase):
                 with self.subTest(code=code), self.assertRaises(kind):
                     call()
 
-    def test_a_gone_rendition_or_original_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
+    def test_a_gone_rendition_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
         for route in (f"/api/assets/{ASSET}/thumbnail", "/api/search/metadata", f"/api/assets/{ASSET}/original", "/api/map/markers"):
             self.fake.routes[route] = (410, {}, b'{"message": "gone"}')
         for size in ("thumbnail", "preview"):
