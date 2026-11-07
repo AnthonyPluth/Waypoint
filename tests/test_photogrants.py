@@ -1447,6 +1447,68 @@ class DecisionTests(GrantCase):
         self.assertEqual(self.grant(self.jid, born[0]), ("only_me", None, "u-jane"))
         self.assertTrue(self.c.orm.get(PhotoGrant, (self.jid, born[0])).ask_again)
 
+    def test_a_dated_trip_created_while_home_is_saved_is_asked_again(self):
+        order: list[str] = []
+        born: list[int] = []
+        real_lock, real_dated = photogrants.lock_home, photogrants.dated_trips
+
+        def create_first(conn):
+            order.append("home")
+            if not born:
+                born.append(0)
+                born[0] = trips.create_trip(self.c, self.jane, {"name": "Raced", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"}, confirmed=True)["id"]
+                self.share(self.jid, born[0])
+            return real_lock(conn)
+
+        def listed(conn):
+            order.append("dated")
+            return real_dated(conn)
+        with mock.patch.object(photogrants, "lock_home", side_effect=create_first), mock.patch.object(photogrants, "dated_trips", side_effect=listed):
+            home.save(self.c, {"city": "Denver", "state": "CO", "zip": "", "country": "US"})
+        self.assertEqual(order[:3], ["home", "home", "dated"])
+        self.assertEqual(self.grant(self.jid, born[0]), ("only_me", None, "u-jane"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.jid, born[0])).ask_again)
+
+    def test_a_dated_trip_created_while_home_is_cleared_is_asked_again(self):
+        home.save(self.c, {"city": "Denver", "state": "CO", "zip": "", "country": "US"})
+        born: list[int] = []
+        real = photogrants.lock_home
+
+        def create_first(conn):
+            if not born:
+                born.append(0)
+                born[0] = trips.create_trip(self.c, self.jane, {"name": "Raced", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"}, confirmed=True)["id"]
+                self.share(self.jid, born[0])
+            return real(conn)
+        with mock.patch.object(photogrants, "lock_home", side_effect=create_first):
+            home.clear(self.c)
+        self.assertEqual(self.grant(self.jid, born[0]), ("only_me", None, "u-jane"))
+        self.assertTrue(self.c.orm.get(PhotoGrant, (self.jid, born[0])).ask_again)
+
+    def test_creating_a_dated_trip_waits_for_a_home_change_before_it_reads_the_window(self):
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="trip", share_all=True, set_by="u-jane", share_all_since=5.0, steward_sub=None))
+        self.c.orm.flush()
+        trips_before = list(self.c.execute(select(Trip.id)).scalars())
+        seen: list[list[int]] = []
+        real = photogrants.lock_home
+
+        def save_first(conn):
+            if not seen:
+                seen.append(list(self.c.execute(select(Trip.id)).scalars()))
+                home.save(self.c, {"city": "Denver", "state": "CO", "zip": "", "country": "US"})
+            return real(conn)
+        with mock.patch.object(photogrants, "lock_home", side_effect=save_first):
+            made = trips.create_trip(self.c, self.jane, {"name": "Raced", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"}, confirmed=True)["id"]
+        self.assertEqual(seen, [trips_before])
+        self.assertEqual(self.grant(self.jid, made), ("trip", None, "u-jane"))
+        self.assertFalse(self.c.orm.get(PhotoGrant, (self.jid, made)).ask_again)
+        self.assertEqual(home.read(self.c)["city"], "Denver")
+
+    def test_creating_a_trip_without_dates_leaves_home_unlocked(self):
+        with mock.patch.object(photogrants, "lock_home", wraps=photogrants.lock_home) as locked:
+            trips.create_trip(self.c, self.jane, {"name": "Someday", "people": [self.jid]})
+        locked.assert_not_called()
+
     def test_a_decision_locks_the_grants_of_both_trips_in_order(self):
         self.share(self.jid, self.a)
         self.share(self.jid, self.b)
