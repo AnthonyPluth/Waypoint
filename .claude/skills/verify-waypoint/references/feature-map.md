@@ -26,6 +26,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **What usually breaks:**
   - Starts with `fake_first_run` and a `reload`: the page then believes the household has a connected mailbox and no trips, so it isn't the demo trips you see on Upcoming.
 
+#### `cruise-ship`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone, desktop.
+- **Drive it:** `tools/control flow cruise-ship`; or `poetry run python run.py verify --flow cruise-ship`.
+
 #### `first-run-connect`
 
 - **Starts at:** `#upcoming`.

@@ -75,6 +75,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_first_run: true }] })).toEqual(["step 1: fake_first_run takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: "Sam Doe | Mia Doe" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: 3 }] })).toEqual(["step 1: fake_merge_warning takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ clock: "2026-08-31T12:00:00Z" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ clock: 3 }] })).toEqual(["step 1: clock takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
   });

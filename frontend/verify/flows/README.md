@@ -56,6 +56,7 @@ A step has one action and an optional `timeout` in milliseconds (default 10000).
 
 These change what the page’s later requests see; nothing is stored. Where a step says “put it before a `reload`”, the change applies to the loads after it.
 
+- `{"clock": "2026-08-31T12:00:00Z"}` sets the browser’s clock to that moment (an ISO time with its offset), for a page that reads the time to place something, such as the ship on a cruise. The demo server keeps its own frozen clock. Put it before a `reload`.
 - `{"long_names": ", a suffix"}` adds the suffix to the names in the Stats reply (`name`, `city` and `hotel`) for the page’s later loads, so a flow shows long names in every list. The demo data itself doesn’t change. Put it before a `reload`.
 - `{"fake_labels": "Japan 2026, Taxes"}` answers the page’s requests for a mailbox’s Gmail labels with those made-up names (the demo mailbox can’t reach Google), and accepts a save.
 - `{"fake_ignored": "news.example, deals.example"}` answers the page’s requests for a mailbox’s ignored senders with those made-up domains, and drops a domain from the list when it is stopped.
