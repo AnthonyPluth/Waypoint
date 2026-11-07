@@ -139,7 +139,7 @@ final class WebSessionClockTests: XCTestCase {
     }
 }
 
-final class PendingRevocationTests: XCTestCase {
+final class PendingRevocationRemovalTests: XCTestCase {
     private let a = PendingRevocation(server: "https://a.example", refreshToken: "wpr_a")
     private let b = PendingRevocation(server: "https://b.example", refreshToken: "wpr_b")
 
