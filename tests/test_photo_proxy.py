@@ -308,10 +308,15 @@ class RenditionTests(ProxyCase):
         self.assertLess(rendition["deadline"] - time.monotonic(), immich.IMAGE_SECONDS)
 
     def test_a_missing_original_follows_the_same_rule(self):
-        self.immich.routes[f"{self.asset}/original"] = failing(http_error(404))
-        self.missing("ana", f"/api/photos/{self.mine}/original")
-        self.assertIsNotNone(stored(self.mine))
-        self.immich.routes[self.asset] = failing(http_error(404))
+        for code in (404, 410):
+            for headers in ({}, {"Range": "bytes=0-9"}):
+                with self.subTest(code=code, headers=headers):
+                    self.immich.routes[f"{self.asset}/original"] = failing(http_error(code))
+                    self.immich.calls.clear()
+                    self.missing("ana", f"/api/photos/{self.mine}/original", headers)
+                    self.assertEqual([c["path"] for c in self.immich.calls], [f"{self.asset}/original", self.asset])
+                    self.assertIsNotNone(stored(self.mine))
+        self.immich.routes[self.asset] = failing(http_error(410))
         self.missing("ana", f"/api/photos/{self.mine}/original")
         self.assertIsNone(stored(self.mine))
 
@@ -541,6 +546,27 @@ class OriginalTests(ProxyCase):
 
     def test_a_stalled_upstream_is_cut_off_at_the_recheck_once_the_photo_is_taken_back_not_at_the_idle_limit(self):
         took = self.blocked_stream(lambda: self.revoke("ben"), release=False, recheck=0.2, idle=3.0)
+        self.assertLess(took, 1.5)
+
+    def test_an_upstream_that_stalls_just_before_the_recheck_is_cut_off_within_one_interval_once_the_photo_is_taken_back(self):
+        body = bytes(MP4) * 4
+        gate = threading.Event()
+        self.addCleanup(gate.set)
+        self.immich.routes[f"{self.asset}/original"] = ranged(body, "video/mp4", piece=1024, pause=0.05, gate=gate, gate_after=14, idle=30.0)
+        with mock.patch.object(photoproxy, "RECHECK_SECONDS", 1.0):
+            began = time.monotonic()
+            link = http.client.HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=20)
+            self.addCleanup(link.close)
+            link.request("GET", f"/api/photos/{self.mine}/original", headers={"X-Waypoint": "1", **self.who["ana"]})
+            reply = link.getresponse()
+            self.assertEqual(reply.status, 200)
+            self.revoke("ben")
+            got = bytearray()
+            while piece := reply.read(1024):
+                got += piece
+            took = time.monotonic() - began
+        self.assertLess(len(got), len(body))
+        self.assertEqual(bytes(got), body[:len(got)])
         self.assertLess(took, 1.5)
 
     def test_a_slow_but_live_upstream_streams_to_the_end_across_rechecks(self):

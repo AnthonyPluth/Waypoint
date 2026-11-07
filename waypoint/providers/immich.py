@@ -54,7 +54,7 @@ LOCAL = re.compile(r"(\d{4}-\d\d-\d\dT\d\d:\d\d)", re.ASCII)
 UTC_NAME = re.compile(r"UTC(?:([+-])(\d{1,2})(?::?(\d\d))?)?", re.ASCII)
 DIGITS = re.compile(r"[0-9]{1,10}")
 BYTE_RANGE = re.compile(r"bytes=(?:([0-9]{1,15})-([0-9]{0,15})|-([0-9]{1,15}))")
-RENDITION_MISSING = (404, 410)
+ASSET_MISSING = (404, 410)
 SIGNATURES = ((b"\x89PNG\r\n\x1a\n", "image/png"), (b"\xff\xd8\xff", "image/jpeg"))
 SNIFF_BYTES = 4096
 INLINE = True
@@ -536,7 +536,7 @@ def thumbnail(source: Source, asset_id: str, size: Size, *, seconds: float | Non
         return None
     deadline = time.monotonic() + (IMAGE_SECONDS if seconds is None else seconds)
     request = _request(source, f"{ASSETS}{asset_id}/thumbnail", IMAGE_TYPES, query={"size": size})
-    response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=RENDITION_MISSING)
+    response = _open(source, request, IMAGE_TIMEOUT, deadline, missing=ASSET_MISSING)
     if response is None:
         return None
     with response:
@@ -551,7 +551,7 @@ def asset_exists(source: Source, asset_id: str, *, seconds: float | None = None)
     if not ASSET_ID.fullmatch(asset_id):
         return False
     deadline = time.monotonic() + (JSON_SECONDS if seconds is None else seconds)
-    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, deadline, missing=RENDITION_MISSING)
+    response = _open(source, _request(source, f"{ASSETS}{asset_id}", JSON_TYPE), TIMEOUT, deadline, missing=ASSET_MISSING)
     if response is None:
         return False
     response.close()
@@ -571,5 +571,5 @@ def open_original(source: Source, asset_id: str, *, seconds: float = ORIGINAL_SE
     deadline = time.monotonic() + seconds
     asked = single_range(byte_range)
     request = _request(source, f"{ASSETS}{asset_id}/original", ORIGINAL_TYPES, byte_range=asked)
-    response = _open(source, request, ORIGINAL_TIMEOUT, deadline, accepted=(200, 206, 416) if asked else (200,))
+    response = _open(source, request, ORIGINAL_TIMEOUT, deadline, missing=ASSET_MISSING, accepted=(200, 206, 416) if asked else (200,))
     return None if response is None else Original(response, deadline)

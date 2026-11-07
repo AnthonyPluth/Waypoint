@@ -626,14 +626,15 @@ class RequestTests(unittest.TestCase):
                 with self.subTest(code=code), self.assertRaises(kind):
                     call()
 
-    def test_a_gone_rendition_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
+    def test_a_gone_rendition_or_original_is_a_retryable_miss_but_gone_elsewhere_is_unavailable(self):
         for route in (f"/api/assets/{ASSET}/thumbnail", "/api/search/metadata", f"/api/assets/{ASSET}/original", "/api/map/markers"):
             self.fake.routes[route] = (410, {}, b'{"message": "gone"}')
         for size in ("thumbnail", "preview"):
             with self.subTest(size=size):
                 self.assertIsNone(immich.thumbnail(self.fake.source, ASSET, size))  # type: ignore[arg-type]
-        for call in (lambda: immich.search(self.fake.source, AFTER, BEFORE), lambda: immich.open_original(self.fake.source, ASSET),
-                     lambda: immich.markers(self.fake.source, AFTER, BEFORE)):
+        self.assertIsNone(immich.open_original(self.fake.source, ASSET))
+        self.assertIsNone(immich.open_original(self.fake.source, ASSET, byte_range="bytes=0-9"))
+        for call in (lambda: immich.search(self.fake.source, AFTER, BEFORE), lambda: immich.markers(self.fake.source, AFTER, BEFORE)):
             with self.subTest(call=call), self.assertRaises(immich.Unavailable) as e:
                 call()
             self.assertEqual(str(e.exception), immich.UNAVAILABLE)

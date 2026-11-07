@@ -14,6 +14,7 @@ from .photos import Rendition
 from .visibility import Viewer
 
 RECHECK_SECONDS = 5.0
+READ_FLOOR = 0.05
 SNIFF_RANGE = f"bytes=0-{immich.SNIFF_BYTES - 1}"
 KNOWN_TYPES = 1024
 UNAVAILABLE = "Couldn’t get this picture from the photo library; try again later."
@@ -198,7 +199,7 @@ def _body(viewer: Viewer, served: Served, original: immich.Original, prefix: byt
         while True:
             if not pending:
                 try:
-                    pending = original.read(wait=RECHECK_SECONDS)
+                    pending = original.read(wait=max(checked + RECHECK_SECONDS - time.monotonic(), READ_FLOOR))
                 except immich.ImmichError:
                     return
                 if pending is None:
