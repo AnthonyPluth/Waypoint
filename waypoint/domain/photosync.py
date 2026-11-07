@@ -159,14 +159,26 @@ def _syncs(conn: db.Connection, source_id: int) -> dict[int, PhotoTripSync]:
     return {s.trip_id: s for s in conn.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == source_id)).all()}
 
 
-def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
+def _hold(run: _Run, trip_ids: Iterable[int] | None = None) -> dict[int, PhotoGrant] | None:
     conn = run.conn
     conn.orm.expire_all()
-    photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
+    photo_sources.lock_person(conn, run.person)
+    photo_sources.lock(conn, run.source_id)
+    held = conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars() if trip_ids is None else trip_ids
+    grants = photogrants.lock(conn, run.person, held)
     if not _same_person(run):
         conn.commit()
+        return None
+    return grants
+
+
+def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
+    conn = run.conn
+    photogrants.lock_home(conn)
+    if _hold(run) is None:
         return False
     conn.orm.expire_all()
+    run.home = photos.home_in(conn)
     run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
     if restart and run.windows:
         db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), repr(run.now.timestamp()))
@@ -239,10 +251,8 @@ def _digest(window: TripWindow, at_home: HomeIn | None) -> str:
 
 def _write(run: _Run, trip_id: int, got: immich.Page) -> Written:
     conn = run.conn
-    conn.orm.expire_all()
-    grants = photogrants.lock(conn, run.person, conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == run.person)).scalars())
-    if not _same_person(run):
-        conn.commit()
+    grants = _hold(run)
+    if grants is None:
         return "moved"
     live = {t for t, g in grants.items() if g.revoked is None}
     row = conn.orm.get(PhotoTripSync, (run.source_id, trip_id))
@@ -290,11 +300,12 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
     updated = photos.instant(row.cursor) - CLOCK_SKEW if row.cursor else None
     window = run.windows[trip_id]
     after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
+    page = 1
     while True:
         if photo_sources.status(conn, run.source_id) in (OFF, None):
             conn.commit()
             return PAUSED
-        got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=1)
+        got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=page)
         run.summary.pages += 1
         written = _write(run, trip_id, got)
         if written == "changed":
@@ -305,9 +316,12 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
             return DENSE
         if written == "gone" or got.next_page is None:
             return DONE
-        if got.last_taken is None or got.one_instant:
+        if got.last_taken is None or (got.one_instant and page == 1 and not got.foreign):
             return DENSE
-        after = max(after, got.last_taken)
+        if got.one_instant:
+            page += 1
+        else:
+            after, page = max(after, got.last_taken), 1
         if _clock() >= run.deadline:
             return STOPPED
 
@@ -319,10 +333,7 @@ def _same_person(run: _Run) -> bool:
 
 def _finish_relist(run: _Run, started: float) -> bool:
     conn = run.conn
-    conn.orm.expire_all()
-    photogrants.lock(conn, run.person, run.windows)
-    if not _same_person(run):
-        conn.commit()
+    if _hold(run, run.windows) is None:
         return False
     windows = list(run.windows.values())
     for p in _rows(conn, run.source_id):
@@ -386,7 +397,7 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
         return summary
     if unlocked is None:
         return summary
-    job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, photos.home_in(conn), {}, summary, sealed)
+    job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, None, {}, summary, sealed)
     started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
     if not _prepare(job, fresh, started if not fresh else None):
         return summary

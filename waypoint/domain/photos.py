@@ -6,6 +6,7 @@ import heapq
 import math
 import time
 from collections import Counter
+from enum import Enum
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, time as clock
@@ -34,6 +35,13 @@ HOME: MatchKind = "home"
 FAR: MatchKind = "far"
 OWNER = "owner"
 AUTO = "auto"
+
+
+class HomeUnread(Enum):
+    UNREAD = "unread"
+
+
+HOME_UNREAD = HomeUnread.UNREAD
 INFERRED: LocationSource = "inferred"
 ONLY_ME: Scope = "only_me"
 TRIP: Scope = "trip"
@@ -712,9 +720,11 @@ def keep_on(photo: Photo, person: int, chosen: TripWindow) -> None:
 
 
 def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow] | None = None,
-             left_out: set[int] | None = None, home: photomatch.HomeIn | None = None) -> bool:
-    if photo.match == HOME and photo.trip_id is None and home is None:
-        return True
+             left_out: set[int] | None = None, home: photomatch.HomeIn | HomeUnread | None = HOME_UNREAD) -> bool:
+    if home is HOME_UNREAD:
+        if photo.match == HOME and photo.trip_id is None:
+            return True
+        home = None
     shot = _shot(photo, person)
     inside = [w for w in (candidate_windows(conn, person) if windows is None else windows) if w.start <= shot.taken <= w.end]
     if left_out is None:

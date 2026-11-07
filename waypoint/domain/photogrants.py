@@ -508,7 +508,9 @@ def reconcile_all(conn: db.Connection, now: float | None = None) -> int:
     standing = select(PhotoSharingPrefs.person_id).where(PhotoSharingPrefs.share_all.is_(True))
     trip_ids = set(conn.execute(select(TripPerson.trip_id).where(TripPerson.person_id.in_(standing))).scalars())
     trip_ids |= set(conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.revoked.is_(None))).scalars())
-    return sum(reconcile(conn, trip_id, now) for trip_id in sorted(trip_ids))
+    held = lock_trips(conn, trip_ids)
+    lock_grants_for(conn, held)
+    return sum(reconcile(conn, trip_id, now) for trip_id in held)
 
 
 def left(conn: db.Connection, person_id: int, trip_id: int) -> None:

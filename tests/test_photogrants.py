@@ -835,7 +835,8 @@ class TripChangeTests(GrantCase):
         self.assertTrue(photos.re_place(self.c, at_home, self.jid))
         self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (None, "home"))
         self.assertEqual(self.seen(self.sam, self.a), [])
-        photogrants._re_place(self.c, self.jid, [])
+        with mock.patch.object(home, "located", return_value=home.geocode.Point(SOHO[0], SOHO[1], "zip")):
+            photogrants._re_place(self.c, self.jid, [])
         self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (None, "home"))
 
     def test_a_trip_that_shrinks_keeps_a_hand_placement_its_new_window_still_holds(self):

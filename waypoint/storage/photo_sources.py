@@ -116,6 +116,10 @@ def mark(conn: db.Connection, source_id: int, status: Status, error: str | None 
     return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused, *same_key, *unchanged).values(**values)).rowcount) > 0
 
 
+def lock(conn: db.Connection, source_id: int) -> bool:
+    return int(conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(status=PhotoSource.status)).rowcount) > 0
+
+
 def status(conn: db.Connection, source_id: int) -> Status | None:
     found = conn.execute(select(PhotoSource.status).where(PhotoSource.id == source_id)).scalar()
     return found if found in STATUSES else None
