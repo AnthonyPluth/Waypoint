@@ -59,6 +59,8 @@ Waypoint sends nothing about itself anywhere: no analytics, no error reporting, 
 
 Python 3.14 backend, Svelte web app, Starlight docs. [Development](https://anthonypluth.github.io/Waypoint/contributing/development/) covers setting up a checkout and running the checks; `make check` runs everything CI runs locally. AI coding agents start from [AGENTS.md](AGENTS.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
+`python run.py demo` fills a database with made-up trips, mail, people and photos (generated placeholder pictures; no Immich server is needed), which is what `make verify` runs on.
+
 ## License
 
 [AGPL-3.0](LICENSE)

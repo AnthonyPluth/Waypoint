@@ -18,6 +18,7 @@ Hand-edited. `tools/user_feature_map.py` merges these into [feature-map.md](feat
 
 ## settings
 - Sections are routes of their own (`#settings/offline`, `#settings/account`); `goto` the section rather than clicking down from `settings`.
+- Photos: the demo's photos are generated placeholder pictures from `demo` libraries (one per member), so the road trip, the Lakeside Resort trip and the current trip show photos with no Immich server. A demo library's Test and Sync now do nothing real (Test answers with the person's name, Sync now answers `started: false`) and open no connection, so pressing them gives no 5xx and nothing in `console`. Connecting a new library needs the `fake_immich` flow step (PHOTOS-UI-SETTINGS).
 
 ## design
 - Not in the navigation: the navigation keeps Settings lit on it. It shows the app's own components (booking cards, chips, tiles) on made-up data, and make verify checks it like any page.

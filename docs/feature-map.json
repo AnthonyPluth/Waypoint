@@ -584,6 +584,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_photo_proxy.py",
         "tests/test_photo_sources.py"
       ],
       "docs": [
@@ -598,6 +599,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
+        "tests/test_photo_proxy.py",
         "tests/test_photo_sources.py"
       ],
       "docs": [

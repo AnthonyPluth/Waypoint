@@ -13,6 +13,7 @@ from ..providers import immich
 from ..storage import db, photo_sources, secretbox
 from ..storage.models import Person, User
 from ..storage.photo_sources import OFF, OK, REFUSED, UNREACHABLE, Status, Stored
+from . import photoqueue
 
 NO_SOURCE = "No such photo library"
 NO_PERSON = "No such person"
@@ -184,8 +185,14 @@ def _outcome(conn: db.Connection, source: Stored, error: immich.ImmichError) -> 
     conn.commit()
 
 
+def is_demo(source: Stored) -> bool:
+    return source["url"] == photoqueue.DEMO
+
+
 def test(conn: db.Connection, actor: Actor, source_id: int, key: str | None) -> Tested:
     source = owned(conn, actor, source_id)
+    if is_demo(source):
+        return {"name": conn.execute(select(Person.display_name).where(Person.id == source["person_id"])).scalar(), "same_account": True}
     if key is not None:
         account = _ping(provider_source(source["url"], key))
         return {"name": account.name, "same_account": account.user_id == source["immich_user_id"]}

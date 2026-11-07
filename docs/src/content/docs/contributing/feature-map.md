@@ -47,8 +47,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/photo-sources/test` | `photos.py:api_photo_source_test_new` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}` | `photos.py:api_photo_source_edit` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `DELETE /api/photo-sources/{id}` | `photos.py:api_photo_source_remove` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
-| `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_set` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_stop` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |

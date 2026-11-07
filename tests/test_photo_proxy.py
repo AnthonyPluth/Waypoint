@@ -21,7 +21,7 @@ from waypoint.domain import photoproxy, photos, photosources
 from waypoint.providers import immich
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db, secretbox
-from waypoint.storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSource
+from waypoint.storage.models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource
 
 HOST = "immich-canary-8h2k.example"
 HEADER_CANARY = "canary-immich-header-3v8n"
@@ -375,6 +375,19 @@ class DemoTests(ProxyCase):
         other = self.photo("ben")
         self.assertNotEqual(self.image("ana", f"/api/photos/{other}/thumbnail")[1], thumbnail)
         self.missing("cy", f"/api/photos/{self.mine}/thumbnail")
+
+    def test_testing_and_syncing_a_demo_library_answer_locally_and_the_original_opens_no_connection(self):
+        with db.session() as conn:
+            name = conn.orm.get(Person, self.person["ben"]).display_name
+            before = conn.orm.get(PhotoSource, self.sources["ben"]).status
+        source = self.sources["ben"]
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{source}/test", {}), {"name": name, "same_account": True})
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{source}/test", {"key": "canary-demo-key-3c9"}), {"name": name, "same_account": True})
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{source}/sync"), {"started": False})
+        self.assertEqual(self.image("ana", f"/api/photos/{self.mine}/original")[0]["Content-Type"], "image/png")
+        with db.session() as conn:
+            self.assertEqual(conn.orm.get(PhotoSource, source).status, before)
+        self.assertEqual(self.immich.calls, [])
 
     def test_the_placeholder_is_a_deterministic_gradient_of_its_asset(self):
         kind, data = photos.placeholder("asset-one", "thumbnail")

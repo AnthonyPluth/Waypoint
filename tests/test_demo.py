@@ -1,10 +1,15 @@
 from datetime import UTC, date, datetime
 
+from collections import Counter
+from unittest import mock
+
 from sqlalchemy import MetaData, func, select
 
-from waypoint.domain import demo, stats, trips
+from waypoint import tls
+from waypoint.domain import demo, people, photos, stats, trips
 from waypoint.domain.visibility import Viewer
-from waypoint.storage import gate_codes, stored_mail
+from waypoint.storage import gate_codes, secretbox, stored_mail
+from waypoint.storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment
 from tests.shared import DbCase
 
 
@@ -74,3 +79,90 @@ class DemoTests(DbCase):
         assert shown
         self.assertEqual(gate_codes.dimensions(shown["data"]), (290, 290))
         self.assertEqual(len(stored_mail.for_segment(self.c, lots[1]["id"])), 1)
+
+
+class DemoPhotoTests(DbCase):
+    TODAY = date(2026, 10, 5)
+
+    def setUp(self):
+        super().setUp()
+        failed = mock.patch.object(tls, "urlopen", side_effect=AssertionError("seeding the demo opened a connection"))
+        failed.start()
+        self.addCleanup(failed.stop)
+        demo.seed(self.c, self.TODAY)
+        self.jane, self.sam = (people.person_for_sub(self.c, sub) for sub in ("demo-jane", "demo-sam"))
+
+    def trip_of(self, origin: str) -> int:
+        trip_id = self.c.orm.scalars(select(Segment.trip_id).where(Segment.origin == origin).order_by(Segment.id)).first()
+        assert trip_id is not None
+        return trip_id
+
+    def count(self, model, *where) -> int:
+        return self.c.orm.scalar(select(func.count()).select_from(model).where(*where)) or 0
+
+    def test_each_member_has_a_demo_library_that_is_never_synced(self):
+        sources = self.c.orm.scalars(select(PhotoSource).order_by(PhotoSource.person_id)).all()
+        self.assertEqual([s.person_id for s in sources], sorted([self.jane, self.sam]))
+        for source in sources:
+            self.assertEqual((source.url, source.status, source.owner_sub), ("demo", "ok", f"demo-{'jane' if source.person_id == self.jane else 'sam'}"))
+            self.assertIsNotNone(source.last_sync)
+            self.assertNotIn("demo", source.api_key)
+            self.assertEqual(secretbox.decrypt(source.api_key), "demo-not-a-token")
+        synced = self.c.orm.scalars(select(PhotoTripSync)).all()
+        self.assertEqual(len(synced), 5)
+        for row in synced:
+            self.assertEqual((row.cursor is None, row.resume_after is None, row.inputs is None, row.fetch_started is None, row.synced is not None), (False, True, False, True, True))
+
+    def test_has_the_rows_the_ui_needs(self):
+        self.assertEqual((self.count(PhotoSource), self.count(Photo), self.count(PhotoGrant), self.count(PhotoExclusion), self.count(PhotoTripSync)), (2, 29, 6, 1, 5))
+        self.assertEqual(Counter(p.match for p in self.c.orm.scalars(select(Photo))), {"place": 21, "time": 6, "far": 1, "ambiguous": 1})
+        self.assertEqual(Counter(p.kind for p in self.c.orm.scalars(select(Photo))), {"image": 29})
+        self.assertEqual(len({p.asset_id for p in self.c.orm.scalars(select(Photo))}), 29)
+
+    def test_every_photo_is_inside_its_trips_window_and_not_after_the_clock(self):
+        now = datetime(2026, 10, 5, 12, tzinfo=UTC)
+        for photo in self.c.orm.scalars(select(Photo)):
+            taken = photos.instant(photo.taken_utc)
+            self.assertLessEqual(taken, now, photo.asset_id)
+            person = self.c.orm.get(PhotoSource, photo.source_id).person_id
+            if photo.trip_id is None:
+                windows = photos.candidate_windows(self.c, person)
+            else:
+                found = photos.trip_window(self.c, photo.trip_id)
+                assert found is not None
+                windows = [found]
+            self.assertTrue(any(w.start <= taken <= w.end for w in windows), photo.asset_id)
+
+    def test_grants_share_each_photographed_trip_with_the_trip_and_leave_two_trips_unshared_or_declined(self):
+        granted = self.c.orm.scalars(select(PhotoGrant)).all()
+        live = [g for g in granted if g.revoked is None]
+        self.assertEqual((len(live), {g.scope for g in live}), (5, {"trip"}))
+        self.assertEqual({g.trip_id for g in live}, {self.trip_of(o) for o in ("Mile High Inn", "Lakeside Resort", "Harbour Hotel")})
+        declined = [g for g in granted if g.revoked is not None]
+        self.assertEqual([(g.person_id, g.trip_id) for g in declined], [(self.sam, self.trip_of("Miami"))])
+        self.assertEqual(self.count(Photo, Photo.trip_id == self.trip_of("Bayview Inn")), 0)
+        self.assertEqual(self.c.orm.get(PhotoGrant, (self.jane, self.trip_of("Bayview Inn"))), None)
+
+    def test_the_road_trip_has_clusters_an_inferred_only_one_a_far_photo_and_a_removed_one(self):
+        road = self.trip_of("Mile High Inn")
+        got = photos.for_trip(self.c, Viewer(self.jane), road)
+        assert got
+        self.assertEqual((got["counts"]["total"], got["counts"]["far"]), (13, 1))
+        self.assertTrue(any(c["inferred"] for c in got["clusters"]))
+        self.assertTrue(any(not c["inferred"] and c["count"] >= 3 for c in got["clusters"]))
+        self.assertIsNone(photos.for_trip(self.c, Viewer(self.sam), road))
+        sharing = photos.removed(self.c, Viewer(self.jane), road)
+        self.assertEqual(len(sharing), 1)
+        self.assertEqual(self.count(PhotoExclusion, PhotoExclusion.trip_id == road), 1)
+
+    def test_needs_a_look_has_one_far_and_one_ambiguous_photo(self):
+        got = photos.needs_a_look(self.c, Viewer(self.jane))["photos"]
+        self.assertEqual(sorted(p["match"] for p in got), ["ambiguous", "far"])
+        self.assertTrue(all(p["candidates"] for p in got))
+        self.assertEqual(photos.needs_a_look(self.c, Viewer(self.sam))["photos"], [])
+
+    def test_a_trip_nobody_shared_shows_no_photos(self):
+        for who in (self.jane, self.sam):
+            got = photos.for_trip(self.c, Viewer(who), self.trip_of("Bayview Inn"))
+            assert got
+            self.assertEqual(got["counts"]["total"], 0)

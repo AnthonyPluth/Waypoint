@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import hashlib
+import math
+import time
 from datetime import UTC, date, datetime, timedelta
+from typing import NamedTuple
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select, update
 
 from ..providers import flightstatus as service
 from ..storage import db, secretbox, stored_mail
-from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentCode, SegmentMessage, SegmentPort,
-                              SegmentTraveler, StoredMessage, Trip, TripPerson, User)
-from . import flightstatus, logos, loyalty, people, pixels, trips
+from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, ReviewItem,
+                              Segment, SegmentCode, SegmentMessage, SegmentPort, SegmentTraveler, StoredMessage, Trip, TripPerson, User)
+from . import flightstatus, logos, loyalty, people, photoqueue, photos, pixels, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
 
@@ -241,6 +246,61 @@ SAME_RESERVATION: list[tuple[str, int, str]] = [("Online check-in is open", 18, 
 SHARED_UNREAD: list[tuple[str, int, review.Reason]] = [("example-cruises.example", 9, "no_markup")]
 
 
+class _Shot(NamedTuple):
+    who: str
+    at: str
+    anchor: str
+    minutes: int
+    spot: tuple[str, str, float, float] | None = None
+    note: str | None = None
+
+
+JANE, SAM = "demo-jane", "demo-sam"
+MILE_HIGH, SALT_FLAT, FOOTHILLS = "Mile High Inn", "Salt Flat Inn", "Foothills Lodge"
+LAKESIDE, HARBOUR = "Lakeside Resort", "Harbour Hotel"
+DEMO_KEY = "demo-not-a-token"
+DEMO_DECLINED = "Miami"
+HOURS = 60
+
+DEMO_PHOTOS: dict[str, list[_Shot]] = {
+    MILE_HIGH: [
+        _Shot(JANE, MILE_HIGH, "start", 90, (MILE_HIGH, "origin", 0.2, 0.1)),
+        _Shot(JANE, MILE_HIGH, "start", 26 * HOURS, (MILE_HIGH, "origin", 0.5, -0.3)),
+        _Shot(JANE, MILE_HIGH, "start", 30 * HOURS),
+        _Shot(JANE, MILE_HIGH, "start", 50 * HOURS, (MILE_HIGH, "origin", 0.4, 0.2), "removed"),
+        _Shot(JANE, SALT_FLAT, "start", 60, (SALT_FLAT, "origin", 7.0, 2.0)),
+        _Shot(JANE, SALT_FLAT, "start", 90, (SALT_FLAT, "origin", 7.3, 2.2)),
+        _Shot(JANE, SALT_FLAT, "start", 22 * HOURS, (SALT_FLAT, "origin", 35.0, 20.0)),
+        _Shot(JANE, SALT_FLAT, "start", 22 * HOURS + 25, (SALT_FLAT, "origin", 35.3, 20.2)),
+        _Shot(JANE, SALT_FLAT, "start", 22 * HOURS + 50, (SALT_FLAT, "origin", 35.1, 19.8)),
+        _Shot(JANE, SALT_FLAT, "start", 23 * HOURS + 20, (SALT_FLAT, "origin", 35.4, 20.1)),
+        _Shot(JANE, SALT_FLAT, "start", 40 * HOURS),
+        _Shot(JANE, SALT_FLAT, "start", 46 * HOURS, (SALT_FLAT, "origin", 560.0, 0.0)),
+        _Shot(JANE, FOOTHILLS, "start", 120, (FOOTHILLS, "origin", 0.3, 0.3)),
+        _Shot(JANE, FOOTHILLS, "start", 20 * HOURS),
+    ],
+    LAKESIDE: [
+        _Shot(JANE, "JFK", "start", -90, ("JFK", "origin", 0.4, 0.2)),
+        _Shot(JANE, "JFK", "end", 40, ("JFK", "destination", 0.3, -0.2)),
+        _Shot(JANE, LAKESIDE, "start", 120, (LAKESIDE, "origin", 0.1, 0.1)),
+        _Shot(JANE, LAKESIDE, "start", 30 * HOURS, (LAKESIDE, "origin", 0.2, 0.3)),
+        _Shot(JANE, LAKESIDE, "start", 50 * HOURS),
+        _Shot(JANE, "MCO", "start", -75, ("MCO", "origin", 0.4, -0.1)),
+        _Shot(SAM, LAKESIDE, "start", 180, (LAKESIDE, "origin", 0.2, 0.2)),
+        _Shot(SAM, "MCO", "end", 30, ("MCO", "destination", 0.3, 0.3)),
+    ],
+    HARBOUR: [
+        _Shot(JANE, "JFK", "start", -100, ("JFK", "origin", 0.3, 0.1)),
+        _Shot(JANE, "JFK", "end", 30, None, "ambiguous"),
+        _Shot(JANE, HARBOUR, "start", 60, (HARBOUR, "origin", 0.1, 0.1)),
+        _Shot(JANE, HARBOUR, "start", 4 * HOURS, (HARBOUR, "origin", 0.3, -0.2)),
+        _Shot(JANE, HARBOUR, "start", 8 * HOURS),
+        _Shot(SAM, HARBOUR, "start", 65, (HARBOUR, "origin", 0.2, 0.1)),
+        _Shot(SAM, HARBOUR, "start", 5 * HOURS),
+    ],
+}
+
+
 FAMILY_SEATS = {"DL 1412": ("22A", "22B", "22C"), "AA 101": ("31A", "31B", "31C")}
 
 
@@ -362,8 +422,90 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     for brand, color in DEMO_LOGO_COLORS.items():
         db.upsert(conn, BrandLogo, {"key": logos.key(brand), "name": brand, "logo": _square(color), "logo_type": "image/png",
                                     "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "demo"}, key=["key"])
+    assert jane.person_id is not None and sam.person_id is not None
+    _photo_library(conn, {JANE: jane.person_id, SAM: sam.person_id})
     hold_status(today)
     return _rows(conn) - before
+
+
+def _trip_of(conn: db.Connection, origin: str) -> int:
+    found = conn.orm.scalars(select(Segment.trip_id).where(Segment.origin == origin).order_by(Segment.id)).first()
+    assert found is not None
+    return found
+
+
+def _segment(conn: db.Connection, trip_id: int, origin: str) -> Segment:
+    found = conn.orm.scalars(select(Segment).where(Segment.trip_id == trip_id, Segment.origin == origin).order_by(Segment.id)).first()
+    assert found is not None
+    return found
+
+
+def _spot(conn: db.Connection, trip_id: int, spot: tuple[str, str, float, float]) -> tuple[float, float]:
+    origin, side, north, east = spot
+    segment = _segment(conn, trip_id, origin)
+    point = photos.segment_points(conn, [segment])[segment.id][0]
+    base = point.origin if side == "origin" else point.destination
+    assert base is not None
+    latitude = base[0] + north / photos.KM_PER_DEGREE
+    return round(latitude, 5), round(base[1] + east / (photos.KM_PER_DEGREE * math.cos(math.radians(latitude))), 5)
+
+
+def _photo(conn: db.Connection, trip_id: int, shot: _Shot, source_id: int, number: int, now: float) -> Photo:
+    segment = _segment(conn, trip_id, shot.at)
+    local, zone = (segment.start_local, segment.start_zone) if shot.anchor == "start" else (segment.end_local, segment.end_zone)
+    taken = trips.instant(local, zone) + timedelta(minutes=shot.minutes)
+    where = _spot(conn, trip_id, shot.spot) if shot.spot else None
+    placed = taken.astimezone(ZoneInfo(zone))
+    offset = placed.utcoffset()
+    return Photo(source_id=source_id, asset_id=f"demo-{number:04d}", asset_updated=taken.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                 kind="image", taken_utc=taken.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                 taken_local=f"{placed:%Y-%m-%dT%H:%M}", taken_offset=int(offset.total_seconds() // 60) if offset else None,
+                 latitude=where[0] if where else None, longitude=where[1] if where else None, location_source="exif" if where else None, state=None, country=None,
+                 trip_id=None, segment_id=None, match=photos.AMBIGUOUS if shot.note == "ambiguous" else "none", distance_km=None,
+                 decided_by=photos.AUTO if shot.note == "ambiguous" else None, seen=now)
+
+
+def _photo_library(conn: db.Connection, members: dict[str, int]) -> None:
+    now = time.time()
+    sources = {}
+    for sub, person_id in members.items():
+        source = PhotoSource(person_id=person_id, owner_sub=sub, url=photoqueue.DEMO, immich_user_id=sub, api_key=secretbox.encrypt(DEMO_KEY) or "",
+                             label="Demo library", status="ok", last_sync=now - 3600, last_error=None, created=now - 86400)
+        conn.orm.add(source)
+        sources[sub] = source
+    conn.orm.flush()
+    declined = _trip_of(conn, DEMO_DECLINED)
+    conn.orm.add(PhotoGrant(person_id=members[SAM], trip_id=declined, scope=photos.ONLY_ME, revoked=now - 7200, changed=now - 7200, granted_by=SAM, ask_again=False))
+    placed: list[tuple[Photo, int, str | None]] = []
+    number = 0
+    for origin, shots in DEMO_PHOTOS.items():
+        trip_id = _trip_of(conn, origin)
+        for sub in dict.fromkeys(shot.who for shot in shots):
+            conn.orm.add(PhotoGrant(person_id=members[sub], trip_id=trip_id, scope=photos.TRIP, revoked=None, changed=now - 3600, granted_by=sub, ask_again=False))
+        for shot in shots:
+            number += 1
+            row = _photo(conn, trip_id, shot, sources[shot.who].id, number, now)
+            conn.orm.add(row)
+            placed.append((row, trip_id, shot.note))
+    conn.orm.flush()
+    for row, trip_id, note in placed:
+        person_id = members[next(s.owner_sub for s in sources.values() if s.id == row.source_id)]
+        if note == "removed":
+            conn.orm.add(PhotoExclusion(person_id=person_id, asset_id=row.asset_id, trip_id=trip_id, created=now - 1800, was_trip_id=None))
+            conn.orm.flush()
+    windows = {person_id: photos.candidate_windows(conn, person_id) for person_id in members.values()}
+    for row, _, note in placed:
+        if note != "ambiguous":
+            person_id = next(s.person_id for s in sources.values() if s.id == row.source_id)
+            photos.re_place(conn, row, person_id, windows[person_id])
+    for source in sources.values():
+        for trip_id in {t for r, t, _ in placed if r.source_id == source.id}:
+            found = photos.trip_window(conn, trip_id)
+            assert found is not None
+            conn.orm.add(PhotoTripSync(source_id=source.id, trip_id=trip_id, window_start=found.start.isoformat(), window_end=found.end.isoformat(),
+                                       cursor=f"{datetime.fromtimestamp(now - 3600, UTC):%Y-%m-%dT%H:%M:%S}.000Z", resume_after=None,
+                                       inputs=hashlib.sha256(f"{source.id}:{trip_id}".encode()).hexdigest(), fetch_started=None, synced=now - 3600))
+    conn.orm.flush()
 
 
 def hold_status(today: date) -> None:
@@ -381,4 +523,5 @@ def restore_status(conn: db.Connection) -> None:
 
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
-               for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage, SegmentCode))
+               for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage, SegmentCode,
+                PhotoSource, Photo, PhotoGrant, PhotoExclusion, PhotoTripSync))
