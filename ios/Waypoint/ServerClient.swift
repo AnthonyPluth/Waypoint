@@ -129,15 +129,37 @@ enum ServerClient {
         return try await send(request)
     }
 
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.waitsForConnectivity = true
+        configuration.timeoutIntervalForResource = 45
+        return URLSession(configuration: configuration)
+    }()
+
+    static let retryDelay: UInt64 = 1_500_000_000
+
+    static func shouldRetry(_ code: URLError.Code, attempt: Int) -> Bool {
+        guard attempt < 2 else { return false }
+        return code == .notConnectedToInternet || code == .cannotConnectToHost
+    }
+
     static func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw ServerError.notWaypoint }
-            return (data, http)
-        } catch let error as ServerError {
-            throw error
-        } catch {
-            throw ServerError.notReachable(error.localizedDescription)
+        var attempt = 0
+        while true {
+            do {
+                let (data, response) = try await session.data(for: request)
+                guard let http = response as? HTTPURLResponse else { throw ServerError.notWaypoint }
+                return (data, http)
+            } catch let error as ServerError {
+                throw error
+            } catch {
+                if let failure = error as? URLError, shouldRetry(failure.code, attempt: attempt) {
+                    attempt += 1
+                    try? await Task.sleep(nanoseconds: retryDelay)
+                    continue
+                }
+                throw ServerError.notReachable(error.localizedDescription)
+            }
         }
     }
 

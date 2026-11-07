@@ -1,6 +1,6 @@
 # Waypoint for iPhone
 
-A native shell around the Waypoint web app. The person types the address of their own Waypoint; the app signs in to it with the system sign-in sheet and shows the web app in a Capacitor web view. Scope and decisions: https://claude.ai/artifact/4ipdDY5JrUtsfmrxWJ9fXG
+A native shell around the Waypoint web app. The person types the address of their own Waypoint; the app signs in to it with the system sign-in sheet and shows the web app in a Capacitor web view. Setup and sign-in are described in the [iPhone app page](https://anthonypluth.github.io/Waypoint/start/ios/).
 
 **Status: written without Xcode or a Mac, never compiled or run.** Expect to fix compile errors on first build. The server side it talks to is tested (`tests/test_app_sign_in.py`).
 
@@ -42,7 +42,8 @@ Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholde
 - Offline encrypted store behind the web app's trip data, local reminders, Face ID lock.
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.
-- Sign out in Settings (the code, `ServerSession.signOut`, exists but nothing calls it from the web UI).
+- A sign-out button. `ServerSession.signOut` exists, but the only screen that calls it is the error screen's **Use another Waypoint** (and it runs on its own when the server says the sign-in is no longer valid); there is no sign-out in Settings or the web UI.
+- Renewing the web session when a request answers 401 while the app is already in the foreground (renewal runs only when the app becomes active).
 - Servers behind a forward-auth proxy, and self-signed certificates (App Transport Security only relaxes local-network addresses).
 - File picker, downloads and `webcal://` handling in the web view.
 - Running the app on a simulator or device in CI (the iOS workflow builds it and runs the unit tests only).
