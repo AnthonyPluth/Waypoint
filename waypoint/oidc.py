@@ -17,7 +17,7 @@ from sqlalchemy import delete, insert, select, update
 from .domain import people
 from .storage import db, secretbox
 from . import tls
-from .storage.models import AuthPending, AuthSession, User
+from .storage.models import AuthPending, AuthSession, OAuthGrant, User
 
 
 LOGIN_TTL = 600
@@ -208,6 +208,25 @@ def finish_login(conn, params: dict, login_cookie: str | None) -> tuple[str, str
     return token, safe_next(row["next"])
 
 
+def user_name(conn, sub: str | None) -> str | None:
+    return conn.execute(select(User.name).where(User.sub == sub)).scalar() if sub else None
+
+
+def create_session(conn, sub: str | None, email: str | None, name: str | None, max_life: int | None = None,
+                   grant_id: int | None = None) -> tuple[str, int]:
+    token = secrets.token_urlsafe(32)
+    now = time.time()
+    life = config()["session_days"] * 86400
+    if max_life is not None:
+        life = min(life, max_life)
+    if known_only_at_sign_in():
+        seen = conn.execute(select(User.last_seen).where(User.sub == sub)).scalar() if sub else None
+        life = min(life, max(0, (seen or 0) + config()["session_days"] * 86400 - now))
+    conn.execute(insert(AuthSession).values(token_hash=_hash(token), sub=sub, email=email, name=name, created=now, expires=now + life,
+                                            id_token=None, grant_id=grant_id))
+    return token, int(life)
+
+
 def first_name(name: str | None, email: str | None, given: str | None = None) -> str:
     if given and given.strip():
         return given.strip().split()[0]
@@ -301,13 +320,20 @@ def verify_id_token(id_token: str, nonce: str, d: dict) -> dict:
     return claims
 
 
+def _grant_live(conn, grant_id: int | None) -> bool:
+    if grant_id is None:
+        return True
+    row = conn.execute(select(OAuthGrant.revoked).where(OAuthGrant.id == grant_id)).fetchone()
+    return row is not None and row["revoked"] is None
+
+
 def session_user(conn, token: str | None) -> dict | None:
     if not token:
         return None
     row = conn.execute(select(AuthSession).where(AuthSession.token_hash == _hash(token))).fetchone()
     if not row:
         return None
-    if row["expires"] < time.time() or not still_allowed(row["email"]):
+    if row["expires"] < time.time() or not still_allowed(row["email"]) or not _grant_live(conn, row["grant_id"]):
         conn.execute(delete(AuthSession).where(AuthSession.token_hash == row["token_hash"]))
         return None
     return {"sub": row["sub"], "email": row["email"], "name": row["name"]}
@@ -317,10 +343,10 @@ def renew_session(conn, token: str | None) -> int | None:
     if not token:
         return None
     c = config()
-    row = conn.execute(select(AuthSession.expires, AuthSession.created, AuthSession.email)
+    row = conn.execute(select(AuthSession.expires, AuthSession.created, AuthSession.email, AuthSession.grant_id)
                        .where(AuthSession.token_hash == _hash(token))).fetchone()
     now, life = time.time(), c["session_days"] * 86400
-    if not row or row["expires"] < now or row["expires"] > now + life - SESSION_RENEW_AFTER:
+    if not row or row["grant_id"] is not None or row["expires"] < now or row["expires"] > now + life - SESSION_RENEW_AFTER:
         return None
     if not (c["any_user"] or (row["email"] or "").lower() in c["emails"]):
         return None

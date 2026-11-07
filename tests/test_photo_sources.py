@@ -2,21 +2,22 @@ import contextlib
 import io
 import json
 import os
+import time
 import unittest
 from unittest import mock
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
-from tests.test_trips import RouteCase, guest
+from tests.test_trips import BACK, OUT, RouteCase, guest
 from waypoint import oidc
-from waypoint.domain import people, photogrants, photos, photosources
+from waypoint.domain import people, photogrants, photos, photosources, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.providers import immich
 from waypoint.server import ROUTES, jobs, mcp_access, mcp_http
 from waypoint.storage import backup, db, photo_sources, secretbox
-from waypoint.storage.models import Photo, PhotoSharingPrefs, PhotoSource
+from waypoint.storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, User
 
 URL = "https://immich-canary-8h2k.example:2283"
 LAN = "http://immich.local:2283"
@@ -200,6 +201,27 @@ class SourceRoutes(RouteCase):
                                              "photos": 1, "trips": 1})
         self.assertEqual((got[mine["id"]]["photos"], got[mine["id"]]["trips"], got[mine["id"]]["last_sync"], got[mine["id"]]["mine"]), (None, None, None, False))
 
+    def test_a_photo_removed_from_its_only_trip_leaves_the_librarys_counts_at_once(self):
+        trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
+        other = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])["trip_id"]
+        mine = self.connect()
+        with db.session() as conn:
+            conn.orm.add_all([photo(mine["id"], trip, 1), photo(mine["id"], trip, 2), photo(mine["id"], other, 3)])
+            conn.orm.flush()
+        counts = lambda: next((s["photos"], s["trips"]) for s in self.listing("ana")["sources"] if s["id"] == mine["id"])
+        self.assertEqual(counts(), (3, 2))
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ana"], asset_id="asset-3", trip_id=other, created=2.0, was_trip_id=other))
+            conn.orm.flush()
+        self.assertEqual(counts(), (2, 1))
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ben"], asset_id="asset-1", trip_id=trip, created=2.0, was_trip_id=trip))
+            conn.orm.flush()
+        self.assertEqual(counts(), (2, 1))
+        with db.session() as conn:
+            conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == self.person["ana"]))
+        self.assertEqual(counts(), (3, 2))
+
     def test_only_the_owner_edits_tests_removes_and_syncs_a_library(self):
         made = self.connect()
         calls = [("POST", f"/api/photo-sources/{made['id']}", {"label": "Stolen"}), ("DELETE", f"/api/photo-sources/{made['id']}", None),
@@ -306,6 +328,72 @@ class SourceRoutes(RouteCase):
         self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{made['id']}", {"label": "Mine now"})["label"], "Mine now")
 
+    def meanwhile(self, source_id, status):
+        def change(_source):
+            with db.session() as conn:
+                photo_sources.mark(conn, source_id, status, None)
+            return ACCOUNT
+        return mock.patch.object(immich, "ping", side_effect=change)
+
+    def test_a_pause_made_while_a_test_waits_on_immich_survives_the_test(self):
+        made = self.connect()
+        with self.meanwhile(made["id"], "off"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
+        with self.meanwhile(made["id"], "off"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY})["status"], "off")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
+    def test_a_resume_made_while_a_test_waits_on_immich_survives_the_test(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+
+        def resumed_then_refused(_source):
+            with db.session() as conn:
+                photo_sources.mark(conn, made["id"], "ok", None)
+            raise immich.Refused(immich.REFUSED)
+        with mock.patch.object(immich, "ping", side_effect=resumed_then_refused):
+            self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})[0], 400)
+        self.assertEqual(self.raw(made["id"])[1:3], ("refused", immich.REFUSED))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        with self.meanwhile(made["id"], "ok"):
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
+
+    def shared(self, who, scope="trip", revoked=None):
+        trip = self.book(who, travelers=[{"person_id": self.person[who]}])["trip_id"]
+        with db.session() as conn:
+            conn.orm.add(PhotoGrant(person_id=self.person[who], trip_id=trip, scope=scope, revoked=revoked, changed=1.0, granted_by=f"sub-{who}"))
+            conn.orm.flush()
+        return trip
+
+    def test_a_library_connected_under_an_active_trip_grant_starts_paused(self):
+        self.shared("ana")
+        self.shared("ben", scope="only_me")
+        self.shared("cy", revoked=2.0)
+        made = self.connect()
+        self.assertEqual((made["status"], self.raw(made["id"])[1:3]), ("off", ("off", None)))
+        self.assertEqual(self.connect(who="ben")["status"], "ok")
+        self.assertEqual(self.connect(who="cy")["status"], "ok")
+        self.assertEqual(self.connect(url=LAN, person_id=self.guest)["status"], "ok")
+        with ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})["name"], "Ana Example")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+
+    def test_resuming_under_an_active_trip_grant_waits_for_a_confirmation_that_is_not_here_yet(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        self.shared("ana")
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (409, {"error": photosources.RESUME_ASKS}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True, "label": "Still off"})["status"], "off")
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"label": "Named"})["status"], "off")
+        theirs = self.connect(who="ben")
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": True})["status"], "off")
+        self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": False})["status"], "ok")
+
     def test_a_key_that_can_no_longer_be_unlocked_asks_to_be_entered_again(self):
         made = self.connect()
         with db.session() as conn:
@@ -388,6 +476,56 @@ class SourceRoutes(RouteCase):
         self.assertEqual({p for _m, p, *_ in ROUTES if p.startswith("/api/photo-sources")}, set(PATTERNS))
 
 
+class SnapshotRoutes(RouteCase):
+    def setUp(self):
+        super().setUp()
+        self.trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
+        with ping():
+            self.library = self.ok("ana", "POST", "/api/photo-sources", {"url": URL, "key": KEY})
+
+    def sharing(self, trip=None):
+        return self.ok("ana", "GET", f"/api/trips/{self.trip if trip is None else trip}/photo-sharing")
+
+    def snapshot(self, seen):
+        return {"window": seen["window"], "audience": seen["audience"], "sources": seen["sources"]}
+
+    def test_a_first_sharing_confirmed_before_someone_joined_is_refused_by_the_route(self):
+        seen = self.sharing()
+        self.assertEqual((seen["audience"], seen["sources"]), ([self.person["ana"]], [{"id": self.library["id"], "status": "ok"}]))
+        stale = self.snapshot(seen)
+        self.book("ana", BACK, trip_id=self.trip, travelers=[{"person_id": self.person["ben"]}])
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **stale}), (409, {"error": photogrants.STALE_SHARE}))
+        self.assertEqual(self.sharing()["state"], "none")
+        fresh = self.sharing()
+        got = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **self.snapshot(fresh)})
+        self.assertEqual((got["state"], got["audience"], got["sources"]), ("shared", sorted([self.person["ana"], self.person["ben"]]), fresh["sources"]))
+
+    def test_a_library_connected_or_resumed_after_the_snapshot_is_refused_by_the_route(self):
+        stale = self.snapshot(self.sharing())
+        with ping(OTHER):
+            second = self.ok("ana", "POST", "/api/photo-sources", {"url": LAN, "key": NEW_KEY})
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **stale}), (409, {"error": photogrants.STALE_SOURCES}))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": True})["status"], "off")
+        stale = self.snapshot(self.sharing())
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": False})["status"], "ok")
+        self.assertEqual(self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **stale}), (409, {"error": photogrants.STALE_SOURCES}))
+        self.assertEqual(self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "trip", **self.snapshot(self.sharing())})["state"], "shared")
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": True})["status"], "off")
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{second['id']}", {"paused": False}), (409, {"error": photosources.RESUME_ASKS}))
+
+    def test_share_on_all_confirmed_before_someone_joined_a_pending_trip_is_refused_by_the_route(self):
+        seen = self.sharing()
+        stale = {"share_all": True, "windows": {str(self.trip): seen["window"]}, "audiences": {str(self.trip): seen["audience"]}, "sources": seen["sources"]}
+        self.book("ana", BACK, trip_id=self.trip, travelers=[{"person_id": self.person["ben"]}])
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", stale), (409, {"error": photogrants.STALE_SETTING}))
+        self.assertFalse(self.ok("ana", "GET", "/api/photo-grants")["people"][0]["prefs"]["share_all"])
+        fresh = self.sharing()
+        got = self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}",
+                      {"share_all": True, "windows": {str(self.trip): fresh["window"]}, "audiences": {str(self.trip): fresh["audience"]}, "sources": fresh["sources"]})
+        self.assertTrue(got["share_all"])
+        self.assertEqual(self.sharing()["state"], "shared")
+
+
 class LocalMode(ServerCase):
     unset = ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_ALLOWED_EMAILS")
 
@@ -449,6 +587,19 @@ class Storage(DbCase):
             self.assertEqual(secretbox.encrypt_stored(self.c), 0)
         self.assertIn("Immich library's key can't be decrypted", out.getvalue())
         self.assertNotIn(KEY, out.getvalue())
+
+    def test_a_key_lost_at_start_marks_the_library_until_it_is_entered_again(self):
+        paused = photo_sources.save(self.c, self.person, "sub-ana", LAN, ACCOUNT.user_id, NEW_KEY, None, 1.0, "off")
+        self.c.commit()
+        with mock.patch.dict(os.environ, {"WAYPOINT_SECRET_KEY": "a-brand-new-key-abcdefghijklmnopqrstuvwxyz"}), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(secretbox.encrypt_stored(self.c), 0)
+        found = {s["id"]: s for s in photo_sources.list_all(self.c)}
+        self.assertEqual((found[self.source]["status"], found[self.source]["last_error"]), ("refused", photosources.KEY_LOST))
+        self.assertEqual((found[paused]["status"], found[paused]["last_error"]), ("off", photosources.KEY_LOST))
+        photo_sources.set_key(self.c, self.source, KEY)
+        photo_sources.mark(self.c, self.source, "ok", None)
+        self.assertEqual(secretbox.encrypt_stored(self.c), 0)
+        self.assertEqual(photo_sources.get(self.c, self.source)["status"], "ok")
 
     def test_a_plain_key_is_sealed_at_start(self):
         self.c.execute(update(PhotoSource).where(PhotoSource.id == self.source).values(api_key=NEW_KEY))
@@ -566,9 +717,13 @@ class Races(DbCase):
         source = photo_sources.save(self.c, self.guest, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
         self.c.commit()
 
+        handed = []
+
         def handed_over(conn, sub, email, now=None):
-            with db.session(self.path) as other:
-                photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
+            if not handed:
+                handed.append(sub)
+                with db.session(self.path) as other:
+                    photogrants.claim(other, self.guest, self.ben.person_id, "sub-ben")
             return "user_removed" if sub == "sub-ana" else None
         with mock.patch.object(oidc, "access_lapsed", side_effect=handed_over):
             self.assertEqual(photosources.end_lapsed(self.c), 0)
@@ -579,6 +734,48 @@ class Races(DbCase):
         with mock.patch.object(oidc, "access_lapsed", side_effect=lambda conn, sub, email, now=None: "user_removed" if sub == "sub-ben" else None):
             self.assertEqual(photosources.end_lapsed(self.c), 1)
         self.assertIsNone(photo_sources.get(self.c, source))
+
+    def test_the_sweep_leaves_a_library_whose_owner_signs_in_as_it_runs(self):
+        source = photo_sources.save(self.c, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
+        checked = oidc.access_lapsed
+
+        def signs_in_after_the_check(conn, sub, email, now=None):
+            found = checked(conn, sub, email, now)
+            if found is not None:
+                with db.session(self.path) as other:
+                    oidc.remember_user(other, "sub-ana", "ana@example.com", "Ana", None)
+            return found
+        with mock.patch.dict(os.environ, groups), mock.patch.object(oidc, "access_lapsed", side_effect=signs_in_after_the_check):
+            self.assertEqual(photosources.end_lapsed(self.c), 0)
+        self.c.commit()
+        self.assertIsNotNone(photo_sources.get(self.c, source))
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        with mock.patch.dict(os.environ, groups):
+            self.assertEqual(photosources.end_lapsed(self.c), 1)
+        self.assertIsNone(photo_sources.get(self.c, source))
+
+    def test_the_grant_sweep_locks_the_owner_before_its_last_access_check(self):
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": self.ana.person_id, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=self.ana.person_id, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        self.c.orm.flush()
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
+        order = []
+        checked, locked = oidc.access_lapsed, photo_sources.lock_owner
+        with mock.patch.dict(os.environ, groups), \
+                mock.patch.object(oidc, "access_lapsed", side_effect=lambda conn, sub, email, now=None: order.append(("check", sub)) or checked(conn, sub, email, now)), \
+                mock.patch.object(photo_sources, "lock_owner", side_effect=lambda conn, sub: order.append(("lock", sub)) or locked(conn, sub)):
+            self.assertEqual(photogrants.end_lapsed(self.c), 1)
+        self.assertIn(("lock", "sub-ana"), order)
+        self.assertEqual(order[-1], ("check", "sub-ana"))
+        self.assertLess(order.index(("lock", "sub-ana")), len(order) - 1)
+        self.assertEqual(self.c.execute(select(PhotoGrant.person_id)).scalars(), [])
 
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):

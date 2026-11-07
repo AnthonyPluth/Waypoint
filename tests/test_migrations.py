@@ -298,7 +298,21 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0037")
         self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
 
-    def test_0039_turns_hidden_photos_into_one_exclusion_each_and_its_downgrade_widens_nothing(self):
+    def test_0039_ties_an_app_session_to_its_grant_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        tables = shape(self.path)
+        self.assertIn("grant_id", [col[0] for col in tables["auth_sessions"]["columns"]])
+        self.assertIn("CASCADE", {fk[0]: fk[4] for fk in tables["auth_sessions"]["fks"]}["fk_auth_sessions_grant_id"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0038")
+        self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
+
+    def test_0040_turns_hidden_photos_into_one_exclusion_each_and_its_downgrade_widens_nothing(self):
         from alembic import command
         old_photos = sa.table("photos", *(sa.column(n) for n in ("id", "source_id", "asset_id", "asset_updated", "kind", "taken_utc", "taken_local", "trip_id", "match", "hidden", "seen")))
         syncs = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end")))
@@ -367,11 +381,23 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(drift(self.path), [])
         self.assertEqual(rows_of(self.path, "photo_exclusions"), [])
 
-    def test_0040_pages_photo_syncs_by_capture_time_and_restarts_a_traversal_in_progress(self):
+    def test_0040_types_the_exclusion_timestamp_so_postgres_accepts_it(self):
+        import importlib
+        from sqlalchemy.dialects import postgresql
+        migration = importlib.import_module("waypoint.storage.migrations.versions.0040_photo_grants")
+        statements = []
+        with mock.patch.object(migration, "op") as fake_op:
+            fake_op.execute.side_effect = statements.append
+            migration.upgrade()
+        inserts = [s.compile(dialect=postgresql.dialect()) for s in statements if getattr(s, "is_insert", False)]
+        self.assertEqual(len(inserts), 1)
+        self.assertIn("CAST(%(param_1)s AS FLOAT)", str(inserts[0]))
+
+    def test_0042_pages_photo_syncs_by_capture_time_and_restarts_a_traversal_in_progress(self):
         from alembic import command
         old = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end", "cursor", "resume_page", "fetch_started")))
         with db.engine(self.path).begin() as c:
-            command.upgrade(db.alembic_config(c), "0039")
+            command.upgrade(db.alembic_config(c), "0040")
             c.execute(insert(schema.people).values(id=1, display_name="One"))
             c.execute(insert(schema.trips), [{"id": 1, "name": "Trip 1", "auto": True}, {"id": 2, "name": "Trip 2", "auto": True}])
             c.execute(insert(schema.photo_sources).values(id=1, person_id=1, owner_sub="sub-x", url="https://photos.example", immich_user_id="u",
@@ -382,7 +408,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(drift(self.path), [])
         self.assertEqual([r[:7] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1", None, None), (1, 2, "a", "b", None, None, None)])
         with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0039")
+            command.downgrade(db.alembic_config(c), "0040")
             names = [r[1] for r in c.exec_driver_sql("PRAGMA table_info(photo_trip_syncs)")]
         self.assertIn("resume_page", names)
         self.assertFalse({"resume_after", "inputs"} & set(names))

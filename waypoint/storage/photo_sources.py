@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
-from sqlalchemy import ColumnElement, delete, func, select, true, update
+from sqlalchemy import ColumnElement, delete, exists, func, select, true, update
 
 from . import db, secretbox
-from .models import Person, Photo, PhotoSharingPrefs, PhotoSource
+from .models import Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, User
 
 Status = Literal["ok", "refused", "unreachable", "off"]
 OK: Status = "ok"
@@ -77,9 +77,15 @@ def set_steward(conn: db.Connection, person_id: int, sub: str) -> bool:
     return steward_of(conn, person_id) == sub
 
 
-def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float) -> int | None:
+def trip_shared(conn: db.Connection, person_id: int) -> bool:
+    return conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.person_id == person_id, PhotoGrant.scope == "trip", PhotoGrant.revoked.is_(None))
+                        .limit(1)).fetchone() is not None
+
+
+def save(conn: db.Connection, person_id: int, owner_sub: str, url: str, immich_user_id: str, key: str, label: str | None, now: float,
+         status: Status = OK) -> int | None:
     values = {"person_id": person_id, "owner_sub": owner_sub, "url": url, "immich_user_id": immich_user_id, "api_key": secretbox.encrypt(key) or "",
-              "label": label, "status": OK, "last_sync": None, "last_error": None, "created": now}
+              "label": label, "status": status, "last_sync": None, "last_error": None, "created": now}
     if db.insert_ignore(conn, PhotoSource, values, key=["person_id", "url", "immich_user_id"]).rowcount == 0:
         return None
     found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id == person_id, PhotoSource.url == url, PhotoSource.immich_user_id == immich_user_id,
@@ -133,6 +139,13 @@ def source_for_provider(conn: db.Connection, source_id: int) -> Unlocked | None:
 
 
 def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
+    removed = exists().where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,
+                             PhotoExclusion.trip_id == Photo.trip_id)
     rows = conn.execute(select(Photo.source_id, func.count(Photo.id), func.count(Photo.trip_id.distinct()))
-                        .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP)).group_by(Photo.source_id)).fetchall()
+                        .join(PhotoSource, PhotoSource.id == Photo.source_id)
+                        .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP), ~removed).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
+
+
+def lock_owner(conn: db.Connection, sub: str) -> bool:
+    return int(conn.execute(update(User).where(User.sub == sub).values(name=User.name)).rowcount) > 0

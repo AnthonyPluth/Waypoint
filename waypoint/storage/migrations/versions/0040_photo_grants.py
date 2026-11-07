@@ -3,8 +3,8 @@ import time
 import sqlalchemy as sa
 from alembic import op
 
-revision = '0039'
-down_revision = '0038'
+revision = '0040'
+down_revision = '0039'
 branch_labels = None
 depends_on = None
 
@@ -53,7 +53,7 @@ def upgrade() -> None:
     sa.ForeignKeyConstraint(['person_id'], ['people.id'], name='fk_photo_sharing_prefs_person_id', ondelete='CASCADE', initially='IMMEDIATE', deferrable=True),
     sa.PrimaryKeyConstraint('person_id'),
     )
-    hidden = sa.select(sources.c.person_id, photos.c.asset_id, photos.c.trip_id, sa.literal(time.time(), sa.Float())).distinct() \
+    hidden = sa.select(sources.c.person_id, photos.c.asset_id, photos.c.trip_id, sa.cast(sa.literal(time.time()), sa.Float())).distinct() \
         .join_from(photos, sources, sources.c.id == photos.c.source_id) \
         .where(photos.c.hidden.is_(sa.true()), photos.c.trip_id.is_not(None))
     op.execute(exclusions.insert().from_select(['person_id', 'asset_id', 'trip_id', 'created'], hidden))

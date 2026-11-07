@@ -20,8 +20,10 @@ NOT_YOURS = "A member who signs in connects their own libraries; ask them to con
 OTHER_STEWARD = "This person’s library is managed by another member; ask them to connect it."
 ALREADY = "That library is already connected for this person."
 OTHER_ACCOUNT = "That key belongs to a different Immich account; remove this library and connect it again."
-KEY_LOST = "Waypoint can’t unlock this library’s key any more; enter it again."
+KEY_LOST = secretbox.KEY_LOST
 HTTPS_ONLY = "Use https:// for an Immich server outside your own network."
+RESUME_ASKS = "Resuming this library would add its photos to trips shared with everyone on them; confirming that isn’t available yet."
+RECORD_TRIES = 3
 PERMISSIONS = ("asset.read", "asset.view", "user.read", "map.read", "asset.download")
 
 
@@ -138,7 +140,8 @@ def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: st
     _not_yet(conn, person_id, url, account.user_id)
     if not photo_sources.lock_person(conn, person_id):
         raise NoSuchPerson()
-    source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now)
+    status: Status = OFF if photo_sources.trip_shared(conn, person_id) else OK
+    source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now, status)
     if source_id is None:
         raise Refused(ALREADY)
     if stewarded and not photo_sources.set_steward(conn, person_id, actor.sub):
@@ -165,9 +168,15 @@ def _unlocked(conn: db.Connection, stored: Stored) -> immich.Source:
 
 
 def _record(conn: db.Connection, source: Stored, status: Status, error: str | None, synced: float | None = None) -> None:
-    kept = OFF if source["status"] == OFF else status
-    if not photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"]):
-        raise NoSuchSource()
+    current: Stored | None = source
+    for _ in range(RECORD_TRIES):
+        if current is None or current["owner_sub"] != source["owner_sub"]:
+            break
+        kept = OFF if current["status"] == OFF else status
+        if photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"], was=(current["status"], current["last_error"])):
+            return
+        current = photo_sources.get(conn, source["id"])
+    raise NoSuchSource()
 
 
 def _outcome(conn: db.Connection, source: Stored, error: immich.ImmichError) -> None:
@@ -207,6 +216,8 @@ def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, p
     if paused is True and source["status"] != OFF:
         changed = photo_sources.mark(conn, source_id, OFF, None, owner=source["owner_sub"])
     elif paused is False and source["status"] == OFF:
+        if photo_sources.trip_shared(conn, source["person_id"]):
+            raise Refused(RESUME_ASKS)
         changed = photo_sources.mark(conn, source_id, OK, None, owner=source["owner_sub"])
     else:
         changed = True
@@ -221,11 +232,18 @@ def remove(conn: db.Connection, actor: Actor, source_id: int) -> None:
         raise NoSuchSource()
 
 
+def _lapsed(conn: db.Connection, sub: str, now: float) -> bool:
+    email = conn.execute(select(User.email).where(User.sub == sub)).scalar()
+    return oidc.access_lapsed(conn, sub, email, now) is not None
+
+
 def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     now = time.time() if now is None else now
     ended = 0
     for s in photo_sources.list_all(conn):
-        email = conn.execute(select(User.email).where(User.sub == s["owner_sub"])).scalar()
-        if oidc.access_lapsed(conn, s["owner_sub"], email, now) and photo_sources.remove(conn, s["id"], owner=s["owner_sub"]):
+        if not _lapsed(conn, s["owner_sub"], now):
+            continue
+        photo_sources.lock_owner(conn, s["owner_sub"])
+        if _lapsed(conn, s["owner_sub"], now) and photo_sources.remove(conn, s["id"], owner=s["owner_sub"]):
             ended += 1
     return ended

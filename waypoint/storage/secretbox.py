@@ -16,6 +16,7 @@ from . import settings_keys
 from .models import LoyaltyId, Mailbox, PhotoSource, SegmentCode, Setting, StoredMessage
 
 PREFIX = "enc:v1:"
+KEY_LOST = "Waypoint can’t unlock this library’s key any more; enter it again."
 KEY_FILE = "secret.key"
 MIN_KEY_LENGTH = 32
 
@@ -194,6 +195,8 @@ def encrypt_stored(conn) -> int:
             new = reencrypt(p["api_key"])
         except InvalidToken:
             monitoring.log("Warning: a saved Immich library's key can't be decrypted with the current key; enter it again in Settings.", "warning")
+            conn.execute(update(PhotoSource).where(PhotoSource.id == p["id"], PhotoSource.status != "off").values(status="refused"))
+            conn.execute(update(PhotoSource).where(PhotoSource.id == p["id"]).values(last_error=KEY_LOST))
             continue
         if new != p["api_key"]:
             conn.execute(update(PhotoSource).where(PhotoSource.id == p["id"]).values(api_key=new))
