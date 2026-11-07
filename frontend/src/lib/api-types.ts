@@ -708,9 +708,7 @@ export interface PhotoSourceEdit {
   key?: string;
   label?: string | null;
   paused?: boolean;
-  grants?: PhotoResumeGrant[];
-  sources?: PhotoSourceVersion[];
-  home?: string;
+  snapshot?: string;
 }
 
 export interface PhotoSourceNewTestBody {
@@ -722,8 +720,7 @@ export interface PhotoSourceResume {
   asks: boolean;
   count: number;
   grants: PhotoResumeGrant[];
-  sources: PhotoSourceVersion[];
-  home: string;
+  snapshot: string;
 }
 
 export interface PhotoSourceTest {

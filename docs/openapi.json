@@ -7037,19 +7037,7 @@
           "paused": {
             "type": "boolean"
           },
-          "grants": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PhotoResumeGrant"
-            }
-          },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PhotoSourceVersion"
-            }
-          },
-          "home": {
+          "snapshot": {
             "type": "string"
           }
         },
@@ -7087,13 +7075,7 @@
               "$ref": "#/components/schemas/PhotoResumeGrant"
             }
           },
-          "sources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PhotoSourceVersion"
-            }
-          },
-          "home": {
+          "snapshot": {
             "type": "string"
           }
         },
@@ -7101,8 +7083,7 @@
           "asks",
           "count",
           "grants",
-          "sources",
-          "home"
+          "snapshot"
         ],
         "additionalProperties": false
       },

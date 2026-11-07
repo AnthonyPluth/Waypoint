@@ -42,9 +42,8 @@ ORIGINAL_CACHE = "private, no-store"
 NOT_AN_AUDIENCE = 'Send "audience" as a list of person ids'
 NOT_AUDIENCES = 'Send "audiences" as a map of trip ids to lists of person ids'
 NOT_SOURCES = 'Send "sources" as a list of {id, status}'
-NOT_GRANTS = 'Send "grants" as a list of {trip_id, changed, window}'
-NOT_HOME = 'Send "home" as the text the confirmation showed'
-HOME_LIMIT = 64
+NOT_A_SNAPSHOT = 'Send "snapshot" as the text the confirmation showed'
+SNAPSHOT_LIMIT = 64
 _p = validate.Validator(ApiError, not_number=NOT_A_PERSON)
 
 
@@ -357,25 +356,12 @@ def api_photo_source_edit(conn, _q, body: PhotoSourceEdit, source_id) -> PhotoSo
     label = _text(body, "label", "label", LABEL_LIMIT)
     if key is None and paused is None and "label" not in body:
         raise ApiError(NOTHING_TO_CHANGE)
-    grants, sources = _grants(body.get("grants")), _sources(body.get("sources"))
-    home = body.get("home")
-    if home is not None and (not isinstance(home, str) or len(home) > HOME_LIMIT):
-        raise ApiError(NOT_HOME)
+    snapshot = body.get("snapshot")
+    if snapshot is not None and (not isinstance(snapshot, str) or len(snapshot) > SNAPSHOT_LIMIT):
+        raise ApiError(NOT_A_SNAPSHOT)
     if key is not None:
         _ask(lambda: photosources.change_key(conn, me, this, key))
-    return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body, grants, sources, home)))
-
-
-def _grants(value: Any) -> list[dict[str, object]] | None:
-    if value is None:
-        return None
-    if not isinstance(value, list) or any(not isinstance(g, dict) or isinstance(g.get("trip_id"), bool) or not isinstance(g.get("trip_id"), int)
-                                          or isinstance(g.get("changed"), bool) or not isinstance(g.get("changed"), (int, float)) for g in value):
-        raise ApiError(NOT_GRANTS)
-    try:
-        return [{"trip_id": int(g["trip_id"]), "changed": float(g["changed"]), "window": _window(g.get("window"))} for g in value]
-    except ApiError:
-        raise ApiError(NOT_GRANTS) from None
+    return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body, snapshot)))
 
 
 def api_photo_source_resume(conn, _q, _b, source_id) -> PhotoSourceResume:
