@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -492,6 +492,12 @@ describe("shipProgress and shipLeft", () => {
     expect(shipLeft(0)).toBe("calc((100% - 2.25rem) * 0)");
     expect(shipLeft(0.5)).toBe("calc((100% - 2.25rem) * 0.5)");
     expect(shipLeft(1)).toBe("calc((100% - 2.25rem) * 1)");
+  });
+  it("runs the solid part from the line's start to the middle of the tile", () => {
+    expect(shipTrail(0.5)).toBe("calc((100% - 2.25rem) * 0.5 + 1.125rem)");
+    expect(shipTrail(1)).toBe("calc((100% - 2.25rem) * 1 + 1.125rem)");
+    expect(shipTrail(7)).toBe(shipTrail(1));
+    expect(shipTrail(Number.NaN)).toBe(shipTrail(0));
   });
   it("clamps a progress outside 0 to 1 and one that isn't a number", () => {
     expect(shipLeft(-1)).toBe(shipLeft(0));
