@@ -232,6 +232,7 @@ When a contract breaks, move the code to where its import is allowed rather than
 A handler in `waypoint/server/api/` is listed in `routes.py`’s `ROUTES`, takes `(conn, query, body, *ids)` and returns the JSON to answer, or a `common.Response` for anything else (a download, a stream: `common.download` writes a download’s headers).
 
 - A route that takes a file instead of JSON is marked `@common.upload(limit)`, and one that opens its own database sessions (a restore) `@common.own_session`.
+- A route whose query has a value that can be blank on purpose is marked `@common.keep_blank`. Without it the query is parsed with blank values dropped, so `?created=` reads the same as no `created` at all. A handler that must tell an omitted value from an explicitly blank one needs the marker, and then rejects the blank (a 400) instead of treating it as not sent.
 - A handler checks everything it’s sent before using it. Numbers, whole numbers, days and on/off switches go through `waypoint/validate.py` (a switch sent as `"false"` is off); ids, query-string numbers and text fields through `server/common.py`’s `row_id`, `query_int` and `text`.
 - What it can’t use, it refuses with `ApiError`: a 4xx and a message saying what’s wrong.
 
