@@ -403,14 +403,39 @@ class DnsDeadlineTests(unittest.TestCase):
         self.assertIsInstance(caught.exception.reason, TimeoutError)
         self.assertLess(time.monotonic() - began, 2.0)
 
-    def test_a_late_answer_is_discarded(self):
-        resolver, started, release = self.blocked_resolver()
-        with mock.patch.object(socket, "getaddrinfo", resolver), mock.patch.object(socket, "socket", side_effect=AssertionError("late answer used")):
-            with self.assertRaises(urllib.error.URLError):
+    def serving(self, body, accepted):
+        def handle(request):
+            accepted.append(body)
+            request.request.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s" % (len(body), body))
+        server = socketserver.TCPServer(("127.0.0.1", 0), type("Answering", (socketserver.BaseRequestHandler,), {"handle": handle}))
+        self.addCleanup(server.server_close)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.shutdown)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", server.server_address)]
+
+    def test_a_late_answer_never_reaches_a_later_request(self):
+        accepted: list = []
+        late = self.serving(b"late", accepted)
+        own = self.serving(b"own", accepted)
+        release = threading.Event()
+        self.addCleanup(release.set)
+        finished = threading.Event()
+
+        def slow(*args, **kwargs):
+            release.wait(10)
+            finished.set()
+            return late
+
+        with mock.patch.object(socket, "getaddrinfo", slow):
+            with self.assertRaises(urllib.error.URLError) as caught:
                 self.open(time.monotonic() + 0.2)
-            self.assertTrue(started.is_set())
+            self.assertIsInstance(caught.exception.reason, TimeoutError)
             release.set()
+            self.assertTrue(finished.wait(2))
             time.sleep(0.1)
+        with mock.patch.object(socket, "getaddrinfo", return_value=own), self.open(time.monotonic() + 5) as reply:
+            self.assertEqual(reply.read(), b"own")
+        self.assertEqual(accepted, [b"own"])
 
     def test_an_answer_inside_the_deadline_is_used(self):
         server = socketserver.TCPServer(("127.0.0.1", 0), type("Quiet", (socketserver.BaseRequestHandler,), {"handle": lambda self: self.request.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")}))
@@ -426,7 +451,7 @@ class DnsDeadlineTests(unittest.TestCase):
             self.open(time.monotonic() + 5)
         self.assertIsInstance(caught.exception.reason, socket.gaierror)
 
-    def test_lookups_at_the_cap_fail_at_once_with_the_deadline_error(self):
+    def test_lookups_at_the_cap_fail_at_once_with_a_message_of_their_own(self):
         resolver, started, _ = self.blocked_resolver()
         with mock.patch.object(socket, "getaddrinfo", resolver), mock.patch.object(tls, "_LOOKUPS", threading.BoundedSemaphore(1)):
             first = threading.Thread(target=lambda: self.open_quietly(time.monotonic() + 3), daemon=True)
@@ -437,7 +462,7 @@ class DnsDeadlineTests(unittest.TestCase):
                 self.open(time.monotonic() + 30)
             self.assertLess(time.monotonic() - began, 1.0)
             self.assertIsInstance(caught.exception.reason, TimeoutError)
-            self.assertEqual(str(caught.exception.reason), "the time for this request ran out")
+            self.assertEqual(str(caught.exception.reason), "too many name lookups are waiting")
 
     def open_quietly(self, deadline):
         with contextlib.suppress(OSError):

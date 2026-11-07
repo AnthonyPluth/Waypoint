@@ -168,7 +168,7 @@ def _resolve_within(host, port, deadline: float):
     left = _left(deadline)
     lookups = _LOOKUPS
     if not lookups.acquire(blocking=False):
-        raise TimeoutError("the time for this request ran out")
+        raise TimeoutError("too many name lookups are waiting")
     outcome: list = []
 
     def lookup() -> None:
