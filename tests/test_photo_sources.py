@@ -186,7 +186,7 @@ class SourceRoutes(RouteCase):
     def test_counts_and_errors_show_only_to_those_acting_for_the_person(self):
         trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
         mine = self.connect(label="Ana’s")
-        theirs = self.connect(who="ben", url=LAN)
+        theirs = self.connect(who="ben", url=LAN, label="Ben’s private name")
         with db.session() as conn:
             conn.orm.add_all([photo(mine["id"], trip, 1), photo(mine["id"], trip, 2, "time"), photo(mine["id"], trip, 3, "far"), photo(mine["id"], None, 4, "ambiguous"),
                               photo(mine["id"], trip, 5, "home"), photo(theirs["id"], trip, 6)])
