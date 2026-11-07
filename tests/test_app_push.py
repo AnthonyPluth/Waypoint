@@ -65,14 +65,17 @@ class DeviceTests(Apple):
         self.assertEqual(again["id"], first["id"])
         self.assertEqual(self.c.orm.scalars(select(AppDevice)).one().environment, "sandbox")
 
-    def test_a_rotated_token_replaces_the_one_it_names_and_only_the_owners(self):
+    def test_a_rotated_token_replaces_the_one_it_names(self):
         old = self.phone()
         self.phone("u-other", OTHER)
         new = app_push.add_device(self.c, "u-jane", "ef56" * 16, "production", time.time(), replaces=TOKEN)
         self.assertNotEqual(new["id"], old["id"])
         self.assertEqual([d.token for d in self.c.orm.scalars(select(AppDevice).order_by(AppDevice.id))], [OTHER, "ef56" * 16])
-        app_push.add_device(self.c, "u-jane", "ef56" * 16, "production", time.time(), replaces=OTHER)
-        self.assertEqual(len(self.c.orm.scalars(select(AppDevice)).all()), 2)
+
+    def test_a_phone_that_changes_member_and_token_at_once_is_not_left_with_the_first_member(self):
+        self.phone("u-ana", TOKEN)
+        app_push.add_device(self.c, "u-ben", "ef56" * 16, "production", time.time(), replaces=TOKEN)
+        self.assertEqual([(d.owner_sub, d.token) for d in self.c.orm.scalars(select(AppDevice))], [("u-ben", "ef56" * 16)])
 
     def test_it_refuses_what_is_not_an_apns_registration(self):
         for token, environment in (("short", "production"), (TOKEN, "staging"), ("not hex! " * 8, "production"), (TOKEN + "zz", "production")):

@@ -70,7 +70,7 @@ def add_device(conn: db.Connection, owner: str, token: str, environment: str, no
     if not _TOKEN.fullmatch(token) or environment not in ENVIRONMENTS:
         raise Invalid("That isn’t a push registration Waypoint can use.")
     if old and old != token:
-        conn.execute(delete(AppDevice).where(AppDevice.owner_sub == owner, AppDevice.token == old))
+        conn.execute(delete(AppDevice).where(AppDevice.token == old))
     mine = conn.orm.scalars(select(AppDevice).where(AppDevice.owner_sub == owner)).all()
     if len(mine) >= MAX_DEVICES and token not in {d.token for d in mine}:
         raise Invalid(f"Turn notifications off on an iPhone you no longer use first (at most {MAX_DEVICES}).")
