@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v2.3.0 (plugins/fleet/skills/fix-with-checks/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v3.0.0 (plugins/fleet/skills/fix-with-checks/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-fix-with-checks
 description: Use when fixing a review finding or a CI failure whose kind is listed under "Mistakes that keep coming back" in AGENTS.md, or when the same mistake shows up a second time. The fix then includes the check that would have caught it - a lint rule, a Semgrep rule with examples, a type or a test - and the AGENTS.md item's parenthesis names that check.
 ---
