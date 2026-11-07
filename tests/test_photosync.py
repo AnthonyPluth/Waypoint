@@ -1040,6 +1040,45 @@ class EighthReviewTests(SyncCase):
         self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}"), relisted)
 
 
+    def test_a_guest_claimed_before_preparation_locks_writes_nothing(self):
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.mia]}, confirmed=True)
+        mias = photo_sources.save(self.c, self.mia, "u-jane", self.lib.url, OWNER, KEY, None, 1.0)
+        self.share(self.a, self.mia)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-02T13:00:00Z", gps=SOHO)]
+        photosync.run(self.c, mias, immich, NOW)
+        self.c.execute(update(Photo).where(Photo.source_id == mias, Photo.asset_id == self.lib.items[0]["id"]).values(decided_by=photos.OWNER))
+        self.c.commit()
+        self.c.orm.expire_all()
+
+        def placed():
+            return {(p.asset_id, p.trip_id, p.match, p.decided_by) for p in self.c.orm.scalars(select(Photo).where(Photo.source_id == mias)).all()}
+
+        def tracked():
+            return {(s.trip_id, s.window_start, s.window_end, s.inputs, s.cursor, s.synced) for s in
+                    self.c.orm.scalars(select(PhotoTripSync).where(PhotoTripSync.source_id == mias)).all()}
+        before, syncs = placed(), tracked()
+        self.assertEqual(len(before), 2)
+        last = photo_sources.get(self.c, mias)["last_sync"]
+        relisted = db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}")
+        searched = len(self.lib.asked())
+        real = photosync._prepare
+
+        def claimed_first(run, restart, started=None):
+            with db.session() as other:
+                people.claim_guest(other, self.sid, self.mia, "2026-07-01")
+            return real(run, restart, started)
+        with mock.patch.object(photosync, "_prepare", claimed_first):
+            got = photosync.run(self.c, mias, immich, NOW + timedelta(days=8), full=True)
+        self.c.orm.expire_all()
+        self.assertEqual(photo_sources.get(self.c, mias)["person_id"], self.sid)
+        self.assertEqual((placed(), tracked()), (before, syncs))
+        self.assertEqual((got.deleted, got.failed, got.pages), (0, 0, 0))
+        self.assertEqual(len(self.lib.asked()), searched)
+        self.assertEqual(photo_sources.get(self.c, mias)["last_sync"], last)
+        self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{mias}"), relisted)
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{mias}"))
+
 class NinthReviewTests(SyncCase):
     def test_a_pause_during_the_last_page_of_a_relist_deletes_nothing_and_keeps_the_generation(self):
         self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
