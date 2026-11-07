@@ -109,6 +109,7 @@ def save(conn: db.Connection, body: dict[str, Any]) -> HomeOut:
         "zip": _field(body, "zip", "ZIP or postal code", POSTAL_LIMIT, POSTAL).upper(),
         "country": _field(body, "country", "country", 2, COUNTRY).upper() or default_country(conn),
     }
+    photogrants.lock_home(conn)
     dated = photogrants.dated_trips(conn)
     before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, json.dumps(home))
@@ -118,6 +119,7 @@ def save(conn: db.Connection, body: dict[str, Any]) -> HomeOut:
 
 
 def clear(conn: db.Connection) -> HomeOut:
+    photogrants.lock_home(conn)
     dated = photogrants.dated_trips(conn)
     before = photogrants.snapshot(conn, dated)
     db.set_setting(conn, sk.HOME, None)

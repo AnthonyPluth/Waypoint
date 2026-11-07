@@ -458,6 +458,24 @@ class PhotoRoutes(RouteCase):
         self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created={stamp + 1}")[0], 409)
         self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created={stamp}")["removed_count"], 0)
 
+    def test_a_put_back_stamp_that_is_not_a_finite_number_is_a_400(self):
+        mine = self.photo(self.ana, self.trip, "2026-06-02T12:00", where=SOHO)
+        self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [mine]})
+        for bad in ("nan", "inf", "-inf", "abc", "1e999", "1e400"):
+            with self.subTest(bad=bad):
+                self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created={bad}"),
+                                 (400, {"error": 'Send "created" as a number'}))
+
+    def test_a_blank_put_back_stamp_is_a_400_not_no_stamp(self):
+        mine = self.photo(self.ana, self.trip, "2026-06-02T12:00", where=SOHO)
+        self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [mine]})
+        self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{mine}?created="),
+                         (400, {"error": 'Send "created" as a number'}))
+        self.assertEqual(self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing")["removed"][0]["removed_at"] is not None, True)
+
+    def test_a_blank_query_value_on_another_route_is_still_dropped(self):
+        self.assertEqual(self.ok("ana", "GET", "/api/stats?person=&year=")["person"], None)
+
     def test_moving_to_a_trip_whose_bookings_are_all_cancelled_is_refused_because_its_sharing_ended(self):
         later = self.later()
         self.ok("ana", "POST", f"/api/segments/{later['id']}", {"status": "cancelled"})

@@ -89,7 +89,7 @@ npm run build                         # into waypoint/static/app/, which Waypoin
 
 ## The documentation
 
-This site is [Astro Starlight](https://starlight.astro.build) in `docs/`, published to GitHub Pages by `.github/workflows/docs.yml` on every push to `main` that changes it. Each page is a Markdown file in `docs/src/content/docs/`, in a folder per sidebar group (`start/`, `privacy/`, `reference/`, `contributing/`). Its front matter sets the title, the description and its place in the group (`sidebar.order`). Images go in `docs/src/assets/`.
+This site is [Astro Starlight](https://starlight.astro.build) in `docs/`, published to GitHub Pages by `.github/workflows/docs.yml` on every push to `main` that changes it (it runs `make docs-site`: the standalone demo is built and verified, the site is built, and the demo is copied into it). Each page is a Markdown file in `docs/src/content/docs/`, in a folder per sidebar group (`start/`, `privacy/`, `reference/`, `contributing/`). Its front matter sets the title, the description and its place in the group (`sidebar.order`). Images go in `docs/src/assets/`.
 
 ```bash
 make docs          # http://localhost:4321/Waypoint/, reloading as you edit

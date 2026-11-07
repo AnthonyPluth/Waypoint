@@ -22,7 +22,7 @@ from sqlalchemy.schema import CreateColumn
 from . import db, schema, secretbox
 from .. import monitoring
 from . import settings_keys as sk
-from .models import LoyaltyId, Mailbox, Setting
+from .models import LoyaltyId, Mailbox, PhotoSource, Setting
 
 FORMAT = "waypoint-backup"
 VERSION = 1
@@ -205,6 +205,8 @@ def unreadable_secrets(conn) -> list[str]:
         out.append(MAILBOXES)
     if any(not _readable(number) for number in conn.execute(select(LoyaltyId.number)).scalars()):
         out.append(LOYALTY)
+    if any(not _readable(key) for key in conn.execute(select(PhotoSource.api_key)).scalars()):
+        out.append(PHOTO_SOURCES)
     return out
 
 
@@ -220,6 +222,8 @@ MAILBOXES = "mailboxes"
 MAILBOXES_LABEL = "Gmail connections (connect them again in Settings)"
 LOYALTY = "loyalty_ids"
 LOYALTY_LABEL = "loyalty numbers (enter them again on People)"
+PHOTO_SOURCES = "photo_sources"
+PHOTO_SOURCES_LABEL = "Immich library keys (enter them again in Settings → Photos)"
 
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
@@ -228,7 +232,7 @@ SECRET_LABELS = {
 
 
 def unreadable_summary(unreadable: list[str]) -> str:
-    labels = {**SECRET_LABELS, MAILBOXES: MAILBOXES_LABEL, LOYALTY: LOYALTY_LABEL}
+    labels = {**SECRET_LABELS, MAILBOXES: MAILBOXES_LABEL, LOYALTY: LOYALTY_LABEL, PHOTO_SOURCES: PHOTO_SOURCES_LABEL}
     return ", ".join(dict.fromkeys(label for key, label in labels.items() if key in unreadable))
 
 

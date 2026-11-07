@@ -8,7 +8,8 @@ from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict
 from sqlalchemy import and_, delete, or_, select, update
 
 from .. import oidc
-from ..storage import db
+from ..storage import db, photo_sources
+from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
 from . import people, photos, trippeople, trips, visibility
 from .visibility import Viewer
@@ -186,6 +187,10 @@ def _acting(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -
         return None
     trip, by = visibility.visible_trip(conn, viewer, trip_id), photos.viewer_sub(conn, viewer)
     return (trip, by) if trip is not None and by is not None else None
+
+
+def lock_home(conn: db.Connection) -> None:
+    db.lock_setting(conn, sk.HOME)
 
 
 def lock_trips(conn: db.Connection, trip_ids: Iterable[int]) -> list[int]:
@@ -652,6 +657,8 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     for person in sorted({person for person, _, _ in lapsed} | set(settings)):
         people.lock(conn, person)
     lock_trips(conn, [trip for _, trip, _ in lapsed])
+    for sub in sorted(gone):
+        photo_sources.lock_owner(conn, sub)
     gone = {s for s in sorted(gone) if _lapsed(conn, s, stamp)}
     for person, trip, by in lapsed:
         conn.orm.expire_all()

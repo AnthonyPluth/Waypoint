@@ -6,6 +6,7 @@ import io
 import ipaddress
 import socket
 import ssl
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -161,10 +162,44 @@ def _bounded(timeout, deadline: float) -> float:
     return min(timeout, left) if isinstance(timeout, int | float) else left
 
 
+MAX_LOOKUPS = 8
+_LOOKUPS = threading.BoundedSemaphore(MAX_LOOKUPS)
+
+
+def _resolve_within(host, port, deadline: float):
+    left = _left(deadline)
+    lookups = _LOOKUPS
+    if not lookups.acquire(blocking=False):
+        raise TimeoutError("too many name lookups are waiting")
+    outcome: list = []
+
+    def lookup() -> None:
+        try:
+            outcome.append((socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM), None))
+        except BaseException as e:
+            outcome.append((None, e))
+        finally:
+            lookups.release()
+
+    worker = threading.Thread(target=lookup, name="dns-lookup", daemon=True)
+    try:
+        worker.start()
+    except BaseException:
+        lookups.release()
+        raise
+    worker.join(left)
+    if worker.is_alive():
+        raise TimeoutError("the time for this request ran out")
+    found, failure = outcome[0]
+    if failure is not None:
+        raise failure
+    return found
+
+
 def _connect_within(address, idle, deadline: float, source_address=None) -> socket.socket:
     failure: OSError | None = None
     host, port = address
-    for family, kind, proto, _, sockaddr in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+    for family, kind, proto, _, sockaddr in _resolve_within(host, port, deadline):
         wait = _bounded(idle, deadline)
         sock = socket.socket(family, kind, proto)
         try:

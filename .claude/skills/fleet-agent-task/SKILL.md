@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v2.3.0 (plugins/fleet/skills/agent-task/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v3.0.0 (plugins/fleet/skills/agent-task/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-agent-task
 description: Use when writing or drafting a GitHub issue that an AI coding agent will carry out - an issue finished in one session and one pull request, with the sections Context, Scope, Out of scope, Acceptance criteria, Tests, Depends on and Model, and the model chosen by the rules here.
 ---
@@ -26,8 +26,7 @@ Write them in this order, each as a bold heading line (`**Context**`):
 
 ## The model
 
-- **Opus** by default.
-- **Fable** (`claude-fable-5-1`) for security work, the review workflows, CI secrets, anything that handles untrusted pull request content, and security scanning.
+- **Opus** by default, including security work, the review workflows, CI secrets, anything that handles untrusted pull request content, and security scanning.
 - **Sonnet** only for mechanical copying: renames, typo fixes, moving text without changing it.
 
 ## Drafts that refer to each other

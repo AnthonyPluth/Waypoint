@@ -25,4 +25,4 @@ jobs:
       contents: read           # AGENTS.md
       issues: write            # the one issue
       pull-requests: read      # the pull requests in the window
-    uses: AnthonyPluth/fleet/.github/workflows/review-mining.yml@e46ed57c9783080142e148121176bd7d4a321a8a   # v2.3.0
+    uses: AnthonyPluth/fleet/.github/workflows/review-mining.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
