@@ -731,10 +731,24 @@ class PhotoSourceBody(TypedDict):
     label: NotRequired[str | None]
 
 
+class PhotoResumeGrant(TypedDict):
+    trip_id: int
+    changed: float
+    window: PhotoWindow | None
+
+
 class PhotoSourceEdit(TypedDict):
     key: NotRequired[str]
     label: NotRequired[str | None]
     paused: NotRequired[bool]
+    snapshot: NotRequired[str]
+
+
+class PhotoSourceResume(TypedDict):
+    asks: bool
+    count: int
+    grants: list[PhotoResumeGrant]
+    snapshot: str
 
 
 class PhotoSourceNewTestBody(TypedDict):

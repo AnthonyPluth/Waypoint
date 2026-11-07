@@ -491,6 +491,9 @@ class Replies(DbCase):
             self.check("POST /api/photo-sources/{id}/test", photos_api.api_photo_source_test(self.c, {}, {"key": "k-8"}, str(made["id"])))
             self.check("POST /api/photo-sources/{id}", photos_api.api_photo_source_edit(self.c, {}, {"key": "k-8", "label": None, "paused": True}, str(made["id"])))
         self.check("GET /api/photo-sources", photos_api.api_photo_sources(self.c, {}, {}))
+        empty = immich.Page(assets=(), next_page=None)
+        with mock.patch.object(immich, "search", return_value=empty):
+            self.check("GET /api/photo-sources/{id}/resume", photos_api.api_photo_source_resume(self.c, {}, {}, str(made["id"])))
         self.check("POST /api/photo-sources/{id}/sync", photos_api.api_photo_source_sync(self.c, {}, {}, str(made["id"])))
         self.check("DELETE /api/photo-sources/{id}", photos_api.api_photo_source_remove(self.c, {}, {}, str(made["id"])))
 
@@ -584,6 +587,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}",
                                      "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}",
                                      "DELETE /api/photo-sources/{id}", "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync",
+                                     "GET /api/photo-sources/{id}/resume",
                                      "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
                                      "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/photo-grants",
                                      "POST /api/photo-sharing-prefs/{id}"})

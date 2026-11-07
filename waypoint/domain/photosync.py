@@ -22,7 +22,7 @@ from .photomatch import HomeIn, MatchKind, TripWindow
 
 TIME_BUDGET = 600.0
 CLOCK_SKEW = timedelta(minutes=10)
-TOO_DENSE = "Some of your library couldn’t be read."
+TOO_DENSE = photosources.TOO_DENSE
 Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
 PAUSED: Traversal = "paused"
 Written = Literal["written", "gone", "changed", "moved", "dropped"]

@@ -1186,6 +1186,37 @@
         }
       }
     },
+    "/api/photo-sources/{id}/resume": {
+      "get": {
+        "operationId": "api_photo_source_resume",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_resume",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSourceResume"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/photo-sharing": {
       "get": {
         "operationId": "api_photo_sharing",
@@ -6744,6 +6775,33 @@
         "required": [],
         "additionalProperties": false
       },
+      "PhotoResumeGrant": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "changed": {
+            "type": "number"
+          },
+          "window": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhotoWindow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "trip_id",
+          "changed",
+          "window"
+        ],
+        "additionalProperties": false
+      },
       "PhotoReview": {
         "type": "object",
         "properties": {
@@ -6978,6 +7036,9 @@
           },
           "paused": {
             "type": "boolean"
+          },
+          "snapshot": {
+            "type": "string"
           }
         },
         "required": [],
@@ -6996,6 +7057,33 @@
         "required": [
           "url",
           "key"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSourceResume": {
+        "type": "object",
+        "properties": {
+          "asks": {
+            "type": "boolean"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoResumeGrant"
+            }
+          },
+          "snapshot": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "asks",
+          "count",
+          "grants",
+          "snapshot"
         ],
         "additionalProperties": false
       },

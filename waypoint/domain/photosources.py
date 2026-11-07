@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TypedDict
@@ -11,9 +13,9 @@ from sqlalchemy import select
 from .. import oidc
 from ..providers import immich
 from ..storage import db, photo_sources, secretbox
-from ..storage.models import Person, User
+from ..storage.models import Person, PhotoExclusion, PhotoGrant, User
 from ..storage.photo_sources import OFF, OK, REFUSED, UNREACHABLE, Status, Stored
-from . import photoqueue
+from . import photogrants, photomatch, photoqueue, photos
 
 NO_SOURCE = "No such photo library"
 NO_PERSON = "No such person"
@@ -23,7 +25,11 @@ ALREADY = "That library is already connected for this person."
 OTHER_ACCOUNT = "That key belongs to a different Immich account; remove this library and connect it again."
 KEY_LOST = secretbox.KEY_LOST
 HTTPS_ONLY = "Use https:// for an Immich server outside your own network."
-RESUME_ASKS = "Resuming this library would add its photos to trips shared with everyone on them; confirming that isn’t available yet."
+NEEDS_RESUME_SNAPSHOT = 'Send the "snapshot" the confirmation showed'
+STALE_GRANTS = photos.CHANGED
+TOO_DENSE = "Some of your library couldn’t be read."
+COUNT_SECONDS = 30.0
+SHOWN = ("place", "time", "far")
 RECORD_TRIES = 3
 PERMISSIONS = ("asset.read", "asset.view", "user.read", "map.read", "asset.download")
 
@@ -57,6 +63,23 @@ class Listed(TypedDict):
     last_error: str | None
     photos: int | None
     trips: int | None
+
+
+class Stale(Exception):
+    pass
+
+
+class ResumeGrant(TypedDict):
+    trip_id: int
+    changed: float
+    window: photos.WindowOut | None
+
+
+class Resume(TypedDict):
+    asks: bool
+    count: int
+    grants: list[ResumeGrant]
+    snapshot: str
 
 
 class Tested(TypedDict):
@@ -219,7 +242,101 @@ def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str, resu
     return listed(conn, actor, source_id)
 
 
+@dataclass(frozen=True)
+class _Counted:
+    source_id: int
+    person_id: int
+    home: photomatch.HomeIn | None
+    windows: tuple[photomatch.TripWindow, ...]
+    grants: tuple[tuple[int, str, float], ...]
+    sources: tuple[tuple[int, str], ...]
+    excluded: tuple[tuple[str, int], ...]
+
+    @property
+    def shared(self) -> list[int]:
+        return [trip_id for trip_id, scope, _ in self.grants if scope == photos.TRIP]
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(repr(self).encode()).hexdigest()
+
+    def listed(self) -> list[ResumeGrant]:
+        by_trip = {w.trip_id: w for w in self.windows}
+        return [{"trip_id": trip_id, "changed": changed, "window": photos.window_out(by_trip.get(trip_id))}
+                for trip_id, scope, changed in self.grants if scope == photos.TRIP]
+
+
+def _inputs(conn: db.Connection, source_id: int, person_id: int) -> _Counted:
+    grants = conn.execute(select(PhotoGrant.trip_id, PhotoGrant.scope, PhotoGrant.changed)
+                          .where(PhotoGrant.person_id == person_id, PhotoGrant.revoked.is_(None)).order_by(PhotoGrant.trip_id)).fetchall()
+    excluded = conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.trip_id).where(PhotoExclusion.person_id == person_id)
+                            .order_by(PhotoExclusion.asset_id, PhotoExclusion.trip_id)).fetchall()
+    return _Counted(source_id=source_id, person_id=person_id, home=photos.home_in(conn),
+                    windows=tuple(sorted(photos.candidate_windows(conn, person_id), key=lambda w: w.trip_id)),
+                    grants=tuple((int(t), str(scope), float(changed)) for t, scope, changed in grants),
+                    sources=tuple((s["id"], s["status"]) for s in photogrants.sources_of(conn, person_id)),
+                    excluded=tuple((str(a), int(t)) for a, t in excluded))
+
+
+def _shown(asset: immich.Asset, counted: _Counted, left_out: set[int]) -> int | None:
+    shot = photomatch.PhotoIn(photos.instant(asset.taken_utc), asset.latitude, asset.longitude, counted.person_id)
+    candidates = [w for w in counted.windows if w.start <= shot.taken <= w.end and w.trip_id not in left_out]
+    placed = photomatch.match(shot, candidates, counted.home)
+    return placed.trip_id if placed.match in SHOWN else None
+
+
+def _pages(source: immich.Source, window: photomatch.TripWindow, deadline: float) -> Iterator[immich.Page]:
+    after, page = window.start, 1
+    while True:
+        if time.monotonic() >= deadline:
+            raise immich.Unavailable(immich.TOO_SLOW)
+        got = immich.search(source, after, window.end, page=page)
+        if got.dropped:
+            raise immich.Unavailable(TOO_DENSE)
+        yield got
+        if got.next_page is None:
+            return
+        if got.last_taken is None or (got.one_instant and page == 1 and not got.foreign):
+            raise immich.Unavailable(TOO_DENSE)
+        if got.one_instant:
+            page += 1
+        else:
+            after, page = max(after, got.last_taken), 1
+
+
+def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
+    wanted = set(counted.shared)
+    targets = [w for w in counted.windows if w.trip_id in wanted]
+    if is_demo(source) or not targets:
+        return 0
+    left_out: dict[str, set[int]] = {}
+    for asset_id, trip_id in counted.excluded:
+        left_out.setdefault(asset_id, set()).add(trip_id)
+    unlocked, deadline = _unlocked(conn, source), time.monotonic() + COUNT_SECONDS
+    seen: set[str] = set()
+    total = 0
+    try:
+        for window in targets:
+            for got in _pages(unlocked, window, deadline):
+                for asset in got.assets:
+                    if asset.id not in seen:
+                        seen.add(asset.id)
+                        total += _shown(asset, counted, left_out.get(asset.id, set())) in wanted
+    except immich.ImmichError as e:
+        _outcome(conn, source, e)
+        raise
+    return total
+
+
+def resume_check(conn: db.Connection, actor: Actor, source_id: int) -> Resume:
+    source = owned(conn, actor, source_id)
+    counted = _inputs(conn, source["id"], source["person_id"])
+    asks = source["status"] == OFF and bool(counted.shared)
+    return {"asks": asks, "count": _count(conn, source, counted) if asks else 0, "grants": counted.listed(), "snapshot": counted.digest}
+
+
 def _held_for_resume(conn: db.Connection, actor: Actor, source: Stored) -> Stored:
+    photogrants.lock_home(conn)
     if not photo_sources.lock_person(conn, source["person_id"]) or not photo_sources.lock(conn, source["id"]):
         raise NoSuchSource()
     held = owned(conn, actor, source["id"])
@@ -228,15 +345,30 @@ def _held_for_resume(conn: db.Connection, actor: Actor, source: Stored) -> Store
     return held
 
 
-def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool) -> Listed:
+def _confirmed(conn: db.Connection, source: Stored, snapshot: str | None) -> None:
+    person_id = source["person_id"]
+    if snapshot is None:
+        if photo_sources.trip_shared(conn, person_id):
+            raise Refused(NEEDS_RESUME_SNAPSHOT)
+        return
+    granted = photos.granted_trips(conn, person_id)
+    photogrants.lock_trips(conn, granted)
+    photos.lock_grants(conn, person_id, granted)
+    conn.orm.expire_all()
+    if snapshot != _inputs(conn, source["id"], person_id).digest:
+        raise Stale(STALE_GRANTS)
+
+
+def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool,
+         snapshot: str | None = None) -> Listed:
     source = owned(conn, actor, source_id)
     if paused is False and source["status"] == OFF:
         source = _held_for_resume(conn, actor, source)
     resuming = paused is False and source["status"] == OFF
     if resuming and source["last_error"] == KEY_LOST:
         raise Refused(KEY_LOST)
-    if resuming and photo_sources.trip_shared(conn, source["person_id"]):
-        raise Refused(RESUME_ASKS)
+    if resuming:
+        _confirmed(conn, source, snapshot)
     if had_label and not photo_sources.set_label(conn, source_id, label, owner=source["owner_sub"]):
         raise NoSuchSource()
     if paused is True and source["status"] != OFF:

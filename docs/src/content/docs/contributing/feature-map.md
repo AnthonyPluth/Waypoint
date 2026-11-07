@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-117 routes; 0 have no test yet.
+118 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -49,6 +49,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `DELETE /api/photo-sources/{id}` | `photos.py:api_photo_source_remove` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}/test` | `photos.py:api_photo_source_test` | - | `test_api_contract.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}/sync` | `photos.py:api_photo_source_sync` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_proxy.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photo-sources/{id}/resume` | `photos.py:api_photo_source_resume` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_set` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_stop` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
@@ -63,7 +64,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/segments/{id}/emails/{id}/images/{id}` | `trips.py:api_segment_email_image` | - | `test_mail_scan.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/segments/{id}/code` | `trips.py:api_segment_code` | - | `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/segments/{id}/code` | `trips.py:api_segment_code_choose` | `lib/components/GateCode.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_offline.py`, `test_photos_api.py`, `test_trip_destination.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/segments/{id}` | `trips.py:api_segment_edit` | `lib/components/SegmentForm.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_offline.py`, `test_photo_sources.py`, `test_photos_api.py`, `test_trip_destination.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/segments/{id}` | `trips.py:api_segment_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_logos.py`, `test_mail_scan.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trip_destination.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/segments/{id}/move` | `trips.py:api_segment_move` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/airports` | `trips.py:api_airport_search` | `lib/airport-zones.ts` | `test_api_contract.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
@@ -74,8 +75,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/distance-unit` | `stats.py:api_distance_unit` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `POST /api/distance-unit` | `stats.py:api_distance_unit_save` | `lib/components/settings/DistanceSection.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_stats.py` | [start/stats](/Waypoint/start/stats/) |
 | `GET /api/home` | `home.py:api_home` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/home` | `home.py:api_home_save` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py`, `test_trip_destination.py` | [start/trips](/Waypoint/start/trips/) |
-| `DELETE /api/home` | `home.py:api_home_clear` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/home` | `home.py:api_home_save` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py`, `test_photo_sources.py`, `test_trip_destination.py` | [start/trips](/Waypoint/start/trips/) |
+| `DELETE /api/home` | `home.py:api_home_clear` | `lib/components/settings/HomeSection.svelte` | `test_api_contract.py`, `test_home.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/flight-status` | `flightstatus.py:api_flight_statuses` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp_routes.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `POST /api/flight-status/{id}` | `flightstatus.py:api_flight_status_refresh` | `lib/flightstatus.svelte.ts` | `test_api_contract.py`, `test_flightstatus.py`, `test_mcp.py` | [start/flight-status](/Waypoint/start/flight-status/) |
 | `GET /api/loyalty/{id}/logo` | `logos.py:api_loyalty_logo` | - | `test_loyalty.py` | [start/loyalty](/Waypoint/start/loyalty/) |
