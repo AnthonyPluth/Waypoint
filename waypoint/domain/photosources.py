@@ -81,7 +81,7 @@ def listing(conn: db.Connection, actor: Actor) -> list[Listed]:
     for s in photo_sources.list_all(conn):
         near = acts_for(actor, s)
         photos, trips = counted.get(s["id"], (0, 0))
-        out.append({"id": s["id"], "person_id": s["person_id"], "url": s["url"], "label": s["label"], "status": s["status"],
+        out.append({"id": s["id"], "person_id": s["person_id"], "url": s["url"], "label": s["label"] if near else None, "status": s["status"],
                     "mine": s["owner_sub"] == actor.sub, "last_sync": _when(s["last_sync"]) if near else None,
                     "last_error": s["last_error"] if near else None, "photos": photos if near else None, "trips": trips if near else None})
     return out
