@@ -319,6 +319,8 @@ rules:
       - pattern: $Q.outerjoin(Photo, ...)
       - pattern: $Q.join_from(..., Photo, ...)
       - pattern: $CONN.orm.get(Photo, ...)
+      - pattern: $CONN.orm.query(..., Photo, ...)
+      - pattern: $CONN.orm.query(..., Photo.$C, ...)
       - pattern: $Q.select_from(Photo, ...)
       - pattern: $Q.where(..., <... Photo.$C ...>, ...)
       - pattern: update(Photo)

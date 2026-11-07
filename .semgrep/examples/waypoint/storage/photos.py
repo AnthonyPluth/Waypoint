@@ -23,6 +23,12 @@ filtered = select(func.count(PhotoSource.id)).where(Photo.source_id == PhotoSour
 nested = select(PhotoSource.id).where(PhotoSource.person_id == person_id, exists().where(Photo.source_id == PhotoSource.id))
 
 # ruleid: waypoint-photo-access
+queried = conn.orm.query(Photo).all()
+
+# ruleid: waypoint-photo-access
+columns = conn.orm.query(Photo.id, Photo.trip_id).all()
+
+# ruleid: waypoint-photo-access
 created = insert(Photo)
 
 # ruleid: waypoint-photo-access
