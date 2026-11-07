@@ -353,7 +353,7 @@ def api_photo_source_edit(conn, _q, body: PhotoSourceEdit, source_id) -> PhotoSo
     if key is None and paused is None and "label" not in body:
         raise ApiError(NOTHING_TO_CHANGE)
     if key is not None:
-        _ask(lambda: photosources.change_key(conn, me, this, key))
+        _ask(lambda: photosources.change_key(conn, me, this, key, resuming=paused is False))
     return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body)))
 
 

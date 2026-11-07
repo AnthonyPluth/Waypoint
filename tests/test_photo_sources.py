@@ -340,6 +340,19 @@ class SourceRoutes(RouteCase):
         self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
 
+    def test_a_new_key_and_a_resume_in_one_request_take_the_person_before_writing_the_library(self):
+        made = self.connect()
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["status"], "off")
+        order = []
+        person, keyed, marked = photo_sources.lock_person, photo_sources.set_key, photo_sources.mark
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
+                mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY, "paused": False})["status"], "ok")
+        self.assertEqual(order[0], "person")
+        self.assertIn("write", order)
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
     def test_a_library_whose_key_was_lost_stays_off_through_a_pause_until_the_key_is_entered_again(self):
         made = self.connect()
         with db.session() as conn:
@@ -874,6 +887,19 @@ class Races(DbCase):
                 mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)):
             self.assertEqual(photosources.edit(self.c, self.ana, source, "Back", False, True)["status"], "ok")
         self.assertEqual(order, ["person", "source"])
+
+    def test_a_new_key_sent_with_a_resume_takes_the_person_before_writing_the_library(self):
+        source, _ = self.paused()
+        order = []
+        person, row, keyed, marked = photo_sources.lock_person, photo_sources.lock, photo_sources.set_key, photo_sources.mark
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
+                mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
+                mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
+            photosources.change_key(self.c, self.ana, source, NEW_KEY, resuming=True)
+            self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
+        self.assertEqual(order[:2], ["person", "source"])
+        self.assertIn("write", order)
 
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):

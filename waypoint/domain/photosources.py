@@ -206,11 +206,13 @@ def test(conn: db.Connection, actor: Actor, source_id: int, key: str | None) -> 
     return {"name": account.name, "same_account": account.user_id == source["immich_user_id"]}
 
 
-def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str) -> Listed:
+def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str, resuming: bool = False) -> Listed:
     source = owned(conn, actor, source_id)
     account = _ping(provider_source(source["url"], key))
     if account.user_id != source["immich_user_id"]:
         raise Refused(OTHER_ACCOUNT)
+    if resuming:
+        source = _held_for_resume(conn, actor, source)
     if not photo_sources.set_key(conn, source_id, key, owner=source["owner_sub"]):
         raise NoSuchSource()
     _record(conn, source, OK, None)
