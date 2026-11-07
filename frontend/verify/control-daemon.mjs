@@ -20,7 +20,7 @@ const firstLine = (e) => String(e?.message ?? e).split("\n")[0];
 
 function options(argv) {
   const get = (name) => { const i = argv.indexOf(`--${name}`); return i < 0 ? undefined : argv[i + 1]; };
-  return { dir: get("dir"), python: get("python"), now: get("now"), viewport: get("viewport") ?? "phone", idleMinutes: Number(get("idle-minutes") ?? 30) };
+  return { dir: get("dir"), python: get("python"), now: get("now"), viewport: get("viewport") ?? "phone", idleMinutes: Number(get("idle-minutes") ?? 30), signedIn: get("signed-in") };
 }
 
 function runToEnd(program, args, env) {
@@ -36,7 +36,7 @@ function runToEnd(program, args, env) {
 
 async function main() {
   const opt = options(process.argv.slice(2));
-  if (!opt.dir || !opt.dir.startsWith(`${ARTIFACTS}/`) || !opt.python || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(opt.now ?? "") || !(opt.viewport in VIEWPORTS)) {
+  if (!opt.dir || !opt.dir.startsWith(`${ARTIFACTS}/`) || !opt.python || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(opt.now ?? "") || !(opt.viewport in VIEWPORTS) || ![undefined, "jane", "sam"].includes(opt.signedIn)) {
     console.error("control-daemon: started without its options (tools/control start starts it)");
     process.exit(2);
   }
@@ -74,7 +74,7 @@ async function main() {
 
   async function newServer() {
     server = await startServer({
-      command: (port, folder) => [opt.python, "-m", "waypoint.verify", "serve", "--parent", String(process.pid), "--seed", seedDir, "--data", folder, "--port", String(port)],
+      command: (port, folder) => [opt.python, "-m", "waypoint.verify", "serve", "--parent", String(process.pid), "--seed", seedDir, "--data", folder, "--port", String(port), ...(opt.signedIn ? ["--signed-in", opt.signedIn] : [])],
       folder: join(sessionDir, `data-${++servers}`), timeout: 60000, cwd: ROOT,
     });
     base = `http://127.0.0.1:${server.port}`;
@@ -234,7 +234,7 @@ async function main() {
     const size = page.viewportSize();
     return { route: route(), title: await page.title(), viewport: { name: state.viewport, ...size },
       clock: { frozenNow: opt.now, browser: await page.evaluate(() => new Date().toString()), server: `${opt.now.replace("T", " ").replace("Z", "")} UTC, stopped (libfaketime)` },
-      session: { pid: process.pid, server: base, idleMinutes: opt.idleMinutes } };
+      session: { pid: process.pid, server: base, idleMinutes: opt.idleMinutes, signedIn: opt.signedIn ?? null } };
   }
 
   async function settledNow() {
@@ -377,6 +377,9 @@ async function main() {
     if (!flow) {
       const near = closest(name, flows.map((f) => f.name));
       throw new ControlError("no_such_flow", `no flow named ${name}`, near ? `did you mean ${near}? (\`${PROG} flows\` lists them)` : `\`${PROG} flows\` lists them`);
+    }
+    if (flow.signed_in === true && !opt.signedIn) {
+      throw new ControlError("needs_signed_in", `${name} needs a signed-in session, and this one isn't`, `\`${PROG} stop\`, then \`${PROG} start --signed-in jane\``);
     }
     if (o.viewport && o.viewport !== state.viewport) await handlers.viewport({ args: [o.viewport] });
     const vp = state.viewport;

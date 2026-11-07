@@ -76,16 +76,19 @@ Start a session: a demo server on fresh demo data under the frozen clock, and a 
 The demo data is what make verify seeds (`run.py demo`), so pages look as in docs/src/assets/screenshots/.
 The server and the seed run under libfaketime at make verify's frozen moment, and the browser's clock is fixed at the same moment (UTC).
 One session per checkout, on a port and data of its own: a running make verify is left alone.
+--signed-in jane (or sam) makes every request that member, as if signed in, on this session's demo server only: the photo routes and Settings' photo sources then answer, which the default local user can't reach. It works only on demo data this tool seeded; a normal run, with or without sign-in configured, ignores it.
 Refuses when the machine is busy (more than 1.5 runnable processes per CPU) unless --anyway. A stale session (its process gone) is cleaned up first.
 
 Options:
   --viewport <phone|desktop|laptop|wide|zoomed>  the browser's size to start at (default phone)
   --idle-minutes <number>  stop by itself after this long with no command (default 30)
   --anyway  start even though the machine is busy (pages may load slowly)
+  --signed-in <jane|sam>  serve the demo as that signed-in member, so the photo routes answer (default: the local user, who has no photos)
 
 Examples:
   tools/control start
   tools/control start --viewport desktop
+  tools/control start --signed-in jane
 ```
 
 ### stop

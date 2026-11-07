@@ -64,12 +64,14 @@ export const COMMANDS = {
       viewport: { type: "string", values: VIEWPORT_NAMES, default: "phone", help: "the browser's size to start at" },
       "idle-minutes": { type: "number", default: DEFAULT_IDLE_MINUTES, help: "stop by itself after this long with no command" },
       anyway: { type: "boolean", help: "start even though the machine is busy (pages may load slowly)" },
+      "signed-in": { type: "string", values: ["jane", "sam"], help: "serve the demo as that signed-in member, so the photo routes answer (default: the local user, who has no photos)" },
     },
     details: ["The demo data is what make verify seeds (`run.py demo`), so pages look as in docs/src/assets/screenshots/.",
       "The server and the seed run under libfaketime at make verify's frozen moment, and the browser's clock is fixed at the same moment (UTC).",
       "One session per checkout, on a port and data of its own: a running make verify is left alone.",
+      "--signed-in jane (or sam) makes every request that member, as if signed in, on this session's demo server only: the photo routes and Settings' photo sources then answer, which the default local user can't reach. It works only on demo data this tool seeded; a normal run, with or without sign-in configured, ignores it.",
       "Refuses when the machine is busy (more than 1.5 runnable processes per CPU) unless --anyway. A stale session (its process gone) is cleaned up first."],
-    examples: ["start", "start --viewport desktop"],
+    examples: ["start", "start --viewport desktop", "start --signed-in jane"],
   },
   stop: {
     group: "session", summary: "Stop the session: its browser, its demo server and its copy of the data.",
@@ -652,7 +654,7 @@ async function startLocked(options) {
   if (status.verify_running) notes.push(`make verify is running (${status.verify_running}); this session doesn't touch it`);
   const log = openSync(join(CONTROL_DIR, "daemon.log"), "w", 0o600);
   const child = spawn(process.execPath, [DAEMON, "--dir", CONTROL_DIR, "--python", python, "--now", status.frozen_now_iso, "--viewport", options.viewport,
-    "--idle-minutes", String(options["idle-minutes"])],
+    "--idle-minutes", String(options["idle-minutes"]), ...(options["signed-in"] ? ["--signed-in", options["signed-in"]] : [])],
   { cwd: ROOT, detached: true, stdio: ["ignore", log, log] });
   closeSync(log);
   child.unref();
