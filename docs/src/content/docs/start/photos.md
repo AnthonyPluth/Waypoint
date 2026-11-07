@@ -7,6 +7,36 @@ sidebar:
 
 Waypoint reads each family member’s Immich library and matches photos to trips by when they were taken and then by where: a photo taken during a trip’s dates near one of its bookings belongs to that trip. The pictures stay in Immich; Waypoint keeps only when and where each photo was taken and which trip it matched. The design is in [docs/PHOTOS.md](https://github.com/AnthonyPluth/Waypoint/blob/main/docs/PHOTOS.md).
 
+Photos need sign-in: without it (local mode) there are no libraries, and the photo settings answer as if they did not exist.
+
+## Connecting a library
+
+Each member connects their own Immich library under **Settings → Photos**, with the address of the Immich server and an API key made for Waypoint.
+
+1. In Immich, open **Account Settings → API Keys** and create a key for Waypoint. Give it these permissions, and no more: `asset.read`, `asset.view`, `user.read`, `map.read` and `asset.download` (originals are shown through Waypoint, never straight from Immich). An older Immich without per-key permissions needs `all`.
+2. In Waypoint, enter the Immich address (scheme, host and port, such as `https://immich.example.com` or `http://immich.local:2283`; a plain `http://` address is accepted only on your own network) and the key, and choose **Test**. Waypoint asks Immich who the key belongs to and shows the name, saving nothing.
+3. Choose **Save**. Waypoint checks the address and key once more as typed, and keeps the key encrypted with `WAYPOINT_SECRET_KEY`, like a Gmail connection’s token. The key never appears in a reply, a log or an error; a backup carries it encrypted.
+
+Each library card shows its person, its host and its status: **ok**, **refused** (Immich didn’t accept the key, or it lacks a permission), **unreachable**, or **off** (paused). The library’s own person and whoever connected it also see its last sync, its last error and how many photos it has on how many trips; everyone else sees only the person, the host and the status, so a library’s size says nothing about trips they can’t see.
+
+- **Test** asks Immich again with the saved key and records the outcome, so a library marked refused clears once the key works.
+- **Change key** replaces the key only when the new one belongs to the same Immich account as the old one. A key for a different account is refused: remove the library and connect it again, so one person’s photos can never be re-attributed by swapping keys.
+- **Pause** stops reading the library until it is resumed; **Remove** deletes the library and the photo references Waypoint kept from it. Nothing changes in Immich.
+- A library connected while its person already shares photos with everyone on some trip starts paused, because that sharing was agreed for the libraries that were reading at the time; resuming it (or any paused library of theirs while such sharing is on) asks first, and until that confirmation exists in Waypoint the resume is refused, so no library joins a shared trip unseen.
+- **Sync now** starts a read of the library.
+
+### Who connects whose library
+
+A member who signs in connects only their own libraries, so nobody else can attach a library to them. A person in People who has no sign-in of their own (a child) has one steward: the member who connected their first library, recorded with the child’s sharing settings the moment that library is saved and kept even after their last library is removed, so another member cannot take over by connecting one; the steward connects all of the child’s libraries and shares for them, and another member trying to connect one is refused. The steward’s standing ends with their access (then another member may become steward, starting with nothing shared) or when the child signs in and links the guest entry to themselves: their libraries become their own and the former steward keeps nothing.
+
+### When someone loses access
+
+A library ends with its owner’s access: when the member who connected it can no longer sign in to Waypoint (taken off `OIDC_ALLOWED_EMAILS`, or past their sign-in with `OIDC_ALLOWED_GROUPS`), Waypoint’s hourly sweep deletes the library and the photo references it kept, as it does their Gmail connection.
+
+## What Waypoint reads and keeps
+
+Waypoint reads photos taken during the trips its person is on, and the 12 hours around them, and keeps for each only its Immich id, when and where it was taken and which trip and booking it matched, including photos that turn out not to belong to a trip; never the pictures, file names or camera data. Thumbnails and originals are fetched from Immich when shown and are never written to disk or the database. The Immich address and key never reach the browser, and nothing about a library is reachable from an AI assistant over MCP.
+
 ## Sharing your photos on a trip
 
 Nothing from your library is on a trip until you share it there. On each trip you choose who sees the photos you share: **Only me** (the default) or **Everyone on this trip** (the people on the trip; someone who merely booked it or received a confirmation for it is not one of them). You can change that choice at any time, take single photos off a trip (**Remove from this trip**) and put them back, or stop sharing on a trip altogether; each change takes effect at once, for everyone and everywhere a photo appears (the gallery, the map, the replay, the trip’s counts and summary). Photos you remove stay removed through every later sync, even after you stop and share again or connect the library anew, and are listed for you alone under **Removed from this trip** with **Put back**. Stopping sharing takes every photo of yours off the trip for everyone and keeps your removals for when you share again. Nothing changes in Immich.

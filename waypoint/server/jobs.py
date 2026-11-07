@@ -5,7 +5,7 @@ import time
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, photogrants, reminders
+from ..domain import flightstatus, photogrants, photosources, reminders
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db, roads, states
@@ -33,12 +33,18 @@ def sweep_lapsed() -> None:
         with db.session() as conn:
             others = reminders.end_lapsed(conn)
         with db.session() as conn:
+            libraries = photosources.end_lapsed(conn)
+        with db.session() as conn:
             shares = photogrants.end_lapsed(conn)
-        if ended or others or shares:
-            monitoring.log(f"Ended {ended} Gmail connection(s), {others} person(s)' reminders and calendar feed and {shares} photo sharing grant(s) "
-                           "or setting(s) whose owner can no longer sign in.")
+        if ended or others or libraries or shares:
+            monitoring.log(f"Ended {ended} Gmail connection(s), {others} person(s)' reminders and calendar feed, {libraries} Immich library "
+                           f"connection(s) and {shares} photo sharing grant(s) or setting(s) whose owner can no longer sign in.")
     except Exception as e:
         monitoring.report(e, values=False)
+
+
+def sync_photos_now(source_id: int) -> bool:
+    return False
 
 
 def send_reminders() -> None:
