@@ -667,11 +667,11 @@ def end_lapsed(conn: db.Connection, now: float | None = None) -> int:
     ended = 0
     lapsed = sorted(((g.person_id, g.trip_id, g.granted_by) for g in every if g.granted_by in gone), key=lambda g: g[:2])
     settings = sorted({p.person_id for p in standing if p.set_by in gone} | {p.person_id for p in stewarded if p.steward_sub in gone})
+    for sub in sorted(gone):
+        photo_sources.lock_owner(conn, sub)
     for person in sorted({person for person, _, _ in lapsed} | set(settings)):
         people.lock(conn, person)
     lock_trips(conn, [trip for _, trip, _ in lapsed])
-    for sub in sorted(gone):
-        photo_sources.lock_owner(conn, sub)
     gone = {s for s in sorted(gone) if _lapsed(conn, s, stamp)}
     for person, trip, by in lapsed:
         conn.orm.expire_all()
@@ -770,14 +770,18 @@ def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
     kept.resume_after, kept.fetch_started = None, None
 
 
+def _library(source: PhotoSource) -> tuple[str, str]:
+    return photo_sources.address(source.url), source.immich_user_id
+
+
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:
-    mine = {(s.url, s.immich_user_id): s for s in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == member_id)).all()}
+    mine = {_library(s): s for s in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == member_id)).all()}
     kept: list[int] = []
     for theirs in conn.orm.scalars(select(PhotoSource).where(PhotoSource.person_id == guest_id).order_by(PhotoSource.id)).all():
-        twin = mine.get((theirs.url, theirs.immich_user_id))
+        twin = mine.get(_library(theirs))
         if twin is None:
             theirs.person_id, theirs.owner_sub = member_id, sub
-            mine[(theirs.url, theirs.immich_user_id)] = theirs
+            mine[_library(theirs)] = theirs
             kept.append(theirs.id)
         else:
             _merge_source(conn, theirs, twin)

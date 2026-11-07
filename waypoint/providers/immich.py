@@ -28,6 +28,7 @@ CAPS = {"thumbnail": 2_000_000, "preview": 10_000_000}
 CHUNK = 65_536
 POLL_FLOOR = 0.01
 MAX_URL = 200
+DEFAULT_PORTS = {"http": 80, "https": 443}
 
 USER_AGENT = "Waypoint/1"
 JSON_TYPE = "application/json"
@@ -240,7 +241,8 @@ def clean_url(text: str) -> str | None:
         return None
     if parts.scheme not in ("http", "https") or parts.path not in ("", "/") or port == 0 or host is None:
         return None
-    return f"{parts.scheme}://{host}" + (f":{port}" if port is not None else "")
+    shown = None if port == DEFAULT_PORTS[parts.scheme] else port
+    return f"{parts.scheme}://{host}" + (f":{shown}" if shown is not None else "")
 
 
 def retry_after(value: str | None, now: datetime) -> float | None:
