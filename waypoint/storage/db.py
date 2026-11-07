@@ -16,7 +16,7 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.util import CommandError
-from sqlalchemy import create_engine, event, inspect, select
+from sqlalchemy import create_engine, event, inspect, select, update
 from sqlalchemy.dialects import postgresql as pg_dialect
 from sqlalchemy.dialects import sqlite as sqlite_dialect
 from sqlalchemy.engine import Engine
@@ -433,6 +433,11 @@ def set_setting(conn, key: str, value: str | None) -> None:
     if value is not None and key in secretbox.SECRET_SETTINGS:
         value = secretbox.encrypt(value)
     upsert(conn, Setting, {"key": key, "value": value}, key=["key"])
+
+
+def lock_setting(conn, key: str) -> None:
+    insert_ignore(conn, Setting, {"key": key, "value": None}, key=["key"])
+    conn.execute(update(Setting).where(Setting.key == key).values(value=Setting.value))
 
 
 def rows(cur) -> list[dict]:
