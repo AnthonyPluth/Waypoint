@@ -54,3 +54,23 @@ final class SignInReplyTests: XCTestCase {
         XCTAssertThrowsError(try SignIn.code(from: url, state: "s1", issuer: issuer))
     }
 }
+
+final class WebDataScopeTests: XCTestCase {
+    func testMatchesTheServersOwnName() {
+        XCTAssertTrue(WebDataScope.covers(recordName: "waypoint.example.com", host: "waypoint.example.com"))
+    }
+
+    func testMatchesTheParentDomainRecordOfAServerOnASubdomain() {
+        XCTAssertTrue(WebDataScope.covers(recordName: "example.com", host: "waypoint.example.com"))
+    }
+
+    func testMatchesASubdomainRecordOfAServerOnTheParentDomain() {
+        XCTAssertTrue(WebDataScope.covers(recordName: "app.example.com", host: "example.com"))
+    }
+
+    func testIgnoresOtherSitesEvenWithASimilarName() {
+        XCTAssertFalse(WebDataScope.covers(recordName: "example.org", host: "waypoint.example.com"))
+        XCTAssertFalse(WebDataScope.covers(recordName: "notexample.com", host: "example.com"))
+        XCTAssertFalse(WebDataScope.covers(recordName: "", host: "example.com"))
+    }
+}

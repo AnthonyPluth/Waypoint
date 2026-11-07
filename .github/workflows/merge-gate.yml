@@ -18,7 +18,7 @@ name: Merge gate
 on:  # zizmor: ignore[dangerous-triggers]
   # Each of the pull request's own workflows finishing (the last one to finish decides).
   workflow_run:
-    workflows: [Docker image, Security scans, Docs, Control smoke]
+    workflows: [Docker image, Security scans, Docs, Control smoke, iOS]
     types: [completed]
   # Other apps' checks finishing (CodeQL, Codecov); GitHub doesn't send this for Actions' own.
   check_suite:

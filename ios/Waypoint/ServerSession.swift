@@ -105,7 +105,16 @@ actor ServerSession {
     private static func clearWebData(host: String?) async {
         let store = WKWebsiteDataStore.default()
         let records = await store.dataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes())
-        let mine = records.filter { host != nil && $0.displayName.contains(host!) }
+        let mine = records.filter { host != nil && WebDataScope.covers(recordName: $0.displayName, host: host!) }
         await store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: mine)
+    }
+}
+
+enum WebDataScope {
+    static func covers(recordName: String, host: String) -> Bool {
+        let name = recordName.lowercased()
+        let host = host.lowercased()
+        guard !name.isEmpty, !host.isEmpty else { return false }
+        return name == host || host.hasSuffix("." + name) || name.hasSuffix("." + host)
     }
 }
