@@ -1,3 +1,4 @@
+import contextlib
 import http.client
 import io
 import socket
@@ -375,3 +376,89 @@ class ConnectDeadlineTests(unittest.TestCase):
             conn = self.connect(tls._DeadlineHTTPSConnection, answers_at={8002}, refuse=True, context=context)
         self.assertEqual(conn.sock.sock.address, ("192.0.2.1", 8002))
         self.assertEqual(len(_Unanswered.made), 2)
+
+
+class DnsDeadlineTests(unittest.TestCase):
+    URL = "http://slow-resolver.invalid/"
+
+    def open(self, deadline, timeout=10):
+        return tls.urlopen(self.URL, timeout, allow_http=True, handlers=(urllib.request.ProxyHandler({}),), deadline=deadline)
+
+    def blocked_resolver(self):
+        release = threading.Event()
+        self.addCleanup(release.set)
+        started = threading.Event()
+
+        def resolver(*args, **kwargs):
+            started.set()
+            release.wait(10)
+            return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 9))]
+        return resolver, started, release
+
+    def test_a_resolver_that_never_answers_ends_the_request_at_the_deadline(self):
+        resolver, _, _ = self.blocked_resolver()
+        began = time.monotonic()
+        with mock.patch.object(socket, "getaddrinfo", resolver), self.assertRaises(urllib.error.URLError) as caught:
+            self.open(time.monotonic() + 0.3)
+        self.assertIsInstance(caught.exception.reason, TimeoutError)
+        self.assertLess(time.monotonic() - began, 2.0)
+
+    def test_a_late_answer_is_discarded(self):
+        resolver, started, release = self.blocked_resolver()
+        with mock.patch.object(socket, "getaddrinfo", resolver), mock.patch.object(socket, "socket", side_effect=AssertionError("late answer used")):
+            with self.assertRaises(urllib.error.URLError):
+                self.open(time.monotonic() + 0.2)
+            self.assertTrue(started.is_set())
+            release.set()
+            time.sleep(0.1)
+
+    def test_an_answer_inside_the_deadline_is_used(self):
+        server = socketserver.TCPServer(("127.0.0.1", 0), type("Quiet", (socketserver.BaseRequestHandler,), {"handle": lambda self: self.request.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")}))
+        self.addCleanup(server.server_close)
+        threading.Thread(target=server.handle_request, daemon=True).start()
+        answer = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", server.server_address)]
+        with mock.patch.object(socket, "getaddrinfo", return_value=answer), self.open(time.monotonic() + 5) as reply:
+            self.assertEqual(reply.read(), b"ok")
+
+    def test_a_resolver_error_inside_the_deadline_is_raised_as_it_was(self):
+        with mock.patch.object(socket, "getaddrinfo", side_effect=socket.gaierror(socket.EAI_NONAME, "no such host")), \
+                self.assertRaises(urllib.error.URLError) as caught:
+            self.open(time.monotonic() + 5)
+        self.assertIsInstance(caught.exception.reason, socket.gaierror)
+
+    def test_lookups_at_the_cap_fail_at_once_with_the_deadline_error(self):
+        resolver, started, _ = self.blocked_resolver()
+        with mock.patch.object(socket, "getaddrinfo", resolver), mock.patch.object(tls, "_LOOKUPS", threading.BoundedSemaphore(1)):
+            first = threading.Thread(target=lambda: self.open_quietly(time.monotonic() + 3), daemon=True)
+            first.start()
+            self.assertTrue(started.wait(2))
+            began = time.monotonic()
+            with self.assertRaises(urllib.error.URLError) as caught:
+                self.open(time.monotonic() + 30)
+            self.assertLess(time.monotonic() - began, 1.0)
+            self.assertIsInstance(caught.exception.reason, TimeoutError)
+            self.assertEqual(str(caught.exception.reason), "the time for this request ran out")
+
+    def open_quietly(self, deadline):
+        with contextlib.suppress(OSError):
+            self.open(deadline)
+
+    def test_a_finished_lookup_frees_its_place(self):
+        answer = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 9))]
+        cap = threading.BoundedSemaphore(1)
+        with mock.patch.object(socket, "getaddrinfo", return_value=answer), mock.patch.object(tls, "_LOOKUPS", cap):
+            for _ in range(3):
+                with self.assertRaises(urllib.error.URLError) as caught:
+                    self.open(time.monotonic() + 5)
+                self.assertNotIsInstance(caught.exception.reason, TimeoutError)
+        self.assertTrue(cap.acquire(blocking=False))
+
+    def test_a_request_without_a_deadline_resolves_directly_on_its_own_thread(self):
+        seen = []
+
+        def resolver(*args, **kwargs):
+            seen.append(threading.current_thread())
+            raise socket.gaierror(socket.EAI_NONAME, "no such host")
+        with mock.patch.object(socket, "getaddrinfo", resolver), self.assertRaises(urllib.error.URLError):
+            tls.urlopen(self.URL, 5, allow_http=True, handlers=(urllib.request.ProxyHandler({}),))
+        self.assertEqual(seen, [threading.current_thread()])

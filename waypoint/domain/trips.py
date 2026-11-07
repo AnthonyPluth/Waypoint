@@ -1384,6 +1384,8 @@ def create_trip(conn: db.Connection, viewer: Viewer, fields: TripIn, confirmed: 
         raise Invalid("Give both dates of a trip, or neither")
     if start and end and end < start:
         raise Invalid("A trip can’t end before it starts")
+    if start and end:
+        photogrants.lock_home(conn)
     given = (fields.get("destination") or "").strip() or None
     trip = Trip(name=fields.get("name") or "", destination=given, destination_manual=given is not None, notes=fields.get("notes"),
                 start_date=start, end_date=end, auto=False, booked_by=viewer.person_id)

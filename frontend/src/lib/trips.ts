@@ -388,6 +388,16 @@ export function routeProgress(s: Segment, now: number): number {
   return Math.min(1, Math.max(0, (now - from) / (to - from)));
 }
 
+export const shipProgress = (s: Segment, now: number): number => (s.status === "cancelled" ? 0 : routeProgress(s, now));
+
+const SHIP_TILE_REM = 2.25;
+
+const shipAlong = (progress: number): number => (Number.isNaN(progress) ? 0 : Math.min(1, Math.max(0, progress)));
+
+export const shipLeft = (progress: number): string => `calc((100% - ${SHIP_TILE_REM}rem) * ${shipAlong(progress)})`;
+
+export const shipTrail = (progress: number): string => `calc((100% - ${SHIP_TILE_REM}rem) * ${shipAlong(progress)} + ${SHIP_TILE_REM / 2}rem)`;
+
 export const LIVE_STALE_HOURS = 3;
 const LIVE_STALE_MS = LIVE_STALE_HOURS * 3_600_000;
 
