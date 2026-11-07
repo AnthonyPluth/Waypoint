@@ -639,16 +639,16 @@ class ReviewFixTests(SyncCase):
 
     def test_the_prep_reads_the_windows_under_the_grant_locks(self):
         self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO)]
-        real = photogrants.lock
+        real = photogrants.lock_home
         waited = []
 
-        def stopped_while_waiting(conn, person, trip_ids):
+        def stopped_while_waiting(conn):
             if not waited:
                 waited.append(1)
                 with db.session() as other:
                     other.execute(update(PhotoGrant).where(PhotoGrant.trip_id == self.b).values(revoked=9.0))
-            return real(conn, person, trip_ids)
-        with mock.patch.object(photogrants, "lock", side_effect=stopped_while_waiting):
+            return real(conn)
+        with mock.patch.object(photogrants, "lock_home", side_effect=stopped_while_waiting):
             self.sync()
         self.assertEqual(set(self.syncs()), {self.a})
         self.assertEqual(self.rows()[self.lib.items[0]["id"]].trip_id, self.a)
@@ -1206,7 +1206,7 @@ class TwelfthReviewTests(SyncCase):
     def test_a_partner_item_is_not_counted_as_dropped(self):
         audio = {**asset(8, "2026-06-02T12:00:00Z"), "type": "AUDIO"}
         page = immich.parse_page({"assets": {"items": [asset(9, "2026-06-02T12:00:00Z", owner=PARTNER), audio, "junk", {"id": "x"}], "nextPage": None}}, 1, OWNER)
-        self.assertEqual(page.dropped, 2)
+        self.assertEqual((page.dropped, page.foreign), (2, 2))
 
     def test_an_incremental_page_that_drops_an_item_keeps_the_cursor_until_a_clean_read(self):
         cursor = self.syncs()[self.a].cursor
@@ -1218,3 +1218,153 @@ class TwelfthReviewTests(SyncCase):
         self.sync(NOW + timedelta(hours=12))
         self.assertEqual((self.rows()[fixed["id"]].latitude, self.stored()["last_error"]), (51.5, None))
         self.assertEqual(self.syncs()[self.a].cursor, (NOW + timedelta(hours=6)).isoformat())
+
+
+class PreparationLockTests(SyncCase):
+    def beside(self, action, wait=1.0):
+        failed = []
+
+        def go():
+            try:
+                with db.session() as other:
+                    action(other)
+            except Exception as e:
+                failed.append(e)
+        worker = threading.Thread(target=go)
+        worker.start()
+        worker.join(wait)
+        return worker, failed
+
+    def during_preparation(self, action):
+        real, fired, outcome = photos.candidate_windows, [], {}
+
+        def windows_then(conn, person):
+            if not fired:
+                fired.append(1)
+                worker, failed = self.beside(action)
+                outcome.update(worker=worker, failed=failed, finished=not worker.is_alive())
+            return real(conn, person)
+        return mock.patch.object(photos, "candidate_windows", side_effect=windows_then), outcome
+
+    def test_a_guest_claimed_while_preparation_runs_deletes_nothing(self):
+        trips.edit_trip(self.c, self.jane, self.a, {"people": [self.jid, self.mia]}, confirmed=True)
+        mias = photo_sources.save(self.c, self.mia, "u-jane", self.lib.url, OWNER, KEY, None, 1.0)
+        self.share(self.a, self.mia)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-02T13:00:00Z", gps=SOHO)]
+        photosync.run(self.c, mias, immich, NOW)
+        self.c.execute(update(Photo).where(Photo.source_id == mias, Photo.asset_id == self.lib.items[0]["id"]).values(decided_by=photos.OWNER))
+        self.c.commit()
+
+        def placed():
+            self.c.orm.expire_all()
+            return {(p.asset_id, p.trip_id, p.decided_by) for p in self.c.orm.scalars(select(Photo).where(Photo.source_id == mias)).all()}
+        before = placed()
+        self.assertEqual(len(before), 2)
+        patched, outcome = self.during_preparation(lambda other: people.claim_guest(other, self.sid, self.mia, "2026-07-01"))
+        with patched:
+            got = photosync.run(self.c, mias, immich, NOW + timedelta(days=8), full=True)
+        outcome["worker"].join()
+        self.assertEqual(outcome["failed"], [])
+        self.assertEqual(photo_sources.get(self.c, mias)["person_id"], self.sid)
+        self.assertEqual(placed(), before)
+        self.assertEqual(got.deleted, 0)
+        self.assertFalse(outcome["finished"])
+
+    def test_a_pause_made_while_preparation_runs_leaves_rows_and_the_relist_untouched(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        tracked = {t: (s.cursor, s.synced) for t, s in self.syncs().items()}
+        rows = {k: (p.trip_id, p.match) for k, p in self.rows().items()}
+        calls = len(self.lib.asked())
+        patched, outcome = self.during_preparation(lambda other: photo_sources.mark(other, self.source, "off"))
+        with patched:
+            self.sync(NOW + timedelta(days=8), full=True)
+        outcome["worker"].join()
+        self.assertEqual(outcome["failed"], [])
+        self.assertEqual(self.stored()["status"], "off")
+        if outcome["finished"]:
+            self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+            self.assertEqual({t: (s.cursor, s.synced) for t, s in self.syncs().items()}, tracked)
+            self.assertEqual(len(self.lib.asked()), calls)
+        self.assertEqual({k: (p.trip_id, p.match) for k, p in self.rows().items()}, rows)
+        self.assertFalse(outcome["finished"])
+
+    def test_home_saved_before_preparation_is_read_under_its_locks(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        located = mock.patch.object(home, "located", return_value=None)
+        stub = located.start()
+        self.addCleanup(located.stop)
+        self.sync()
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].match, "place")
+        real = photosync._prepare
+
+        def saved_first(run, restart, started=None):
+            stub.return_value = HOME_POINT
+            return real(run, restart, started)
+        with mock.patch.object(photosync, "_prepare", saved_first):
+            got = self.sync(NOW + timedelta(hours=6))
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.match, row.trip_id), ("home", None))
+        self.assertEqual(got.budget_hit, 0)
+        self.assertIsNotNone(self.syncs()[self.a].cursor)
+
+    def test_photos_return_to_their_trip_once_home_is_cleared(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        with mock.patch.object(home, "located", return_value=HOME_POINT):
+            self.sync()
+        self.assertEqual(self.rows()[self.lib.items[0]["id"]].match, "home")
+        with mock.patch.object(home, "located", return_value=None):
+            self.sync(NOW + timedelta(hours=6))
+        row = self.rows()[self.lib.items[0]["id"]]
+        self.assertEqual((row.match, row.trip_id), ("place", self.a))
+
+    def test_a_dense_instant_of_partner_photos_does_not_stall_the_owners_sync(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", owner=PARTNER), asset(2, "2026-06-02T12:00:00Z", owner=PARTNER),
+                          asset(3, "2026-06-02T12:00:00Z", gps=SOHO), asset(4, "2026-06-03T12:00:00Z", gps=SOHO)]
+        got = self.sync()
+        self.assertEqual(sorted(self.rows()), sorted(self.lib.items[n]["id"] for n in (2, 3)))
+        self.assertEqual((got.failed, self.stored()["last_error"]), (0, None))
+        self.assertIsNotNone(self.syncs()[self.a].cursor)
+
+
+class ReconcileLockOrderTests(SyncCase):
+    def test_the_scheduled_reconcile_locks_trips_before_grants(self):
+        self.share(self.a, self.mia)
+        self.c.commit()
+        taken = []
+        lock_trip, lock_grants = photogrants._lock_trip, photos.lock_grants
+
+        def trip(conn, trip_id):
+            taken.append(trip_id)
+            return lock_trip(conn, trip_id)
+
+        def grants(conn, person_id, trip_ids):
+            taken.append(None)
+            return lock_grants(conn, person_id, trip_ids)
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=trip), mock.patch.object(photos, "lock_grants", side_effect=grants):
+            photogrants.reconcile_all(self.c, 50.0)
+        first = taken.index(None)
+        self.assertIn(self.a, taken[:first])
+        self.assertLessEqual(set(taken[first:]) - {None}, set(taken[:first]))
+        self.assertIsNone(self.c.orm.get(PhotoGrant, (self.mia, self.a)))
+
+
+class SteppedInstantTests(SyncCase):
+    def test_an_asset_shifted_into_a_page_already_read_inside_one_instant_is_never_deleted_by_the_relist(self):
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", owner=PARTNER), asset(2, "2026-06-02T12:00:00Z", owner=PARTNER),
+                          asset(3, "2026-06-02T12:00:00Z", gps=SOHO), asset(4, "2026-06-02T18:00:00Z", gps=SOHO)]
+        self.sync()
+        shifted = self.lib.items[2]["id"]
+        self.assertIn(shifted, self.rows())
+
+        def removed_before_the_boundary(asked):
+            if asked["page"] == 2 and self.lib.items[0]["ownerId"] == PARTNER and len(self.lib.items) == 4:
+                del self.lib.items[0]
+        self.lib.on_search = removed_before_the_boundary
+        for n in range(3):
+            self.sync(NOW + timedelta(days=8, hours=n), full=n == 0)
+            self.assertIn(shifted, self.rows())
+        self.lib.on_search = None
+        self.assertIn(self.lib.items[-1]["id"], self.rows())
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
