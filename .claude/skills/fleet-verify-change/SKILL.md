@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v2.2.0 (plugins/fleet/skills/verify-change/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v2.3.0 (plugins/fleet/skills/verify-change/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-verify-change
 description: Use before marking a pull request ready for review, in a repository whose pyproject.toml sets [tool.fleet.verification]. Lists the change's dimensions (each user-visible behaviour, failure path, migration, permission and invariant), verifies each with the verification guides for the changed paths where the repository has them and the app's own tools and verify skills, and writes the Verification block into the pull request's description - every dimension verified with evidence from this session, or not verified with the reason.
 ---
