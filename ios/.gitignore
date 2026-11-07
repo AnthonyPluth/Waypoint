@@ -1,0 +1,9 @@
+node_modules/
+Waypoint.xcodeproj/
+DerivedData/
+build/
+Pods/
+Waypoint/capacitor.config.json
+Waypoint/config.xml
+Waypoint/public/*
+!Waypoint/public/index.html

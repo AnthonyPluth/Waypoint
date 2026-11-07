@@ -97,7 +97,8 @@
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py",
         "tests/test_mcp_routes.py",
-        "tests/test_people.py"
+        "tests/test_people.py",
+        "tests/test_photo_sources.py"
       ],
       "docs": [
         "start/people"
@@ -117,6 +118,7 @@
         "tests/test_mcp_routes.py",
         "tests/test_people.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -262,6 +264,7 @@
         "tests/test_monitoring.py",
         "tests/test_onboarding.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
@@ -467,6 +470,102 @@
     },
     {
       "method": "GET",
+      "path": "/api/photo-sources",
+      "handler": "waypoint/server/api/photos.py:api_photo_sources",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_add",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/test",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_test_new",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_edit",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/photo-sources/{id}",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_remove",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}/test",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_test",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/photo-sources/{id}/sync",
+      "handler": "waypoint/server/api/photos.py:api_photo_source_sync",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_sources.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing",
       "web": [],
@@ -490,6 +589,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
         "tests/test_trips.py"
       ],
@@ -553,6 +653,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py"
       ],
       "docs": [
@@ -568,6 +669,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
+        "tests/test_photo_sources.py",
         "tests/test_photos_api.py"
       ],
       "docs": [

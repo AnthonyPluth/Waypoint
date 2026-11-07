@@ -29,6 +29,7 @@ from waypoint.server.api import assistant as assistant_api
 from waypoint.server import mcp_oauth
 from waypoint.storage.models import OAuthGrant, OAuthToken
 from waypoint.providers import flightstatus as flight_service
+from waypoint.providers import immich
 from waypoint.server.api import offline as offline_api
 from waypoint.server.api import trips as trips_api
 from waypoint.server.api import photos as photos_api
@@ -127,6 +128,7 @@ class Replies(DbCase):
         self.test_mcp_settings()
         self.test_assistant()
         self.test_photos()
+        self.test_photo_sources()
         self.assertEqual(self.checked, covered(), "check each route the contract covers here")
 
     def test_offline(self):
@@ -461,6 +463,21 @@ class Replies(DbCase):
                                                                                                     "audiences": {trip: seen["audience"]}, "sources": seen["sources"]}, str(me)))
         self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
 
+    def test_photo_sources(self):
+        _current.user = {"sub": "u7", "name": "Ana Example", "email": "ana7@example.com"}
+        oidc.remember_user(self.c, "u7", "ana7@example.com", "Ana Example")
+        account = immich.Account(user_id="immich-u7", name="Ana Example", email=None)
+        with mock.patch.object(immich, "ping", return_value=account):
+            self.check("POST /api/photo-sources/test", photos_api.api_photo_source_test_new(self.c, {}, {"url": "https://photos.example:2283", "key": "k-7"}))
+            made = photos_api.api_photo_source_add(self.c, {}, {"url": "https://photos.example:2283", "key": "k-7", "label": "Ana’s library"})
+            self.check("POST /api/photo-sources", made)
+            self.check("POST /api/photo-sources/{id}/test", photos_api.api_photo_source_test(self.c, {}, {}, str(made["id"])))
+            self.check("POST /api/photo-sources/{id}/test", photos_api.api_photo_source_test(self.c, {}, {"key": "k-8"}, str(made["id"])))
+            self.check("POST /api/photo-sources/{id}", photos_api.api_photo_source_edit(self.c, {}, {"key": "k-8", "label": None, "paused": True}, str(made["id"])))
+        self.check("GET /api/photo-sources", photos_api.api_photo_sources(self.c, {}, {}))
+        self.check("POST /api/photo-sources/{id}/sync", photos_api.api_photo_source_sync(self.c, {}, {}, str(made["id"])))
+        self.check("DELETE /api/photo-sources/{id}", photos_api.api_photo_source_remove(self.c, {}, {}, str(made["id"])))
+
     def test_stats(self):
         _current.user = {"name": None, "email": None, "local": True}
         trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "JFK", "destination": "LHR",
@@ -548,6 +565,8 @@ class Generated(unittest.TestCase):
                                      "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create",
                                      "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email",
                                      "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}",
+                                     "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}",
+                                     "DELETE /api/photo-sources/{id}", "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync",
                                      "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
                                      "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/photo-grants",
                                      "POST /api/photo-sharing-prefs/{id}"})

@@ -905,6 +905,287 @@
         }
       }
     },
+    "/api/photo-sources": {
+      "get": {
+        "operationId": "api_photo_sources",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_sources",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSources"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "api_photo_source_add",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_add",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSourceBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-sources/test": {
+      "post": {
+        "operationId": "api_photo_source_test_new",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_test_new",
+        "parameters": [
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSourceNewTestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSourceTest"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-sources/{id}": {
+      "post": {
+        "operationId": "api_photo_source_edit",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_edit",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSourceEdit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSource"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "api_photo_source_remove",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-sources/{id}/test": {
+      "post": {
+        "operationId": "api_photo_source_test",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_test",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoSourceTestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoSourceTest"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/photo-sources/{id}/sync": {
+      "post": {
+        "operationId": "api_photo_source_sync",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_source_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStarted"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/photo-sharing": {
       "get": {
         "operationId": "api_photo_sharing",
@@ -6446,6 +6727,169 @@
         "required": [],
         "additionalProperties": false
       },
+      "PhotoSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "person_id": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "refused",
+              "unreachable",
+              "off"
+            ]
+          },
+          "mine": {
+            "type": "boolean"
+          },
+          "last_sync": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "photos": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "trips": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "url",
+          "label",
+          "status",
+          "mine",
+          "last_sync",
+          "last_error",
+          "photos",
+          "trips"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSourceBody": {
+        "type": "object",
+        "properties": {
+          "person_id": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "url": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "url",
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSourceEdit": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "PhotoSourceNewTestBody": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSourceTest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "same_account": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "same_account"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSourceTestBody": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
       "PhotoSourceVersion": {
         "type": "object",
         "properties": {
@@ -6459,6 +6903,28 @@
         "required": [
           "id",
           "status"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoSources": {
+        "type": "object",
+        "properties": {
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoSource"
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "sources",
+          "permissions"
         ],
         "additionalProperties": false
       },
@@ -8730,6 +9196,18 @@
           "truncated",
           "original",
           "images"
+        ],
+        "additionalProperties": false
+      },
+      "SyncStarted": {
+        "type": "object",
+        "properties": {
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "started"
         ],
         "additionalProperties": false
       },
