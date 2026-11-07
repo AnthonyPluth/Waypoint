@@ -13,6 +13,24 @@ joined = select(PhotoSource.id).join(Photo, Photo.source_id == PhotoSource.id)
 # ruleid: waypoint-photo-access
 raw = conn.execute(text("select count(*) from photos where trip_id = :t"))
 
+# ruleid: waypoint-photo-access
+counted = select(func.count()).select_from(Photo)
+
+# ruleid: waypoint-photo-access
+filtered = select(func.count(PhotoSource.id)).where(Photo.source_id == PhotoSource.id)
+
+# ruleid: waypoint-photo-access
+nested = select(PhotoSource.id).where(PhotoSource.person_id == person_id, exists().where(Photo.source_id == PhotoSource.id))
+
+# ruleid: waypoint-photo-access
+created = insert(Photo)
+
+# ruleid: waypoint-photo-access
+ignored = db.insert_ignore(conn, Photo, rows)
+
+# ruleid: waypoint-photo-access
+added = conn.orm.add(Photo(asset_id=asset_id, source_id=source_id))
+
 # ok: waypoint-photo-access
 sources = select(PhotoSource.id).where(PhotoSource.person_id == person_id)
 
