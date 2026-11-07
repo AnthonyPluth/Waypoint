@@ -28,6 +28,6 @@ The browser verification:
 
 ## GitHub Pages
 
-The main-only `Docs` workflow builds the documentation and the demo, then copies the demo output under `docs/dist/demo/`. One artifact serves the documentation at `/Waypoint/` and the demo at `/Waypoint/demo/`. Frontend and docs changes both trigger the workflow; pull requests build both without publishing.
+The main-only `Docs` workflow (fleet's reusable docs workflow, which runs `make docs-site`) builds the documentation and the demo, then copies the demo output under `docs/dist/demo/`. One artifact serves the documentation at `/Waypoint/` and the demo at `/Waypoint/demo/`. Frontend and docs changes both trigger the workflow; pull requests build both without publishing.
 
 Pages Source must be **GitHub Actions**, and the `github-pages` environment only needs to allow `main`. Publishing needs a merge and a successful Docs deployment from `main`; preparing or pushing code is not publication.
