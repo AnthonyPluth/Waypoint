@@ -381,6 +381,18 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual(drift(self.path), [])
         self.assertEqual(rows_of(self.path, "photo_exclusions"), [])
 
+
+    def test_0040_types_the_exclusion_timestamp_so_postgres_accepts_it(self):
+        import importlib
+        from sqlalchemy.dialects import postgresql
+        migration = importlib.import_module("waypoint.storage.migrations.versions.0040_photo_grants")
+        statements = []
+        with mock.patch.object(migration, "op") as fake_op:
+            fake_op.execute.side_effect = statements.append
+            migration.upgrade()
+        inserts = [s.compile(dialect=postgresql.dialect()) for s in statements if getattr(s, "is_insert", False)]
+        self.assertEqual(len(inserts), 1)
+        self.assertIn("CAST(%(param_1)s AS FLOAT)", str(inserts[0]))
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:
