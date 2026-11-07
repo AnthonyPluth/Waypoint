@@ -573,7 +573,7 @@ export interface PersonLink {
 
 export interface PhotoBody {
   trip_id?: number | null;
-  hidden?: boolean;
+  excluded?: boolean;
 }
 
 export interface PhotoCandidate {
@@ -596,7 +596,31 @@ export interface PhotoCounts {
   located: number;
   inferred: number;
   far: number;
-  hidden: number;
+}
+
+export interface PhotoExclusionsBody {
+  photo_ids: number[];
+}
+
+export interface PhotoGrantPerson {
+  person_id: number;
+  prefs: PhotoPrefs;
+  trips: PhotoGrantTrip[];
+}
+
+export interface PhotoGrantTrip {
+  trip_id: number;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  state: "shared" | "declined";
+  scope: "only_me" | "trip" | null;
+  count: number;
+  removed_count: number;
+}
+
+export interface PhotoGrants {
+  people: PhotoGrantPerson[];
 }
 
 export interface PhotoPerson {
@@ -604,8 +628,53 @@ export interface PhotoPerson {
   count: number;
 }
 
+export interface PhotoPrefs {
+  default_scope: "only_me" | "trip";
+  share_all: boolean;
+}
+
+export interface PhotoPrefsBody {
+  default_scope?: "only_me" | "trip";
+  share_all?: boolean;
+  windows?: Record<string, PhotoWindow>;
+  audiences?: Record<string, number[]>;
+  sources?: PhotoSourceVersion[];
+}
+
 export interface PhotoReview {
   photos: ReviewPhoto[];
+}
+
+export interface PhotoSharing {
+  state: "shared" | "declined" | "ask" | "none";
+  scope: "only_me" | "trip" | null;
+  count: number;
+  removed_count: number;
+  removed: TripPhoto[];
+  window: PhotoWindow | null;
+  changed: number | null;
+  audience: number[];
+  sources: PhotoSourceVersion[];
+}
+
+export interface PhotoSharingBody {
+  person_id?: number;
+  scope?: "only_me" | "trip";
+  declined?: boolean;
+  window?: PhotoWindow;
+  expected_changed?: number;
+  audience?: number[];
+  sources?: PhotoSourceVersion[];
+}
+
+export interface PhotoSourceVersion {
+  id: number;
+  status: string;
+}
+
+export interface PhotoWindow {
+  start: string;
+  end: string;
 }
 
 export interface Port {
@@ -757,7 +826,7 @@ export interface ReviewPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
-  hidden: boolean;
+  removed_at: number | null;
   candidates: PhotoCandidate[];
 }
 
@@ -1184,7 +1253,7 @@ export interface TripPhoto {
   match: "place" | "time" | "far" | "ambiguous" | "home" | "none";
   distance_km: number | null;
   cluster: number | null;
-  hidden: boolean;
+  removed_at: number | null;
 }
 
 export interface TripPhotoCounts {
@@ -1297,6 +1366,13 @@ export interface Endpoints {
   "GET /api/trips/{id}/photos": { body: never; reply: TripPhotos };
   "GET /api/photos/review": { body: never; reply: PhotoReview };
   "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
+  "GET /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };
+  "POST /api/trips/{id}/photo-sharing": { body: PhotoSharingBody; reply: PhotoSharing };
+  "DELETE /api/trips/{id}/photo-sharing": { body: never; reply: PhotoSharing };
+  "POST /api/trips/{id}/photo-exclusions": { body: PhotoExclusionsBody; reply: PhotoSharing };
+  "DELETE /api/trips/{id}/photo-exclusions/{id}": { body: never; reply: PhotoSharing };
+  "GET /api/photo-grants": { body: never; reply: PhotoGrants };
+  "POST /api/photo-sharing-prefs/{id}": { body: PhotoPrefsBody; reply: PhotoPrefs };
   "POST /api/segments": { body: SegmentBody; reply: Segment };
   "GET /api/segments/{id}": { body: never; reply: Segment };
   "POST /api/segments/{id}": { body: SegmentEdit; reply: Segment };

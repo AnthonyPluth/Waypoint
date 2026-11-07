@@ -23,6 +23,7 @@ BLOCKED = (
     "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/segments/{id}/emails", "/api/segments/{id}/code",
     "/api/trips/{id}/emails",
     "/api/offline", "/api/trips/{id}/destination", "/api/home", "/api/photos", "/api/trips/{id}/photos",
+    "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions", "/api/photo-grants", "/api/photo-sharing-prefs",
 )
 
 WRITE_READABLE = ("/api/people/claim-suggestions",)
