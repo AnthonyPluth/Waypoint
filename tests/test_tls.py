@@ -1,3 +1,4 @@
+import contextlib
 import http.client
 import io
 import socket
@@ -439,10 +440,8 @@ class DnsDeadlineTests(unittest.TestCase):
             self.assertEqual(str(caught.exception.reason), "the time for this request ran out")
 
     def open_quietly(self, deadline):
-        try:
+        with contextlib.suppress(OSError):
             self.open(deadline)
-        except OSError:
-            pass
 
     def test_a_finished_lookup_frees_its_place(self):
         answer = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 9))]
