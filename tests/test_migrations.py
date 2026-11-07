@@ -393,6 +393,21 @@ class MigrationTests(unittest.TestCase):
         inserts = [s.compile(dialect=postgresql.dialect()) for s in statements if getattr(s, "is_insert", False)]
         self.assertEqual(len(inserts), 1)
         self.assertIn("CAST(%(param_1)s AS FLOAT)", str(inserts[0]))
+
+    def test_0041_adds_the_app_devices_table_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        table = shape(self.path)["app_devices"]
+        self.assertEqual(table["uniques"], [("uq_app_devices_token", ("token",))])
+        self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

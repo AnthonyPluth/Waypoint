@@ -19,6 +19,17 @@ urllib.request.build_opener()
 # ok: waypoint-raw-urlopen
 tls.urlopen(req, timeout=5)
 
+# ruleid: waypoint-raw-httpx
+import httpx
+# ruleid: waypoint-raw-httpx
+import http.client
+# ruleid: waypoint-raw-httpx
+from httpx import Client
+# ruleid: waypoint-raw-httpx
+http.client.HTTPSConnection("api.push.apple.com")
+# ok: waypoint-raw-httpx
+tls.post_http2(url, headers, body, 5)
+
 # ruleid: waypoint-sql-from-string
 sa.text(f"SELECT * FROM {name}")
 # ruleid: waypoint-sql-from-string

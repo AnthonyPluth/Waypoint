@@ -310,6 +310,15 @@ class PushDevice(Base):
     created: Mapped[float]
 
 
+class AppDevice(Base):
+    __table__ = schema.app_devices
+    id: Mapped[int]
+    owner_sub: Mapped[str]
+    token: Mapped[str]
+    environment: Mapped[str]
+    created: Mapped[float]
+
+
 class ReminderPrefs(Base):
     __table__ = schema.reminder_prefs
     owner_sub: Mapped[str]

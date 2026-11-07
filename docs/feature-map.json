@@ -1398,6 +1398,45 @@
       ]
     },
     {
+      "method": "GET",
+      "path": "/api/reminders/app",
+      "handler": "waypoint/server/api/reminders.py:api_app_push",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_app_push.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/reminders/app/devices",
+      "handler": "waypoint/server/api/reminders.py:api_app_device_add",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_app_push.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/reminders/app/devices/{id}",
+      "handler": "waypoint/server/api/reminders.py:api_app_device_remove",
+      "web": [],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_app_push.py"
+      ],
+      "docs": [
+        "start/reminders"
+      ]
+    },
+    {
       "method": "POST",
       "path": "/api/feed",
       "handler": "waypoint/server/api/reminders.py:api_feed_make",

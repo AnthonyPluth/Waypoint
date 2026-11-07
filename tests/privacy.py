@@ -45,16 +45,21 @@ def no_leaks(case, *canaries: str, database: str | None = None, sent_ok: bool = 
     out, err, logged = io.StringIO(), io.StringIO(), io.StringIO()
     sent: list[str] = []
     real_urlopen = tls.urlopen
+    real_post = tls.post_http2
 
     def recording_urlopen(req, *args, **kwargs):
         sent.append(_request_text(req, kwargs.get("data")))
         return real_urlopen(req, *args, **kwargs)
 
+    def recording_post(url, headers, content, *args, **kwargs):
+        sent.append("\n".join([url, *(f"{k}: {v}" for k, v in headers.items()), content.decode("utf-8", "replace")]))
+        return real_post(url, headers, content, *args, **kwargs)
+
     handler = logging.StreamHandler(logged)
     root = logging.getLogger()
     root.addHandler(handler)
     try:
-        with mock.patch.object(tls, "urlopen", recording_urlopen), \
+        with mock.patch.object(tls, "urlopen", recording_urlopen), mock.patch.object(tls, "post_http2", recording_post), \
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             yield
     finally:
