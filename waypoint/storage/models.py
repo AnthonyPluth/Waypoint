@@ -416,7 +416,7 @@ class PhotoSource(Base):
 
 
 class Photo(Base):
-    __table__ = schema.photos
+    __table__ = schema.photos   # nosemgrep: waypoint-photo-access -- the table's mapping, the one place models.py names it
     id: Mapped[int]
     source_id: Mapped[int]
     asset_id: Mapped[str]
