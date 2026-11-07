@@ -54,7 +54,7 @@ actor ServerSession {
         let endpoints = try await ServerClient.endpoints(server)
         do {
             let renewed = try await ServerClient.refresh(current.refreshToken, endpoints: endpoints)
-            guard self.server == server else { throw ServerError.signedOut }
+            guard self.server == server, tokens == current else { throw ServerError.signedOut }
             keep(server: server, tokens: renewed)
             return renewed.accessToken
         } catch ServerError.signedOut {
