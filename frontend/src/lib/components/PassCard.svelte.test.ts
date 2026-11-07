@@ -11,7 +11,7 @@ import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
 import type { FlightStatus, FlightStatusList, Segment } from "$lib/api-types";
 import { flightStatus } from "$lib/flightstatus.svelte";
-import { instant } from "$lib/trips";
+import { instant, shipLeft, shipTrail } from "$lib/trips";
 import { toast } from "svelte-sonner";
 import { segment } from "../../test/fixtures";
 import PassCard from "./PassCard.svelte";
@@ -206,6 +206,52 @@ describe("the other kinds of pass", () => {
     expect(screen.getByText("London → Paris")).toBeInTheDocument();
     expect(screen.getByText("Arrives in 1 h 20 min")).toBeInTheDocument();
     expect(screen.getByText("31")).toBeInTheDocument();
+  });
+  describe("the ship on a cruise", () => {
+    const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_local: "2026-11-21T16:00", start_zone: "America/New_York", end_local: "2026-11-28T07:00", end_zone: "America/New_York", details: { ship: "Example Star" } });
+    const from = instant(ship.start_local, "America/New_York"), to = instant(ship.end_local, "America/New_York");
+    const board = { boarding: true, tripName: "Trip to Miami", eyebrow: "Next up" };
+    const line = (container: HTMLElement) => container.querySelector("[data-progress]:not(section)") as HTMLElement;
+    const leftOf = (progress: number) => { const probe = document.createElement("span"); probe.style.left = shipLeft(progress); return probe.style.left; };
+    const trailOf = (progress: number) => { const probe = document.createElement("span"); probe.style.width = shipTrail(progress); return probe.style.width; };
+    const trail = (container: HTMLElement) => container.querySelector("[data-ship-trail]") as HTMLElement | null;
+    const tile = (container: HTMLElement) => container.querySelector("[data-ship]") as HTMLElement;
+    it("waits at the start before embarking", () => {
+      const { container } = render(PassCard, { ...board, segment: ship, now: from - HOUR });
+      expect(line(container).dataset.progress).toBe("0");
+      expect(tile(container).style.left).toBe(leftOf(0));
+      expect(trail(container)).toBeNull();
+    });
+    it("moves along the line with the cruise's progress", () => {
+      const { container } = render(PassCard, { ...board, segment: ship, now: (from + to) / 2 });
+      expect(line(container).dataset.progress).toBe("0.5");
+      expect(tile(container).style.left).toBe(leftOf(0.5));
+      expect(trail(container)?.style.width).toBe(trailOf(0.5));
+      expect(trail(container)?.getAttribute("aria-hidden")).toBe("true");
+      expect(trail(container)?.className).toContain("border-kind-cruise");
+    });
+    it("rests at the end once disembarked", () => {
+      const { container } = render(PassCard, { ...board, segment: ship, now: to + HOUR });
+      expect(line(container).dataset.progress).toBe("1");
+      expect(tile(container).style.left).toBe(leftOf(1));
+      expect(trail(container)?.style.width).toBe(trailOf(1));
+    });
+    it("keeps a cancelled cruise at the start", () => {
+      const { container } = render(PassCard, { ...board, segment: { ...ship, status: "cancelled" }, now: (from + to) / 2 });
+      expect(line(container).dataset.progress).toBe("0");
+      expect(trail(container)).toBeNull();
+    });
+    it("keeps an untimed cruise at the start", () => {
+      const { container } = render(PassCard, { ...board, segment: { ...ship, details: { ...ship.details, time_unknown: "yes" } }, now: (from + to) / 2 });
+      expect(line(container).dataset.progress).toBe("0");
+      expect(trail(container)).toBeNull();
+    });
+    it("leaves a stay's tile centered, with no progress", () => {
+      const { container } = render(PassCard, { ...board, segment: stay, now: nowStay });
+      expect(container.querySelector("[data-ship]")).toBeNull();
+      expect(container.querySelector("[data-progress]:not(section)")).toBeNull();
+      expect(container.querySelector("[data-ship-trail]")).toBeNull();
+    });
   });
   it("leads a cruise with embarking and disembarking", () => {
     const ship = segment({ id: 5, kind: "cruise", provider: "Example Cruise Line", origin: "Miami", destination: "Miami", start_local: "2026-11-21T16:00", start_zone: "America/New_York", end_local: "2026-11-28T07:00", end_zone: "America/New_York", details: { ship: "Example Star", room: "9012", deck: "9" } });

@@ -167,6 +167,18 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/flightstatus.py"]
 
+  - id: waypoint-immich-hosts
+    message: >-
+      Only waypoint/providers/immich.py talks to Immich, so its endpoints and the per-person API key (sent as
+      x-api-key, never in a URL, a log or an error) stay in one place (AGENTS.md, "Private data in logs"): call it
+      rather than naming Immich's endpoints or its key header elsewhere.
+    severity: ERROR
+    languages: [python]
+    pattern-regex: (?i)(/api/search/metadata|/api/map/markers|/api/assets/|x-api-key)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/immich.py"]
+
   - id: waypoint-mail-image-fetch
     message: >-
       Only waypoint/providers/mailimages.py downloads the images of a kept email, once, when the message is kept, with
@@ -290,6 +302,30 @@ rules:
       - pattern-regex: (?i)\b(from|join|update|into)\s+"?(trips|segments|segment_travelers|trip_people)\b
     paths:
       include: ["/waypoint/server/"]
+
+  - id: waypoint-photo-access
+    message: >-
+      A photo is read for a request only through the one access predicate in waypoint/domain/photos.py (visible, and
+      unsettled and removed for the photo's own person), so nothing shows, counts, pins or sums a photo its person hasn't
+      shared with the viewer (AGENTS.md, "Photos are shared by their person"); photogrants.py's grants and removals and
+      photosync.py's writes are the other places that touch the rows. Ask photos.visible_rows instead of querying Photo.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - pattern: select(..., Photo, ...)
+      - pattern: select(..., Photo.$C, ...)
+      - pattern: $Q.join(Photo, ...)
+      - pattern: $Q.outerjoin(Photo, ...)
+      - pattern: $Q.join_from(..., Photo, ...)
+      - pattern: $CONN.orm.get(Photo, ...)
+      - pattern: update(Photo)
+      - pattern: delete(Photo)
+      - pattern: aliased(Photo, ...)
+      - pattern: schema.photos
+      - pattern-regex: (?i)\b(from|join|update|into)\s+"?photos\b
+    paths:
+      include: ["/waypoint/server/", "/waypoint/domain/"]
+      exclude: ["/waypoint/domain/photos.py", "/waypoint/domain/photogrants.py", "/waypoint/domain/photosync.py"]
 
   - id: waypoint-naive-now
     message: >-

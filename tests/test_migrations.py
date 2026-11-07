@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 import unittest
@@ -7,7 +8,7 @@ import sqlalchemy as sa
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 
 from waypoint.storage import backup, db, schema, secretbox
 from waypoint.storage.models import Setting, User
@@ -31,6 +32,16 @@ def replay(path):
     from alembic import command
     with db.engine(path).begin() as c:
         command.upgrade(db.alembic_config(c), "head")
+
+
+@contextlib.contextmanager
+def migrating(path):
+    with db.engine(path).connect() as c:
+        if c.dialect.name == "sqlite":
+            c.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            c.commit()
+        with c.begin():
+            yield c
 
 
 def shape(path):
@@ -272,7 +283,7 @@ class MigrationTests(unittest.TestCase):
         db.init(self.path)
         self.assertEqual(drift(self.path), [])
         tables = shape(self.path)
-        self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
+        self.assertEqual(tables["photo_sources"]["uniques"], [("uq_photo_sources_person_url_user", ("person_id", "url", "immich_user_id"))])
         self.assertEqual(tables["photos"]["uniques"], [("uq_photos_source_asset", ("source_id", "asset_id"))])
         self.assertEqual([i[0] for i in tables["photos"]["indexes"] if not i[2]], ["ix_photos_segment_id", "ix_photos_source_id_taken_utc", "ix_photos_trip_id"])
         self.assertEqual(tables["photo_trip_syncs"]["pk"], ["source_id", "trip_id"])
@@ -286,20 +297,6 @@ class MigrationTests(unittest.TestCase):
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0037")
         self.assertFalse({"photo_sources", "photos", "photo_trip_syncs"} & set(shape(self.path)))
-
-    def test_0040_adds_the_app_devices_table_and_takes_it_away(self):
-        from alembic import command
-        with db.engine(self.path).begin() as c:
-            command.upgrade(db.alembic_config(c), "0039")
-        self.assertNotIn("app_devices", shape(self.path))
-        db.init(self.path)
-        self.assertEqual(drift(self.path), [])
-        table = shape(self.path)["app_devices"]
-        self.assertEqual(table["uniques"], [("uq_app_devices_token", ("token",))])
-        self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
-        with db.engine(self.path).begin() as c:
-            command.downgrade(db.alembic_config(c), "0039")
-        self.assertNotIn("app_devices", shape(self.path))
 
     def test_0039_ties_an_app_session_to_its_grant_and_takes_it_away(self):
         from alembic import command
@@ -315,6 +312,102 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0038")
         self.assertNotIn("grant_id", [col[0] for col in shape(self.path)["auth_sessions"]["columns"]])
 
+    def test_0040_turns_hidden_photos_into_one_exclusion_each_and_its_downgrade_widens_nothing(self):
+        from alembic import command
+        old_photos = sa.table("photos", *(sa.column(n) for n in ("id", "source_id", "asset_id", "asset_updated", "kind", "taken_utc", "taken_local", "trip_id", "match", "hidden", "seen")))
+        syncs = sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end")))
+
+        def photo(c, id, source, asset, trip, hidden=False):
+            c.execute(old_photos.insert().values(id=id, source_id=source, asset_id=asset, asset_updated="t", kind="image", taken_utc="2026-01-01T00:00:00Z",
+                                                 taken_local="2026-01-01T00:00", trip_id=trip, match="time", hidden=hidden, seen=1.0))
+        with migrating(self.path) as c:
+            command.upgrade(db.alembic_config(c), "0038")
+            c.execute(insert(schema.people), [{"id": 1, "display_name": "One"}, {"id": 2, "display_name": "Two"}])
+            c.execute(insert(schema.trips), [{"id": n, "name": f"Trip {n}", "auto": True} for n in (1, 2, 3)])
+            c.execute(insert(schema.photo_sources), [{"id": s, "person_id": p, "owner_sub": "sub-x", "url": f"https://photos{s}.example", "immich_user_id": "u",
+                                                      "api_key": "enc:v1:x", "status": "ok", "created": 1.0} for s, p in ((1, 1), (2, 1), (3, 2))])
+            photo(c, 1, 1, "twice", 1, hidden=True)
+            photo(c, 2, 2, "twice", 1, hidden=True)
+            photo(c, 3, 3, "theirs", 1, hidden=True)
+            photo(c, 4, 1, "shown", 1)
+            photo(c, 5, 1, "unplaced", None, hidden=True)
+            c.execute(syncs.insert().values(source_id=1, trip_id=1, window_start="a", window_end="b"))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(shape(self.path)["photo_sources"]["uniques"], [("uq_photo_sources_person_url_user", ("person_id", "url", "immich_user_id"))])
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.photo_sources), [{"id": s, "person_id": 1, "owner_sub": "sub-x", "url": "https://two-accounts.example", "immich_user_id": u,
+                                                         "api_key": "enc:v1:x", "status": "ok", "created": 1.0} for s, u in ((8, "first-user"), (9, "second-user"))])
+        self.assertEqual([r[:3] for r in rows_of(self.path, "photo_exclusions")], [(1, "twice", 1), (2, "theirs", 1)])
+        self.assertTrue(all(r[3] > 0 for r in rows_of(self.path, "photo_exclusions")))
+        self.assertEqual((rows_of(self.path, "photos"), rows_of(self.path, "photo_trip_syncs")), ([], []))
+        tables = shape(self.path)
+        self.assertNotIn("hidden", [col[0] for col in tables["photos"]["columns"]])
+        self.assertIn("ask_again", [col[0] for col in tables["photo_grants"]["columns"]])
+        self.assertIn("was_trip_id", [col[0] for col in tables["photo_exclusions"]["columns"]])
+        self.assertIn("SET NULL", {fk[0]: fk[4] for fk in tables["photo_exclusions"]["fks"]}["fk_photo_exclusions_was_trip_id"])
+        self.assertEqual((tables["photo_grants"]["pk"], tables["photo_exclusions"]["pk"], tables["photo_sharing_prefs"]["pk"]),
+                         (["person_id", "trip_id"], ["person_id", "asset_id", "trip_id"], ["person_id"]))
+        self.assertEqual([i[0] for i in tables["photo_grants"]["indexes"] if not i[2]], ["ix_photo_grants_trip_id"])
+        self.assertEqual([i[0] for i in tables["photo_exclusions"]["indexes"] if not i[2]], ["ix_photo_exclusions_trip_id"])
+        for table in ("photo_grants", "photo_exclusions", "photo_sharing_prefs"):
+            for fk in tables[table]["fks"]:
+                if fk[0] != "fk_photo_exclusions_was_trip_id":
+                    self.assertIn("CASCADE", fk[4], (table, fk[0]))
+        with db.session(self.path) as conn:
+            conn.execute(insert(schema.trips), [{"id": 4, "name": "Trip 4", "auto": True}, {"id": 5, "name": "Trip 5", "auto": True}])
+            conn.execute(update(schema.trips).where(schema.trips.c.id == 1).values(booked_by=2))
+            conn.execute(insert(schema.trip_people), [{"trip_id": t, "person_id": p} for t, p in ((1, 1), (2, 1), (3, 2), (5, 1))])
+            conn.execute(insert(schema.photo_grants), [{"person_id": p, "trip_id": t, "scope": scope, "revoked": revoked, "changed": 1.0, "granted_by": "sub-x"}
+                                                       for p, t, scope, revoked in ((1, 1, "trip", None), (1, 2, "only_me", None), (2, 1, "trip", 2.0), (2, 3, "trip", None), (2, 4, "trip", None),
+                                                                                    (1, 5, "trip", None))])
+            conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="removed", trip_id=1, created=3.0))
+            conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="elsewhere", trip_id=2, created=3.0))
+            conn.execute(insert(schema.photo_sharing_prefs).values(person_id=1, default_scope="trip", share_all=True, set_by="sub-x", share_all_since=4.0, steward_sub=None))
+            rows = [(1, 1, "shown", 1), (2, 1, "removed", 1), (3, 2, "elsewhere", 1), (4, 1, "mine", 2), (5, 1, "unplaced", None),
+                    (6, 3, "stopped", 1), (7, 3, "ok", 3), (8, 3, "ungranted", 2), (9, 3, "left", 4), (10, 1, "members_only", 5)]
+            conn.execute(insert(schema.photos), [{"id": id, "source_id": source, "asset_id": asset, "asset_updated": "t", "kind": "image", "taken_utc": "2026-01-01T00:00:00Z",
+                                                  "taken_local": "2026-01-01T00:00", "trip_id": trip, "match": "time", "seen": 1.0} for id, source, asset, trip in rows])
+            conn.execute(insert(schema.photo_trip_syncs).values(source_id=1, trip_id=1, window_start="a", window_end="b"))
+        with migrating(self.path) as c:
+            command.downgrade(db.alembic_config(c), "0038")
+        self.assertFalse({"photo_grants", "photo_exclusions", "photo_sharing_prefs"} & set(shape(self.path)))
+        self.assertEqual(shape(self.path)["photo_sources"]["uniques"], [("uq_photo_sources_person_url", ("person_id", "url"))])
+        self.assertEqual([r[0] for r in rows_of(self.path, "photo_sources") if r[3] == "https://two-accounts.example"], [8])
+        self.assertIn("hidden", [col[0] for col in shape(self.path)["photos"]["columns"]])
+        self.assertEqual((rows_of(self.path, "photos"), rows_of(self.path, "photo_trip_syncs")), ([], []))
+        with migrating(self.path) as c:
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(rows_of(self.path, "photo_exclusions"), [])
+
+
+    def test_0040_types_the_exclusion_timestamp_so_postgres_accepts_it(self):
+        import importlib
+        from sqlalchemy.dialects import postgresql
+        migration = importlib.import_module("waypoint.storage.migrations.versions.0040_photo_grants")
+        statements = []
+        with mock.patch.object(migration, "op") as fake_op:
+            fake_op.execute.side_effect = statements.append
+            migration.upgrade()
+        inserts = [s.compile(dialect=postgresql.dialect()) for s in statements if getattr(s, "is_insert", False)]
+        self.assertEqual(len(inserts), 1)
+        self.assertIn("CAST(%(param_1)s AS FLOAT)", str(inserts[0]))
+
+    def test_0041_adds_the_app_devices_table_and_takes_it_away(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+        db.init(self.path)
+        self.assertEqual(drift(self.path), [])
+        table = shape(self.path)["app_devices"]
+        self.assertEqual(table["uniques"], [("uq_app_devices_token", ("token",))])
+        self.assertEqual([i[0] for i in table["indexes"] if not i[2]], ["ix_app_devices_owner"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0040")
+        self.assertNotIn("app_devices", shape(self.path))
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:
@@ -325,12 +418,20 @@ class MigrationTests(unittest.TestCase):
             conn.execute(insert(schema.photos).values(id=1, source_id=1, asset_id="a", asset_updated="t", kind="image", taken_utc="2026-01-01T00:00:00Z",
                                                       taken_local="2026-01-01T00:00", trip_id=1, match="time", seen=1.0))
             conn.execute(insert(schema.photo_trip_syncs).values(source_id=1, trip_id=1, window_start="a", window_end="b"))
+            conn.execute(insert(schema.photo_grants).values(person_id=1, trip_id=1, scope="trip", changed=1.0, granted_by="sub-a"))
+            conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="b", trip_id=1, created=1.0))
+            conn.execute(insert(schema.trips).values(id=2, name="Other", auto=True))
+            conn.execute(insert(schema.photo_exclusions).values(person_id=1, asset_id="c", trip_id=2, created=1.0, was_trip_id=1))
+            conn.execute(insert(schema.photo_sharing_prefs).values(person_id=1, default_scope="only_me", share_all=False, steward_sub="sub-b"))
             conn.execute(delete(schema.trips).where(schema.trips.c.id == 1))
             self.assertIsNone(conn.execute(select(schema.photos.c.trip_id)).scalar())
-            self.assertFalse(conn.execute(select(schema.photos.c.hidden)).scalar())
-            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.photo_trip_syncs)).scalar(), 0)
+            self.assertEqual(conn.execute(select(schema.photo_exclusions.c.asset_id, schema.photo_exclusions.c.was_trip_id)).fetchall(), [("c", None)])
+            conn.execute(delete(schema.photo_exclusions))
+            for table in ("photo_trip_syncs", "photo_grants", "photo_exclusions"):
+                self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0, table)
+            self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.photo_sharing_prefs)).scalar(), 1)
             conn.execute(delete(schema.people).where(schema.people.c.id == 1))
-            for table in ("photo_sources", "photos"):
+            for table in ("photo_sources", "photos", "photo_sharing_prefs"):
                 self.assertEqual(conn.execute(select(sa.func.count()).select_from(schema.metadata.tables[table])).scalar(), 0, table)
 
     def test_a_cruises_ports_go_with_the_cruise(self):

@@ -435,7 +435,6 @@ class Photo(Base):
     match: Mapped[str]
     distance_km: Mapped[float | None]
     decided_by: Mapped[str | None]
-    hidden: Mapped[bool]
     seen: Mapped[float]
 
 
@@ -449,3 +448,33 @@ class PhotoTripSync(Base):
     resume_page: Mapped[int | None]
     fetch_started: Mapped[str | None]
     synced: Mapped[float | None]
+
+
+class PhotoGrant(Base):
+    __table__ = schema.photo_grants
+    person_id: Mapped[int]
+    trip_id: Mapped[int]
+    scope: Mapped[str]
+    revoked: Mapped[float | None]
+    changed: Mapped[float]
+    granted_by: Mapped[str]
+    ask_again: Mapped[bool]
+
+
+class PhotoExclusion(Base):
+    __table__ = schema.photo_exclusions
+    person_id: Mapped[int]
+    asset_id: Mapped[str]
+    trip_id: Mapped[int]
+    created: Mapped[float]
+    was_trip_id: Mapped[int | None]
+
+
+class PhotoSharingPrefs(Base):
+    __table__ = schema.photo_sharing_prefs
+    person_id: Mapped[int]
+    default_scope: Mapped[str]
+    share_all: Mapped[bool]
+    set_by: Mapped[str | None]
+    share_all_since: Mapped[float | None]
+    steward_sub: Mapped[str | None]

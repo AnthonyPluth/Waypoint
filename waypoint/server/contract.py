@@ -586,7 +586,7 @@ class TripPhoto(TypedDict):
     match: Literal["place", "time", "far", "ambiguous", "home", "none"]
     distance_km: float | None
     cluster: int | None
-    hidden: bool
+    removed_at: float | None
 
 
 class PhotoCluster(TypedDict):
@@ -604,7 +604,6 @@ class PhotoCounts(TypedDict):
     located: int
     inferred: int
     far: int
-    hidden: int
 
 
 class PhotoPerson(TypedDict):
@@ -634,7 +633,77 @@ class PhotoReview(TypedDict):
 
 class PhotoBody(TypedDict):
     trip_id: NotRequired[int | None]
-    hidden: NotRequired[bool]
+    excluded: NotRequired[bool]
+
+
+class PhotoWindow(TypedDict):
+    start: str
+    end: str
+
+
+class PhotoSourceVersion(TypedDict):
+    id: int
+    status: str
+
+
+class PhotoSharing(TypedDict):
+    state: Literal["shared", "declined", "ask", "none"]
+    scope: Literal["only_me", "trip"] | None
+    count: int
+    removed_count: int
+    removed: list[TripPhoto]
+    window: PhotoWindow | None
+    changed: float | None
+    audience: list[int]
+    sources: list[PhotoSourceVersion]
+
+
+class PhotoSharingBody(TypedDict):
+    person_id: NotRequired[int]
+    scope: NotRequired[Literal["only_me", "trip"]]
+    declined: NotRequired[bool]
+    window: NotRequired[PhotoWindow]
+    expected_changed: NotRequired[float]
+    audience: NotRequired[list[int]]
+    sources: NotRequired[list[PhotoSourceVersion]]
+
+
+class PhotoExclusionsBody(TypedDict):
+    photo_ids: list[int]
+
+
+class PhotoPrefs(TypedDict):
+    default_scope: Literal["only_me", "trip"]
+    share_all: bool
+
+
+class PhotoPrefsBody(TypedDict):
+    default_scope: NotRequired[Literal["only_me", "trip"]]
+    share_all: NotRequired[bool]
+    windows: NotRequired[dict[str, PhotoWindow]]
+    audiences: NotRequired[dict[str, list[int]]]
+    sources: NotRequired[list[PhotoSourceVersion]]
+
+
+class PhotoGrantTrip(TypedDict):
+    trip_id: int
+    name: str
+    start_date: str | None
+    end_date: str | None
+    state: Literal["shared", "declined"]
+    scope: Literal["only_me", "trip"] | None
+    count: int
+    removed_count: int
+
+
+class PhotoGrantPerson(TypedDict):
+    person_id: int
+    prefs: PhotoPrefs
+    trips: list[PhotoGrantTrip]
+
+
+class PhotoGrants(TypedDict):
+    people: list[PhotoGrantPerson]
 
 
 class TripPhotoCounts(TypedDict):

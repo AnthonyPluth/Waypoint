@@ -99,6 +99,17 @@ OTHER = "https://example-api.rapidapi.com/status"
 # ok: waypoint-flightstatus-hosts
 flightstatus.fetch("EX101", "2026-11-20")
 
+# ruleid: waypoint-immich-hosts
+SEARCH_URL = "https://photos.example.com:2283/api/search/metadata"
+# ruleid: waypoint-immich-hosts
+MAP = f"{base}/api/map/markers"
+# ruleid: waypoint-immich-hosts
+PICTURE = f"{base}/api/assets/{asset_id}/thumbnail"
+# ruleid: waypoint-immich-hosts
+IMMICH_HEADERS = {"X-Api-Key": key}
+# ok: waypoint-immich-hosts
+found = immich.search(source, after, before)
+
 # ruleid: waypoint-mail-image-fetch
 picture = tls.urlopen(request, 5, public_only=True)
 # ok: waypoint-mail-image-fetch

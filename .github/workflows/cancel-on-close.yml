@@ -21,7 +21,7 @@ defaults:
 
 jobs:
   cancel:
-    uses: AnthonyPluth/fleet/.github/workflows/cancel-on-close.yml@b554ed883ec02bab75af3ba976743a3b4ed3ba5a   # v2.2.0
+    uses: AnthonyPluth/fleet/.github/workflows/cancel-on-close.yml@e46ed57c9783080142e148121176bd7d4a321a8a   # v2.3.0
     with:
       groups: '["docker-image-refs/pull/{0}/merge", "security-refs/pull/{0}/merge"]'   # docker.yml, security.yml
       # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a

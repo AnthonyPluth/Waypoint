@@ -8,7 +8,7 @@ from sqlalchemy import delete, select, update
 
 from ..storage import db
 from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
-from . import visibility
+from . import photogrants, visibility
 
 
 class Fields(TypedDict):
@@ -177,13 +177,21 @@ def _new_names(known: list[str], extra: list[str]) -> list[str]:
     return out
 
 
+def lock(conn: db.Connection, person_id: int) -> bool:
+    return int(conn.execute(update(Person).where(Person.id == person_id).values(display_name=Person.display_name)).rowcount) > 0
+
+
 def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) -> Listed:
-    me = conn.orm.get(Person, member_id, with_for_update=True)
+    held = {person_id: lock(conn, person_id) for person_id in sorted((member_id, guest_id))}
+    me = conn.orm.get(Person, member_id, with_for_update=True) if held[member_id] else None
     if me is None or me.user_sub is None:
         raise NotAMember()
+    if not held[guest_id]:
+        raise NoSuchGuest()
     guest = conn.orm.get(Person, guest_id)
     if guest is None:
         raise NoSuchGuest()
+    photogrants.lock_trips_of(conn, guest_id, member_id)
     if guest.user_sub is not None:
         raise NotAGuest()
     if decode_links(me.links):
@@ -210,6 +218,7 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     me.links = json.dumps([*decode_links(me.links), {"guest": guest.display_name, "by": me.display_name, "on": today}],
                           ensure_ascii=False)
     conn.orm.flush()
+    photogrants.claim(conn, guest_id, member_id, me.user_sub)
     conn.execute(delete(Person).where(Person.id == guest_id, Person.user_sub.is_(None)))
     conn.orm.expire_all()
     return listed(me)

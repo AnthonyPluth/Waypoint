@@ -103,19 +103,26 @@ broken_contract_guidance = "Make the request with waypoint.tls.urlopen instead o
 id = "gmail-alone"
 name = "The Gmail provider imports no other provider, and none imports it"
 type = "independence"
-modules = ["waypoint.providers.gmail", "waypoint.providers.webpush"]
+modules = ["waypoint.providers.gmail", "waypoint.providers.webpush", "waypoint.providers.immich"]
 
 [[tool.importlinter.contracts]]
 id = "flightstatus-alone"
 name = "The flight status provider imports no other provider, and none imports it"
 type = "independence"
-modules = ["waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
+modules = ["waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush", "waypoint.providers.immich"]
 
 [[tool.importlinter.contracts]]
 id = "mailimages-alone"
 name = "The mail image fetcher imports no other provider, and none imports it"
 type = "independence"
-modules = ["waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush"]
+modules = ["waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail", "waypoint.providers.webpush", "waypoint.providers.immich"]
+
+[[tool.importlinter.contracts]]
+id = "immich-alone"
+name = "The Immich provider imports no other provider, and none imports it"
+type = "independence"
+modules = ["waypoint.providers.immich", "waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail",
+           "waypoint.providers.webpush"]
 
 [[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"
