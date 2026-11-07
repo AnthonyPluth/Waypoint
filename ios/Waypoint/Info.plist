@@ -40,6 +40,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Waypoint connects to the server you enter, which may be on your home network.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Waypoint uses Face ID to open the trips saved on this iPhone.</string>
 	<key>UILaunchScreen</key>
