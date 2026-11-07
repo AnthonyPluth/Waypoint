@@ -225,7 +225,7 @@ jobs:
   fleet-checks:
     permissions:
       contents: read
-    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@e46ed57c9783080142e148121176bd7d4a321a8a   # v2.3.0
+    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
     with:
       # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a
       # job's form, and this one is an input.
@@ -290,158 +290,38 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: npm run build
 
-  # The image is built while the tests run, and published only once they (and the web app's checks) pass.
-  # build: works out the version, builds the image for this runner and checks it starts, then builds it for Intel/AMD
-  # and ARM into the build cache. It has no permission to publish anything and sends nothing out.
+  # The image pipeline is fleet's reusable workflow (AnthonyPluth/fleet, .github/workflows/docker.yml), called twice: the
+  # build runs while the tests run (it works out the version, builds the image, checks it starts and fills the build
+  # cache, with no permission to publish), and the publish runs once the tests, the web app's checks and the build have
+  # passed (push, tag, Release, then the cleanup of untagged leftovers). Only main is ever released: fleet's publish
+  # also refuses a pull request, so a mistake here can't publish one. Both calls grant contents: write and packages:
+  # write, because GitHub checks every job of the called workflow against the calling job's grant, even the jobs the
+  # inputs skip; each of fleet's jobs takes only what it needs. At v3.0.0 its workflow starts from `permissions: {}`:
+  # build has `contents: read` (line 117); publish has `contents: write` and `packages: write` (line 240) and runs only
+  # on main, never for a pull request or pull_request_target (line 237); cleanup has `packages: write` alone (line 334).
+  # The statuses are "build / Build", "publish / Publish" and "publish / Cleanup"; the merge gate counts this workflow, "Docker image", not its jobs.
   build:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 45
-    outputs:
-      version: ${{ steps.next.outputs.version }}
-      new: ${{ steps.next.outputs.new }}
-      newest: ${{ steps.next.outputs.newest }}
-      skip: ${{ steps.next.outputs.skip }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-        with:
-          fetch-depth: 0       # full history and tags, to find the last version
-          persist-credentials: false
+    permissions:
+      contents: write          # the ceiling for fleet's jobs; its build job takes contents: read
+      packages: write
+    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    with:
+      image: waypoint
+      smoke-env: WAYPOINT_ALLOW_NO_AUTH=1
+      "runs-on": ${{ vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"' }}
 
-      # The shim runs fleet through uvx, which a self-hosted runner may not have.
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2   # v10.3.3
-        with:
-          enable-cache: false
-
-      # fleet next-version (the same outputs .github/scripts/next-version.sh wrote: newest, then version and new, or skip),
-      # from the commits since the last tag, stepping from the highest version ever tagged.
-      - name: Work out the next version
-        id: next
-        run: tools/fleet next-version
-
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1   # v4.4.0
-        if: steps.next.outputs.skip != 'true'
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1
-        if: steps.next.outputs.skip != 'true'
-
-      # Start the image and ask it /healthz.
-      - name: Build for this runner
-        if: steps.next.outputs.skip != 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
-        with:
-          context: .
-          load: true
-          tags: waypoint:smoke
-          build-args: |
-            VERSION=${{ steps.next.outputs.version }}
-          cache-from: type=gha
-      - name: Check the image starts
-        if: steps.next.outputs.skip != 'true'
-        run: |
-          docker run -d --name smoke -p 8765:8765 -e WAYPOINT_ALLOW_NO_AUTH=1 waypoint:smoke
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8765/healthz; then docker rm -f smoke; exit 0; fi
-            sleep 1
-          done
-          docker logs smoke; exit 1
-
-      # The slow part (ARM is built under emulation), done now: into the build cache only, which publish reads back.
-      - name: Build for Intel/AMD and ARM (not pushed)
-        if: steps.next.outputs.skip != 'true'
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: false
-          build-args: |
-            VERSION=${{ steps.next.outputs.version }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # publish: once the tests, the web app's checks and the build have all passed, push the image (from the build's
-  # cache, so it isn't built again) and then tag the release. The tag and Release come last, so a failed or cancelled
-  # push never leaves a version with no image.
   publish:
     needs: [test, web, build]
     if: needs.build.outputs.skip != 'true'
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 30
     permissions:
-      contents: write          # create the tag and the release
-      packages: write          # publish to ghcr.io
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Image name (registry names must be lowercase)
-        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/waypoint" >> "$GITHUB_ENV"
-
-      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1   # v4.4.0
-      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069   # v4.4.1
-
-      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6   # v4.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Image tags (latest, 1.2.3, v1.2.3, 1.2 and 1)
-        id: tags
-        env:
-          VERSION: ${{ needs.build.outputs.version }}
-          NEWEST: ${{ needs.build.outputs.newest }}
-        run: |
-          v="${VERSION#v}"
-          IFS=. read -r major minor patch <<< "$v"
-          {
-            echo "list<<EOF"
-            echo "$IMAGE:$v"
-            echo "$IMAGE:v$v"
-            if [ "$NEWEST" = true ]; then
-              echo "$IMAGE:latest"
-              echo "$IMAGE:$major.$minor"
-              echo "$IMAGE:$major"
-            fi
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Push (from the build's cache)
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc   # v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.tags.outputs.list }}
-          build-args: |
-            VERSION=${{ needs.build.outputs.version }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ needs.build.outputs.version }}
-          cache-from: type=gha
-
-      - name: Tag and publish the release
-        if: needs.build.outputs.new == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.build.outputs.version }}
-        run: |
-          # --target makes GitHub create the tag v1.2.3 on this commit (through the API, so the checkout needs no
-          # credentials); a tag that already exists is used as it is.
-          gh release create "$VERSION" --target "$GITHUB_SHA" --title "Waypoint $VERSION" --generate-notes
-
-  # A third-party action, so it runs on its own with only the permission it needs (no access to the repository).
-  cleanup:
-    needs: publish
-    runs-on: ${{ fromJSON(vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"') }}
-    timeout-minutes: 10
-    permissions:
-      packages: write          # delete old versions from ghcr.io
-    steps:
-      - name: Delete untagged leftovers (every released version stays pullable)
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f   # v1.2.2
-        with:
-          package: waypoint
-          delete-untagged: true      # understands multi-architecture images, so tagged versions stay intact
-          token: ${{ secrets.GITHUB_TOKEN }}
+      contents: write          # the tag and the release
+      packages: write          # the push, and the cleanup of untagged versions
+    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    with:
+      image: waypoint
+      publish: true
+      version: ${{ needs.build.outputs.version }}
+      new: ${{ needs.build.outputs.new }}
+      newest: ${{ needs.build.outputs.newest }}
+      "runs-on": ${{ vars.RUNS_ON != '' && github.actor != 'dependabot[bot]' && (!github.event.pull_request || github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]') && vars.RUNS_ON || '"ubuntu-latest"' }}
