@@ -22,7 +22,7 @@ from waypoint.providers import webpush
 from waypoint import tls
 from waypoint.server import jobs
 from waypoint.storage import db
-from waypoint.storage.models import Mailbox, PushDevice, ReminderSent
+from waypoint.storage.models import Mailbox, PushDevice, ReminderSent, ReviewItem
 
 VERDICT = json.dumps({"bookings": [], "not_a_booking": "promotion"})
 ONE = "1 booking email needs your review"
@@ -55,7 +55,7 @@ class PushCase(ScanAiCase):
         jobs.scan_mailboxes()
 
     def remembered(self):
-        return self.read(lambda conn: sorted(conn.execute(select(ReminderSent.owner_sub, ReminderSent.kind)).fetchall()))
+        return self.read(lambda conn: sorted(conn.execute(select(ReminderSent.owner_sub, ReminderSent.kind).where(ReminderSent.kind != "review_retry")).fetchall()))
 
     def bodies(self):
         return [m["body"] for _i, m in self.sent]
@@ -307,6 +307,61 @@ class FailureTests(PushCase):
         with db.session() as conn:
             self.assertEqual(reminders.review_due(conn, started, time.time(), self.send, [self.mailbox]), 1)
         self.assertEqual(self.bodies(), [ONE])
+
+    def test_a_failed_wake_for_an_item_the_scan_window_has_passed_is_tried_on_the_next_run_and_not_again_once_sent(self):
+        self.device()
+        self.failing = RuntimeError("couldn't reach the push service")
+        self.incomplete()
+        self.scan_job()
+        self.assertEqual((self.sent, self.remembered()), ([], []))
+        self.failing = None
+        later = time.time() + 60
+        with db.session() as conn:
+            self.assertEqual(reminders.review_due(conn, later, later, self.send, [self.mailbox]), 1)
+            self.assertEqual(reminders.review_due(conn, later + 60, later + 60, self.send, [self.mailbox]), 0)
+        self.assertEqual(self.bodies(), [ONE])
+        self.assertEqual(self.remembered(), [("u-jane", "review")])
+
+    def test_a_retried_item_is_counted_with_the_new_ones_and_an_answered_one_is_left_out(self):
+        self.device()
+        self.failing = RuntimeError("couldn't reach the push service")
+        self.incomplete("m-old", "m-dismissed")
+        self.scan_job()
+        self.failing = None
+        with db.session() as conn:
+            review.dismiss(conn, "u-jane", self.read(lambda c: c.execute(select(ReviewItem.id).where(ReviewItem.message_id == "m-dismissed")).scalar()))
+        self.incomplete("m-new")
+        self.scan_job()
+        self.assertEqual(self.bodies(), [TWO])
+        self.assertEqual(len(self.remembered()), 2)
+
+    def test_a_failed_phone_wake_for_a_passed_item_is_tried_again_and_not_once_it_got_through(self):
+        with db.session() as conn:
+            app_push.add_device(conn, "u-jane", "ab12" * 16, "production", time.time())
+        self.incomplete()
+        waking = mock.Mock(return_value=(0, 1))
+        with mock.patch.object(app_push, "wake", waking), mock.patch.object(app_push, "enabled", return_value=True):
+            self.scan_job()
+            self.assertEqual((waking.call_count, self.remembered()), (1, []))
+            waking.return_value = (1, 1)
+            later = time.time() + 60
+            with db.session() as conn:
+                self.assertEqual(reminders.review_due(conn, later, later, self.send, [self.mailbox]), 1)
+                self.assertEqual(reminders.review_due(conn, later + 60, later + 60, self.send, [self.mailbox]), 0)
+        self.assertEqual((waking.call_count, self.remembered()), (2, [("u-jane", "review")]))
+
+    def test_an_item_that_is_gone_or_in_a_mailbox_not_scanned_leaves_the_retry_alone_or_forgets_it(self):
+        self.device()
+        self.failing = RuntimeError("couldn't reach the push service")
+        self.incomplete("m-gone")
+        self.scan_job()
+        self.failing = None
+        with db.session() as conn:
+            review.dismiss(conn, "u-jane", self.read(lambda c: c.execute(select(ReviewItem.id)).scalar()))
+        later = time.time() + 60
+        with db.session() as conn:
+            self.assertEqual(reminders.review_due(conn, later, later, self.send, [self.mailbox]), 0)
+        self.assertEqual((self.sent, self.read(lambda conn: conn.execute(select(ReminderSent.id)).fetchall())), ([], []))
 
     def test_a_device_the_push_service_has_forgotten_is_dropped_and_the_scan_goes_on(self):
         self.device()

@@ -21,7 +21,7 @@ from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
 
-Kind = Literal["check_in", "day_of", "review"]
+Kind = Literal["check_in", "day_of", "review", "review_retry"]
 CHECK_IN_AHEAD = timedelta(hours=24)
 DAY_OF_HOUR = 7
 LOCAL_OWNER = "local"
@@ -281,20 +281,43 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
     return sent
 
 
+def _retries(conn: db.Connection, owner: str) -> list[str]:
+    return list(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review_retry")
+                             .order_by(ReminderSent.id)).scalars())
+
+
+def _forget_retries(conn: db.Connection, owner: str, refs: Collection[str]) -> None:
+    if refs:
+        conn.execute(delete(ReminderSent).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review_retry", ReminderSent.ref.in_(sorted(refs))))
+
+
+def _unsent_review(conn: db.Connection, owner: str, arrived: list[str], mailbox_ids: Collection[int]) -> list[str]:
+    retries = _retries(conn, owner)
+    if retries:
+        waiting = set(review.arrived(conn, owner, 0.0, mailbox_ids))
+        scanned = {str(n) for n in mailbox_ids}
+        _forget_retries(conn, owner, [ref for ref in retries if ref.split("/", 1)[0] in scanned and ref not in waiting])
+        arrived = list(dict.fromkeys([*arrived, *(ref for ref in retries if ref in waiting)]))
+    told = set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review",
+                                                           ReminderSent.ref.in_(arrived))).scalars()) if arrived else set()
+    return [ref for ref in arrived if ref not in told]
+
+
 def review_due(conn: db.Connection, since: float, now: float, send: Send, mailbox_ids: Collection[int]) -> int:
     end_lapsed(conn, now)
     sent = 0
     for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
         if not prefs(conn, owner)["review"]:
             continue
-        arrived = review.arrived(conn, owner, since, mailbox_ids)
-        told = set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "review",
-                                                               ReminderSent.ref.in_(arrived))).scalars()) if arrived else set()
-        fresh = [ref for ref in arrived if ref not in told]
-        if fresh and _deliver(conn, owner, review_message(len(fresh)), send):
-            for ref in fresh:
+        arrived = _unsent_review(conn, owner, review.arrived(conn, owner, since, mailbox_ids), mailbox_ids)
+        if arrived and _deliver(conn, owner, review_message(len(arrived)), send):
+            for ref in arrived:
                 _record(conn, owner, "review", ref, now)
+            _forget_retries(conn, owner, arrived)
             sent += 1
+        else:
+            for ref in arrived:
+                _record(conn, owner, "review_retry", ref, now)
     return sent
 
 
