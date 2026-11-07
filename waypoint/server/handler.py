@@ -434,7 +434,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "Bad JSON"})
         if hit is None:
             return self._json(404, {"error": "Not found"})
-        q = urllib.parse.parse_qs(url.query)
+        q = urllib.parse.parse_qs(url.query, keep_blank_values=hit.route.keep_blank)
         _current.user = getattr(self, "user", None)
         _current.host = self.headers.get("Host")
         _current.assistant = False

@@ -9,7 +9,7 @@ from ...domain.photosources import Actor
 from ...domain.visibility import Viewer
 from ...providers import immich
 from .. import jobs
-from ..common import ApiError, _current, row_id
+from ..common import ApiError, _current, keep_blank, row_id
 from ..contract import (Ok, PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, PhotoSource,
                         PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, SyncStarted, TripPhoto,
                         TripPhotos)
@@ -178,6 +178,7 @@ def api_photo_exclude(conn, _q, body: PhotoExclusionsBody, trip_id) -> PhotoShar
     return _run(lambda: photogrants.exclude(conn, who, trip, ids), NO_PHOTO)
 
 
+@keep_blank
 def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
     who, trip, this = _viewer(conn), row_id(trip_id, NO_TRIP), row_id(photo_id, NO_PHOTO)
     given = (q.get("created") or [None])[0]

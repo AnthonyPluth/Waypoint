@@ -924,6 +924,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_photos_api.py",
         "tests/test_stats.py"
       ],
       "docs": [
