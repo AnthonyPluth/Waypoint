@@ -409,7 +409,7 @@ class MigrationTests(unittest.TestCase):
         self.assertEqual([r[:7] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1", None, None), (1, 2, "a", "b", None, None, None)])
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0040")
-            names = [r[1] for r in c.exec_driver_sql("PRAGMA table_info(photo_trip_syncs)")]
+            names = [col["name"] for col in sa.inspect(c).get_columns("photo_trip_syncs")]
         self.assertIn("resume_page", names)
         self.assertFalse({"resume_after", "inputs"} & set(names))
         self.assertEqual([(r[names.index("cursor")], r[names.index("resume_page")]) for r in rows_of(self.path, "photo_trip_syncs")], [("c1", None), (None, None)])
