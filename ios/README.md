@@ -11,7 +11,7 @@ Needs a Mac with Xcode 16+, Node 22+ and [XcodeGen](https://github.com/yonaskolb
 ```sh
 cd ios
 npm ci            # Capacitor 8.6.0
-npx cap sync ios  # not needed for the first build; the project below links Capacitor from node_modules
+npx cap sync ios  # not needed for the first build; the project below takes Capacitor from the capacitor-swift-pm package
 xcodegen          # writes Waypoint.xcodeproj from project.yml (not committed)
 open Waypoint.xcodeproj
 ```
