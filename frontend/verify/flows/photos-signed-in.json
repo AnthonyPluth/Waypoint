@@ -2,7 +2,6 @@
   "name": "photos-signed-in",
   "page": "trips",
   "signed_in": true,
-  "audit": false,
   "viewports": ["desktop"],
   "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
   "steps": [

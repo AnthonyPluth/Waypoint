@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -236,9 +236,11 @@ describe("signed_in flows", () => {
     expect(flowProblems({ ...ok, signed_in: true })).toEqual([]);
     expect(flowProblems({ ...ok, signed_in: "yes" })).toEqual(["signed_in is true or false"]);
   });
-  it("takes audit as true or false", () => {
-    expect(flowProblems({ ...ok, audit: false })).toEqual([]);
-    expect(flowProblems({ ...ok, audit: 0 })).toEqual(["audit is true or false"]);
+  it("audits an HTML page and not a JSON reply or an image", () => {
+    expect(auditable("text/html; charset=utf-8")).toBe(true);
+    expect(auditable("application/xhtml+xml")).toBe(true);
+    expect(auditable(undefined)).toBe(true);
+    for (const type of ["application/json", "image/png", "image/jpeg", "text/plain"]) expect(auditable(type)).toBe(false);
   });
   it("runs a flow on the signed-in server and everything else on the local one", () => {
     const env = { base: "http://127.0.0.1:1", signedBase: "http://127.0.0.1:2" };

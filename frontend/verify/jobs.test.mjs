@@ -53,6 +53,14 @@ describe("splitVisits", () => {
     }
   });
 
+  it("keeps every signed-in flow on one queue, so they never run at once on the shared signed-in server", () => {
+    const signed = plan([flow("a", 5, { signed_in: true }), flow("b", 5), flow("c", 5, { signed_in: true }), flow("d", 5), flow("e", 5, { signed_in: true })]);
+    const { queues } = splitVisits(signed, 4);
+    const holding = queues.filter((q) => q.some((v) => v.flow.signed_in === true));
+    expect(holding).toHaveLength(1);
+    expect(holding[0].filter((v) => v.flow.signed_in === true).map((v) => v.flow.name)).toEqual(["a", "a", "c", "c", "e", "e"]);
+  });
+
   it("balances the queues by cost and splits the same way every time", () => {
     const first = splitVisits(visits, 3).queues.map((q) => names(q));
     expect(splitVisits(visits, 3).queues.map((q) => names(q))).toEqual(first);

@@ -330,10 +330,6 @@ class ControlSessionTests(unittest.TestCase):
         self.assertIn("usage: python -m waypoint.verify serve", usage.stderr)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class SignedInTests(unittest.TestCase):
     def test_the_names_and_the_marker_are_the_ones_the_server_checks(self):
         from waypoint import oidc
@@ -375,21 +371,33 @@ class SignedInTests(unittest.TestCase):
             self.assertEqual(verify.seed(["--data", data]), 0)
             self.assertTrue(os.path.isfile(os.path.join(data, verify.DEMO_MARKER)))
 
-    def test_a_signed_in_server_is_started_only_when_a_flow_asks_for_one(self):
+    def test_a_signed_in_server_is_started_only_when_a_selected_flow_asks_for_one(self):
         with tempfile.TemporaryDirectory() as tmp:
             for name, body in (("a.json", {"name": "a", "steps": []}), ("b.json", {"name": "b", "signed_in": False, "steps": []}), ("bad.json", "[")):
                 with open(os.path.join(tmp, name), "w") as f:
                     f.write(body if isinstance(body, str) else json.dumps(body))
-            self.assertFalse(verify.flows_need_signed_in(None, tmp))
+            need = lambda pages=None, only=None: verify.flows_need_signed_in(pages, only, tmp)
+            self.assertFalse(need())
             with open(os.path.join(tmp, "c.json"), "w") as f:
-                json.dump({"name": "c", "signed_in": True, "steps": []}, f)
-            self.assertTrue(verify.flows_need_signed_in(None, tmp))
-            self.assertTrue(verify.flows_need_signed_in(["c"], tmp))
-            self.assertFalse(verify.flows_need_signed_in(["a"], tmp))
-        self.assertFalse(verify.flows_need_signed_in(None, "/no/such/folder"))
+                json.dump({"name": "c", "page": "trips", "signed_in": True, "steps": []}, f)
+            with open(os.path.join(tmp, "d.json"), "w") as f:
+                json.dump({"name": "d", "signed_in": True, "steps": []}, f)
+            self.assertTrue(need())
+            self.assertTrue(need(None, ["c"]))
+            self.assertFalse(need(None, ["a"]))
+            self.assertTrue(need(["trips"]))
+            self.assertTrue(need(["upcoming"]))
+            self.assertFalse(need(["settings"]))
+            self.assertFalse(need(["settings"], ["a"]))
+            self.assertTrue(need(["settings"], ["c"]))
+        self.assertFalse(verify.flows_need_signed_in(None, None, "/no/such/folder"))
 
     def test_the_node_command_names_the_signed_in_server_only_when_there_is_one(self):
         plain = verify.node_command("node", "/f", ["http://a"], [], [])
         self.assertNotIn("--signed-url", plain)
         both = verify.node_command("node", "/f", ["http://a"], [], [], "http://b")
         self.assertEqual(both[both.index("--signed-url") + 1], "http://b")
+
+
+if __name__ == "__main__":
+    unittest.main()

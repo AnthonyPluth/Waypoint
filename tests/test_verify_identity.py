@@ -18,8 +18,9 @@ def seed_demo_data(marker: bool = True) -> None:
             pass
 
 
+@unittest.skipIf(db.using_postgres(), "the setting is refused on Postgres; these tests build their own SQLite folder")
 class SignedInDemoTests(ServerCase):
-    unset = ("OIDC_ISSUER", "DATABASE_URL", oidc.VERIFY_AS)
+    unset = ("OIDC_ISSUER", oidc.VERIFY_AS)
 
     @classmethod
     def setUpClass(cls):

@@ -67,7 +67,7 @@ def signed_in_env(env: dict[str, str], who: str | None) -> dict[str, str]:
     return {**env, SIGNED_IN_ENV: who}
 
 
-def flows_need_signed_in(only: list[str] | None = None, folder: str = FLOWS) -> bool:
+def flows_need_signed_in(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
     try:
         names = sorted(n for n in os.listdir(folder) if n.endswith(".json"))
     except OSError:
@@ -78,7 +78,15 @@ def flows_need_signed_in(only: list[str] | None = None, folder: str = FLOWS) -> 
                 flow = json.load(f)
         except (OSError, ValueError):
             continue
-        if isinstance(flow, dict) and flow.get("signed_in") is True and (not only or flow.get("name") in only):
+        if not isinstance(flow, dict) or flow.get("signed_in") is not True:
+            continue
+        if only:
+            selected = flow.get("name") in only
+        elif pages:
+            selected = flow.get("page", "upcoming") in pages
+        else:
+            selected = True
+        if selected:
             return True
     return False
 
@@ -229,7 +237,7 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     root = tempfile.mkdtemp(prefix="waypoint-verify-")
     instances: list[Instance] = []
     try:
-        signed = SIGNED_IN_AS[0] if flows_need_signed_in(flows) else None
+        signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) else None
         try:
             instances = start_instances(root, count, library, signed)
         except RuntimeError as e:

@@ -1,3 +1,5 @@
+const SIGNED_IN_GROUP = "\0signed-in";
+
 export const urlsOf = (text) => String(text ?? "").split(",").map((u) => u.trim()).filter(Boolean);
 
 export function planVisits({ pages, flows, viewports, ownPages, filtered, flowsOnly = false }) {
@@ -16,9 +18,12 @@ export const labelOf = (visit) => (visit.kind === "flow" ? `flow ${visit.flow.na
 export function splitVisits(visits, workers) {
   const shared = visits.filter((v) => v.kind !== "flow");
   const flows = new Map();
-  for (const v of visits.filter((x) => x.kind === "flow")) flows.set(v.flow.name, [...(flows.get(v.flow.name) ?? []), v]);
+  for (const v of visits.filter((x) => x.kind === "flow")) {
+    const key = v.flow.signed_in === true ? SIGNED_IN_GROUP : v.flow.name;
+    flows.set(key, [...(flows.get(key) ?? []), v]);
+  }
   const queues = Array.from({ length: workers }, () => ({ load: 0, visits: [] }));
-  const byCost = [...flows.values()].map((group) => ({ group, cost: group.length * (1 + group[0].flow.steps.length) }))
+  const byCost = [...flows.values()].map((group) => ({ group, cost: group.reduce((n, v) => n + 1 + v.flow.steps.length, 0) }))
     .sort((a, b) => b.cost - a.cost || a.group[0].index - b.group[0].index);
   for (const { group, cost } of byCost) {
     const queue = queues.reduce((least, q) => (q.load < least.load ? q : least));

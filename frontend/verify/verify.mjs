@@ -83,7 +83,6 @@ export function flowProblems(flow) {
   if (flow?.host !== undefined && !/^[\w.-]+$/.test(flow.host)) out.push("host is a host name such as localhost");
   if (flow?.allow_console !== undefined && !(Array.isArray(flow.allow_console) && flow.allow_console.every((t) => typeof t === "string"))) out.push("allow_console is a list of texts");
   if (flow?.phone_agent !== undefined && typeof flow.phone_agent !== "boolean") out.push("phone_agent is true or false");
-  if (flow?.audit !== undefined && typeof flow.audit !== "boolean") out.push("audit is true or false");
   if (flow?.signed_in !== undefined && typeof flow.signed_in !== "boolean") out.push("signed_in is true or false");
   if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
@@ -281,6 +280,8 @@ export async function settlePage(page, name, where, notes, scrollToTop = true) {
   await page.waitForTimeout(SETTLE_MS);
 }
 
+export const auditable = (contentType) => contentType === undefined || /^\s*(text\/html|application\/xhtml\+xml)\b/i.test(contentType);
+
 async function visit(env, label, viewport, work, { audit = true, reducedMotion = "no-preference", allowConsole = [], phoneAgent = false } = {}) {
   const { browser, now, images, out } = env;
   const ctx = await browser.newContext(contextOptions(viewport, { reducedMotion, phoneAgent }));
@@ -293,6 +294,8 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
     page.on("pageerror", (e) => consoleErrors.push(`uncaught: ${e.message}`));
+    let documentType;
+    page.on("response", (r) => { if (r.request().isNavigationRequest() && r.frame() === page.mainFrame()) documentType = r.headers()["content-type"]; });
     page.on("response", (r) => { if (r.status() >= 500) problems.push(`${where}: ${r.status()} from ${r.request().method()} ${new URL(r.url()).pathname}`); });
     page.on("requestfailed", (r) => { if (r.failure()?.errorText !== "net::ERR_ABORTED") notes.push(`${where}: request failed (${r.failure()?.errorText}) ${new URL(r.url()).pathname}`); });
     const files = [];
@@ -315,7 +318,7 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
     };
     try {
       await work(page, shot, saveDownload);
-      if (audit) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
+      if (audit && auditable(documentType)) for (const p of await auditPage(page, viewport)) problems.push(`${where}: a11y ${p}`);
     } catch (e) {
       problems.push(`${where}: ${String(e.message).split("\n")[0]}`);
       await shot(`${label.replace(/\W+/g, "-")}-FAILED`, out).catch(() => {});
@@ -350,7 +353,7 @@ export function runVisit(env, v) {
         checks = checksAfter(checks, step);
       }
       await shotChecked(`flow-${flow.name}`);
-    }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true, audit: flow.audit !== false });
+    }, { allowConsole: flow.allow_console, phoneAgent: flow.phone_agent === true });
   }
   if (v.kind === "reduced") {
     return visit(env, `reduced motion ${v.name}`, v.viewport, async (page) => {
