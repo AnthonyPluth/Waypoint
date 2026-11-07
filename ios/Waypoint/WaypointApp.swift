@@ -29,7 +29,7 @@ struct WaypointApp: App {
         case .starting:
             ProgressView().task { await open() }
         case .connect:
-            ConnectView { Task { await open() } }
+            ConnectView { await open() }
         case .shell:
             Shell().ignoresSafeArea()
         case .failed(let why):
