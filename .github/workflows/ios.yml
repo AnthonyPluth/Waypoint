@@ -45,13 +45,18 @@ jobs:
       - name: Generate the Xcode project
         working-directory: ios
         run: xcodegen
+      - name: Pick an iPhone simulator
+        run: |
+          xcrun simctl list devices available
+          udid=$(xcrun simctl list devices available iPhone -j | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
+          echo "SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
       - name: Build and test
         working-directory: ios
         run: |
           xcodebuild test \
             -project Waypoint.xcodeproj \
             -scheme Waypoint \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "id=$SIMULATOR_UDID" \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
