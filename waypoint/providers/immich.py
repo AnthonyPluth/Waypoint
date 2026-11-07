@@ -335,8 +335,8 @@ def _read(response: Any, cap: int, deadline: float) -> bytes:
     return bytes(data)
 
 
-def _json(source: Source, req: urllib.request.Request) -> Any:
-    deadline = time.monotonic() + JSON_SECONDS
+def _json(source: Source, req: urllib.request.Request, *, seconds: float | None = None) -> Any:
+    deadline = time.monotonic() + (JSON_SECONDS if seconds is None else min(JSON_SECONDS, seconds))
     response = _open(source, req, TIMEOUT, deadline)
     if response is None:
         raise Unavailable(UNAVAILABLE)
@@ -523,11 +523,11 @@ def search_body(taken_after: datetime, taken_before: datetime, updated_after: da
 
 
 def search(source: Source, taken_after: datetime, taken_before: datetime, *, updated_after: datetime | None = None,
-           page: int = 1) -> Page:
+           page: int = 1, seconds: float | None = None) -> Page:
     if not source.user_id:
         raise NotConfigured(NOT_CONFIGURED)
     body = search_body(taken_after, taken_before, updated_after, page)
-    return parse_page(_json(source, _request(source, SEARCH, JSON_TYPE, body=body)), page, source.user_id)
+    return parse_page(_json(source, _request(source, SEARCH, JSON_TYPE, body=body), seconds=seconds), page, source.user_id)
 
 
 def markers(source: Source, after: datetime, before: datetime) -> list[Marker]:
