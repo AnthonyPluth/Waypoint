@@ -120,6 +120,26 @@ class SourceRoutes(RouteCase):
         with ping(OTHER):
             self.assertEqual(self.call("ana", "POST", "/api/photo-sources", {"url": URL, "key": KEY})[0], 409)
 
+    def test_an_address_with_its_default_port_is_the_same_library(self):
+        first = self.connect(url="https://immich-canary.example")
+        self.assertEqual(first["url"], "https://immich-canary.example")
+        with ping():
+            self.assertEqual(self.call("ana", "POST", "/api/photo-sources", {"url": "https://immich-canary.example:443", "key": NEW_KEY}),
+                             (409, {"error": photosources.ALREADY}))
+        lan = self.connect(url="http://immich.local:80/")
+        self.assertEqual(lan["url"], "http://immich.local")
+        with ping():
+            self.assertEqual(self.call("ana", "POST", "/api/photo-sources", {"url": "http://immich.local", "key": NEW_KEY})[0], 409)
+        self.assertEqual(len(self.listing("ana")["sources"]), 2)
+
+    def test_a_library_saved_with_its_default_port_before_is_still_found_as_a_duplicate(self):
+        with db.session() as conn:
+            photo_sources.save(conn, self.person["ana"], "sub-ana", "https://immich-canary.example:443", ACCOUNT.user_id, KEY, None, 1.0)
+        with ping():
+            self.assertEqual(self.call("ana", "POST", "/api/photo-sources", {"url": "https://immich-canary.example", "key": NEW_KEY}),
+                             (409, {"error": photosources.ALREADY}))
+        self.assertEqual(len(self.listing("ana")["sources"]), 1)
+
     def test_what_immich_answers_decides_whether_the_library_is_saved(self):
         for error, status in ((immich.Refused(immich.REFUSED), 400), (immich.Unavailable(immich.UNREACHABLE), 502),
                               (immich.Unavailable(immich.UNREADABLE), 502), (immich.RateLimited(immich.RATE_LIMITED, 30.0), 503),
@@ -313,7 +333,28 @@ class SourceRoutes(RouteCase):
             conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(api_key="enc:v1:not-a-token"))
         self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {})[0], 400)
         self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False}), (400, {"error": photosources.KEY_LOST}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+        with ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY})["status"], "off")
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
+
+    def test_a_library_whose_key_was_lost_stays_off_through_a_pause_until_the_key_is_entered_again(self):
+        made = self.connect()
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == made["id"]).values(api_key="enc:v1:not-a-token"))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}/test", {}), (400, {"error": photosources.KEY_LOST}))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})["last_error"], photosources.KEY_LOST)
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False, "label": "Back"}), (400, {"error": photosources.KEY_LOST}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
+        self.assertIsNone(self.listing("ana")["sources"][0]["label"])
+        with ping():
+            self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY})
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": False})["status"], "ok")
+        self.assertEqual(self.raw(made["id"])[1:3], ("ok", None))
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
 
     def test_a_former_steward_whose_request_is_in_flight_changes_nothing(self):
         made = self.connect(person_id=self.guest)
@@ -777,6 +818,63 @@ class Races(DbCase):
         self.assertLess(order.index(("lock", "sub-ana")), len(order) - 1)
         self.assertEqual(self.c.execute(select(PhotoGrant.person_id)).scalars(), [])
 
+    def test_the_grant_sweep_takes_owners_before_people_as_sign_in_does(self):
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": self.ana.person_id, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=self.ana.person_id, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        self.c.orm.flush()
+        self.c.execute(update(User).where(User.sub == "sub-ana").values(last_seen=time.time() - 15 * 86400))
+        self.c.commit()
+        groups = {"OIDC_ISSUER": "https://idp.example.com", "OIDC_CLIENT_ID": "waypoint", "OIDC_ALLOWED_EMAILS": "", "OIDC_ALLOWED_GROUPS": "household"}
+        order = []
+        owner, person = photo_sources.lock_owner, people.lock
+        with mock.patch.dict(os.environ, groups), \
+                mock.patch.object(photo_sources, "lock_owner", side_effect=lambda conn, sub: order.append("owner") or owner(conn, sub)), \
+                mock.patch.object(people, "lock", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)):
+            self.assertEqual(photogrants.end_lapsed(self.c), 1)
+        self.assertIn("owner", order)
+        self.assertIn("person", order)
+        self.assertLess(max(i for i, kind in enumerate(order) if kind == "owner"), min(i for i, kind in enumerate(order) if kind == "person"))
+
+    def paused(self):
+        source = photo_sources.save(self.c, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0, "off")
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": self.ana.person_id, "name": None}]})
+        assert source is not None and trip is not None
+        self.c.commit()
+        return source, trip["trip_id"]
+
+    def test_a_trip_grant_made_while_a_resume_waits_for_the_person_keeps_the_library_paused(self):
+        source, trip = self.paused()
+        order = []
+        real = photo_sources.lock_person
+
+        def granted_first(conn, person_id):
+            order.append("person")
+            with db.session(self.path) as other:
+                other.orm.add(PhotoGrant(person_id=person_id, trip_id=trip, scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+                other.orm.flush()
+            return real(conn, person_id)
+        shared = photo_sources.trip_shared
+        with mock.patch.object(photo_sources, "lock_person", side_effect=granted_first), \
+                mock.patch.object(photo_sources, "trip_shared", side_effect=lambda conn, person_id: order.append("shared") or shared(conn, person_id)):
+            with self.assertRaises(photosources.Refused) as refused:
+                photosources.edit(self.c, self.ana, source, None, False, False)
+        self.assertEqual(str(refused.exception), photosources.RESUME_ASKS)
+        self.assertEqual(order, ["person", "shared"])
+        self.c.rollback()
+        found = photo_sources.get(self.c, source)
+        assert found is not None
+        self.assertEqual(found["status"], "off")
+
+    def test_a_resume_takes_the_person_before_the_library(self):
+        source, _ = self.paused()
+        order = []
+        person, row = photo_sources.lock_person, photo_sources.lock
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)):
+            self.assertEqual(photosources.edit(self.c, self.ana, source, "Back", False, True)["status"], "ok")
+        self.assertEqual(order, ["person", "source"])
+
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):
             people.claim_guest(conn, self.ben.person_id, self.guest, "2026-10-05")
@@ -820,6 +918,16 @@ class Claiming(DbCase):
             unlocked = photo_sources.source_for_provider(self.c, source)
             assert unlocked is not None
             self.assertEqual(unlocked.key, key)
+
+    def test_claiming_merges_a_library_saved_with_its_default_port_into_the_members(self):
+        theirs = photo_sources.save(self.c, self.guest, "sub-steward", "https://third-canary.example:443", ACCOUNT.user_id, NEW_KEY, None, 1.0)
+        mine = photo_sources.save(self.c, self.member, "u1", "https://third-canary.example", ACCOUNT.user_id, KEY, None, 1.0)
+        assert theirs and mine
+        self.c.orm.add(photo(theirs, None, 1, "ambiguous"))
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual([s["id"] for s in photo_sources.list_all(self.c)], [mine])
+        self.assertEqual(self.c.execute(select(Photo.source_id)).scalars(), [mine])
 
     def test_claiming_locks_the_guest_before_moving_their_libraries(self):
         order = []

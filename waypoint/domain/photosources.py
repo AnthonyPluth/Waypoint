@@ -131,7 +131,7 @@ def test_new(url: str, key: str) -> Tested:
 
 
 def _not_yet(conn: db.Connection, person_id: int, url: str, user_id: str) -> None:
-    if any(s["url"] == url and s["immich_user_id"] == user_id for s in photo_sources.for_person(conn, person_id)):
+    if any(photo_sources.address(s["url"]) == photo_sources.address(url) and s["immich_user_id"] == user_id for s in photo_sources.for_person(conn, person_id)):
         raise Refused(ALREADY)
 
 
@@ -141,6 +141,7 @@ def connect(conn: db.Connection, actor: Actor, person_id: int, url: str, key: st
     _not_yet(conn, person_id, url, account.user_id)
     if not photo_sources.lock_person(conn, person_id):
         raise NoSuchPerson()
+    _not_yet(conn, person_id, url, account.user_id)
     status: Status = OFF if photo_sources.trip_shared(conn, person_id) else OK
     source_id = photo_sources.save(conn, person_id, actor.sub, url, account.user_id, key, label, time.time() if now is None else now, status)
     if source_id is None:
@@ -216,15 +217,30 @@ def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str) -> L
     return listed(conn, actor, source_id)
 
 
+def _held_for_resume(conn: db.Connection, actor: Actor, source: Stored) -> Stored:
+    if not photo_sources.lock_person(conn, source["person_id"]) or not photo_sources.lock(conn, source["id"]):
+        raise NoSuchSource()
+    held = owned(conn, actor, source["id"])
+    if held["person_id"] != source["person_id"]:
+        raise NoSuchSource()
+    return held
+
+
 def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool) -> Listed:
     source = owned(conn, actor, source_id)
+    if paused is False and source["status"] == OFF:
+        source = _held_for_resume(conn, actor, source)
+    resuming = paused is False and source["status"] == OFF
+    if resuming and source["last_error"] == KEY_LOST:
+        raise Refused(KEY_LOST)
+    if resuming and photo_sources.trip_shared(conn, source["person_id"]):
+        raise Refused(RESUME_ASKS)
     if had_label and not photo_sources.set_label(conn, source_id, label, owner=source["owner_sub"]):
         raise NoSuchSource()
     if paused is True and source["status"] != OFF:
-        changed = photo_sources.mark(conn, source_id, OFF, None, owner=source["owner_sub"])
-    elif paused is False and source["status"] == OFF:
-        if photo_sources.trip_shared(conn, source["person_id"]):
-            raise Refused(RESUME_ASKS)
+        kept = KEY_LOST if source["last_error"] == KEY_LOST else None
+        changed = photo_sources.mark(conn, source_id, OFF, kept, owner=source["owner_sub"])
+    elif resuming:
         changed = photo_sources.mark(conn, source_id, OK, None, owner=source["owner_sub"])
     else:
         changed = True

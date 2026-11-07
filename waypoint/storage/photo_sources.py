@@ -15,6 +15,7 @@ UNREACHABLE: Status = "unreachable"
 OFF: Status = "off"
 STATUSES: tuple[Status, ...] = (OK, REFUSED, UNREACHABLE, OFF)
 ON_A_TRIP = ("place", "time", "far")
+DEFAULT_SUFFIXES = {"https": ":443", "http": ":80"}
 
 
 class Stored(TypedDict):
@@ -36,6 +37,12 @@ class Unlocked:
     url: str = field(repr=False)
     key: str = field(repr=False)
     user_id: str = field(repr=False)
+
+
+def address(url: str) -> str:
+    scheme = url.partition("://")[0]
+    suffix = DEFAULT_SUFFIXES.get(scheme)
+    return url.removesuffix(suffix) if suffix is not None else url
 
 
 COLUMNS = (PhotoSource.id, PhotoSource.person_id, PhotoSource.owner_sub, PhotoSource.url, PhotoSource.immich_user_id, PhotoSource.label,
