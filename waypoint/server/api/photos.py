@@ -365,5 +365,5 @@ def api_photo_source_remove(conn, _q, _b, source_id) -> Ok:
 
 def api_photo_source_sync(conn, _q, _b, source_id) -> SyncStarted:
     me, this = actor(conn), row_id(source_id, photosources.NO_SOURCE)
-    _ask(lambda: photosources.owned(conn, me, this))
-    return {"started": jobs.sync_photos_now(this)}
+    source = _ask(lambda: photosources.owned(conn, me, this))
+    return {"started": not photosources.is_demo(source) and jobs.sync_photos_now(this)}
