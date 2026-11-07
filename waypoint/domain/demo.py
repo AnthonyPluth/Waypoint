@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import struct
-import zlib
 from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select, update
@@ -10,7 +8,7 @@ from ..providers import flightstatus as service
 from ..storage import db, secretbox, stored_mail
 from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, ReviewItem, Segment, SegmentCode, SegmentMessage, SegmentPort,
                               SegmentTraveler, StoredMessage, Trip, TripPerson, User)
-from . import flightstatus, logos, loyalty, people, trips
+from . import flightstatus, logos, loyalty, people, pixels, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
 
@@ -44,15 +42,9 @@ DEMO_LOGO_COLORS = {"American Airlines": (30, 110, 190), "United Airlines": (20,
                     "Transportation Security Administration": (40, 90, 60)}
 
 
-def _png_chunk(kind: bytes, data: bytes) -> bytes:
-    return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-
-
 def _square(color: tuple[int, int, int]) -> bytes:
     size = 48
-    rows = b"".join(b"\x00" + bytes(color) * size for _ in range(size))
-    chunk = _png_chunk
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+    return pixels.png(size, size, b"".join(b"\x00" + bytes(color) * size for _ in range(size)))
 
 
 def _pattern(modules: int = 29, scale: int = 10) -> bytes:
@@ -65,8 +57,7 @@ def _pattern(modules: int = 29, scale: int = 10) -> bytes:
 
     side = modules * scale
     rows = b"".join(b"\x00" + bytes(0 if dark(y // scale, x // scale) else 255 for x in range(side)) for y in range(side))
-    return (b"\x89PNG\r\n\x1a\n" + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", side, side, 8, 0, 0, 0, 0)) + _png_chunk(b"IDAT", zlib.compress(rows))
-            + _png_chunk(b"IEND", b""))
+    return pixels.png(side, side, rows, pixels.GREY)
 
 
 def _at(today: date, days: int, clock: str) -> str:
@@ -224,14 +215,6 @@ def _message(domain: str, days_ago: int, today: date, subject: str, lines: tuple
             "html": "".join(f"<p>{line}</p>" for line in lines), "truncated": False, "original": True, "images": 0}
 
 
-def _png(width: int, height: int, top: tuple[int, int, int], bottom: tuple[int, int, int]) -> bytes:
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-
-    rows = b"".join(b"\x00" + bytes(top[c] + (bottom[c] - top[c]) * y // max(height - 1, 1) for c in range(3)) * width for y in range(height))
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
-
-
 def _styled_message(domain: str, days_ago: int, today: date, subject: str, lines: tuple[str, ...]) -> tuple[stored_mail.Content, list[stored_mail.Image]]:
     paragraphs = "".join(f'<p style="margin:0 0 12px;font-size:15px;line-height:1.5">{line}</p>' for line in lines)
     html = ('<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;color:#1f2937;font-family:Arial,Helvetica,sans-serif">'
@@ -244,8 +227,8 @@ def _styled_message(domain: str, days_ago: int, today: date, subject: str, lines
             '<tr><td style="background-color:#f3f4f6;padding:12px 24px;font-size:12px;color:#4b5563">Made-up message for the demo.</td></tr></table>')
     content: stored_mail.Content = {"subject": subject, "sender_domain": domain, "received": (today - timedelta(days=days_ago)).isoformat(),
                                     "text": "\n".join(lines), "html": html, "truncated": False, "original": True, "images": 2}
-    return content, [{"type": "image/png", "data": _png(64, 64, (253, 186, 116), (234, 88, 12))},
-                     {"type": "image/png", "data": _png(600, 160, (30, 64, 175), (251, 146, 60))}]
+    return content, [{"type": "image/png", "data": pixels.gradient(64, 64, (253, 186, 116), (234, 88, 12))},
+                     {"type": "image/png", "data": pixels.gradient(600, 160, (30, 64, 175), (251, 146, 60))}]
 
 
 SUBJECTS = {"example-air.example": "Your itinerary", "example-stays.example": "Your reservation", "example-cruises.example": "Your cruise booking"}
@@ -356,7 +339,7 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
         reminder = _message("example-parking.example", 1, today, "Your parking reservation: QR code reminder",
                             ("Hello Jane,", "Show this code at the gate of Example Airport Long-Term Lot.", "Confirmation: PK30417"))
         stored_mail.put(conn, box.id, "demo-parking-code", {**reminder, "images": 2}, 0.0,
-                        [{"type": "image/png", "data": _pattern()}, {"type": "image/png", "data": _png(64, 64, (253, 186, 116), (234, 88, 12))}])
+                        [{"type": "image/png", "data": _pattern()}, {"type": "image/png", "data": pixels.gradient(64, 64, (253, 186, 116), (234, 88, 12))}])
         stored_mail.link(conn, parking_id, box.id, "demo-parking-code")
     if past_stay_id is not None:
         stored_mail.put(conn, box.id, "demo-past-stay", _message("example-stays.example", 41, today, "Your reservation: Lakeside Resort",

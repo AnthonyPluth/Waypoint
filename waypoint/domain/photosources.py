@@ -173,7 +173,7 @@ def _record(conn: db.Connection, source: Stored, status: Status, error: str | No
         if current is None or current["owner_sub"] != source["owner_sub"]:
             break
         kept = OFF if current["status"] == OFF else status
-        if photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"], was=current["status"]):
+        if photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"], was=(current["status"], current["last_error"])):
             return
         current = photo_sources.get(conn, source["id"])
     raise NoSuchSource()

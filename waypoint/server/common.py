@@ -95,8 +95,11 @@ def position(value: str) -> int:
     return int(value)
 
 
+IMAGE_CSP = "default-src 'none'; sandbox"
+
+
 def image_response(image: Mapping[str, Any]) -> Response:
-    return Response(image["data"], image["type"], csp="default-src 'none'; sandbox")
+    return Response(image["data"], image["type"], csp=IMAGE_CSP)
 
 
 def clamped_int(v, label: str, default: int, low: int, high: int) -> int:
@@ -123,6 +126,14 @@ def request_ref() -> str:
 
 
 _current = threading.local()
+
+
+def request_header(name: str) -> str | None:
+    headers = getattr(_current, "headers", None)
+    value = headers.get(name) if headers is not None else None
+    return value if isinstance(value, str) else None
+
+
 EXTRA_HOSTS = {h.strip().lower() for h in (os.environ.get("WAYPOINT_ALLOWED_HOSTS") or "").split(",") if h.strip()}
 if os.environ.get("WAYPOINT_PUBLIC_URL"):
     EXTRA_HOSTS.add((urllib.parse.urlsplit(os.environ["WAYPOINT_PUBLIC_URL"]).hostname or "").lower())

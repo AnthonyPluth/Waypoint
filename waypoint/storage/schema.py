@@ -567,9 +567,10 @@ photo_trip_syncs = Table(
     Column('window_start', Text, nullable=False),
     Column('window_end', Text, nullable=False),
     Column('cursor', Text, doc="Immich's updatedAfter for the next incremental run; moves only when a traversal completes"),
-    Column('resume_page', Integer, doc='the page to continue from when a run stopped inside a traversal'),
     Column('fetch_started', Text, doc='UTC time the traversal in progress began; becomes the cursor when it completes'),
     Column('synced', Float),
+    Column('resume_after', Text, doc='the capture time a stopped traversal continues from (keyset paging, inclusive)'),
+    Column('inputs', Text, doc="a digest of what the matcher reads for this trip and the Home point, so a change to them re-places the trip's rows"),
     info={'doc': "what each photo source has fetched for each trip's window, so a changed window is fetched again and an unchanged one incrementally"},
 )
 

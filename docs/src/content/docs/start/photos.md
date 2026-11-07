@@ -1,6 +1,6 @@
 ---
 title: Photos
-description: "How a trip's photos are read from each member's Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone."
+description: "How a trip’s photos are read from each member’s Immich library, which ones a trip shows, what waits under Needs a look, and who sees whose photos: each person shares their own, per trip, with everyone on it or with themselves alone."
 sidebar:
   order: 6
 ---
@@ -36,6 +36,16 @@ A library ends with its owner’s access: when the member who connected it can n
 ## What Waypoint reads and keeps
 
 Waypoint reads photos taken during the trips its person is on, and the 12 hours around them, and keeps for each only its Immich id, when and where it was taken and which trip and booking it matched, including photos that turn out not to belong to a trip; never the pictures, file names or camera data. Thumbnails and originals are fetched from Immich when shown and are never written to disk or the database. The Immich address and key never reach the browser, and nothing about a library is reachable from an AI assistant over MCP.
+
+### How pictures reach your browser
+
+A picture is never loaded from Immich directly: the browser asks Waypoint for a photo’s thumbnail, preview or original by Waypoint’s own id, Waypoint checks that you may see that photo (the same check as everywhere else: the trip is yours to see, its person shared their photos on it with you, and it was not removed), and only then asks Immich for it with the library’s key, which stays on the server. A photo you may not see answers as if it did not exist. What comes back is the picture’s bytes with a type Waypoint reads from the bytes themselves, never anything Immich said about it: thumbnails and previews are WebP, JPEG or PNG; originals are shown inline when a browser can display them (JPEG, PNG, WebP, GIF, AVIF, MP4, QuickTime and WebM video) and offered as a download otherwise (HEIC, TIFF, RAW, Matroska), and anything else answers as missing. Thumbnails and previews may sit in your browser’s cache, but the browser must ask Waypoint before showing one again, so a photo taken off a trip is gone on the next look; originals are never cached. A video seeks by asking for byte ranges, each checked the same way, and a stream in progress stops within a few seconds of its photo being taken back. When Immich has not made a thumbnail yet, the request fails and the browser can simply try again; when Immich no longer has the photo at all, Waypoint drops its reference. A key Immich refuses marks the library **refused**, and an Immich that does not answer gets a fixed message, never Immich’s own text.
+
+### How a library is read
+
+Waypoint reads each library every six hours (the first read ten minutes after it starts), one library at a time, and only for the trips its person shared their photos on: it asks Immich for the photos taken during each such trip and the 12 hours around it, and after the first read only for the ones Immich changed since, so a location added later in Immich moves the photo to where it was taken. Sharing a trip or putting a photo back reads that trip at once. Once a week a library is read in full, and photos deleted or archived in Immich are dropped; a photo you removed from a trip stays removed. A read that runs long stops after ten minutes and the next one carries on where it stopped. If more photos share one capture second than Immich returns in one answer, Waypoint can’t step past them: the library shows “Some of your library couldn’t be read”, keeps its last sync time, and drops nothing from that trip. Only the library's own photos are kept, never ones a partner shares with it.
+
+A library whose key Immich refuses is marked **refused** and is not read again until its key is changed or tested; one Immich doesn't answer is marked **unreachable** and keeps its last sync time; when Immich asks Waypoint to slow down, the read stops and tries again at the next one. Waypoint's log records only counts for each read, never a photo, a place or a trip.
 
 ## Sharing your photos on a trip
 

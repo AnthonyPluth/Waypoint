@@ -11,7 +11,7 @@ from .. import oidc
 from ..storage import db, photo_sources
 from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
-from . import people, photos, trippeople, trips, visibility
+from . import people, photoqueue, photos, trippeople, trips, visibility
 from .visibility import Viewer
 
 if TYPE_CHECKING:
@@ -127,6 +127,7 @@ KEY = ["person_id", "trip_id"]
 
 def _upsert_grant(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scope, by: str, now: float) -> None:
     db.upsert(conn, PhotoGrant, {"person_id": person_id, "trip_id": trip_id, "scope": scope, "revoked": None, "changed": now, "granted_by": by, "ask_again": False}, key=KEY)
+    photoqueue.after_commit(conn, person_id, trip_id)
 
 
 def _write(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scope, by: str, now: float) -> None:
@@ -137,16 +138,18 @@ def _write(conn: db.Connection, person_id: int, trip_id: int, scope: photos.Scop
 def _person_rows(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> list[Photo]:
     on_trips = Photo.trip_id.in_(list(trip_ids)) if trip_ids else Photo.trip_id.is_(None)
     q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id == person_id, Photo.match != photos.HOME, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match == photos.AMBIGUOUS))) \
-        .order_by(Photo.id)
+        .where(PhotoSource.person_id == person_id, or_(on_trips, and_(Photo.trip_id.is_(None), Photo.match.in_([photos.AMBIGUOUS, photos.HOME])))).order_by(Photo.id)
     return list(conn.orm.scalars(q).all())
 
 
 def _re_place(conn: db.Connection, person_id: int, trip_ids: Sequence[int], keep_owner: bool = False) -> None:
-    windows = photos.candidate_windows(conn, person_id)
-    for row in _person_rows(conn, person_id, trip_ids):
+    rows = _person_rows(conn, person_id, trip_ids)
+    if not rows:
+        return
+    windows, at_home = photos.candidate_windows(conn, person_id), photos.home_in(conn)
+    for row in rows:
         if not (keep_owner and row.decided_by == photos.OWNER and row.trip_id is not None):
-            photos.re_place(conn, row, person_id, windows)
+            photos.re_place(conn, row, person_id, windows, home=at_home)
 
 
 def _sweep_home(conn: db.Connection, person_id: int) -> None:
@@ -354,6 +357,7 @@ def put_back(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int, c
         raise Stale(STALE_REMOVAL)
     was = exclusion.was_trip_id if exclusion is not None else None
     conn.execute(delete(PhotoExclusion).where(PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.trip_id == trip_id))
+    photoqueue.after_commit(conn, person, trip_id)
     conn.orm.expire_all()
     photo = conn.orm.get(Photo, photo.id) or photo
     if photo.decided_by == photos.OWNER and photo.trip_id not in (None, trip_id):
@@ -498,6 +502,13 @@ def reconcile(conn: db.Connection, trip_id: int, now: float | None = None) -> in
     for person, trip in lost:
         _end(conn, person, trip)
     return len(ended) + len(lost) + sum(1 for person in trippeople.of(conn, [trip_id])[trip_id] if joined(conn, person, trip_id, stamp))
+
+
+def reconcile_all(conn: db.Connection, now: float | None = None) -> int:
+    standing = select(PhotoSharingPrefs.person_id).where(PhotoSharingPrefs.share_all.is_(True))
+    trip_ids = set(conn.execute(select(TripPerson.trip_id).where(TripPerson.person_id.in_(standing))).scalars())
+    trip_ids |= set(conn.execute(select(PhotoGrant.trip_id).where(PhotoGrant.revoked.is_(None))).scalars())
+    return sum(reconcile(conn, trip_id, now) for trip_id in sorted(trip_ids))
 
 
 def left(conn: db.Connection, person_id: int, trip_id: int) -> None:
@@ -754,7 +765,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
 def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
     same_window = (kept.window_start, kept.window_end) == (gone.window_start, gone.window_end)
     kept.cursor = min(kept.cursor, gone.cursor) if same_window and kept.cursor and gone.cursor else None
-    kept.resume_page, kept.fetch_started = None, None
+    kept.resume_after, kept.fetch_started = None, None
 
 
 def _claim_sources(conn: db.Connection, guest_id: int, member_id: int, sub: str) -> None:

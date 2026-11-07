@@ -445,7 +445,8 @@ class PhotoTripSync(Base):
     window_start: Mapped[str]
     window_end: Mapped[str]
     cursor: Mapped[str | None]
-    resume_page: Mapped[int | None]
+    resume_after: Mapped[str | None]
+    inputs: Mapped[str | None]
     fetch_started: Mapped[str | None]
     synced: Mapped[float | None]
 

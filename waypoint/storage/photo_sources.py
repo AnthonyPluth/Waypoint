@@ -106,12 +106,24 @@ def set_label(conn: db.Connection, source_id: int, label: str | None, owner: str
 
 
 def mark(conn: db.Connection, source_id: int, status: Status, error: str | None = None, synced: float | None = None,
-         owner: str | None = None, was: Status | None = None) -> bool:
+         owner: str | None = None, *, keep_off: bool = False, sealed: str | None = None, was: tuple[Status, str | None] | None = None) -> bool:
     values: dict[str, object] = {"status": status, "last_error": error}
     if synced is not None:
         values["last_sync"] = synced
-    unchanged = PhotoSource.status == was if was is not None else true()
-    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), unchanged).values(**values)).rowcount) > 0
+    paused = [PhotoSource.status != OFF] if keep_off else []
+    same_key = [PhotoSource.api_key == sealed] if sealed is not None else []
+    unchanged = [] if was is None else [PhotoSource.status == was[0], PhotoSource.last_error.is_(None) if was[1] is None else PhotoSource.last_error == was[1]]
+    return int(conn.execute(update(PhotoSource).where(*_held_by(source_id, owner), *paused, *same_key, *unchanged).values(**values)).rowcount) > 0
+
+
+def status(conn: db.Connection, source_id: int) -> Status | None:
+    found = conn.execute(select(PhotoSource.status).where(PhotoSource.id == source_id)).scalar()
+    return found if found in STATUSES else None
+
+
+def sealed_key(conn: db.Connection, source_id: int) -> str | None:
+    found = conn.execute(select(PhotoSource.api_key).where(PhotoSource.id == source_id)).scalar()
+    return str(found) if found is not None else None
 
 
 def remove(conn: db.Connection, source_id: int, owner: str | None = None) -> bool:
