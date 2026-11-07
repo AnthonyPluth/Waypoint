@@ -463,6 +463,8 @@ class DnsDeadlineTests(unittest.TestCase):
             self.assertLess(time.monotonic() - began, 1.0)
             self.assertIsInstance(caught.exception.reason, TimeoutError)
             self.assertEqual(str(caught.exception.reason), "too many name lookups are waiting")
+        first.join(5)
+        self.assertFalse(first.is_alive())
 
     def open_quietly(self, deadline):
         with contextlib.suppress(OSError):
