@@ -494,6 +494,10 @@ class RequestTests(unittest.TestCase):
         with mock.patch.object(immich, "JSON_SECONDS", 0.5):
             self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE))
 
+    def test_a_search_reply_that_trickles_stops_at_the_time_the_caller_left(self):
+        self.fake.routes["/api/search/metadata"] = (200, {**JSON_HEADERS, "_trickle": "0.02"}, b'{"assets": {"items": [], "nextPage": null}}' + b" " * 400)
+        self._slow(lambda: immich.search(self.fake.source, AFTER, BEFORE, seconds=0.5))
+
     def test_a_chunked_thumbnail_whose_size_line_and_trailers_trickle_stops_at_its_budget(self):
         self.fake.routes[f"/api/assets/{ASSET}/thumbnail"] = (200, {"_chunked": "1", "_trickle": "0.02"}, JPEG)
         with mock.patch.object(immich, "IMAGE_SECONDS", 0.5):
