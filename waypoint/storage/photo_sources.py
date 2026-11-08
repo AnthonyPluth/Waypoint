@@ -158,5 +158,9 @@ def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
 
 
+def stored_assets(conn: db.Connection, source_id: int) -> set[str]:
+    return set(conn.execute(select(Photo.asset_id).where(Photo.source_id == source_id)).scalars())   # nosemgrep: waypoint-photo-access -- asset ids only, to subtract what a source already holds from a resume count; domain/photosources.py shows only the count, to those who act for the source's person
+
+
 def lock_owner(conn: db.Connection, sub: str) -> bool:
     return int(conn.execute(update(User).where(User.sub == sub).values(name=User.name)).rowcount) > 0

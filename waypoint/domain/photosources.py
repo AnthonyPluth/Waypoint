@@ -313,7 +313,7 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
     for asset_id, trip_id in counted.excluded:
         left_out.setdefault(asset_id, set()).add(trip_id)
     unlocked, deadline = _unlocked(conn, source), time.monotonic() + COUNT_SECONDS
-    seen: set[str] = set()
+    seen = photo_sources.stored_assets(conn, source["id"])
     total = 0
     try:
         for window in targets:

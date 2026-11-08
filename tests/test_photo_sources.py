@@ -506,6 +506,19 @@ class SourceRoutes(RouteCase):
         self.assertEqual((status, got["asks"], got["count"], got["grants"]), (200, False, 0, []))
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": False})["status"], "ok")
 
+    def test_a_resume_count_leaves_out_photos_the_library_already_holds(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        trip = self.shared("ana")
+        pages = [[item(1, ident="asset-1"), item(2, ident="asset-2"), item(3, ident="asset-3")]]
+        self.assertEqual(self.check(made["id"], *pages)[1]["count"], 3)
+        with db.session() as conn:
+            conn.orm.add_all([photo(made["id"], trip, 1), photo(made["id"], trip, 2, match="none")])
+            conn.orm.flush()
+        status, seen = self.check(made["id"], *pages)
+        self.assertEqual((status, seen["asks"], seen["count"]), (200, True, 1))
+        self.assertEqual(self.resume(made["id"], seen)[1]["status"], "ok")
+
     def test_a_connection_under_a_trip_grant_asks_even_when_it_would_add_no_photos(self):
         trip = self.shared("ana")
         made = self.connect()
