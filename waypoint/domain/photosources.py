@@ -288,10 +288,11 @@ def _shown(asset: immich.Asset, counted: _Counted, left_out: set[int]) -> int | 
 def _pages(source: immich.Source, window: photomatch.TripWindow, deadline: float) -> Iterator[immich.Page]:
     after, page = window.start, 1
     while True:
-        if time.monotonic() >= deadline:
+        left = deadline - time.monotonic()
+        if left <= 0:
             raise immich.Unavailable(immich.TOO_SLOW)
-        got = immich.search(source, after, window.end, page=page)
-        if got.dropped:
+        got = immich.search(source, after, window.end, page=page, seconds=left)
+        if time.monotonic() >= deadline or got.dropped:
             raise immich.Unavailable(TOO_DENSE)
         yield got
         if got.next_page is None:

@@ -42,7 +42,7 @@ def item(number, taken="2026-06-02T09:00:00.000Z", owner=ACCOUNT.user_id, gps=No
 def library(*pages):
     asked = []
 
-    def search(source, taken_after, taken_before, *, updated_after=None, page=1):
+    def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
         asked.append((source, taken_after, taken_before, page))
         index = min(len(asked), len(pages)) - 1
         items = pages[index]
@@ -556,6 +556,30 @@ class SourceRoutes(RouteCase):
         self.assertEqual(self.check(made["id"], [item(1)]), (400, {"error": photosources.KEY_LOST}))
         self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.KEY_LOST))
 
+    def test_a_page_that_returns_past_the_count_deadline_fails_the_count_but_a_fast_one_near_it_succeeds(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        clock = [100.0]
+        budgets = []
+
+        def timed(spent):
+            def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+                budgets.append(seconds)
+                clock[0] += spent
+                return immich.parse_page({"assets": {"items": [item(1)], "nextPage": None}}, page, source.user_id)
+            return search
+        with mock.patch.object(photosources.time, "monotonic", side_effect=lambda: clock[0]):
+            with mock.patch.object(immich, "search", side_effect=timed(29.0)):
+                status, seen = self.call("ana", "GET", f"/api/photo-sources/{made['id']}/resume")
+            self.assertEqual((status, seen["count"]), (200, 1))
+            self.assertEqual(len(budgets), 1)
+            self.assertAlmostEqual(budgets[0], photosources.COUNT_SECONDS)
+            clock[0] = 100.0
+            with mock.patch.object(immich, "search", side_effect=timed(31.0)):
+                self.assertEqual(self.call("ana", "GET", f"/api/photo-sources/{made['id']}/resume"), (502, {"error": photosources.TOO_DENSE}))
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", photosources.TOO_DENSE))
+
     def test_a_snapshot_taken_before_the_trip_grants_or_libraries_changed_is_refused(self):
         made = self.connect()
         self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
@@ -637,7 +661,7 @@ class SourceRoutes(RouteCase):
         pages = [[item(n, f"2026-06-02T{8 + n:02d}:00:00.000Z"), item(n + 10, f"2026-06-02T{8 + n:02d}:30:00.000Z")] for n in range(4)]
         asked = []
 
-        def search(source, taken_after, taken_before, *, updated_after=None, page=1):
+        def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
             gc.collect()
             peaks.append(len(live))
             index = len(asked)
