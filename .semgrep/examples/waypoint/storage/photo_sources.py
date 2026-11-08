@@ -6,3 +6,9 @@ rows = select(Photo.source_id, func.count(Photo.id)).group_by(Photo.source_id)  
 
 # ruleid: waypoint-photo-access
 unjustified = select(Photo.source_id, func.count(Photo.id)).group_by(Photo.source_id)
+
+# ok: waypoint-photo-access
+ids = select(Photo.asset_id).where(Photo.source_id == source_id)  # nosemgrep: waypoint-photo-access -- asset ids the resume count leaves out
+
+# ruleid: waypoint-photo-access
+unjustified_ids = select(Photo.asset_id).where(Photo.source_id == source_id)

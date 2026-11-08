@@ -506,6 +506,49 @@ class SourceRoutes(RouteCase):
         self.assertEqual((status, got["asks"], got["count"], got["grants"]), (200, False, 0, []))
         self.assertEqual(self.ok("ben", "POST", f"/api/photo-sources/{theirs['id']}", {"paused": False})["status"], "ok")
 
+    def paused_with_stored(self, *stored):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        trip = self.shared("ana")
+        quiet = self.shared("ana", scope="only_me", segment=LATER)
+        with db.session() as conn:
+            conn.orm.add_all([photo(made["id"], {"trip": trip, "quiet": quiet, None: None}[where], number, match) for where, number, match in stored])
+        return made, trip
+
+    def test_a_library_that_synced_before_it_was_paused_counts_only_the_photos_a_resume_would_add(self):
+        made, trip = self.paused_with_stored(("trip", 1, "place"), ("trip", 2, "time"), ("trip", 3, "far"), ("quiet", 4, "place"), (None, 5, "ambiguous"), (None, 6, "home"))
+        status, seen = self.check(made["id"], [item(n, ident=f"asset-{n}") for n in range(1, 9)])
+        self.assertEqual((status, seen["asks"], seen["count"], [g["trip_id"] for g in seen["grants"]]), (200, True, 5, [trip]))
+        self.assertEqual(self.resume(made["id"], seen)[1]["status"], "ok")
+
+    def test_a_library_with_every_matching_photo_already_stored_counts_none_and_still_asks(self):
+        made, _ = self.paused_with_stored(("trip", 1, "place"), ("trip", 2, "place"))
+        status, seen = self.check(made["id"], [item(1, ident="asset-1"), item(2, ident="asset-2")])
+        self.assertEqual((status, seen["asks"], seen["count"]), (200, True, 0))
+
+    def test_a_library_with_nothing_stored_counts_every_matching_photo(self):
+        made, _ = self.paused_with_stored()
+        status, seen = self.check(made["id"], [item(n, ident=f"asset-{n}") for n in range(1, 4)])
+        self.assertEqual((status, seen["count"]), (200, 3))
+
+    def test_a_photo_stored_for_another_library_does_not_lower_this_librarys_count(self):
+        made, trip = self.paused_with_stored(("trip", 1, "place"))
+        theirs = self.connect(who="ben")
+        with db.session() as conn:
+            conn.orm.add(photo(theirs["id"], trip, 2))
+        status, seen = self.check(made["id"], [item(1, ident="asset-1"), item(2, ident="asset-2")])
+        self.assertEqual((status, seen["count"]), (200, 1))
+
+    def test_the_stored_photos_a_count_leaves_out_are_those_shown_on_the_trips_it_counts(self):
+        made, trip = self.paused_with_stored(("trip", 1, "place"), ("trip", 2, "time"), ("trip", 3, "far"), ("trip", 4, "place"), ("quiet", 5, "place"),
+                                             (None, 6, "ambiguous"), (None, 7, "home"), ("trip", 8, "none"))
+        with db.session() as conn:
+            conn.orm.add(PhotoExclusion(person_id=self.person["ana"], asset_id="asset-4", trip_id=trip, created=2.0, was_trip_id=None))
+            conn.orm.flush()
+            self.assertEqual(photo_sources.shown_assets(conn, made["id"], {trip}), {"asset-1", "asset-2", "asset-3"})
+            self.assertEqual(photo_sources.shown_assets(conn, made["id"], set()), set())
+            self.assertEqual(photo_sources.shown_assets(conn, made["id"] + 1000, {trip}), set())
+
     def test_a_connection_under_a_trip_grant_asks_even_when_it_would_add_no_photos(self):
         trip = self.shared("ana")
         made = self.connect()

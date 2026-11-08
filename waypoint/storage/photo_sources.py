@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
@@ -156,6 +157,15 @@ def counts(conn: db.Connection) -> dict[int, tuple[int, int]]:
                         .join(PhotoSource, PhotoSource.id == Photo.source_id)
                         .where(Photo.trip_id.is_not(None), Photo.match.in_(ON_A_TRIP), ~removed).group_by(Photo.source_id)).fetchall()
     return {int(r[0]): (int(r[1]), int(r[2])) for r in rows}
+
+
+def shown_assets(conn: db.Connection, source_id: int, trip_ids: Collection[int]) -> set[str]:
+    removed = exists().where(PhotoExclusion.person_id == PhotoSource.person_id, PhotoExclusion.asset_id == Photo.asset_id,   # nosemgrep: waypoint-photo-access -- asset ids the resume count leaves out, which domain/photosources.py shows only to those who act for the source's person
+                             PhotoExclusion.trip_id == Photo.trip_id)
+    rows = conn.execute(select(Photo.asset_id)   # nosemgrep: waypoint-photo-access -- asset ids the resume count leaves out, which domain/photosources.py shows only to those who act for the source's person
+                        .join(PhotoSource, PhotoSource.id == Photo.source_id)
+                        .where(Photo.source_id == source_id, Photo.trip_id.in_(trip_ids), Photo.match.in_(ON_A_TRIP), ~removed)).fetchall()
+    return {str(r[0]) for r in rows}
 
 
 def lock_owner(conn: db.Connection, sub: str) -> bool:
