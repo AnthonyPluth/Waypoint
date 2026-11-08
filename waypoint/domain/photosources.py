@@ -314,6 +314,7 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
     for asset_id, trip_id in counted.excluded:
         left_out.setdefault(asset_id, set()).add(trip_id)
     unlocked, deadline = _unlocked(conn, source), time.monotonic() + COUNT_SECONDS
+    shown_on = photo_sources.shown_assets(conn, source["id"], wanted)
     seen: set[str] = set()
     total = 0
     try:
@@ -322,7 +323,9 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
                 for asset in got.assets:
                     if asset.id not in seen:
                         seen.add(asset.id)
-                        total += _shown(asset, counted, left_out.get(asset.id, set())) in wanted
+                        placed = _shown(asset, counted, left_out.get(asset.id, set()))
+                        stored_on, pinned = shown_on.get(asset.id, (None, False))
+                        total += placed in wanted and not pinned and placed != stored_on
     except immich.ImmichError as e:
         _outcome(conn, source, e)
         raise
