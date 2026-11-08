@@ -313,15 +313,17 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
     for asset_id, trip_id in counted.excluded:
         left_out.setdefault(asset_id, set()).add(trip_id)
     unlocked, deadline = _unlocked(conn, source), time.monotonic() + COUNT_SECONDS
-    settled = photo_sources.shown_assets(conn, source["id"], wanted)
+    shown_on = photo_sources.shown_assets(conn, source["id"], wanted)
+    seen: set[str] = set()
     total = 0
     try:
         for window in targets:
             for got in _pages(unlocked, window, deadline):
                 for asset in got.assets:
-                    if asset.id not in settled:
-                        settled.add(asset.id)
-                        total += _shown(asset, counted, left_out.get(asset.id, set())) in wanted
+                    if asset.id not in seen:
+                        seen.add(asset.id)
+                        placed = _shown(asset, counted, left_out.get(asset.id, set()))
+                        total += placed in wanted and placed != shown_on.get(asset.id)
     except immich.ImmichError as e:
         _outcome(conn, source, e)
         raise
