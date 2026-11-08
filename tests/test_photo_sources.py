@@ -661,6 +661,17 @@ class SourceRoutes(RouteCase):
         self.assertEqual((status, seen["count"], len(asked)), (200, 8, 4))
         self.assertLessEqual(max(peaks), 2)
 
+    def test_a_count_steps_past_a_dense_instant_made_up_of_a_partners_photos(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        self.shared("ana")
+        same = "2026-06-02T09:00:00.000Z"
+        partners = [item(n, same, owner="partner-canary") for n in (1, 2)]
+        status, seen = self.check(made["id"], partners, partners, [item(3, same), item(4, "2026-06-02T10:00:00.000Z")])
+        self.assertEqual((status, seen["count"]), (200, 2))
+        self.assertEqual([a[3] for a in self.asked], [1, 2, 3])
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+
     def test_a_count_shown_before_home_moved_or_was_cleared_is_refused(self):
         made = self.connect()
         self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
