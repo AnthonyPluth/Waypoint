@@ -323,7 +323,8 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
                     if asset.id not in seen:
                         seen.add(asset.id)
                         placed = _shown(asset, counted, left_out.get(asset.id, set()))
-                        total += placed in wanted and placed != shown_on.get(asset.id)
+                        stored_on, pinned = shown_on.get(asset.id, (None, False))
+                        total += placed in wanted and not pinned and placed != stored_on
     except immich.ImmichError as e:
         _outcome(conn, source, e)
         raise
