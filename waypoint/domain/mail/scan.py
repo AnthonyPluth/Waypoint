@@ -26,6 +26,7 @@ State = Literal["done", "failed", "not_started", "busy"]
 BOOKING, UNREADABLE, SKIPPED, FOLLOW_UP = "booking", "unreadable", "skipped", "follow-up"
 IGNORED = review.IGNORED
 BUDGET = 1200
+MIN_SETTLE = 10
 _clock = time.monotonic
 MAX_CHAIN = 12
 LOCAL = "local"
@@ -205,30 +206,31 @@ def keep_message(mailbox_id: int, message_id: str, raw: dict[str, Any], segments
     return content
 
 
-def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float) -> None:
+def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float, started: float | None = None) -> None:
     try:
         keep_message(mailbox_id, message_id, raw, segments, now)
-        for segment_id in segments:
-            gatecode.settle(segment_id, now)
+        _settle_message(mailbox_id, message_id, segments, now, started)
     except Exception as e:
         if db.is_busy(e):
             raise
         monitoring.report(e, values=False)
 
 
-def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float) -> None:
+def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float, started: float | None = None) -> None:
     with db.session() as conn:
         if not gate_codes.is_parking(conn, segment_id):
             return
     content, images = extract.keep(raw, mailimages.Fetcher())
     with db.session() as conn:
         gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
-    gatecode.settle_pictures(segment_id, mailbox_id, [images[n] for n in gate_codes.qualifying(images)], content["received"], now)
+    left = _time_left(started)
+    if left is None or left >= MIN_SETTLE:
+        gatecode.settle_pictures(segment_id, mailbox_id, [images[n] for n in gate_codes.qualifying(images)], content["received"], now, left)
 
 
-def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float) -> None:
+def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float, started: float | None = None) -> None:
     try:
-        keep_code(mailbox_id, segment_id, raw, now)
+        keep_code(mailbox_id, segment_id, raw, now, started)
     except Exception as e:
         if db.is_busy(e):
             raise
@@ -380,19 +382,20 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     read = _read(cfg, text)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
-    _settle_codes(filed, now)
+    _settle_message(mailbox_id, message_id, filed.segments, now)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
 
-MIN_SETTLE = 10
+def _time_left(started: float | None) -> float | None:
+    return None if started is None else BUDGET - (_clock() - started)
 
 
-def _settle_codes(filed: Filed, now: float, started: float | None = None) -> None:
-    for segment_id in filed.segments:
-        left = None if started is None else BUDGET - (_clock() - started)
-        if left is not None and left < MIN_SETTLE:
-            return
-        gatecode.settle(segment_id, now, left)
+def _settle_message(mailbox_id: int, message_id: str, segments: Iterable[int], now: float, started: float | None = None) -> None:
+    with db.session() as conn:
+        parking = [n for n in dict.fromkeys(segments) if gate_codes.is_parking(conn, n)]
+    left = _time_left(started)
+    if len(parking) == 1 and (left is None or left >= MIN_SETTLE):
+        gatecode.settle(parking[0], mailbox_id, message_id, now, left)
 
 
 def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
@@ -544,7 +547,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
-        _settle_codes(filed, time.time(), started)
+        _settle_message(mailbox_id, message_id, filed.segments, time.time(), started)
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
@@ -679,9 +682,9 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
-                _keep_quietly(mailbox_id, message_id, raw, wanted, now)
+                _keep_quietly(mailbox_id, message_id, raw, wanted, now, started)
             if followed:
-                _keep_code_quietly(mailbox_id, followed[0].segment_id, raw, now)
+                _keep_code_quietly(mailbox_id, followed[0].segment_id, raw, now, started)
             if outcome is not None:
                 with db.session() as conn:
                     _record(conn, mailbox_id, message_id, outcome, now, segment_id=followed[0].segment_id if followed else None)

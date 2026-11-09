@@ -544,7 +544,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.assertTrue(self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW)))
         self.answer('{"picture": 2}')
-        self.assertFalse(gatecode.settle(self.segment, NOW + 5))
+        self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 5))
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
         self.assertEqual(len(self.fake.requests), 1)
 
@@ -568,11 +568,11 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError("busy")), mock.patch.object(gatecode.db, "is_busy", return_value=True):
             with self.assertRaises(RuntimeError):
-                gatecode.settle(self.segment, NOW)
+                gatecode.settle(self.segment, self.mailbox, "m-two", NOW)
 
     def test_settling_does_nothing_without_a_choice_waiting_or_enough_candidates(self):
         self.turn_on(auto=False)
-        self.assertFalse(gatecode.settle(self.segment, NOW))
+        self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW))
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}], None, NOW))
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
         self.assertEqual(self.fake.requests, [])
@@ -602,7 +602,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.answer('{"picture": 2}')
         newer = raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X"), "y": png(420, 420, b"NEWER-Y")}, day="Sat, 17 Oct 2026 09:00:00 +0100")
         self.fake.on_request = lambda n: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10)
-        gatecode.settle(self.segment, NOW + 20)
+        gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20)
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))
 
 
@@ -683,3 +683,58 @@ class AiFiledTests(ScanAiCase, Kept):
         [segment] = self.parking()
         self.assertEqual(self.code(segment), (("choose", "2026-10-16"), None))
         self.assertEqual(len(self.fake.requests), 1)
+
+
+class OneMessageOnlyTests(ScanAiCase, Kept):
+    TWO = raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR})
+    NEWER = raw_of("Your parking reservation", {"c": png(310, 310, b"NEWER-ONE-1"), "d": png(320, 320, b"NEWER-TWO-2")},
+                   day="Mon, 19 Oct 2026 09:00:00 +0100")
+
+    def answer(self, content: str, status: int = 200) -> None:
+        self.fake.content, self.fake.status = content, status
+
+    def test_only_the_pictures_of_the_message_that_reopened_the_choice_are_sent(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW)
+        self.fake.reset()
+        self.answer('{"picture": 2}')
+        scan._keep_quietly(self.mailbox, "m-newer", self.NEWER, [self.segment], NOW + 1)
+        [(_, _, body)] = self.fake.requests
+        sent = body["messages"][1]["images"]
+        self.assertNotIn(base64.b64encode(QR).decode(), sent)
+        self.assertNotIn(base64.b64encode(OTHER_QR).decode(), sent)
+        self.assertEqual(len(sent), 2)
+        self.assertEqual(self.read(lambda conn: gate_codes.states(conn, [self.segment])[self.segment]), ("ready", "2026-10-19"))
+
+    def test_two_parking_bookings_in_one_message_are_left_to_a_person(self):
+        self.turn_on(auto=False)
+        other = self.park({**PARKING, "confirmation": "PK30418"})
+        self.answer('{"picture": 1}')
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment, other], NOW)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual([(self.state(n), self.image(n)) for n in (self.segment, other)], [(("choose", "2026-10-16"), None)] * 2)
+
+    def test_a_stay_beside_one_parking_booking_does_not_stop_the_pick(self):
+        self.turn_on(auto=False)
+        stay = self.park(STAY)
+        self.answer('{"picture": 1}')
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment, stay], NOW)
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
+
+    def test_the_ordinary_scan_paths_send_no_picture_when_the_scan_has_no_time_left(self):
+        self.turn_on(auto=False)
+        self.answer('{"picture": 1}')
+        with mock.patch.object(scan, "_clock", return_value=float(scan.BUDGET)):
+            scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, 0.0)
+            scan.keep_code(self.mailbox, self.segment, self.NEWER, NOW + 1, 0.0)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+
+    def test_the_ordinary_scan_paths_cap_the_picture_wait_by_the_time_left(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        with mock.patch.object(scan, "_clock", return_value=100.0), mock.patch.object(ai, "pick_picture", wraps=ai.pick_picture) as picked:
+            scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, 0.0)
+            scan.keep_code(self.mailbox, self.segment, self.NEWER, NOW + 1, 0.0)
+        self.assertEqual([c.args[2] for c in picked.call_args_list], [scan.BUDGET - 100.0] * 2)

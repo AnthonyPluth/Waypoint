@@ -94,7 +94,9 @@ Choosing **Off**, or turning the automatic switch off, stops the sending at once
 
 A parking booking’s email can hold several pictures that could be the QR code that opens the gate. Waypoint already picks by a fixed rule (a near-square PNG or JPEG, 100 to 1,000 pixels a side, not repeated in the message). When that rule leaves more than one and the AI is set to Local (Ollama), Waypoint sends those candidate pictures, and nothing else of the email (no text, subject or sender), to your own Ollama server and asks which one is the gate’s QR code. If it names one, that picture becomes the code with nothing for you to do.
 
-- There is no separate switch; it applies only in Local mode, and only for a parking booking with more than one candidate (at most eight are sent).
+- There is no separate switch; it applies only in Local mode, and only for a parking booking with more than one candidate (at most eight are sent), taken from the one message that brought the choice up, never from other emails of the booking.
+- A message that holds more than one parking booking stays on **Choose the code**, because the model can’t tell which booking a picture belongs to.
+- During a scan the question is skipped when little of the scan’s time is left, and waits no longer than that time allows; the choice then stays with you.
 - Waypoint never decodes the code itself; the model only chooses between the pictures.
 - With OpenRouter chosen or the AI off, no picture is sent anywhere.
 - A model that can’t read pictures, an error, a timeout or an answer that doesn’t clearly name one picture leaves **Choose the code** exactly as it was, with no message.
