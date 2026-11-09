@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -250,5 +250,40 @@ describe("signed_in flows", () => {
   });
   it("refuses a signed-in flow when no signed-in server was started", () => {
     expect(() => baseFor({ base: "http://127.0.0.1:1" }, { ...ok, signed_in: true })).toThrow(/needs the signed-in demo server/);
+  });
+});
+
+describe("mapkit flows", () => {
+  const ok = { name: "replay", steps: [{ goto: "#trips" }] };
+  it("takes fake, error or blocked", () => {
+    for (const mode of ["fake", "error", "blocked"]) expect(flowProblems({ ...ok, mapkit: mode })).toEqual([]);
+    expect(flowProblems({ ...ok, mapkit: true })).toEqual(["mapkit is one of fake, error, blocked"]);
+  });
+  it("runs a flow on the MapKit server and refuses one when none was started", () => {
+    const env = { base: "http://127.0.0.1:1", mapkitBase: "http://127.0.0.1:3" };
+    expect(baseFor(env, { ...ok, mapkit: "fake" })).toBe("http://127.0.0.1:3");
+    expect(baseFor(env, ok)).toBe("http://127.0.0.1:1");
+    expect(() => baseFor({ base: "http://127.0.0.1:1" }, { ...ok, mapkit: "fake" })).toThrow(/needs the MapKit demo server/);
+  });
+  it("answers Apple's hosts itself: the stand-in for the script, a refusal for the rest", async () => {
+    const routes = [];
+    const ctx = { route: async (pattern, handler) => routes.push({ pattern, handler }) };
+    const answer = async (mode, url) => {
+      routes.length = 0;
+      await standInForApple(ctx, mode);
+      const out = {};
+      await routes[0].handler({ request: () => ({ url: () => url }), fulfill: (o) => { out.fulfilled = o; }, abort: (reason) => { out.aborted = reason; } });
+      return out;
+    };
+    const script = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js";
+    const fake = await answer("fake", script);
+    expect(routes[0].pattern).toBe(APPLE_MAPS_URLS);
+    expect(fake.fulfilled.headers["Access-Control-Allow-Origin"]).toBe("*");
+    expect(fake.fulfilled.body).toContain("window.mapkit");
+    expect(fake.fulfilled.body).not.toContain("__fail(\"Unauthorized\")");
+    expect((await answer("error", script)).fulfilled.body).toContain("__fail(\"Unauthorized\")");
+    expect((await answer("blocked", script)).aborted).toBe("blockedbyclient");
+    expect((await answer(undefined, script)).aborted).toBe("blockedbyclient");
+    expect((await answer("fake", "https://cdn.apple-mapkit.com/tiles/1.png")).aborted).toBe("blockedbyclient");
   });
 });

@@ -378,6 +378,9 @@ async function main() {
       const near = closest(name, flows.map((f) => f.name));
       throw new ControlError("no_such_flow", `no flow named ${name}`, near ? `did you mean ${near}? (\`${PROG} flows\` lists them)` : `\`${PROG} flows\` lists them`);
     }
+    if (flow.mapkit !== undefined) {
+      throw new ControlError("needs_mapkit", `${name} needs the MapKit demo server that make verify starts for it, which a session doesn't have`, `run it with \`make verify\` (\`make verify PAGES=… \` limits the pages; the flow is named ${name})`);
+    }
     if (flow.signed_in === true && !opt.signedIn) {
       throw new ControlError("needs_signed_in", `${name} needs a signed-in session, and this one isn't`, `\`${PROG} stop\`, then \`${PROG} start --signed-in jane\``);
     }

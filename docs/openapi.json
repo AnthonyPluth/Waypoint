@@ -2939,6 +2939,27 @@
         }
       }
     },
+    "/api/mapkit/token": {
+      "get": {
+        "operationId": "api_mapkit_token",
+        "x-handler": "waypoint/server/api/mapkit.py:api_mapkit_token",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapkitToken"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/reminders/app": {
       "get": {
         "operationId": "api_app_push",
@@ -6148,6 +6169,27 @@
         "required": [
           "configured",
           "mailboxes"
+        ],
+        "additionalProperties": false
+      },
+      "MapkitToken": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "integer"
+          },
+          "script": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "enabled"
         ],
         "additionalProperties": false
       },

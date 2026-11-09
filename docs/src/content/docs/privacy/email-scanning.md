@@ -102,7 +102,7 @@ The same setting powers one small button that involves no email: the sparkle bes
 
 ## Addresses are looked up on your server
 
-A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This happens entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)). No geocoding or map service is asked and the address is not sent anywhere ([Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map)).
+A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This happens entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)). No geocoding or map service is asked and the address is not sent anywhere ([Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map)). The one map that can reach Apple is the route replay, and only when you add a MapKit key: then a viewer’s browser, not your server, asks Apple for tiles of the area on screen ([Apple’s map for the route replay](/Waypoint/start/trips/#apples-map-for-the-route-replay)). No email text or address is part of that.
 
 ## Live flight status is the one other thing that leaves the server
 

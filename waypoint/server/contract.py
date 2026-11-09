@@ -1377,3 +1377,10 @@ class AssistantMatched(TypedDict):
     ok: bool
     segment_id: int
     trip_id: int
+
+
+class MapkitToken(TypedDict):
+    enabled: bool
+    token: NotRequired[str]
+    expires: NotRequired[int]
+    script: NotRequired[str]

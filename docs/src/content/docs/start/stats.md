@@ -38,7 +38,7 @@ The map shows everywhere you have flown and stayed, for the person and year you 
 - **Where a stay is placed.** At the centre of the ZIP or postal code in its address (see [Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map)), so two hotels in different ZIP codes of one city are two diamonds; otherwise at its city, or roughly where its city’s airports are. A stay with none of these isn’t plotted, and neither is an airport Waypoint has no coordinates for. No pin is ever at a street address.
 - **Zoom.** The map opens on just the places you have been. Drag, pinch or use the buttons to zoom, **Reset** to return to that view and **World** to see everything.
 
-The map is drawn on your device from outlines bundled with the app: countries from [Natural Earth](https://www.naturalearthdata.com/) and US states from the Census Bureau, both public domain. It loads no tiles and calls no map service, so no one outside learns where the household goes; places are found on your own server from lists that ship with Waypoint. Its code and outlines are downloaded only when you open the Stats page.
+The map is drawn on your device from outlines bundled with the app: countries from [Natural Earth](https://www.naturalearthdata.com/) and US states from the Census Bureau, both public domain. It loads no tiles and calls no map service (the [route replay](/Waypoint/start/trips/#apples-map-for-the-route-replay) can use Apple’s map, but only if you add a MapKit key, and this map never does), so no one outside learns where the household goes from it; places are found on your own server from lists that ship with Waypoint. Its code and outlines are downloaded only when you open the Stats page.
 
 ## Year in review
 

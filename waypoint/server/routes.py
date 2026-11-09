@@ -32,6 +32,7 @@ from .api.review import (api_review, api_review_attach, api_review_dismiss, api_
                          api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_show_costs_save, api_state
+from .api.mapkit import api_mapkit_token
 from .api.home import api_home, api_home_clear, api_home_save
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
 
@@ -126,6 +127,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/reminders", api_reminders_set),
     ("POST", "/api/reminders/devices", api_device_add),
     ("DELETE", "/api/reminders/devices/{id}", api_device_remove),
+    ("GET", "/api/mapkit/token", api_mapkit_token),
     ("GET", "/api/reminders/app", api_app_push),
     ("POST", "/api/reminders/app/devices", api_app_device_add),
     ("DELETE", "/api/reminders/app/devices/{id}", api_app_device_remove),

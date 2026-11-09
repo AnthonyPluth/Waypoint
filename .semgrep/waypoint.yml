@@ -357,6 +357,18 @@ rules:
     paths:
       include: ["/waypoint/domain/", "/waypoint/providers/"]
 
+  - id: waypoint-mapkit-hosts
+    message: >-
+      Only waypoint/providers/mapkit.py names Apple's MapKit hosts, so the page's Content-Security-Policy, the script the
+      browser loads and the token's origin stay in one place and nothing reaches Apple unless a MapKit key is configured
+      (AGENTS.md, "You see the trips you're on"): use what that module exports rather than naming the hosts elsewhere.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?i)apple-mapkit
+    paths:
+      include: ["/waypoint/", "/frontend/src/", "/run.py"]
+      exclude: ["/waypoint/providers/mapkit.py", "*.test.ts"]
+
   - id: waypoint-no-telemetry
     message: >-
       Waypoint sends nothing about itself to an outside service: no error reporting, analytics or monitoring SDK (AGENTS.md,
