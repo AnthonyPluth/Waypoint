@@ -660,6 +660,15 @@ class AiFiledTests(ScanAiCase, Kept):
         self.assertTrue(all("images" not in body["messages"][1] for _, _, body in self.fake.requests))
         self.assertEqual(self.code(self.parking()[0]), (("choose", "2026-10-16"), None))
 
+    def test_a_second_parking_booking_the_ai_response_held_but_parsing_rejected_stops_the_pick(self):
+        self.turn_on()
+        rejected = {"kind": "parking", "provider": "Example Parking", "confirmation": "PK30417"}
+        self.fake.content = json.dumps({"bookings": [json.loads(self.PARKING_ANSWER), rejected]})
+        self.scan()
+        self.assertEqual(len(self.parking()), 1)
+        self.assertTrue(all("images" not in body["messages"][1] for _, _, body in self.fake.requests))
+        self.assertEqual(self.code(self.parking()[0]), (("choose", "2026-10-16"), None))
+
     def test_a_failing_settle_still_leaves_the_booking_filed_with_the_choice_open(self):
         self.turn_on()
         self.answers("{}", 500)

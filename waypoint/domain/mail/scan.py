@@ -356,12 +356,13 @@ class Read(NamedTuple):
     error: str | None
     failed: bool
     not_a_booking: str | None = None
+    parking: int = 0
 
 
 def _read(cfg: ai.Config, text: str, timeout: float | None = None) -> Read:
     try:
         reading = ai.suggest(cfg, text, timeout)
-        return Read(reading.bookings, reading.error, False, reading.not_a_booking)
+        return Read(reading.bookings, reading.error, False, reading.not_a_booking, max(reading.parking, _parking_in(reading.bookings)))
     except ai.AiError as e:
         return Read([], str(e), str(e) != ai.NO_BOOKING and not e.retried)
     except Exception as e:
@@ -383,7 +384,7 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     read = _read(cfg, text)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
-    _settle_message(mailbox_id, message_id, filed.segments, now, parked=_parking_in(read.suggestions))
+    _settle_message(mailbox_id, message_id, filed.segments, now, parked=read.parking)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
 
@@ -552,7 +553,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
-        _settle_message(mailbox_id, message_id, filed.segments, time.time(), started, _parking_in(read.suggestions))
+        _settle_message(mailbox_id, message_id, filed.segments, time.time(), started, read.parking)
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
