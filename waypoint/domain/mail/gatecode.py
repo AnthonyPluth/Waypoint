@@ -18,8 +18,8 @@ def _quietly(work: Callable[[], bool]) -> bool:
         return False
 
 
-def settle(segment_id: int, now: float) -> bool:
-    return _quietly(lambda: _settle(segment_id, now))
+def settle(segment_id: int, now: float, timeout: float | None = None) -> bool:
+    return _quietly(lambda: _settle(segment_id, now, timeout))
 
 
 def settle_pictures(segment_id: int, mailbox_id: int, pictures: Sequence[Image], day: str | None, now: float) -> bool:
@@ -32,7 +32,7 @@ def _config(segment_id: int) -> ai.Config | None:
         return cfg if cfg is not None and gate_codes.waiting(conn, segment_id) else None
 
 
-def _settle(segment_id: int, now: float) -> bool:
+def _settle(segment_id: int, now: float, timeout: float | None) -> bool:
     cfg = _config(segment_id)
     if cfg is None:
         return False
@@ -40,7 +40,7 @@ def _settle(segment_id: int, now: float) -> bool:
         found = gate_codes.candidates(conn, segment_id)
     if len(found) < 2:
         return False
-    picked = ai.pick_picture(cfg, [c.image["data"] for c in found])
+    picked = ai.pick_picture(cfg, [c.image["data"] for c in found], timeout)
     if picked is None:
         return False
     with db.session() as conn:

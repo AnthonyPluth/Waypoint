@@ -384,9 +384,15 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
 
-def _settle_codes(filed: Filed, now: float) -> None:
+MIN_SETTLE = 10
+
+
+def _settle_codes(filed: Filed, now: float, started: float | None = None) -> None:
     for segment_id in filed.segments:
-        gatecode.settle(segment_id, now)
+        left = None if started is None else BUDGET - (_clock() - started)
+        if left is not None and left < MIN_SETTLE:
+            return
+        gatecode.settle(segment_id, now, left)
 
 
 def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
@@ -538,7 +544,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
-        _settle_codes(filed, time.time())
+        _settle_codes(filed, time.time(), started)
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:

@@ -535,11 +535,12 @@ PICTURE_TIMEOUT = 120
 MAX_PICTURES = 8
 
 
-def pick_picture(cfg: Config, pictures: Sequence[bytes]) -> int | None:
+def pick_picture(cfg: Config, pictures: Sequence[bytes], timeout: float | None = None) -> int | None:
     if cfg.mode != LOCAL or not 2 <= len(pictures) <= MAX_PICTURES:
         return None
     try:
-        reply = _ask(cfg, f"Pictures 1 to {len(pictures)} follow, in order.", PICTURE_SYSTEM, timeout=PICTURE_TIMEOUT, pictures=pictures)
+        reply = _ask(cfg, f"Pictures 1 to {len(pictures)} follow, in order.", PICTURE_SYSTEM,
+                    timeout=PICTURE_TIMEOUT if timeout is None else min(PICTURE_TIMEOUT, timeout), pictures=pictures)
         found = json.loads(reply) if isinstance(reply, str) else None
     except (AiError, ValueError):
         return None

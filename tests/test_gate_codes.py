@@ -1,5 +1,6 @@
 import base64
 import email.message
+import itertools
 import json
 import secrets
 import struct
@@ -603,3 +604,82 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.fake.on_request = lambda n: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10)
         gatecode.settle(self.segment, NOW + 20)
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))
+
+
+class AiFiledTests(ScanAiCase, Kept):
+    PARKING_ANSWER = json.dumps({"kind": "parking", "provider": "Example Parking", "confirmation": "PK30417", "origin": "Example Airport Long-Term Lot",
+                                 "start_local": "2026-12-01T05:15", "end_local": "2026-12-04T03:00",
+                                 "start_zone": "America/New_York", "end_zone": "America/New_York"})
+
+    def setUp(self):
+        super().setUp()
+        self.read(lambda conn: conn.execute(Segment.__table__.delete()))
+        self.add_mail("m-ai", mail("Your parking reservation PK30417 is confirmed", {"a": QR, "b": OTHER_QR},
+                                   f"Reservation PK30417 is confirmed. Entry QR codes below. {CANARY_TEXT}"))
+
+    def answers(self, picture: str, status: int = 200) -> None:
+        def on_request(n: int) -> None:
+            self.fake.content, self.fake.status = (self.PARKING_ANSWER, 200) if n == 1 else (picture, status)
+        self.fake.on_request = on_request
+
+    def parking(self) -> list[int]:
+        return [s["id"] for s in self.segments() if s["kind"] == "parking"]
+
+    def code(self, segment: int):
+        return self.state(segment), self.image(segment)
+
+    def waiting_item(self) -> None:
+        self.scan()
+        self.assertEqual((self.parking(), len(self.items())), ([], 1))
+
+    def test_a_booking_the_automatic_pass_files_is_settled_after_it_commits(self):
+        self.turn_on()
+        self.answers('{"picture": 2}')
+        with no_leaks(self, CANARY_TEXT, database=self.path, sent_ok=True):
+            self.scan()
+        [segment] = self.parking()
+        self.assertEqual(self.code(segment), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))
+        self.assertEqual(len(self.fake.requests), 2)
+        self.assertNotIn("images", self.fake.requests[0][2]["messages"][1])
+
+    def test_a_booking_filed_by_ask_ai_is_settled_after_it_commits(self):
+        self.waiting_item()
+        self.turn_on(auto=False)
+        self.answers('{"picture": 1}')
+        scan._ask(self.mailbox, "m-ai", "Reservation PK30417 is confirmed.", NOW)
+        [segment] = self.parking()
+        self.assertEqual(self.code(segment), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
+
+    def test_a_failing_settle_still_leaves_the_booking_filed_with_the_choice_open(self):
+        self.turn_on()
+        self.answers("{}", 500)
+        self.scan()
+        [segment] = self.parking()
+        self.assertEqual(self.code(segment), (("choose", "2026-10-16"), None))
+        self.assertEqual(self.items(), [])
+
+    def test_a_settle_that_raises_does_not_stop_the_booking_or_the_scan(self):
+        self.turn_on()
+        self.answers('{"picture": 1}')
+        with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError("boom")):
+            result = self.scan()
+        self.assertEqual(result.state, "done")
+        [segment] = self.parking()
+        self.assertEqual(self.code(segment), (("choose", "2026-10-16"), None))
+
+    def test_the_wait_for_pictures_is_capped_by_what_is_left_of_the_scans_time(self):
+        self.turn_on()
+        self.answers('{"picture": 1}')
+        with mock.patch.object(ai, "pick_picture", wraps=ai.pick_picture) as picked:
+            self.scan()
+        [(_, _, timeout)] = [c.args for c in picked.call_args_list]
+        self.assertLessEqual(timeout, scan.BUDGET)
+
+    def test_with_hardly_any_time_left_no_picture_is_sent_and_the_choice_stays_open(self):
+        self.turn_on()
+        self.answers('{"picture": 1}')
+        with mock.patch.object(scan, "_clock", side_effect=itertools.chain([0.0], itertools.repeat(scan.BUDGET - 1))):
+            self.scan()
+        [segment] = self.parking()
+        self.assertEqual(self.code(segment), (("choose", "2026-10-16"), None))
+        self.assertEqual(len(self.fake.requests), 1)
