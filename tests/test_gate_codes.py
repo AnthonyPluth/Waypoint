@@ -650,6 +650,25 @@ class AiFiledTests(ScanAiCase, Kept):
         [segment] = self.parking()
         self.assertEqual(self.code(segment), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
 
+    def test_a_second_parking_booking_the_ai_could_not_file_stops_the_pick(self):
+        self.turn_on()
+        unfinished = json.dumps({"kind": "parking", "origin": "Other Lot", "start_local": "2026-12-01T05:15", "end_local": "2026-12-04T03:00"})
+        reply = json.dumps({"bookings": [json.loads(self.PARKING_ANSWER), json.loads(unfinished)]})
+        self.fake.content = reply
+        self.scan()
+        self.assertEqual(len(self.parking()), 1)
+        self.assertTrue(all("images" not in body["messages"][1] for _, _, body in self.fake.requests))
+        self.assertEqual(self.code(self.parking()[0]), (("choose", "2026-10-16"), None))
+
+    def test_a_second_parking_booking_the_ai_response_held_but_parsing_rejected_stops_the_pick(self):
+        self.turn_on()
+        rejected = {"kind": "parking", "provider": "Example Parking", "confirmation": "PK30417"}
+        self.fake.content = json.dumps({"bookings": [json.loads(self.PARKING_ANSWER), rejected]})
+        self.scan()
+        self.assertEqual(len(self.parking()), 1)
+        self.assertTrue(all("images" not in body["messages"][1] for _, _, body in self.fake.requests))
+        self.assertEqual(self.code(self.parking()[0]), (("choose", "2026-10-16"), None))
+
     def test_a_failing_settle_still_leaves_the_booking_filed_with_the_choice_open(self):
         self.turn_on()
         self.answers("{}", 500)
@@ -714,6 +733,19 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment, other], NOW)
         self.assertEqual(self.fake.requests, [])
         self.assertEqual([(self.state(n), self.image(n)) for n in (self.segment, other)], [(("choose", "2026-10-16"), None)] * 2)
+
+    def test_one_filed_parking_booking_beside_an_unresolved_one_is_left_to_a_person(self):
+        self.turn_on(auto=False)
+        self.answer('{"picture": 1}')
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, parked=2)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+
+    def test_exactly_one_parking_booking_in_the_message_still_settles(self):
+        self.turn_on(auto=False)
+        self.answer('{"picture": 1}')
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, parked=1)
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
 
     def test_a_stay_beside_one_parking_booking_does_not_stop_the_pick(self):
         self.turn_on(auto=False)

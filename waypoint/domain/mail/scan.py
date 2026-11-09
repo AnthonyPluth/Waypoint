@@ -206,10 +206,11 @@ def keep_message(mailbox_id: int, message_id: str, raw: dict[str, Any], segments
     return content
 
 
-def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float, started: float | None = None) -> None:
+def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float, started: float | None = None,
+                  parked: int = 0) -> None:
     try:
         keep_message(mailbox_id, message_id, raw, segments, now)
-        _settle_message(mailbox_id, message_id, segments, now, started)
+        _settle_message(mailbox_id, message_id, segments, now, started, parked)
     except Exception as e:
         if db.is_busy(e):
             raise
@@ -355,12 +356,13 @@ class Read(NamedTuple):
     error: str | None
     failed: bool
     not_a_booking: str | None = None
+    parking: int = 0
 
 
 def _read(cfg: ai.Config, text: str, timeout: float | None = None) -> Read:
     try:
         reading = ai.suggest(cfg, text, timeout)
-        return Read(reading.bookings, reading.error, False, reading.not_a_booking)
+        return Read(reading.bookings, reading.error, False, reading.not_a_booking, max(reading.parking, _parking_in(reading.bookings)))
     except ai.AiError as e:
         return Read([], str(e), str(e) != ai.NO_BOOKING and not e.retried)
     except Exception as e:
@@ -382,7 +384,7 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     read = _read(cfg, text)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
-    _settle_message(mailbox_id, message_id, filed.segments, now)
+    _settle_message(mailbox_id, message_id, filed.segments, now, parked=read.parking)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
 
@@ -390,11 +392,15 @@ def _time_left(started: float | None) -> float | None:
     return None if started is None else BUDGET - (_clock() - started)
 
 
-def _settle_message(mailbox_id: int, message_id: str, segments: Iterable[int], now: float, started: float | None = None) -> None:
+def _parking_in(entries: Iterable[Any]) -> int:
+    return sum(1 for e in entries if (e.get("kind") if isinstance(e, dict) else e.kind) == "parking")
+
+
+def _settle_message(mailbox_id: int, message_id: str, segments: Iterable[int], now: float, started: float | None = None, parked: int = 0) -> None:
     with db.session() as conn:
         parking = [n for n in dict.fromkeys(segments) if gate_codes.is_parking(conn, n)]
     left = _time_left(started)
-    if len(parking) == 1 and (left is None or left >= MIN_SETTLE):
+    if len(parking) == 1 and parked <= 1 and (left is None or left >= MIN_SETTLE):
         gatecode.settle(parking[0], mailbox_id, message_id, now, left)
 
 
@@ -547,7 +553,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
-        _settle_message(mailbox_id, message_id, filed.segments, time.time(), started)
+        _settle_message(mailbox_id, message_id, filed.segments, time.time(), started, read.parking)
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
@@ -682,7 +688,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
-                _keep_quietly(mailbox_id, message_id, raw, wanted, now, started)
+                _keep_quietly(mailbox_id, message_id, raw, wanted, now, started, _parking_in(message.bookings))
             if followed:
                 _keep_code_quietly(mailbox_id, followed[0].segment_id, raw, now, started)
             if outcome is not None:

@@ -85,6 +85,7 @@ class Reading:
     bookings: list[Suggestion]
     error: str | None = None
     not_a_booking: str | None = None
+    parking: int = 0
 
 
 @dataclass(frozen=True)
@@ -483,7 +484,8 @@ def parse(content: Any, sent: str, seats: bool = False) -> Reading:
             kept.append(one)
     if not kept:
         raise dropped[0]
-    return Reading(kept, _left_out(len(kept), len(listed), dropped[0]) if dropped else None)
+    parking = sum(1 for each in listed if isinstance(each.get("kind"), str) and each["kind"].strip().lower() == "parking")
+    return Reading(kept, _left_out(len(kept), len(listed), dropped[0]) if dropped else None, parking=parking)
 
 
 def _answer(cfg: Config, body: Any) -> Any:
