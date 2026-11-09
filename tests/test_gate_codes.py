@@ -10,7 +10,7 @@ import zlib
 from unittest import mock
 from datetime import datetime
 
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import ServerCase, fetch
@@ -548,18 +548,17 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
         self.assertEqual(len(self.fake.requests), 1)
 
-    def race(self, name: str, commit) -> None:
-        real = getattr(gate_codes, name)
+    def race(self, commit) -> None:
+        real = gate_codes._sealed
         fired = []
 
         def wrapped(*args, **kwargs):
-            found = real(*args, **kwargs)
             if not fired:
                 fired.append(True)
                 commit()
-            return found
+            return real(*args, **kwargs)
 
-        patcher = mock.patch.object(gate_codes, name, wrapped)
+        patcher = mock.patch.object(gate_codes, "_sealed", wrapped)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -568,7 +567,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
-        self.race("candidates", lambda: self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW + 5)))
+        self.race(lambda: self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW + 5)))
         self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20))
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
 
@@ -578,9 +577,23 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.answer('{"picture": 2}')
         newer = raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X")}, day="Sat, 17 Oct 2026 09:00:00 +0100")
-        self.race("candidates", lambda: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10))
+        self.race(lambda: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10))
         self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20))
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-17"), {"type": "image/png", "data": png(410, 410, b"NEWER-X")}))
+
+    def test_a_segment_that_stops_being_parking_before_the_write_gets_no_code(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.answer('{"picture": 2}')
+
+        def change() -> None:
+            with db.session() as conn:
+                conn.execute(update(Segment).where(Segment.id == self.segment).values(kind="hotel"))
+
+        self.race(change)
+        self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20))
+        self.assertEqual(self.image(), None)
 
     def test_pictures_settled_while_a_choice_commits_during_the_pick_never_replace_it(self):
         self.turn_on(auto=False)

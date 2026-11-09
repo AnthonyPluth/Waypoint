@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal, NamedTuple
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, exists, or_, select, update
 
 from . import db, secretbox
 from .models import Segment, SegmentCode, SegmentMessage, StoredMessage
@@ -168,7 +168,8 @@ def keep_chosen(conn: db.Connection, segment_id: int, mailbox_id: int, image: Im
     if not image["data"]:
         return False
     permits = SegmentCode.day.is_(None) if day is None else or_(SegmentCode.day.is_(None), SegmentCode.day <= day)
-    done = conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None), permits)
+    done = conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None), permits,
+                                                  exists().where(Segment.id == SegmentCode.segment_id, Segment.kind == KIND))
                         .values(mailbox_id=mailbox_id, content=_sealed(image), day=day, created=now))
     return int(done.rowcount) == 1
 
