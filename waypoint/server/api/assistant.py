@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 from typing import Any, cast
 
 from ... import monitoring, validate
 from ...domain import trips, visibility
-from ...domain.mail import assist, review
-from ..common import ApiError, row_id
+from ...domain.mail import assist, gatecode, review
+from ...storage import db
+from ..common import ApiError, own_session, row_id
 from ..contract import (AssistantCreateBody, AssistantDismissBody, AssistantDismissed, AssistantEmail, AssistantItemDetail,
                         AssistantItems, AssistantMatchBody, AssistantMatched, AssistantSegmentEmails, Segment)
 from .mailboxes import owner
@@ -77,7 +79,15 @@ def _whole(body: Mapping[str, Any], key: str, missing: str) -> int | None:
     return row_id(body[key], missing, 400)
 
 
-def api_assistant_review_match(conn, _q, body: AssistantMatchBody, item_id: str) -> AssistantMatched:
+@own_session
+def api_assistant_review_match(_conn, _q, body: AssistantMatchBody, item_id: str) -> AssistantMatched:
+    with db.session() as conn:
+        done, target = _match(conn, body, item_id)
+    gatecode.settle_linked(done, time.time())
+    return target
+
+
+def _match(conn, body: AssistantMatchBody, item_id: str) -> tuple[gatecode.Linked, AssistantMatched]:
     who, item = viewer(conn), row_id(item_id, NO_ITEM)
     row = review.visible(conn, owner(), item)
     if row is None:
@@ -98,25 +108,29 @@ def api_assistant_review_match(conn, _q, body: AssistantMatchBody, item_id: str)
     if trip is not None and visibility.visible_trip(conn, who, trip) is None:
         raise ApiError(NO_TRIP, 404)
     try:
-        target = review.settle(conn, owner(), who, item, entry, segment, trip, any_visible=True)
+        done = review.settle(conn, owner(), who, item, entry, segment, trip, any_visible=True)
     except trips.Invalid as e:
         raise ApiError(str(e)) from None
-    if target is None:
+    if done is None:
         raise ApiError("That isn’t one of the bookings in this message")
+    target = done.segments[0]
     placed = visibility.visible_segment(conn, who, target)
-    return {"ok": True, "segment_id": target, "trip_id": placed.trip_id if placed else 0}
+    return done, {"ok": True, "segment_id": target, "trip_id": placed.trip_id if placed else 0}
 
 
-def api_assistant_review_create(conn, _q, body: AssistantCreateBody, item_id: str) -> Segment:
-    who, item = viewer(conn), row_id(item_id, NO_ITEM)
+@own_session
+def api_assistant_review_create(_conn, _q, body: AssistantCreateBody, item_id: str) -> Segment:
     fields = segment_fields(body)
-    try:
-        added = assist.create(conn, owner(), who, item, _whole(body, "entry", "entry must be a number from get_review_item"), fields)
-    except trips.Invalid as e:
-        raise ApiError(str(e)) from None
-    if added is None:
-        raise ApiError(NO_ITEM, 404)
-    return Segment(**added)
+    with db.session() as conn:
+        who, item = viewer(conn), row_id(item_id, NO_ITEM)
+        try:
+            added = assist.create(conn, owner(), who, item, _whole(body, "entry", "entry must be a number from get_review_item"), fields)
+        except trips.Invalid as e:
+            raise ApiError(str(e)) from None
+        if added is None:
+            raise ApiError(NO_ITEM, 404)
+    gatecode.settle_linked(added[1], time.time())
+    return Segment(**added[0])
 
 
 def api_assistant_review_dismiss(conn, _q, body: AssistantDismissBody, item_id: str) -> AssistantDismissed:

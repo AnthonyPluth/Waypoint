@@ -12,6 +12,7 @@ from ...storage.models import Person, Segment
 from .. import trips, visibility
 from ..visibility import Viewer
 from . import review
+from .gatecode import Linked
 
 Confidence = Literal["exact", "likely", "possible"]
 RANK: dict[str, int] = {"exact": 3, "likely": 2, "possible": 1}
@@ -338,7 +339,8 @@ def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
     return out
 
 
-def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int | None, overrides: trips.SegmentIn) -> trips.SegmentOut | None:
+def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int | None,
+           overrides: trips.SegmentIn) -> tuple[trips.SegmentOut, Linked] | None:
     row = review.visible(conn, owner, item_id)
     if row is None:
         return None
@@ -374,11 +376,13 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
             raise trips.Invalid("The booking couldn’t be added")
         target = added["id"]
     if entry is not None:
-        review.finish_entry(conn, row, int(entry["id"]), target)
+        linked = review.finish_entry(conn, row, int(entry["id"]), target)
     elif pick and len(suggestions) > 1:
         stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
         left = [x for n, x in enumerate(suggestions, 1) if n != pick]
         review.set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), left, row["suggestion_error"])  # type: ignore[arg-type]
+        linked = review.linked(row, [target])
     else:
-        review.dismiss(conn, owner, item_id, (viewer, [target]))
-    return trips.get_segment(conn, viewer, target)
+        linked = review.dismiss(conn, owner, item_id, (viewer, [target])) or review.linked(row, [])
+    made = trips.get_segment(conn, viewer, target)
+    return None if made is None else (made, linked)

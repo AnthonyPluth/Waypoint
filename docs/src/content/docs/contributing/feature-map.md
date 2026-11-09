@@ -110,13 +110,13 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/review` | `review.py:api_review` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_ai.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/who/{id}` | `review.py:api_review_who` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/ignore` | `review.py:api_review_ignore` | `lib/components/settings/ReviewGlance.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
-| `POST /api/review/{id}/match` | `review.py:api_review_match` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
+| `POST /api/review/{id}/match` | `review.py:api_review_match` | `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/same` | `review.py:api_review_same` | `pages/Review.svelte` | `test_api_contract.py` | [start/review](/Waypoint/start/review/) |
-| `POST /api/review/{id}/attach` | `review.py:api_review_attach` | `pages/Review.svelte` | `test_api_contract.py` | [start/review](/Waypoint/start/review/) |
+| `POST /api/review/{id}/attach` | `review.py:api_review_attach` | `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/preview` | `review.py:api_review_preview` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/images/{id}` | `review.py:api_review_image` | - | `test_mail_scan.py`, `test_mcp_routes.py` | [start/review](/Waypoint/start/review/) |
 | `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
-| `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
+| `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/mcp-settings` | `mcp.py:api_mcp_settings` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_app_sign_in.py`, `test_mcp_protocol.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/mcp-settings/writes` | `mcp.py:api_mcp_writes` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/mcp-settings/connections/{id}/mail` | `mcp.py:api_mcp_mail` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
@@ -124,8 +124,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/assistant/review` | `assistant.py:api_assistant_review` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/assistant/review/{id}` | `assistant.py:api_assistant_review_item` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/assistant/review/{id}/email` | `assistant.py:api_assistant_review_email` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
-| `POST /api/assistant/review/{id}/match` | `assistant.py:api_assistant_review_match` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
-| `POST /api/assistant/review/{id}/create` | `assistant.py:api_assistant_review_create` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `POST /api/assistant/review/{id}/match` | `assistant.py:api_assistant_review_match` | - | `test_api_contract.py`, `test_gate_codes.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
+| `POST /api/assistant/review/{id}/create` | `assistant.py:api_assistant_review_create` | - | `test_api_contract.py`, `test_gate_codes.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/assistant/review/{id}/dismiss` | `assistant.py:api_assistant_review_dismiss` | - | `test_api_contract.py`, `test_mcp_review.py`, `test_mcp_routes.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/assistant/segments/{id}/email` | `assistant.py:api_assistant_segment_emails` | - | `test_api_contract.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `GET /api/state` | `state.py:api_state` | `lib/app.svelte.ts` | `test_api_contract.py`, `test_api_state.py`, `test_backup.py`, `test_http_pinned.py`, `test_http_server.py`, `test_mail_scan.py`, `test_monitoring.py`, `test_onboarding.py`, `test_security.py`, `test_server.py`, `test_server_errors.py`, `test_trip_destination.py`, `test_verify_identity.py` | [start/docker](/Waypoint/start/docker/) |

@@ -96,6 +96,7 @@ A parking booking’s email can hold several pictures that could be the QR code 
 
 - There is no separate switch; it applies only in Local mode, and only for a parking booking with more than one candidate (at most eight are sent), taken from the one message that brought the choice up, never from other emails of the booking.
 - A message that holds more than one parking booking stays on **Choose the code**, because the model can’t tell which booking a picture belongs to.
+- It is asked when a scan files the booking and also when you resolve a Review item that links such a message to a parking booking: matching it to a booking, adding it to one, adding it as a booking, or dismissing it with the booking it made, in the app or through an AI assistant. It runs after your action is saved, waits at most 30 seconds, and never holds up, fails or undoes the action; if it can’t pick, **Choose the code** stays as it was.
 - During a scan the question is skipped when little of the scan’s time is left, and waits no longer than that time allows; the choice then stays with you.
 - Waypoint never decodes the code itself; the model only chooses between the pictures.
 - With OpenRouter chosen or the AI off, no picture is sent anywhere.
