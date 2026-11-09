@@ -7,7 +7,7 @@ import json
 import struct
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from sqlalchemy import delete, select
 
@@ -156,18 +156,50 @@ def waiting(conn: db.Connection, segment_id: int) -> bool:
     return row is not None and row["content"] is None
 
 
+class Candidate(NamedTuple):
+    stored_id: int
+    mailbox_id: int
+    position: int
+    image: Image
+    day: str | None
+
+
+def _held_day(conn: db.Connection, segment_id: int) -> str | None:
+    return conn.execute(select(SegmentCode.day).where(SegmentCode.segment_id == segment_id)).scalar()
+
+
+def _not_older(day: str | None, held: str | None) -> bool:
+    return held is None or (day is not None and day >= held)
+
+
 def keep_chosen(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image, day: str | None, now: float) -> bool:
-    if not waiting(conn, segment_id) or not image["data"]:
+    if not waiting(conn, segment_id) or not image["data"] or not _not_older(day, _held_day(conn, segment_id)):
         return False
     _set(conn, segment_id, mailbox_id, image, day, now)
     return True
 
 
-def candidates(conn: db.Connection, segment_id: int) -> list[tuple[int, int, Image]]:
+def candidates(conn: db.Connection, segment_id: int) -> list[Candidate]:
     if not waiting(conn, segment_id):
         return []
-    return [(email, n, pictures[n]) for email, (_, found) in enumerate(_emails_of(conn, segment_id))
-            for pictures in [_images(found.get("images"))] for n in qualifying(pictures)]
+    rows = conn.execute(select(StoredMessage.id, StoredMessage.mailbox_id, StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                        .where(SegmentMessage.segment_id == segment_id).order_by(StoredMessage.created.desc(), StoredMessage.id.desc())).fetchall()
+    out: list[Candidate] = []
+    for row in rows:
+        found = _parsed(row["content"])
+        if found is None:
+            continue
+        received = found.get("received")
+        pictures = _images(found.get("images"))
+        out += [Candidate(int(row["id"]), int(row["mailbox_id"]), n, pictures[n], received if isinstance(received, str) else None) for n in qualifying(pictures)]
+    return out
+
+
+def keep_candidate(conn: db.Connection, segment_id: int, picked: Candidate, now: float) -> bool:
+    digest = hashlib.sha256(picked.image["data"]).digest()
+    same = [c for c in candidates(conn, segment_id)
+            if (c.stored_id, c.position) == (picked.stored_id, picked.position) and hashlib.sha256(c.image["data"]).digest() == digest]
+    return bool(same) and keep_chosen(conn, segment_id, same[0].mailbox_id, same[0].image, same[0].day, now)
 
 
 def image_for(conn: db.Connection, segment_id: int) -> Image | None:

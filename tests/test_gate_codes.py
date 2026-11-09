@@ -579,3 +579,27 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.fake.reset()
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
         self.assertEqual(len(self.fake.requests), 1)
+
+    def test_an_older_reminder_settled_by_the_ai_never_replaces_a_newer_choice_still_waiting(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.add_mail("m-new", mail("Your parking reservation: QR code reminder", {"a": QR, "b": OTHER_QR},
+                                    f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Mon, 19 Oct 2026 09:00:00 +0100"))
+        self.scan()
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
+        self.answer('{"picture": 1}')
+        self.add_mail("m-old", mail("Your parking reservation: QR code reminder", {"c": png(310, 310, b"OLDER-ONE-1"), "d": png(320, 320, b"OLDER-TWO-2")},
+                                    f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Fri, 16 Oct 2026 09:00:00 +0100"))
+        self.scan()
+        self.assertEqual(len(self.fake.requests), 2)
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
+
+    def test_a_message_linked_while_the_ai_is_thinking_never_changes_which_picture_is_saved(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.answer('{"picture": 2}')
+        newer = raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X"), "y": png(420, 420, b"NEWER-Y")}, day="Sat, 17 Oct 2026 09:00:00 +0100")
+        self.fake.on_request = lambda n: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10)
+        gatecode.settle(self.segment, NOW + 20)
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))

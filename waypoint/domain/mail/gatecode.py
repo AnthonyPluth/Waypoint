@@ -40,12 +40,11 @@ def _settle(segment_id: int, now: float) -> bool:
         found = gate_codes.candidates(conn, segment_id)
     if len(found) < 2:
         return False
-    picked = ai.pick_picture(cfg, [image["data"] for _, _, image in found])
+    picked = ai.pick_picture(cfg, [c.image["data"] for c in found])
     if picked is None:
         return False
-    email, index, _ = found[picked]
     with db.session() as conn:
-        return gate_codes.waiting(conn, segment_id) and gate_codes.choose(conn, segment_id, email, index, now)
+        return gate_codes.keep_candidate(conn, segment_id, found[picked], now)
 
 
 def _settle_pictures(segment_id: int, mailbox_id: int, pictures: Sequence[Image], day: str | None, now: float) -> bool:

@@ -380,7 +380,13 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
     read = _read(cfg, text)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
+    _settle_codes(filed, now)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
+
+
+def _settle_codes(filed: Filed, now: float) -> None:
+    for segment_id in filed.segments:
+        gatecode.settle(segment_id, now)
 
 
 def _ai_fields(conn: db.Connection, s: ai.Suggestion) -> trips.SegmentIn | None:
@@ -418,6 +424,7 @@ class Filed(NamedTuple):
     added: int = 0
     cleared: int = 0
     dismissed: int = 0
+    segments: tuple[int, ...] = ()
 
 
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
@@ -458,12 +465,12 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         conn.execute(update(ReviewItem).where(ReviewItem.id == row["id"]).values(reason="incomplete" if pending or error else "match", matches=matches))
     if pending or error or held or not suggestions:
         review.set_suggestions(conn, mailbox_id, message_id, pending, error, auto=auto)
-        return Filed(added)
+        return Filed(added, segments=tuple(touched))
     else:
         review.dismiss(conn, row["owner_sub"], row["id"], (viewer, touched))
         conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
                      .values(outcome=BOOKING, scanned=now, segment_id=touched[0] if touched else None))
-        return Filed(added, 1)
+        return Filed(added, 1, segments=tuple(touched))
 
 
 def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message_ids: list[str]) -> int:
@@ -531,6 +538,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
+        _settle_codes(filed, time.time())
 
 
 def _fail(mailbox_id: int, text: str, partial: tuple[int, int, int]) -> Result:
