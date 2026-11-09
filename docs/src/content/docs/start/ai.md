@@ -50,7 +50,7 @@ An AI assistant connected over [MCP](/Waypoint/start/mcp/) never dismisses this 
 
 The setting is the household’s: any member can change it, and once the automatic switch is on, qualifying mail from every connected mailbox is sent. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
 
-Only the message’s plain text goes out, for an item in Check suggestions or Add missing details, unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address. The sender, subject, images and markup are not sent, and prompts and replies are never logged. Only one part of Waypoint sends email text anywhere, and only to your Ollama server.
+Only the message’s plain text goes out, for an item in Check suggestions or Add missing details, unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address. The sender, subject and markup are not sent, and prompts and replies are never logged. Pictures are not sent with the text either; the one case where they are sent is [the gate code of a parking booking](#picking-a-parking-gate-code), below. Only one part of Waypoint sends email text anywhere, and only to your Ollama server.
 
 ### Who can ask
 
@@ -89,3 +89,13 @@ Waypoint keeps a seat for a traveller only when the name and the seat both appea
 ## Turning it off
 
 Choosing **Off**, or turning the automatic switch off, stops the sending at once, including a scan under way: the settings are read again before each message. So does choosing OpenRouter.
+
+## Picking a parking gate code
+
+A parking booking’s email can hold several pictures that could be the QR code that opens the gate. Waypoint already picks by a fixed rule (a near-square PNG or JPEG, 100 to 1,000 pixels a side, not repeated in the message). When that rule leaves more than one and the AI is set to Local (Ollama), Waypoint sends those candidate pictures, and nothing else of the email (no text, subject or sender), to your own Ollama server and asks which one is the gate’s QR code. If it names one, that picture becomes the code with nothing for you to do.
+
+- There is no separate switch; it applies only in Local mode, and only for a parking booking with more than one candidate (at most eight are sent).
+- Waypoint never decodes the code itself; the model only chooses between the pictures.
+- With OpenRouter chosen or the AI off, no picture is sent anywhere.
+- A model that can’t read pictures, an error, a timeout or an answer that doesn’t clearly name one picture leaves **Choose the code** exactly as it was, with no message.
+- The pictures stay on your network, and neither they nor the prompt or the reply are ever logged.

@@ -149,6 +149,27 @@ def choose(conn: db.Connection, segment_id: int, email: int, index: int, now: fl
     return True
 
 
+def waiting(conn: db.Connection, segment_id: int) -> bool:
+    if not is_parking(conn, segment_id):
+        return False
+    row = conn.execute(select(SegmentCode.content).where(SegmentCode.segment_id == segment_id)).fetchone()
+    return row is not None and row["content"] is None
+
+
+def keep_chosen(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image, day: str | None, now: float) -> bool:
+    if not waiting(conn, segment_id) or not image["data"]:
+        return False
+    _set(conn, segment_id, mailbox_id, image, day, now)
+    return True
+
+
+def candidates(conn: db.Connection, segment_id: int) -> list[tuple[int, int, Image]]:
+    if not waiting(conn, segment_id):
+        return []
+    return [(email, n, pictures[n]) for email, (_, found) in enumerate(_emails_of(conn, segment_id))
+            for pictures in [_images(found.get("images"))] for n in qualifying(pictures)]
+
+
 def image_for(conn: db.Connection, segment_id: int) -> Image | None:
     return _unsealed(conn.execute(select(SegmentCode.content).where(SegmentCode.segment_id == segment_id)).scalar())
 

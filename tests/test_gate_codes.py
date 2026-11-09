@@ -6,19 +6,22 @@ import struct
 import time
 import unittest
 import zlib
+from unittest import mock
 from datetime import datetime
 
 from sqlalchemy import delete, func, insert, select
 
 from tests.privacy import no_leaks
 from tests.shared import ServerCase, fetch
+from tests.test_mail_ai import ScanAiCase
 from tests.test_mail_scan import NOW, ScanCase, b64
 from waypoint import oidc
 from waypoint.domain import calendar, offline, people, trips, visibility
 from waypoint.domain.visibility import Viewer
-from waypoint.domain.mail import review, scan
+from waypoint.domain.mail import ai, gatecode, review, scan
 from waypoint.server import mcp_server
 from waypoint.storage import backup, db, gate_codes, secretbox, stored_mail
+from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import AuthSession, Mailbox, Person, Segment, SegmentCode, SegmentMessage, StoredMessage, Trip, User
 
 CANARY_TEXT = "CANARY-GATE-TEXT-6K3P"
@@ -460,3 +463,119 @@ class CodeRouteTests(ServerCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PickedByAiTests(ScanAiCase, Kept):
+    TWO = raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR})
+
+    def answer(self, content: str, status: int = 200) -> None:
+        self.fake.content, self.fake.status = content, status
+
+    def keep_two(self) -> None:
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW)
+
+    def test_local_with_several_candidates_and_a_vision_model_makes_the_picked_picture_the_code(self):
+        self.turn_on(auto=False)
+        self.answer('{"picture": 2}')
+        with no_leaks(self, CANARY_TEXT, database=self.path, sent_ok=True):
+            self.keep_two()
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))
+        [(path, _, body)] = self.fake.requests
+        self.assertTrue(path.endswith("/api/chat"))
+        user = body["messages"][1]
+        self.assertEqual(user["images"], [base64.b64encode(QR).decode(), base64.b64encode(OTHER_QR).decode()])
+        self.assertNotIn("PK30417", json.dumps(body["messages"]))
+
+    def test_a_reminder_with_several_candidates_is_settled_the_same_way(self):
+        self.turn_on(auto=False)
+        self.answer('{"picture": 1}')
+        self.add_mail("m-reminder", mail("Your parking reservation: QR code reminder", {"a": QR, "b": OTHER_QR},
+                                         f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Mon, 19 Oct 2026 09:00:00 +0100"))
+        with no_leaks(self, CANARY_TEXT, database=self.path, sent_ok=True):
+            self.scan()
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-19"), {"type": "image/png", "data": QR}))
+        self.assertNotIn(CANARY_TEXT, json.dumps(self.fake.requests[0][2]))
+
+    def test_an_error_a_timeout_a_text_only_model_and_an_unusable_answer_leave_the_picker_as_it_is(self):
+        self.turn_on(auto=False)
+        for content, status in (("{}", 500), ("{}", 400), ("I can only read text.", 200), ('{"picture": 0}', 200), ('{"picture": 3}', 200),
+                                ('{"picture": "1"}', 200), ('{"picture": true}', 200), ("[1]", 200), ("", 200)):
+            with self.subTest(content=content, status=status):
+                self.answer(content, status)
+                with db.session() as conn:
+                    conn.execute(SegmentCode.__table__.delete())
+                self.keep_two()
+                self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+
+    def test_a_connection_that_fails_leaves_the_picker_as_it_is(self):
+        self.turn_on(auto=False)
+        with db.session() as conn:
+            db.set_setting(conn, sk.AI_OLLAMA_URL, "http://127.0.0.1:1")
+        self.keep_two()
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+
+    def test_openrouter_and_off_send_no_picture(self):
+        for mode in ("openrouter", "off"):
+            with self.subTest(mode=mode):
+                self.fake.reset()
+                with db.session() as conn:
+                    conn.execute(SegmentCode.__table__.delete())
+                self.turn_on(mode, auto=False)
+                with db.session() as conn:
+                    db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "m/model")
+                    db.set_setting(conn, sk.AI_OPENROUTER_KEY, "sk-test-key-1234")
+                with no_leaks(self, *CANARIES, database=self.path):
+                    self.keep_two()
+                self.assertEqual(self.fake.requests, [])
+                self.assertEqual(self.state(), ("choose", "2026-10-16"))
+
+    def test_one_candidate_and_a_booking_that_already_has_a_code_send_no_picture(self):
+        self.turn_on(auto=False)
+        scan._keep_quietly(self.mailbox, "m-one", raw_of("Your parking reservation", {"a": QR}), [self.segment], NOW)
+        self.assertEqual(self.fake.requests, [])
+        scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW + 1)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
+
+    def test_a_picture_chosen_by_a_person_is_never_overwritten_by_the_ai(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.assertTrue(self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW)))
+        self.answer('{"picture": 2}')
+        self.assertFalse(gatecode.settle(self.segment, NOW + 5))
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
+        self.assertEqual(len(self.fake.requests), 1)
+
+    def test_more_pictures_than_the_limit_are_not_sent(self):
+        self.turn_on(auto=False)
+        many = {f"p{n}": png(200 + n, 200 + n, bytes([n]) * 9) for n in range(ai.MAX_PICTURES + 1)}
+        scan._keep_quietly(self.mailbox, "m-many", raw_of("Your parking reservation", many), [self.segment], NOW)
+        self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")))
+
+    def test_a_failure_inside_the_pick_is_reported_without_values_and_never_stops_the_scan(self):
+        self.turn_on(auto=False)
+        with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError(CANARY_TEXT)), mock.patch.object(gatecode.monitoring, "report") as report:
+            self.keep_two()
+        report.assert_called_once()
+        self.assertEqual(report.call_args.kwargs, {"values": False})
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+
+    def test_a_busy_database_is_not_swallowed(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError("busy")), mock.patch.object(gatecode.db, "is_busy", return_value=True):
+            with self.assertRaises(RuntimeError):
+                gatecode.settle(self.segment, NOW)
+
+    def test_settling_does_nothing_without_a_choice_waiting_or_enough_candidates(self):
+        self.turn_on(auto=False)
+        self.assertFalse(gatecode.settle(self.segment, NOW))
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}], None, NOW))
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
+        self.assertEqual(self.fake.requests, [])
+        self.keep_two()
+        self.fake.reset()
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
+        self.assertEqual(len(self.fake.requests), 1)

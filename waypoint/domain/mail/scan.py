@@ -19,7 +19,7 @@ from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import airports, people, trips
 from ..visibility import Viewer
-from . import ai, autoask, extract, followup, glance, ingest, query, review, triage
+from . import ai, autoask, extract, followup, gatecode, glance, ingest, query, review, triage
 from .booking import Passenger
 
 State = Literal["done", "failed", "not_started", "busy"]
@@ -208,6 +208,8 @@ def keep_message(mailbox_id: int, message_id: str, raw: dict[str, Any], segments
 def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segments: list[int], now: float) -> None:
     try:
         keep_message(mailbox_id, message_id, raw, segments, now)
+        for segment_id in segments:
+            gatecode.settle(segment_id, now)
     except Exception as e:
         if db.is_busy(e):
             raise
@@ -221,6 +223,7 @@ def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float)
     content, images = extract.keep(raw, mailimages.Fetcher())
     with db.session() as conn:
         gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
+    gatecode.settle_pictures(segment_id, mailbox_id, [images[n] for n in gate_codes.qualifying(images)], content["received"], now)
 
 
 def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float) -> None:

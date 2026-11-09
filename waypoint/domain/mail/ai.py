@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -7,6 +8,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Literal, TypedDict
@@ -202,9 +204,12 @@ SYSTEM_SEATS = (
 MAIL_SYSTEM = SYSTEM + SYSTEM_SEATS
 
 
-def request(cfg: Config, text: str, system: str = SYSTEM, thinking: bool = False) -> tuple[str, dict[str, str], dict[str, Any], bool]:
-    messages = [{"role": "system", "content": system}, {"role": "user", "content": text}]
+def request(cfg: Config, text: str, system: str = SYSTEM, thinking: bool = False,
+            pictures: Sequence[bytes] = ()) -> tuple[str, dict[str, str], dict[str, Any], bool]:
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system}, {"role": "user", "content": text}]
     if cfg.mode == LOCAL:
+        if pictures:
+            messages[1]["images"] = [base64.b64encode(p).decode("ascii") for p in pictures]
         return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
                 {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": thinking,
                  "options": {"temperature": 0}}, True)
@@ -498,8 +503,9 @@ def _wait(cfg: Config, limit: float | None) -> float:
     return own if limit is None else max(1.0, min(own, limit))
 
 
-def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None, thinking: bool = False) -> Any:
-    url, headers, body, allow_http = request(cfg, text, system, thinking)
+def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None, thinking: bool = False,
+         pictures: Sequence[bytes] = ()) -> Any:
+    url, headers, body, allow_http = request(cfg, text, system, thinking, pictures)
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
         with tls.urlopen(req, _wait(cfg, timeout), allow_http=allow_http) as resp:
@@ -519,6 +525,28 @@ def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: flo
     except ValueError:
         raise AiError(bad) from None
     return _answer(cfg, reply)
+
+
+PICTURE_SYSTEM = (
+    "You are shown numbered pictures taken from one parking reservation email. At most one of them is the QR code that opens the "
+    "parking gate. Do not read or decode any code. Reply only with JSON: {\"picture\": N} where N is the number of the picture that "
+    "is the gate's QR code, or {\"picture\": 0} when none is clearly that or you cannot tell.")
+PICTURE_TIMEOUT = 120
+MAX_PICTURES = 8
+
+
+def pick_picture(cfg: Config, pictures: Sequence[bytes]) -> int | None:
+    if cfg.mode != LOCAL or not 2 <= len(pictures) <= MAX_PICTURES:
+        return None
+    try:
+        reply = _ask(cfg, f"Pictures 1 to {len(pictures)} follow, in order.", PICTURE_SYSTEM, timeout=PICTURE_TIMEOUT, pictures=pictures)
+        found = json.loads(reply) if isinstance(reply, str) else None
+    except (AiError, ValueError):
+        return None
+    chosen = found.get("picture") if isinstance(found, dict) else None
+    if isinstance(chosen, bool) or not isinstance(chosen, int) or not 1 <= chosen <= len(pictures):
+        return None
+    return chosen - 1
 
 
 def suggest(cfg: Config, text: str, timeout: float | None = None) -> Reading:
