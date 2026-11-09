@@ -176,9 +176,10 @@
               <span class="absolute top-1/2 -translate-y-1/2 bg-card px-1" style={`left: ${shipLeft(shipProgress(s, now))}`} data-ship><KindTile kind={s.kind} decorative /></span>
             </span>
           {:else}
-            <span class="relative mb-5 flex h-7 min-w-8 flex-1 items-center justify-center" aria-hidden="true">
-              <span class="absolute inset-x-0 top-1/2 border-t-2 border-dashed border-border"></span>
-              <span class="relative bg-card px-1"><KindTile kind={s.kind} decorative /></span>
+            <span class="mb-5 flex h-7 min-w-8 flex-1 items-center gap-1" aria-hidden="true">
+              <span class="flex-1 border-t-2 border-dashed border-border"></span>
+              <KindTile kind={s.kind} decorative />
+              <span class="flex-1 border-t-2 border-dashed border-border"></span>
             </span>
           {/if}
           <BoardingTime local={s.end_local} zone={s.end_zone} {unknown} align="end" label={END_WORD[s.kind]} />
