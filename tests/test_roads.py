@@ -205,10 +205,22 @@ class BundledRoadsTests(unittest.TestCase):
 
     def test_a_long_search_over_the_whole_network_stays_fast(self):
         network = roads.highways()
-        began = time.thread_time()
-        got = network.route((39.74, -104.99), (41.88, -87.63))
+
+        def best_cpu_time(work, runs=7):
+            times = []
+            for _ in range(runs):
+                began = time.thread_time()
+                result = work()
+                times.append(time.thread_time() - began)
+            return min(times), result
+
+        def reference_work():
+            return sum(i * i % 7 for i in range(300000))
+
+        reference, _ = best_cpu_time(reference_work)
+        search, got = best_cpu_time(lambda: network.route((39.74, -104.99), (41.88, -87.63)))
         assert got is not None
-        self.assertLess(time.thread_time() - began, 1.0)
+        self.assertLess(search, reference * 6)
 
     def test_a_cross_country_route_follows_interstates_in_order(self):
         got = roads.highways().route((39.74, -104.99), (40.76, -111.89))
