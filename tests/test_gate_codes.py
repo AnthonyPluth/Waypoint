@@ -548,6 +548,61 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
         self.assertEqual(len(self.fake.requests), 1)
 
+    def race(self, name: str, commit) -> None:
+        real = getattr(gate_codes, name)
+        fired = []
+
+        def wrapped(*args, **kwargs):
+            found = real(*args, **kwargs)
+            if not fired:
+                fired.append(True)
+                commit()
+            return found
+
+        patcher = mock.patch.object(gate_codes, name, wrapped)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_a_choice_committed_after_the_reads_is_not_overwritten_by_the_ai(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.answer('{"picture": 2}')
+        self.race("candidates", lambda: self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW + 5)))
+        self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20))
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
+
+    def test_a_newer_single_picture_email_committed_after_the_reads_is_not_overwritten_by_the_ai(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.answer('{"picture": 2}')
+        newer = raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X")}, day="Sat, 17 Oct 2026 09:00:00 +0100")
+        self.race("candidates", lambda: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10))
+        self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20))
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-17"), {"type": "image/png", "data": png(410, 410, b"NEWER-X")}))
+
+    def test_pictures_settled_while_a_choice_commits_during_the_pick_never_replace_it(self):
+        self.turn_on(auto=False)
+        self.answer("{}", 500)
+        self.keep_two()
+        self.answer('{"picture": 2}')
+        pictures = [{"type": "image/png", "data": QR}, {"type": "image/png", "data": OTHER_QR}]
+        self.fake.on_request = lambda n: self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW + 5))
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, pictures[::-1], "2026-10-16", NOW + 20))
+        self.assertEqual(self.image(), {"type": "image/png", "data": QR})
+
+    def test_a_held_day_newer_than_the_candidate_blocks_the_write(self):
+        with db.session() as conn:
+            conn.execute(SegmentCode.__table__.delete())
+            gate_codes._set(conn, self.segment, self.mailbox, None, "2026-10-20", NOW)
+        picture = {"type": "image/png", "data": QR}
+        with db.session() as conn:
+            self.assertFalse(gate_codes.keep_chosen(conn, self.segment, self.mailbox, picture, "2026-10-16", NOW))
+            self.assertFalse(gate_codes.keep_chosen(conn, self.segment, self.mailbox, picture, None, NOW))
+            self.assertTrue(gate_codes.keep_chosen(conn, self.segment, self.mailbox, picture, "2026-10-20", NOW))
+        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-20"), picture))
+
     def test_more_pictures_than_the_limit_are_not_sent(self):
         self.turn_on(auto=False)
         many = {f"p{n}": png(200 + n, 200 + n, bytes([n]) * 9) for n in range(ai.MAX_PICTURES + 1)}

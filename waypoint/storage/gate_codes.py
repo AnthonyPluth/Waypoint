@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Iterable, Sequence
 from typing import Any, Literal, NamedTuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select, update
 
 from . import db, secretbox
 from .models import Segment, SegmentCode, SegmentMessage, StoredMessage
@@ -164,19 +164,13 @@ class Candidate(NamedTuple):
     day: str | None
 
 
-def _held_day(conn: db.Connection, segment_id: int) -> str | None:
-    return conn.execute(select(SegmentCode.day).where(SegmentCode.segment_id == segment_id)).scalar()
-
-
-def _not_older(day: str | None, held: str | None) -> bool:
-    return held is None or (day is not None and day >= held)
-
-
 def keep_chosen(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image, day: str | None, now: float) -> bool:
-    if not waiting(conn, segment_id) or not image["data"] or not _not_older(day, _held_day(conn, segment_id)):
+    if not image["data"]:
         return False
-    _set(conn, segment_id, mailbox_id, image, day, now)
-    return True
+    permits = SegmentCode.day.is_(None) if day is None else or_(SegmentCode.day.is_(None), SegmentCode.day <= day)
+    done = conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None), permits)
+                        .values(mailbox_id=mailbox_id, content=_sealed(image), day=day, created=now))
+    return int(done.rowcount) == 1
 
 
 def stored_id(conn: db.Connection, mailbox_id: int, message_id: str) -> int | None:
