@@ -128,7 +128,7 @@ describe("RouteReplay with the flag on", () => {
     expect(labels(container)).toEqual(["San Francisco"]);
     const map = fake.last();
     expect(map.overlays.size).toBe(2);
-    expect([...map.annotations].filter((a) => a.visible && a.factory().hasAttribute("data-stop"))).toHaveLength(2);
+    expect([...map.annotations].filter((a) => a.factory().hasAttribute("data-stop"))).toHaveLength(2);
   });
 
   it("follows the slider on the MapKit map", async () => {
@@ -137,7 +137,7 @@ describe("RouteReplay with the flag on", () => {
     await screen.findByRole("button", { name: "Pause" });
     await fireEvent.input(screen.getByRole("slider", { name: "Position along the route" }), { target: { value: "4000" } });
     expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
-    expect([...fake.last().annotations].filter((a) => a.visible && a.factory().hasAttribute("data-stop"))).toHaveLength(3);
+    expect([...fake.last().annotations].filter((a) => a.factory().hasAttribute("data-stop"))).toHaveLength(3);
     expect(container.querySelectorAll("[data-stop-item]")).toHaveLength(3);
     await fireEvent.input(screen.getByRole("slider", { name: "Position along the route" }), { target: { value: "0" } });
     expect(fake.last().overlays.size).toBe(0);

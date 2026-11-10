@@ -23,8 +23,9 @@ const start = (extra: Partial<ReplayMapOptions> = {}): { replay: ReplayMap; opts
   return { replay: createReplayMap(fakeMk, document.createElement("div"), opts), opts };
 };
 const annotations = () => [...fake.last().annotations];
+const moversOnMap = () => annotations().filter((a) => a.factory().hasAttribute("data-mover"));
 const named = (name: string) => annotations().find((a) => a.factory().getAttribute("data-stop") === name)!;
-const visibleStops = () => annotations().filter((a) => a.visible && a.factory().hasAttribute("data-stop")).map((a) => a.factory().getAttribute("data-stop"));
+const visibleStops = () => annotations().filter((a) => a.factory().hasAttribute("data-stop")).map((a) => a.factory().getAttribute("data-stop"));
 const overlays = () => [...fake.last().overlays] as FakeOverlay[];
 const colorOf = (o: FakeOverlay) => o.options.style!.options.strokeColor;
 
@@ -166,7 +167,7 @@ describe("the MapKit map", () => {
     replay.update({ progress: 0.5, playing: true, calm: false });
     expect(visibleStops()).toEqual(["Minneapolis", "San Francisco"]);
     replay.update({ progress: 1, playing: false, calm: false });
-    expect(annotations().filter((a) => a.visible && a.factory().hasAttribute("data-stop"))).toHaveLength(3);
+    expect(visibleStops()).toHaveLength(3);
     const glyph = (name: string, kind: string) => { const node = named(name).factory(); expect(node.getAttribute("data-kind")).toBe(kind); return node.querySelector("svg")!.innerHTML; };
     expect(glyph("Minneapolis", "airport")).toContain("fill-map-airport");
     const stay = start({ stops: [denver, saltLake], roads });
@@ -219,12 +220,12 @@ describe("the MapKit map", () => {
 
   it("moves a plane along its leg, hidden before and after, turned the way it flies", () => {
     const { replay } = start();
-    const movers = () => annotations().filter((a) => a.factory().hasAttribute("data-mover"));
+    const movers = moversOnMap;
     replay.update({ progress: 0, playing: false, calm: false });
     expect(movers()).toHaveLength(0);
     replay.update({ progress: 0.25, playing: true, calm: false });
     const [plane] = movers();
-    expect(plane.visible).toBe(true);
+    expect(fake.last().annotations.has(plane)).toBe(true);
     expect(plane.factory().getAttribute("data-vehicle")).toBe("plane");
     expect(plane.factory().getAttribute("data-plane")).toBe("0");
     expect(plane.factory().querySelector("g")!.getAttribute("transform")).toMatch(/^rotate\(-?[\d.]+\) scale\(1\.1\)$/);
@@ -233,7 +234,76 @@ describe("the MapKit map", () => {
     expect(plane.coordinate).not.toEqual(here);
     expect(plane.coordinate.longitude).toBeLessThan(here.longitude);
     replay.update({ progress: 0.5, playing: true, calm: false });
-    expect(plane.visible).toBe(false);
+    expect(movers()).toHaveLength(0);
+  });
+
+  describe("the one mover", () => {
+    const trip = [stopAt("Minneapolis", 44.88, -93.22), stopAt("Denver", 39.86, -104.67, "flight"), stopAt("Salt Lake City", 40.79, -111.98, "flight", "stay"), stopAt("Park City", 40.65, -111.5, null, "stay"), stopAt("Minneapolis", 44.88, -93.22, "flight")];
+    const frame = (progress: number, calm = false) => ({ progress, playing: true, calm });
+    const kinds = () => moversOnMap().map((a) => a.factory().getAttribute("data-vehicle"));
+
+    it("is never more than one on the map as the replay passes leg after leg", () => {
+      const { replay } = start({ stops: trip, roads: none });
+      const seen = new Set<string | null>();
+      for (let progress = 0; progress <= 1.0001; progress += 0.01) {
+        replay.update(frame(Math.min(1, progress)));
+        expect(moversOnMap().length).toBeLessThanOrEqual(1);
+        for (const v of kinds()) seen.add(v);
+      }
+      expect(seen.size).toBeGreaterThan(1);
+    });
+
+    it("is replaced, not left behind, when the next leg starts", () => {
+      const { replay } = start({ stops: trip, roads: none });
+      replay.update(frame(0.1));
+      const [first] = moversOnMap();
+      expect(first.factory().getAttribute("data-mover")).toBe("0");
+      replay.update(frame(0.4));
+      expect(fake.last().annotations.has(first)).toBe(false);
+      expect(moversOnMap()).toHaveLength(1);
+      expect(moversOnMap()[0].factory().getAttribute("data-mover")).toBe("1");
+    });
+
+    it("is gone while paused at a stop, at the end, and when scrubbing back", () => {
+      const { replay } = start({ stops: trip, roads: none });
+      replay.update(frame(0.1));
+      expect(moversOnMap()).toHaveLength(1);
+      replay.update({ progress: 0.5, playing: false, calm: false });
+      expect(moversOnMap()).toHaveLength(0);
+      replay.update(frame(0.62));
+      expect(moversOnMap()).toHaveLength(1);
+      replay.update({ progress: 1, playing: false, calm: false });
+      expect(moversOnMap()).toHaveLength(0);
+      replay.update(frame(0.6));
+      expect(moversOnMap()).toHaveLength(1);
+      replay.update({ progress: 0, playing: false, calm: false });
+      expect(moversOnMap()).toHaveLength(0);
+    });
+
+    it("is not on the map at all in calm mode, even if it was moving a moment before", () => {
+      const { replay } = start({ stops: trip, roads: none });
+      replay.update(frame(0.1));
+      expect(moversOnMap()).toHaveLength(1);
+      replay.update(frame(0.1, true));
+      expect(moversOnMap()).toHaveLength(0);
+      replay.update(frame(0.6, true));
+      expect(moversOnMap()).toHaveLength(0);
+    });
+
+    it("is taken off the map when the replay is destroyed", () => {
+      const { replay } = start({ stops: trip, roads: none });
+      replay.update(frame(0.1));
+      replay.destroy();
+      expect(fake.last().annotations.size).toBe(0);
+    });
+  });
+
+  it("puts a stop on the map when it is reached and takes it off when scrubbed back before it", () => {
+    const { replay } = start();
+    replay.update({ progress: 1, playing: false, calm: false });
+    expect(visibleStops()).toHaveLength(3);
+    replay.update({ progress: 0.1, playing: false, calm: false });
+    expect(visibleStops()).toEqual(["Minneapolis"]);
   });
 
   it("moves a car and a boat as the flat map does", () => {
