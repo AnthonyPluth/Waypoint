@@ -129,3 +129,14 @@ The owner asked, on issue #630 (https://github.com/AnthonyPluth/Waypoint/issues/
 - **CSP.** Not widened. Directions go to Apple's MapKit API hosts under `apple-mapkit.com`, which `connect-src https://*.apple-mapkit.com` already covers (assumed: nothing was run against Apple).
 - **Allowance.** Each drive is one service call of the 25,000 a day (section 3).
 - **Assumptions, not verified:** that `response.routes[0].path` is an array of arrays of coordinates, as read from memory of Apple's documentation; that the directions host is under `apple-mapkit.com`; and Apple's distance limit for a single route (a very long drive may be refused and then keeps the bundled line).
+
+Reading the answer is tolerant (`parseRoute` in `frontend/src/lib/driving-routes.ts`): `routes[0].path` as an array of arrays of `{latitude, longitude}` coordinates, as a flat array of them, or, when `path` is absent or empty, the `steps[].path` of the route joined in order. Anything else, or fewer than two coordinates, is no route and keeps the bundled line. The two stand-ins (`frontend/src/test/fake-mapkit.ts`, `frontend/verify/fake-mapkit.js`) produce these shapes, so they do not all rest on the one assumption.
+
+### Verify with a real key (not done; the one thing left to confirm by hand)
+
+1. Run Waypoint with the three `WAYPOINT_MAPKIT_` values and `WAYPOINT_PUBLIC_URL` set, open a finished trip with a drive in it, and open the browser's network panel with the Content-Security-Policy console messages visible.
+2. Play the replay. Each drive should make one request to a host under `apple-mapkit.com` (note the host and path). It must match the `connect-src https://*.apple-mapkit.com` entry: no "Refused to connect" message in the console. If the host is outside that pattern, record it here and widen the policy by that exact host and no more.
+3. Open the response and note its shape: `routes[0].path` (array of arrays of coordinates), a flat `path`, or only `steps[].path`. Record which; if it is none of these, the replay keeps the bundled line and `parseRoute` needs the real shape.
+4. In the replay, a drive that follows roads turns with the highway and the streets (the line bends along the base map's roads and the car stays on it) where the bundled line is a smooth arc or a straight snap to an interstate. Check one drive from or to Home, and one very long drive; if Apple refuses a long route the leg keeps the old line, so note the distance at which that happens.
+5. Block `apple-mapkit.com` directions requests (the network panel's request blocking) and replay: the drives must keep today's line, with no error banner.
+6. Record the date, what was seen at each step, and any host or shape that differed, in this section.

@@ -19,7 +19,7 @@ export class FakeMap {
   destroy() { this.destroyed = true; }
 }
 
-export type DirectionsMode = "ok" | "error" | "empty" | "hang" | "throw";
+export type DirectionsMode = "ok" | "flat" | "steps" | "error" | "empty" | "hang" | "throw" | "malformed" | "nan" | "short" | "mixed";
 export type DirectionsCall = { origin: MkCoordinate; destination: MkCoordinate; transportType: unknown };
 
 export const windingPath = (from: MkCoordinate, to: MkCoordinate, steps = 12): MkCoordinate[][] => {
@@ -68,7 +68,7 @@ export const fakeMk: Mk = {
   Style: class { constructor(readonly options: Record<string, unknown>) {} } as unknown as Mk["Style"],
   Directions: Object.assign(
     class {
-      route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: { path?: MkCoordinate[][] }[] } | null) => void): number {
+      route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: { path?: unknown; steps?: { path?: unknown }[] }[] } | null) => void): number {
         const { mode } = fake.directions;
         if (mode === "throw") throw new Error("Directions failed");
         fake.directions.calls.push({ origin: request.origin, destination: request.destination, transportType: request.transportType });
@@ -77,6 +77,12 @@ export const fakeMk: Mk = {
         setTimeout(() => {
           if (mode === "error") callback(new Error("Directions error"), null);
           else if (mode === "empty") callback(null, { routes: [] });
+          else if (mode === "flat") callback(null, { routes: [{ path: windingPath(request.origin, request.destination).flat() }] });
+          else if (mode === "steps") callback(null, { routes: [{ path: [], steps: windingPath(request.origin, request.destination).map((path) => ({ path })) }] });
+          else if (mode === "malformed") callback(null, { routes: [{ path: "not a path" }] });
+          else if (mode === "nan") callback(null, { routes: [{ path: [[{ latitude: Number.NaN, longitude: 1 }, { latitude: 2, longitude: 3 }]] }] });
+          else if (mode === "short") callback(null, { routes: [{ path: [[request.origin]] }] });
+          else if (mode === "mixed") callback(null, { routes: [{ path: [[request.origin, [1, 2], request.destination]] }] });
           else callback(null, { routes: [{ path: windingPath(request.origin, request.destination) }] });
         }, 0);
         return id;

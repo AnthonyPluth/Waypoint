@@ -2,7 +2,7 @@
   const WORLD = 1;
   const SVG = "http://www.w3.org/2000/svg";
   const listeners = {};
-  const state = { tokens: [], maps: [], directions: [] };
+  const state = { tokens: [], maps: [], directions: [], shape: "nested" };
   const toPoint = (c) => ({ x: ((c.longitude + 180) / 360) * WORLD, y: (0.5 - Math.log(Math.tan(Math.PI / 4 + (Math.max(-85, Math.min(85, c.latitude)) * Math.PI) / 360)) / (2 * Math.PI)) * WORLD });
 
   class Coordinate { constructor(latitude, longitude) { this.latitude = latitude; this.longitude = longitude; } }
@@ -101,7 +101,9 @@
         part.push(new Coordinate(a.latitude + (b.latitude - a.latitude) * t + wave, a.longitude + (b.longitude - a.longitude) * t - wave));
       }
       state.directions.push({ origin: a, destination: b, transportType: request.transportType });
-      setTimeout(() => callback(null, { routes: [{ path: [part.slice(0, 7), part.slice(7)] }] }), 0);
+      const parts = [part.slice(0, 7), part.slice(7)];
+      const route = state.shape === "flat" ? { path: part } : state.shape === "steps" ? { steps: parts.map((path) => ({ path })) } : { path: parts };
+      setTimeout(() => callback(null, { routes: [route] }), 0);
       return state.directions.length;
     }
     cancel() {}

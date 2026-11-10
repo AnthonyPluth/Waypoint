@@ -11,7 +11,7 @@ export type MkMap = {
   setVisibleMapRectAnimated(rect: object, animate: boolean): void;
   destroy(): void;
 };
-export type MkRoute = { path?: MkCoordinate[][] };
+export type MkRoute = { path?: unknown; steps?: { path?: unknown }[] };
 export type MkDirectionsRequest = { origin: MkCoordinate; destination: MkCoordinate; transportType: unknown };
 export type MkDirections = {
   route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: MkRoute[] } | null) => void): number;
