@@ -129,6 +129,7 @@ class Replies(DbCase):
         self.test_flight_status()
         self.test_loyalty()
         self.test_reminders()
+        self.test_mapkit()
         self.test_mcp_settings()
         self.test_assistant()
         self.test_photos()
@@ -352,6 +353,21 @@ class Replies(DbCase):
             self.check("POST /api/reminders/app/devices", phone)
             self.check("GET /api/reminders/app", reminders_api.api_app_push(self.c, {}, {}))
             self.check("DELETE /api/reminders/app/devices/{id}", reminders_api.api_app_device_remove(self.c, {}, {}, str(phone["id"])))
+
+    def test_mapkit(self):
+        from waypoint.server.api import mapkit as mapkit_api
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        key_path = os.path.join(folder.name, "AuthKey.p8")
+        with open(key_path, "wb") as f:
+            f.write(ec.generate_private_key(ec.SECP256R1()).private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+        env = {"WAYPOINT_MAPKIT_KEY_FILE": key_path, "WAYPOINT_MAPKIT_KEY_ID": "ABC123DEFG", "WAYPOINT_MAPKIT_TEAM_ID": "TEAM123456", "WAYPOINT_PUBLIC_URL": "https://waypoint.example.test"}
+        with mock.patch.dict(os.environ, env):
+            self.check("GET /api/mapkit/token", mapkit_api.api_mapkit_token(self.c, {}, {}))
+            self.assertTrue(mapkit_api.api_mapkit_token(self.c, {}, {})["enabled"])
+        with mock.patch.dict(os.environ, {"WAYPOINT_MAPKIT_ENABLED": "off"}):
+            self.assertEqual(mapkit_api.api_mapkit_token(self.c, {}, {}), {"enabled": False})
 
     def test_mcp_settings(self):
         _current.host = "localhost:8765"
@@ -584,7 +600,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/loyalty/{id}/reveal",
                                      "GET /api/reminders", "POST /api/reminders", "POST /api/reminders/devices",
                                      "DELETE /api/reminders/devices/{id}", "POST /api/feed", "DELETE /api/feed",
-                                     "GET /api/reminders/app", "POST /api/reminders/app/devices", "DELETE /api/reminders/app/devices/{id}",
+                                     "GET /api/reminders/app", "POST /api/reminders/app/devices", "DELETE /api/reminders/app/devices/{id}", "GET /api/mapkit/token",
                                      "GET /api/mcp-settings", "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail",
                                      "DELETE /api/mcp-settings/connections/{id}",
                                      "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",

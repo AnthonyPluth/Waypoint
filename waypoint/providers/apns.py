@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import threading
 import time
@@ -8,11 +7,10 @@ import time
 from dataclasses import dataclass
 
 
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 
-from .. import tls
+from .. import es256, tls
 
 HOSTS = {"production": "https://api.push.apple.com", "sandbox": "https://api.sandbox.push.apple.com"}
 BODY = json.dumps({"aps": {"alert": {"title": "Waypoint", "body": "Open Waypoint to see an update."}, "sound": "default"}}).encode()
@@ -36,10 +34,6 @@ class Credentials:
     topic: str
 
 
-def _b64(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
 def provider_token(creds: Credentials, now: float) -> str:
     with _lock:
         cached = _issued.get((creds.key_id, creds.team_id))
@@ -48,10 +42,7 @@ def provider_token(creds: Credentials, now: float) -> str:
         key = serialization.load_pem_private_key(creds.key_pem, password=None)
         if not isinstance(key, ec.EllipticCurvePrivateKey):
             raise ValueError("the APNs key isn't an elliptic-curve key")
-        head = _b64(json.dumps({"alg": "ES256", "kid": creds.key_id}, separators=(",", ":")).encode())
-        claims = _b64(json.dumps({"iss": creds.team_id, "iat": int(now)}, separators=(",", ":")).encode())
-        r, s = decode_dss_signature(key.sign(f"{head}.{claims}".encode(), ec.ECDSA(hashes.SHA256())))
-        token = f"{head}.{claims}.{_b64(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+        token = es256.sign_jwt(key, {"alg": "ES256", "kid": creds.key_id}, {"iss": creds.team_id, "iat": int(now)})
         _issued[(creds.key_id, creds.team_id)] = (token, now)
         return token
 

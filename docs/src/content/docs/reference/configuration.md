@@ -26,6 +26,10 @@ Anything that belongs to the app, such as Gmail, AI suggestions, distances and b
 | `WAYPOINT_APNS_KEY_ID` | | The ten-character id of that key. |
 | `WAYPOINT_APNS_TEAM_ID` | | Your Apple developer team id (ten characters). |
 | `WAYPOINT_APNS_TOPIC` | | The iPhone app’s bundle id. |
+| `WAYPOINT_MAPKIT_KEY_FILE` | | Path to a MapKit JS key from your Apple developer account (an `AuthKey_….p8` file, with a Maps ID and MapKit JS enabled). With the next two and `WAYPOINT_PUBLIC_URL`, the route replay is drawn on Apple’s map instead of the bundled one; see [Apple’s map for the route replay](/Waypoint/start/trips/#apples-map-for-the-route-replay). |
+| `WAYPOINT_MAPKIT_KEY_ID` | | The ten-character id of that key. |
+| `WAYPOINT_MAPKIT_TEAM_ID` | | Your Apple developer team id (ten characters). |
+| `WAYPOINT_MAPKIT_ENABLED` | on | Apple’s map is on by default but does nothing until the three `WAYPOINT_MAPKIT_` values above are set, so a Waypoint without a key loads nothing from and sends nothing to Apple. With a key, Apple’s unpinned script runs in the page. Set it to `off` (or `0`, `false` or `no`) to keep the bundled map even when a key is set. |
 | `WAYPOINT_ALLOW_INSECURE_HTTP` | | `1` allows an `http://` `WAYPOINT_PUBLIC_URL` on an internet address. Don’t. |
 | `WAYPOINT_ALLOW_NO_AUTH` | `1` in Compose | Allows the container to listen without sign-in; Compose publishes it on localhost only. Also usable behind a proxy that handles sign-in. OIDC takes precedence when configured. |
 | `DATABASE_URL` | | `postgresql://user:password@host:5432/db` to use Postgres instead of the built-in SQLite file. |

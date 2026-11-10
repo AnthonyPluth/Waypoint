@@ -1,14 +1,18 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
+  import RouteReplayMapKit from "$lib/components/RouteReplayMapKit.svelte";
   import { Button } from "$lib/components/ui/button";
   import { landFor } from "$lib/land.svelte";
+  import type { Maps } from "$lib/mapkit";
   import { viewport } from "$lib/phone.svelte";
   import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null } = $props();
+  let fellBack = $state(false);
+  const onMapkit = $derived(maps !== null && !fellBack);
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -112,6 +116,9 @@
 
 <div class="space-y-3">
   <div class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
+    {#if onMapkit && maps}
+      <RouteReplayMapKit {maps} {stops} {roads} {boundaries} {width} {height} {progress} {playing} {calm} onfailure={() => { fellBack = true; }} />
+    {:else}
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label="Map of the route, stop by stop; the stops are listed below" class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
       <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
@@ -180,6 +187,7 @@
         {/each}
       </g>
     </svg>
+    {/if}
     <div aria-hidden="true" class="pointer-events-none absolute left-2 top-2 grid max-w-[11rem]">
       {#each stops as s, i (i)}
         <div class="col-start-1 row-start-1 w-max max-w-[11rem] self-start rounded-lg transition-opacity duration-500 motion-reduce:transition-none border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1"

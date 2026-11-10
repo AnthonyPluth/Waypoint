@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-Waypoint ships with five reference lists. They are the same for every Waypoint, aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine), and are never looked up from an outside service: nothing about your trips leaves the server to use them.
+Waypoint ships with five reference lists. They are the same for every Waypoint, aren’t part of a [backup](/Waypoint/start/docker/#moving-your-data-from-another-machine), and are never looked up from an outside service: nothing about your trips leaves the server to use them. If you add a MapKit key, the route replay’s base map comes from Apple, whose script then runs in the page, instead of these lists ([Apple’s map for the route replay](/Waypoint/start/trips/#apples-map-for-the-route-replay)); the lists themselves still never leave your server.
 
 ## Airports
 

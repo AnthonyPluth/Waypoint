@@ -355,6 +355,31 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow trip-route-replay-backtrack`; or `poetry run python run.py verify --flow trip-route-replay-backtrack`.
 
+#### `trip-route-replay-mapkit-blocked`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Orlando`, `Position along the route`.
+- **Expects to see:** `Trips`.
+- **Console errors it expects:** `net::ERR_BLOCKED_BY_CLIENT`.
+- **Drive it:** `tools/control flow trip-route-replay-mapkit-blocked`; or `poetry run python run.py verify --flow trip-route-replay-mapkit-blocked`.
+
+#### `trip-route-replay-mapkit-fallback`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Orlando`, `Position along the route`.
+- **Expects to see:** `Trips`, `Orlando`.
+- **Drive it:** `tools/control flow trip-route-replay-mapkit-fallback`; or `poetry run python run.py verify --flow trip-route-replay-mapkit-fallback`.
+
+#### `trip-route-replay-mapkit`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Orlando`, `Position along the route`.
+- **Expects to see:** `Trips`, `Orlando`, `New York`.
+- **Drive it:** `tools/control flow trip-route-replay-mapkit`; or `poetry run python run.py verify --flow trip-route-replay-mapkit`.
+
 #### `trip-route-replay`
 
 - **Starts at:** `#trips`.
@@ -370,6 +395,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Show 20`, `San Francisco`, `Position along the route`.
 - **Expects to see:** `Trips`, `State line`.
 - **Drive it:** `tools/control flow trip-state-lines-flight`; or `poetry run python run.py verify --flow trip-state-lines-flight`.
+
+#### `trip-state-lines-mapkit`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Denver`, `Position along the route`.
+- **Expects to see:** `Trips`, `State line`.
+- **Drive it:** `tools/control flow trip-state-lines-mapkit`; or `poetry run python run.py verify --flow trip-state-lines-mapkit`.
 
 #### `trip-state-lines`
 
