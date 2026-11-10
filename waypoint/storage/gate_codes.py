@@ -93,12 +93,15 @@ def is_parking(conn: db.Connection, segment_id: int) -> bool:
     return conn.execute(select(Segment.kind).where(Segment.id == segment_id)).scalar() == KIND
 
 
-def _set(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image | None, day: str | None, now: float) -> None:
+def _set(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image | None, day: str | None, now: float,
+         opener: int | None = None) -> None:
     db.upsert(conn, SegmentCode, {"segment_id": segment_id, "mailbox_id": mailbox_id, "content": _sealed(image) if image else None,
-                                  "day": day, "created": now}, key=["segment_id"], update=["mailbox_id", "content", "day", "created"])
+                                  "day": day, "created": now, "opened_by": opener if image is None else None},
+              key=["segment_id"], update=["mailbox_id", "content", "day", "created", "opened_by"])
 
 
-def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequence[Image], day: str | None, now: float) -> bool:
+def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequence[Image], day: str | None, now: float,
+          opener: int | None = None) -> bool:
     if not is_parking(conn, segment_id):
         return False
     fits = qualifying(images)
@@ -107,8 +110,11 @@ def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequenc
     held = conn.execute(select(SegmentCode.content, SegmentCode.day).where(SegmentCode.segment_id == segment_id)).fetchone()
     if len(fits) > 1:
         if held is None:
-            _set(conn, segment_id, mailbox_id, None, day, now)
+            _set(conn, segment_id, mailbox_id, None, day, now, opener)
             return True
+        if held["content"] is None and day is not None and (held["day"] is None or day > held["day"]):
+            return int(conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None))
+                                    .values(opened_by=opener)).rowcount) == 1
         return False
     if held is not None and held["content"] is not None and not _replaces(day, held["day"]):
         return False
@@ -124,7 +130,8 @@ def offer_stored(conn: db.Connection, segment_id: int, stored_message_id: int) -
     if row is None or found is None:
         return False
     received = found.get("received")
-    return offer(conn, segment_id, int(row["mailbox_id"]), _images(found.get("images")), received if isinstance(received, str) else None, float(row["created"]))
+    return offer(conn, segment_id, int(row["mailbox_id"]), _images(found.get("images")), received if isinstance(received, str) else None,
+                 float(row["created"]), stored_message_id)
 
 
 def _emails_of(conn: db.Connection, segment_id: int) -> list[tuple[int, dict[str, Any]]]:
@@ -199,9 +206,11 @@ def keep_candidate(conn: db.Connection, segment_id: int, picked: Candidate, now:
     return bool(same) and keep_chosen(conn, segment_id, same[0].mailbox_id, same[0].image, same[0].day, now)
 
 
-def opens_choice(conn: db.Connection, segment_id: int, day: str | None) -> bool:
-    permits = SegmentCode.day.is_(None) if day is None else or_(SegmentCode.day.is_(None), SegmentCode.day <= day)
-    return conn.execute(select(SegmentCode.segment_id).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None), permits,
+def opens_choice(conn: db.Connection, segment_id: int, stored_message_id: int | None) -> bool:
+    if stored_message_id is None:
+        return False
+    return conn.execute(select(SegmentCode.segment_id).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
+                                                              SegmentCode.opened_by == stored_message_id,
                                                               exists().where(Segment.id == SegmentCode.segment_id, Segment.kind == KIND))).fetchone() is not None
 
 

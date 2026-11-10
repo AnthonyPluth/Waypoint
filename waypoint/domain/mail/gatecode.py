@@ -64,7 +64,7 @@ def _settle(segment_id: int, mailbox_id: int, message_id: str, now: float, timeo
     with db.session() as conn:
         stored = gate_codes.stored_id(conn, mailbox_id, message_id)
         found = [] if stored is None else gate_codes.candidates(conn, segment_id, stored)
-        opens = bool(found) and gate_codes.opens_choice(conn, segment_id, found[0].day)
+        opens = gate_codes.opens_choice(conn, segment_id, stored)
     if len(found) < 2 or not opens:
         return False
     picked = ai.pick_picture(cfg, [c.image["data"] for c in found], timeout)
@@ -80,9 +80,6 @@ def _settle_pictures(segment_id: int, mailbox_id: int, pictures: Sequence[Image]
     cfg = _config(segment_id)
     if cfg is None:
         return False
-    with db.session() as conn:
-        if not gate_codes.opens_choice(conn, segment_id, day):
-            return False
     picked = ai.pick_picture(cfg, [image["data"] for image in pictures], timeout)
     if picked is None:
         return False

@@ -337,6 +337,7 @@ segment_codes = Table(
     Column('content', Text, doc="the picture of a parking booking's gate code (its type and bytes, JSON), encrypted (waypoint/storage/secretbox.py); empty while several pictures qualify and none is chosen"),
     Column('day', Text, doc='the day of the email the picture came from'),
     Column('created', Float, nullable=False),
+    Column('opened_by', Integer, refers('segment_codes', 'opened_by', 'stored_messages.id', 'SET NULL'), doc='the stored message that opened, or last reopened, the choice between several pictures: the only message whose pictures may go to the local AI to pick one; empty once a picture is chosen, when that message is deleted and for a choice opened before this was kept'),
     info={'doc': "the gate code's picture kept with a parking booking (waypoint/storage/gate_codes.py); deleted with the booking and with the mailbox it came from; never read, only shown"},
 )
 

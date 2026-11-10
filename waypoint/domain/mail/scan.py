@@ -223,9 +223,9 @@ def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float,
             return
     content, images = extract.keep(raw, mailimages.Fetcher())
     with db.session() as conn:
-        gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
+        opened = gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
     left = _time_left(started)
-    if left is None or left >= MIN_SETTLE:
+    if opened and (left is None or left >= MIN_SETTLE):
         gatecode.settle_pictures(segment_id, mailbox_id, [images[n] for n in gate_codes.qualifying(images)], content["received"], now, left)
 
 

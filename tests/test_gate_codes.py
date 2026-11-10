@@ -651,8 +651,6 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.fake.reset()
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
-        self.assertEqual(self.fake.requests, [])
-        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, "2026-10-16", NOW))
         self.assertEqual(len(self.fake.requests), 1)
 
     def test_an_older_reminder_settled_by_the_ai_never_replaces_a_newer_choice_still_waiting(self):
@@ -857,14 +855,14 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.turn_on(auto=False)
         self.fake.content = '{"picture": 2}'
 
-    def fresh(self, held=None, suggestions=None, reason="no_markup") -> int:
+    def fresh(self, held=None, suggestions=None, reason="no_markup", raw=None) -> int:
         def reset(conn):
             for table in (ReviewItem, SegmentCode, SegmentMessage, StoredMessage):
                 conn.execute(table.__table__.delete())
         self.read(reset)
         self.fake.reset()
         self.fake.content = '{"picture": 2}'
-        scan.keep_message(self.mailbox, "m-r", self.TWO, [], NOW)
+        scan.keep_message(self.mailbox, "m-r", raw or self.TWO, [], NOW)
 
         def hold(conn):
             review.add(conn, self.mailbox, "m-r", "mail.exampleparking.example", "2026-10-16", "match" if held else reason, NOW, held=held)
@@ -1057,3 +1055,50 @@ class ReviewPathTests(ScanAiCase, Kept):
         thread.join(10)
         self.assertEqual((first.segments, outcome), ((self.segment,), [None]))
         self.assertEqual(self.read(lambda conn: stored_mail.message_ids(conn, [other])), {})
+
+    def two(self, **more) -> dict:
+        return raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR}, text=f"Reservation PK30417. {CANARY_TEXT}", **more)
+
+    def test_only_the_message_that_opened_the_choice_is_sent_however_the_dates_compare(self):
+        undated = self.two(day="")
+        cases = (("equal day", "Fri, 16 Oct 2026 09:00:00 +0100", self.two(), 0),
+                 ("older day", "Mon, 19 Oct 2026 09:00:00 +0100", self.two(), 0),
+                 ("no day on the item", "Fri, 16 Oct 2026 09:00:00 +0100", undated, 0),
+                 ("no day on either", "", undated, 0),
+                 ("a newer day reopens the choice", "Wed, 14 Oct 2026 09:00:00 +0100", self.two(), 1))
+        for label, opener_day, raw, sent in cases:
+            for name, setup, run in ((n, s, r) for n, (s, r) in self.paths().items()):
+                with self.subTest(case=label, path=name):
+                    item = self.fresh(raw=raw, **setup)
+                    scan.keep_message(self.mailbox, "m-open", self.two(day=opener_day), [self.segment], NOW - 1)
+                    self.fake.reset()
+                    self.fake.content = '{"picture": 2}'
+                    with no_leaks(self, *CANARIES, database=self.path, sent_ok=bool(sent)):
+                        run(item)
+                    self.assertEqual(len(self.fake.requests), sent)
+
+    def test_the_message_that_opened_the_choice_gets_its_pick_by_a_review_action(self):
+        for name, setup, run in ((n, s, r) for n, (s, r) in self.paths().items()):
+            with self.subTest(path=name):
+                item = self.fresh(**setup)
+                run(item)
+                self.assertEqual(len(self.fake.requests), 1)
+
+    def test_a_choice_opened_before_the_opener_was_kept_sends_nothing_for_any_message(self):
+        item = self.fresh(held=[(self.SUGGESTION, [self.segment])])
+        scan.keep_message(self.mailbox, "m-open", self.two(), [self.segment], NOW - 1)
+        self.read(lambda conn: conn.execute(SegmentCode.__table__.update().values(opened_by=None)))
+        self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, item)
+        self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")))
+
+    def test_a_follow_up_with_the_same_day_does_not_reopen_the_choice_and_a_newer_one_does(self):
+        self.turn_on(auto=False)
+        scan.keep_message(self.mailbox, "m-open", self.two(), [self.segment], NOW)
+        self.fake.reset()
+        scan.keep_code(self.mailbox, self.segment, self.two(), NOW + 1)
+        self.assertEqual(self.fake.requests, [])
+        scan._keep_quietly(self.mailbox, "m-same", self.two(), [self.segment], NOW + 2)
+        self.assertEqual(self.fake.requests, [])
+        self.fake.content = '{"picture": 1}'
+        scan.keep_code(self.mailbox, self.segment, self.two(day="Mon, 19 Oct 2026 09:00:00 +0100"), NOW + 3)
+        self.assertEqual(len(self.fake.requests), 1)

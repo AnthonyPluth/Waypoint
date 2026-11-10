@@ -284,6 +284,7 @@ class SegmentCode(Base):
     content: Mapped[str | None]
     day: Mapped[str | None]
     created: Mapped[float]
+    opened_by: Mapped[int | None]
 
 
 class IgnoredSender(Base):
