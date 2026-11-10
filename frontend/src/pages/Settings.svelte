@@ -12,6 +12,7 @@
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
+  import { clearRouteCache } from "$lib/driving-routes";
   import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
@@ -54,6 +55,7 @@
   const group = $derived<(typeof GROUPS)[number] | undefined>(GROUPS.find((g) => g.id === sub) ?? GROUPS.find((g) => g.id === landing));
 
   const signOut = () => act(async () => {
+    clearRouteCache();
     await clearSaved();
     const r = await api<{ redirect: string }>("/auth/logout", { method: "POST" });
     location.href = r.redirect;

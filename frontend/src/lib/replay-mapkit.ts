@@ -1,4 +1,5 @@
 import { geoMercator, type GeoProjection } from "d3-geo";
+import { drivingRoute } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
   activeStop, boundariesShown, cameraAt, inView, legProgress, legsOf, moverAt, positions, reached, roadsShown, routeProjection, shieldsOf,
@@ -148,6 +149,8 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   const legs = legsOf(stops, projection, roads);
   const spots = positions(stops, projection);
   const paths = legs.map(legPath);
+  let lastFrame: Frame | null = null;
+  let over = false;
   const interstates = linesOf(roads.interstates, projection);
   const states = linesOf(boundaries, projection);
   const full: Box = { x: 0, y: 0, w: width, h: height };
@@ -168,6 +171,7 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
 
   const ends: (() => void)[] = [];
   const release = () => {
+    over = true;
     mk.removeEventListener("error", watch);
     for (const end of ends) { try { end(); } catch { continue; } }
     try { map?.destroy(); } catch { map = null; }
@@ -276,8 +280,34 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     }
   };
 
+  const adopt = (index: number, route: number[][]) => {
+    if (over) return;
+    const points: Spot[] = [spots[index]];
+    for (const [la, lo] of route) {
+      const at = projection([lo, la]);
+      if (at) points.push({ x: at[0], y: at[1] });
+    }
+    points.push(spots[index + 1]);
+    if (points.length < 4) return;
+    const track = pathOf(points);
+    legs[index].road = track;
+    paths[index] = track;
+    const mark = legMarks.get(index);
+    if (mark) mark.done = -1;
+    if (lastFrame) {
+      try { draw(lastFrame); } catch { onFailure(); }
+    }
+  };
+  legs.forEach((leg, i) => {
+    if (leg.vehicle !== "car" || stops[i + 1].via !== null) return;
+    const [a, b] = [stops[i], stops[i + 1]];
+    if (a.latitude === b.latitude && a.longitude === b.longitude) return;
+    void drivingRoute(mk, a, b).then((route) => { if (route) adopt(i, route); });
+  });
+
   return {
     update(frame) {
+      lastFrame = frame;
       try { draw(frame); } catch { onFailure(); }
     },
     destroy: release,

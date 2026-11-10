@@ -2,7 +2,7 @@
   const WORLD = 1;
   const SVG = "http://www.w3.org/2000/svg";
   const listeners = {};
-  const state = { tokens: [], maps: [] };
+  const state = { tokens: [], maps: [], directions: [], shape: "nested" };
   const toPoint = (c) => ({ x: ((c.longitude + 180) / 360) * WORLD, y: (0.5 - Math.log(Math.tan(Math.PI / 4 + (Math.max(-85, Math.min(85, c.latitude)) * Math.PI) / 360)) / (2 * Math.PI)) * WORLD });
 
   class Coordinate { constructor(latitude, longitude) { this.latitude = latitude; this.longitude = longitude; } }
@@ -91,8 +91,27 @@
     }
   }
 
+  class Directions {
+    route(request, callback) {
+      const a = request.origin, b = request.destination;
+      const part = [];
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
+        const wave = Math.sin(t * Math.PI * 3) * 0.05 * Math.min(1, Math.hypot(b.latitude - a.latitude, b.longitude - a.longitude));
+        part.push(new Coordinate(a.latitude + (b.latitude - a.latitude) * t + wave, a.longitude + (b.longitude - a.longitude) * t - wave));
+      }
+      state.directions.push({ origin: a, destination: b, transportType: request.transportType });
+      const parts = [part.slice(0, 7), part.slice(7)];
+      const route = state.shape === "flat" ? { path: part } : state.shape === "steps" ? { steps: parts.map((path) => ({ path })) } : { path: parts };
+      setTimeout(() => callback(null, { routes: [route] }), 0);
+      return state.directions.length;
+    }
+    cancel() {}
+  }
+  Directions.Transport = { Automobile: "automobile", Walking: "walking" };
+
   window.mapkit = {
-    Coordinate, MapRect, Style, Annotation, PolylineOverlay,
+    Coordinate, Directions, MapRect, Style, Annotation, PolylineOverlay,
     Map: Object.assign(MapView, { ColorSchemes: { Dark: "dark", Light: "light" } }),
     FeatureVisibility: { Hidden: "hidden", Visible: "visible", Adaptive: "adaptive" },
     init(options) { options.authorizationCallback((token) => state.tokens.push(token)); },

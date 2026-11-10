@@ -1,3 +1,4 @@
+import { clearRouteCache } from "./driving-routes";
 import { onDenied } from "./api";
 import { clearSaved, dropExpired, resumeSaving, saveCurrentTrip, savedInfos, stopSaving, watchExpiry, whenExpired } from "./offline";
 import { isSavingOff, isSetUp, remove, setUp, support, VaultError } from "./offline-vault";
@@ -60,7 +61,7 @@ function forgetCopy(): void {
 whenExpired(() => { void refreshOffline(); });
 
 export function clearOnDenied(): void {
-  onDenied(async () => { await clearSaved(); forgetCopy(); });
+  onDenied(async () => { clearRouteCache(); await clearSaved(); forgetCopy(); });
 }
 
 export async function turnOnOffline(): Promise<VaultError | null> {

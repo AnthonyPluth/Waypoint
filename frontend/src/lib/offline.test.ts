@@ -5,6 +5,8 @@ vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 
 import { apiCall } from "./contract";
 import { api } from "./api";
+import { clearRouteCache, drivingRoute } from "./driving-routes";
+import { fake, fakeMk } from "../test/fake-mapkit";
 import { ignoreFailure } from "./act";
 import { ago, clearSaved, expiryOf, isSavedCopy, savedList } from "./offline";
 import { clearOnDenied, offline, refreshOffline, switchSaving, syncSavedTrip } from "./offline.svelte";
@@ -149,6 +151,28 @@ describe("clearing", () => {
       await api("/api/trips").catch(ignoreFailure);
       expect(await hasSavedTrip()).toBe(false);
       expect(offline.hasCopy).toBe(false);
+    });
+  }
+
+  for (const status of [401, 403]) {
+    it(`forgets the drive routes it holds when a request answers ${status}`, async () => {
+      fake.reset();
+      clearRouteCache();
+      clearOnDenied();
+      const from = { latitude: 39.74, longitude: -104.99 }, to = { latitude: 40.76, longitude: -111.89 };
+      const ask = async () => {
+        const route = drivingRoute(fakeMk, from, to);
+        await vi.advanceTimersByTimeAsync(10);
+        return route;
+      };
+      expect(await ask()).not.toBeNull();
+      await ask();
+      expect(fake.directions.calls).toHaveLength(1);
+      vi.stubGlobal("fetch", vi.fn(() => reply(status)));
+      vi.stubGlobal("location", { href: "", pathname: "/", hash: "" });
+      await api("/api/trips").catch(ignoreFailure);
+      await ask();
+      expect(fake.directions.calls).toHaveLength(2);
     });
   }
 

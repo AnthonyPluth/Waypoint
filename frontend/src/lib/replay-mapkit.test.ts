@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fake, fakeMk, type FakeOverlay } from "../test/fake-mapkit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fake, fakeMk, windingPath, type DirectionsMode, type FakeOverlay } from "../test/fake-mapkit";
+import { clearRouteCache, ROUTE_TIMEOUT_MS } from "./driving-routes";
 import { cutAt, createReplayMap, DEFAULT_PALETTE, legPath, mapPoint, mapRectFor, MAX_LATITUDE, mercatorFor, SAMPLES, WORLD, type ReplayMap, type ReplayMapOptions } from "./replay-mapkit";
 import { geoMercator } from "d3-geo";
 import { legsOf, positions, type Roads, type Stop } from "./route-replay";
@@ -29,7 +30,7 @@ const visibleStops = () => annotations().filter((a) => a.factory().hasAttribute(
 const overlays = () => [...fake.last().overlays] as FakeOverlay[];
 const colorOf = (o: FakeOverlay) => o.options.style!.options.strokeColor;
 
-beforeEach(() => fake.reset());
+beforeEach(() => { fake.reset(); clearRouteCache(); });
 
 describe("the map's projection", () => {
   it("places the world's corners in MapKit's units", () => {
@@ -399,5 +400,144 @@ describe("the MapKit map", () => {
     const { replay } = start();
     fake.last().destroy = () => { throw new Error("gone"); };
     expect(() => replay.destroy()).not.toThrow();
+  });
+});
+
+describe("driving routes from Apple's directions", () => {
+  afterEach(() => { vi.useRealTimers(); });
+  const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
+  const calm = { progress: 1, playing: false, calm: true };
+  const drive = [denver, saltLake];
+  const origin = { latitude: denver.latitude, longitude: denver.longitude }, destination = { latitude: saltLake.latitude, longitude: saltLake.longitude };
+  const legLine = () => overlays().find((o) => colorOf(o) === DEFAULT_PALETTE.stay)!;
+  const here = (c: { latitude: number; longitude: number }) => ({ lat: c.latitude, lon: c.longitude });
+
+  it("asks once for each drive leg, by car, and not again on every frame", async () => {
+    const { replay } = start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], roads: none });
+    for (const progress of [0, 0.2, 0.4, 0.6, 0.8, 1]) replay.update({ progress, playing: true, calm: false });
+    await flush();
+    for (const progress of [0.1, 0.5, 0.9, 1]) replay.update({ progress, playing: true, calm: false });
+    await flush();
+    expect(fake.directions.calls).toHaveLength(2);
+    expect(fake.directions.calls.every((c) => c.transportType === "automobile")).toBe(true);
+    expect(fake.directions.calls[0].origin).toMatchObject(origin);
+    expect(fake.directions.calls[0].destination).toMatchObject(destination);
+  });
+
+  it("does not ask for flights, boats or trains", async () => {
+    start({ stops: flying });
+    start({ stops: [denver, { ...saltLake, via: "cruise" }] });
+    start({ stops: [denver, { ...saltLake, via: "train" }] });
+    await flush();
+    expect(fake.directions.calls).toHaveLength(0);
+  });
+
+  it("asks for a drive that starts or ends at Home too", async () => {
+    const home = stopAt("Home", 44.9, -93.1, null, "home");
+    start({ stops: [home, denver] });
+    start({ stops: [saltLake, stopAt("Home", 44.9, -93.1, null, "home")] });
+    await flush();
+    expect(fake.directions.calls).toHaveLength(2);
+  });
+
+  it("draws the line along the returned road, and keeps the car on it", async () => {
+    const { replay } = start({ stops: drive, roads: none });
+    replay.update({ progress: 0.5, playing: true, calm: false });
+    await flush();
+    replay.update(calm);
+    const road = windingPath(origin, destination).flat();
+    const points = legLine().points;
+    expect(points).toHaveLength(road.length + 2);
+    road.forEach((c, i) => {
+      expect(points[i + 1].latitude).toBeCloseTo(c.latitude, 4);
+      expect(points[i + 1].longitude).toBeCloseTo(c.longitude, 4);
+    });
+  });
+
+  it("redraws a leg already on screen when its road arrives, and moves the car onto it", async () => {
+    const { replay } = start({ stops: drive, roads: none });
+    replay.update({ progress: 0.5, playing: true, calm: false });
+    const line = legLine();
+    const straight = line.points.length;
+    await flush();
+    expect(legLine()).toBe(line);
+    expect(line.points.length).not.toBe(straight);
+    const car = moversOnMap()[0];
+    const tip = here(line.points.at(-1)!), at = here(car.coordinate);
+    expect(at.lat).toBeCloseTo(tip.lat, 4);
+    expect(at.lon).toBeCloseTo(tip.lon, 4);
+    const road = windingPath(origin, destination).flat();
+    expect(line.points.length).toBeLessThanOrEqual(road.length + 2);
+  });
+
+  it("takes the road over a bundled highway for the same drive", async () => {
+    const { replay } = start({ stops: drive, roads });
+    replay.update(calm);
+    expect(legLine().points).toHaveLength(roads.legs[0].points.length + 2);
+    await flush();
+    expect(legLine().points).toHaveLength(windingPath(origin, destination).flat().length + 2);
+  });
+
+  it.each<DirectionsMode>(["error", "empty", "throw"])("keeps today's line, and raises no error, when the directions call goes wrong (%s)", async (mode) => {
+    fake.directions.mode = mode;
+    const { replay, opts } = start({ stops: drive, roads: none });
+    replay.update(calm);
+    await flush();
+    expect(legLine().points).toHaveLength(SAMPLES + 1);
+    expect(opts.onFailure).not.toHaveBeenCalled();
+  });
+
+  it("gives up on a call that never answers after a few seconds, and keeps the line", async () => {
+    vi.useFakeTimers();
+    fake.directions.mode = "hang";
+    const { replay, opts } = start({ stops: drive, roads: none });
+    replay.update(calm);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(ROUTE_TIMEOUT_MS - 1);
+    expect(fake.directions.cancelled).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(2);
+    expect(fake.directions.cancelled).toHaveLength(1);
+    expect(legLine().points).toHaveLength(SAMPLES + 1);
+    expect(opts.onFailure).not.toHaveBeenCalled();
+  });
+
+  it("keeps the line when this MapKit has no directions at all", async () => {
+    const old = { ...fakeMk, Directions: undefined };
+    const opts = options({ stops: drive, roads: none });
+    const replay = createReplayMap(old, document.createElement("div"), opts);
+    replay.update(calm);
+    await flush();
+    expect(legLine().points).toHaveLength(SAMPLES + 1);
+    expect(opts.onFailure).not.toHaveBeenCalled();
+  });
+
+  it("asks Apple once for the same drive however often the replay is opened", async () => {
+    start({ stops: drive, roads: none });
+    await flush();
+    const again = start({ stops: drive, roads: none });
+    again.replay.update(calm);
+    await flush();
+    expect(fake.directions.calls).toHaveLength(1);
+    expect(legLine().points).toHaveLength(windingPath(origin, destination).flat().length + 2);
+  });
+
+  it("asks again the next time after a failure", async () => {
+    fake.directions.mode = "error";
+    start({ stops: drive, roads: none });
+    await flush();
+    fake.directions.mode = "ok";
+    start({ stops: drive, roads: none });
+    await flush();
+    expect(fake.directions.calls).toHaveLength(2);
+  });
+
+  it("ignores a road that arrives after the map is gone", async () => {
+    const { replay } = start({ stops: drive, roads: none });
+    replay.update(calm);
+    const line = legLine();
+    const before = line.points.length;
+    replay.destroy();
+    await flush();
+    expect(line.points).toHaveLength(before);
   });
 });
