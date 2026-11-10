@@ -179,6 +179,10 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       const made = stopElement(stop);
       return { annotation: new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: true }), ping: made.ping, shown: false };
     });
+    if (stopMarks.length > 0) {
+      map?.addAnnotation(stopMarks[0].annotation);
+      stopMarks[0].shown = true;
+    }
   } catch (e) {
     release();
     throw e;
