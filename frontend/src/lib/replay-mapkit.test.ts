@@ -239,7 +239,6 @@ describe("the MapKit map", () => {
   });
 
   describe("the one mover", () => {
-    // Four legs (plane, plane, car, plane), each a quarter of the route, so the legs change at 0.25, 0.5 and 0.75.
     const trip = [stopAt("Minneapolis", 44.88, -93.22), stopAt("Denver", 39.86, -104.67, "flight"), stopAt("Salt Lake City", 40.79, -111.98, "flight", "stay"), stopAt("Park City", 40.65, -111.5, null, "stay"), stopAt("Minneapolis", 44.88, -93.22, "flight")];
     const frame = (progress: number, calm = false) => ({ progress, playing: true, calm });
     const kinds = () => moversOnMap().map((a) => a.factory().getAttribute("data-vehicle"));
