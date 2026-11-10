@@ -553,6 +553,14 @@ class SourceRoutes(RouteCase):
         status, seen = self.check(made["id"], [item(n, ident=f"asset-{n}") for n in (1, 2, 3, 4)])
         self.assertEqual((status, seen["count"]), (200, 2))
 
+    def test_a_photo_pinned_to_an_only_me_trip_is_not_counted_for_a_shared_trip(self):
+        made, trip = self.paused_with_stored(("quiet", 1, "place"), ("quiet", 2, "time"), ("quiet", 3, "far"), ("quiet", 4, "place"))
+        with db.session() as conn:
+            conn.execute(update(Photo).where(Photo.source_id == made["id"], Photo.asset_id.in_(["asset-1", "asset-2", "asset-3"]))
+                         .values(decided_by="owner"))
+        status, seen = self.check(made["id"], [item(n, ident=f"asset-{n}") for n in range(1, 6)])
+        self.assertEqual((status, seen["count"], [g["trip_id"] for g in seen["grants"]]), (200, 2, [trip]))
+
     def test_a_photo_stored_for_another_library_does_not_lower_this_librarys_count(self):
         made, trip = self.paused_with_stored(("trip", 1, "place"))
         theirs = self.connect(who="ben")

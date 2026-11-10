@@ -165,7 +165,8 @@ def shown_assets(conn: db.Connection, source_id: int, trip_ids: Collection[int])
                              PhotoExclusion.trip_id == Photo.trip_id)
     rows = conn.execute(select(Photo.asset_id, Photo.trip_id, Photo.decided_by)   # nosemgrep: waypoint-photo-access -- asset ids the resume count leaves out, which domain/photosources.py shows only to those who act for the source's person
                         .join(PhotoSource, PhotoSource.id == Photo.source_id)
-                        .where(Photo.source_id == source_id, Photo.trip_id.in_(trip_ids), Photo.match.in_(ON_A_TRIP), ~removed)).fetchall()
+                        .where(Photo.source_id == source_id, Photo.trip_id.is_not(None),
+                               (Photo.trip_id.in_(trip_ids) | (Photo.decided_by == OWNER)), Photo.match.in_(ON_A_TRIP), ~removed)).fetchall()
     return {str(r[0]): (int(r[1]), r[2] == OWNER) for r in rows}
 
 
