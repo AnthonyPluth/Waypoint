@@ -122,7 +122,7 @@ Recommendation, revised: adopt for the route replay only, as built, behind the d
 
 ## 10. Driving routes (owner's decision)
 
-The owner asked for the route replay's drive legs to follow real roads, using Apple's directions for every drive leg (a car leg, `vehicle === "car"` and not a train), including legs that start or end at Home, and accepted that each drive's origin and destination coordinates go to Apple. Flights, cruises and trains are unchanged.
+The owner asked, on issue #630 (https://github.com/AnthonyPluth/Waypoint/issues/630), for the route replay's drive legs to follow real roads, using Apple's directions for every drive leg (a car leg, `vehicle === "car"` and not a train), including legs that start or end at Home, and accepted that each drive's origin and destination coordinates go to Apple. Flights, cruises and trains are unchanged.
 
 - **What is sent.** With MapKit active, the viewer's browser calls `mapkit.Directions.route` once per drive when the replay map is made (`frontend/src/lib/driving-routes.ts`; at most four at a time, six seconds each), with the drive's exact start and end coordinates and `Automobile` transport. Answers are kept in the page for its life, keyed by coordinates rounded to four decimals, so re-opening the replay does not ask again. A failed, timed-out or empty call is not kept.
 - **Failure.** MapKit without `Directions`, an error, a timeout, a throw or no route silently keeps the bundled line for that drive; no banner. The "Showing the simple map" fallback stays for MapKit itself failing.

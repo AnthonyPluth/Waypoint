@@ -17,6 +17,14 @@ const keyOf = (a: LatLon, b: LatLon): string => `${round(a.latitude)},${round(a.
 
 export const clearRouteCache = (): void => { found.clear(); pending.clear(); waiting.length = 0; running = 0; };
 
+function giveUp(directions: MkDirections | undefined, id: number): void {
+  try {
+    directions?.cancel?.(id);
+  } catch {
+    return;
+  }
+}
+
 function ask(mk: Mk, from: LatLon, to: LatLon, timeoutMs: number): Promise<RoutePath | null> {
   return new Promise((resolve) => {
     let finished = false;
@@ -29,7 +37,7 @@ function ask(mk: Mk, from: LatLon, to: LatLon, timeoutMs: number): Promise<Route
       resolve(value);
     };
     const timer = setTimeout(() => {
-      try { if (id !== undefined) directions?.cancel?.(id); } catch { id = undefined; }
+      if (id !== undefined) giveUp(directions, id);
       finish(null);
     }, timeoutMs);
     try {
