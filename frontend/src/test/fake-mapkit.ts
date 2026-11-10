@@ -41,7 +41,7 @@ export const fakeMk: Mk = {
   MapRect: class {
     constructor(readonly x: number, readonly y: number, readonly width: number, readonly height: number) {
       for (const v of [x, y, width, height]) if (!(v >= 0 && v <= 1)) throw new RangeError(`MapRect values are normalized to 0..1, got ${v}`);
-      if (x + width > 1 || y + height > 1) throw new RangeError("MapRect reaches outside the world");
+      if (y + height > 1) throw new RangeError("MapRect reaches outside the world");
     }
   } as unknown as Mk["MapRect"],
   Annotation: class {

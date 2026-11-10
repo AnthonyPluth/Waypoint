@@ -9,7 +9,7 @@
   class MapRect {
     constructor(x, y, width, height) {
       for (const v of [x, y, width, height]) if (!(v >= 0 && v <= 1)) throw new RangeError("MapRect values are normalized to 0..1, got " + v);
-      if (x + width > 1 || y + height > 1) throw new RangeError("MapRect reaches outside the world");
+      if (y + height > 1) throw new RangeError("MapRect reaches outside the world");
       this.x = x; this.y = y; this.width = width; this.height = height;
     }
   }
@@ -56,7 +56,7 @@
       const w = this.host.clientWidth, h = this.host.clientHeight;
       if (!rect || !w || !h) return;
       const scale = Math.min(w / rect.width, h / rect.height);
-      const at = (c) => { const p = toPoint(c); return { x: (p.x - rect.x) * scale + (w - rect.width * scale) / 2, y: (p.y - rect.y) * scale + (h - rect.height * scale) / 2 }; };
+      const at = (c) => { const p = toPoint(c); if (p.x < rect.x && rect.x + rect.width > 1) p.x += 1; return { x: (p.x - rect.x) * scale + (w - rect.width * scale) / 2, y: (p.y - rect.y) * scale + (h - rect.height * scale) / 2 }; };
       for (const o of this.overlays) {
         let n = this.nodes.get(o);
         if (!n) {

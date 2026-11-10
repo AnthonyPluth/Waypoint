@@ -18,7 +18,7 @@ from waypoint.server import handler
 
 KEY_ID = "MAPKEY1234"
 TEAM_ID = "TEAMID5678"
-SITE = "waypoint.example.test"
+SITE = "https://waypoint.example.test"
 ADDRESS = "https://waypoint.example.test"
 PRIVATE = ec.generate_private_key(ec.SECP256R1())
 
@@ -28,6 +28,9 @@ def pem_of(key) -> bytes:
 
 
 PEM = pem_of(PRIVATE)
+
+
+JUNK = "JUNK-FILE-CANARY-0123456789"
 
 
 def key_line() -> str:
@@ -158,12 +161,27 @@ class ConfigurationTests(Keys):
         self.assertTrue(verifies(issued.token, other.public_key()))
         self.assertFalse(verifies(issued.token, PRIVATE.public_key()))
 
-    def test_the_origin_is_the_host_alone_as_apple_describes_it(self):
-        for given, want in {"https://waypoint.example.test": SITE, "https://waypoint.example.test/": SITE, "https://waypoint.example.test/app/x?y=1": SITE,
-                            "http://192.168.1.5:8080/": "192.168.1.5", "https://Waypoint.Example.Test:8443": SITE}.items():
+    def test_the_origin_is_the_browser_origin_exactly(self):
+        for given, want in {
+            "https://waypoint.example.test": SITE, "https://waypoint.example.test/": SITE, "https://waypoint.example.test/app/x?y=1#z": SITE,
+            "https://waypoint.example.test:443": SITE, "http://waypoint.example.test:80/": "http://waypoint.example.test", "http://192.168.1.5:8080/": "http://192.168.1.5:8080",
+            "https://waypoint.example.test:8443": "https://waypoint.example.test:8443", "http://waypoint.example.test:443": "http://waypoint.example.test:443",
+            "https://waypoint.example.test:80": "https://waypoint.example.test:80", "HTTPS://Waypoint.Example.TEST": SITE, "https://[::1]:8443/x": "https://[::1]:8443",
+            "https://[2001:db8::1]": "https://[2001:db8::1]", "http://[::1]:80": "http://[::1]", "  https://waypoint.example.test  ": SITE,
+            "https://user:pass@waypoint.example.test/": SITE,
+        }.items():
             with self.subTest(given):
                 self.configure(**{maps.PUBLIC_URL_ENV: given})
                 self.assertEqual(maps.origin(), want)
+
+    def test_an_address_that_is_not_an_http_origin_turns_it_off(self):
+        for given in ("", "waypoint.example.test", "ftp://waypoint.example.test", "https://", "https://:8443", "https://waypoint.example.test:99999",
+                      "https://waypoint.example.test:abc", "javascript:alert(1)", "//waypoint.example.test"):
+            with self.subTest(given):
+                self.configure(**{maps.PUBLIC_URL_ENV: given})
+                self.assertIsNone(maps.origin())
+                self.assertFalse(maps.enabled())
+                self.assertIsNone(maps.issue(1.0))
 
     def test_the_token_carries_the_origin_and_the_script_address(self):
         self.configure()
@@ -259,10 +277,10 @@ class TokenRouteTests(ServerCase, Keys):
     def test_the_key_and_the_token_are_never_logged_or_sent_on(self):
         self.configure()
         sealed = "TOKEN.CANARY.0123456789abcdef"
-        with no_leaks(self, key_line(), sealed, self.path, KEY_ID, TEAM_ID):
+        with no_leaks(self, key_line(), JUNK, sealed, self.path, KEY_ID, TEAM_ID):
             with mock.patch.object(mapkit, "sign", return_value=(sealed, 5)):
                 status, body = self.token()
-            self.configure(**{maps.KEY_FILE_ENV: self.write("junk.p8", b"junk not-a-key\n")})
+            self.configure(**{maps.KEY_FILE_ENV: self.write("junk.p8", JUNK.encode() + b"\n")})
             self.token()
             self.configure(**{maps.KEY_FILE_ENV: os.path.join(self.folder, "gone.p8")})
             self.token()

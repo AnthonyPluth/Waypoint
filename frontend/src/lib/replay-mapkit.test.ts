@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, fakeMk, type FakeOverlay } from "../test/fake-mapkit";
-import { cutAt, createReplayMap, DEFAULT_PALETTE, legPath, mapPoint, MAX_LATITUDE, mercatorFor, SAMPLES, WORLD, type ReplayMap, type ReplayMapOptions } from "./replay-mapkit";
+import { cutAt, createReplayMap, DEFAULT_PALETTE, legPath, mapPoint, mapRectFor, MAX_LATITUDE, mercatorFor, SAMPLES, WORLD, type ReplayMap, type ReplayMapOptions } from "./replay-mapkit";
+import { geoMercator } from "d3-geo";
 import { legsOf, positions, type Roads, type Stop } from "./route-replay";
 
 const stopAt = (name: string, latitude: number, longitude: number, via: Stop["via"] = null, kind: Stop["kind"] = "airport"): Stop =>
@@ -54,8 +55,11 @@ describe("the fake MapKit's rectangles", () => {
   it("refuse values outside 0 to 1, as MapKit JS's normalized units do", () => {
     expect(() => new fakeMk.MapRect(0.1, 0.2, 0.3, 0.3)).not.toThrow();
     expect(() => new fakeMk.MapRect(2 ** 27, 0, 100, 100)).toThrow(RangeError);
-    expect(() => new fakeMk.MapRect(0.9, 0, 0.2, 0.1)).toThrow(/outside the world/);
+    expect(() => new fakeMk.MapRect(0.9, 0, 0.2, 0.1)).not.toThrow();
+    expect(() => new fakeMk.MapRect(0, 0.95, 0.2, 0.1)).toThrow(/outside the world/);
     expect(() => new fakeMk.MapRect(-0.1, 0, 0.2, 0.1)).toThrow(RangeError);
+    expect(() => new fakeMk.MapRect(1.2, 0, 0.2, 0.1)).toThrow(RangeError);
+    expect(() => new fakeMk.MapRect(0.5, 0, 1.5, 0.1)).toThrow(RangeError);
   });
 
   it("see every camera move the replay makes inside the world", () => {
@@ -70,6 +74,44 @@ describe("the fake MapKit's rectangles", () => {
       expect(r.y).toBeGreaterThanOrEqual(0);
       expect(r.x + r.width).toBeLessThanOrEqual(1);
       expect(r.y + r.height).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("the camera's rectangle across the date line", () => {
+  const projection = geoMercator().scale(300).translate([480, 260]);
+
+  it("is unchanged for a box that stays inside the world", () => {
+    const r = mapRectFor(projection, { x: 480, y: 100, w: 200, h: 120 });
+    expect(r.x).toBeCloseTo(0.5, 6);
+    expect(r.width).toBeCloseTo(200 / (300 * 2 * Math.PI), 6);
+    expect(r.x + r.width).toBeLessThan(1);
+    expect(r.height).toBeGreaterThan(0);
+    expect(r.y + r.height).toBeLessThanOrEqual(1);
+  });
+
+  it("keeps the short way round when the box crosses the date line, as a rect that wraps", () => {
+    const r = mapRectFor(projection, { x: 1300, y: 100, w: 200, h: 120 });
+    expect(r.x).toBeGreaterThan(0.9);
+    expect(r.width).toBeCloseTo(200 / (300 * 2 * Math.PI), 6);
+    expect(r.width).toBeLessThan(0.12);
+    expect(r.x + r.width).toBeGreaterThan(1);
+    expect(r.x + r.width).toBeLessThan(1.2);
+  });
+
+  it("covers the whole world, not more, for a box wider than it", () => {
+    expect(mapRectFor(projection, { x: 0, y: 100, w: 3000, h: 100 }).width).toBe(1);
+  });
+
+  it("is what the replay hands MapKit for a route across the Pacific, with a camera that stays narrow", () => {
+    const stops = [stopAt("Nadi", -17.76, 177.45), stopAt("Savusavu", -16.78, 179.34, null, "stay"), stopAt("Apia", -13.83, -171.75, "flight")];
+    const { replay } = start({ stops });
+    for (const progress of [0, 0.3, 0.6, 0.9, 1]) replay.update({ progress, playing: true, calm: false });
+    for (const r of fake.last().rects) {
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.x).toBeLessThan(1);
+      expect(r.width).toBeLessThanOrEqual(1);
+      expect(r.x + r.width).toBeLessThanOrEqual(2);
     }
   });
 });

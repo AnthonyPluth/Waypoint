@@ -29,6 +29,14 @@ export const mapPoint = (latitude: number, longitude: number): Spot => ({
   y: (0.5 - Math.log(Math.tan(Math.PI / 4 + (lat(latitude) * Math.PI) / 360)) / (2 * Math.PI)) * WORLD,
 });
 
+export function mapRectFor(projection: GeoProjection, box: Box): { x: number; y: number; width: number; height: number } {
+  const top = projection.invert?.([box.x, box.y]) ?? [0, 0];
+  const bottom = projection.invert?.([box.x, box.y + box.h]) ?? [0, 0];
+  const a = mapPoint(top[1], top[0]), b = mapPoint(bottom[1], bottom[0]);
+  const x = (((top[0] + 180) / 360) % 1 + 1) % 1;
+  return { x, y: Math.min(a.y, b.y), width: Math.min(1, box.w / (projection.scale() * 2 * Math.PI)), height: Math.abs(b.y - a.y) };
+}
+
 export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads): GeoProjection => routeProjection(stops, width, height, undefined, roads, geoMercator);
 
 type Path = { points: Spot[]; along: number[] };
@@ -187,10 +195,8 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   let seen = "";
 
   const rectOf = (box: Box) => {
-    const a = projection.invert?.([box.x, box.y]) ?? [0, 0];
-    const b = projection.invert?.([box.x + box.w, box.y + box.h]) ?? [0, 0];
-    const p = mapPoint(a[1], a[0]), q = mapPoint(b[1], b[0]);
-    return new mk.MapRect(Math.min(p.x, q.x), Math.min(p.y, q.y), Math.abs(q.x - p.x), Math.abs(q.y - p.y));
+    const r = mapRectFor(projection, box);
+    return new mk.MapRect(r.x, r.y, r.width, r.height);
   };
 
   const sync = <K>(marks: Map<K, MkOverlay>, wanted: Set<K>, make: (key: K) => MkOverlay) => {

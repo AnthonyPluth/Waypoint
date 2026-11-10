@@ -22,6 +22,7 @@ PUBLIC_URL_ENV = "WAYPOINT_PUBLIC_URL"
 MAX_KEY_BYTES = 8192
 _APPLE_ID = re.compile(r"[A-Z0-9]{10}")
 _OFF = {"0", "false", "no", "off"}
+DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 class Issued(NamedTuple):
@@ -48,9 +49,15 @@ def flag_on() -> bool:
 
 def origin() -> str | None:
     parts = urllib.parse.urlsplit(os.environ.get(PUBLIC_URL_ENV, "").strip())
-    if parts.scheme not in ("http", "https") or not parts.hostname:
+    scheme, host = parts.scheme.lower(), parts.hostname
+    if scheme not in DEFAULT_PORTS or not host:
         return None
-    return parts.hostname
+    try:
+        port = parts.port
+    except ValueError:
+        return None
+    shown = f"[{host}]" if ":" in host else host
+    return f"{scheme}://{shown}" if port in (None, DEFAULT_PORTS[scheme]) else f"{scheme}://{shown}:{port}"
 
 
 @lru_cache(maxsize=4)
