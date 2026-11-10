@@ -11,6 +11,7 @@ import { app } from "$lib/app.svelte";
 import { forgetMapkit } from "$lib/mapkit";
 import { stopsOf } from "$lib/route-replay";
 import { fake, fakeMaps, fakeMk } from "../../test/fake-mapkit";
+import { clearRouteCache } from "$lib/driving-routes";
 import { segment, state, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 import RouteReplayMap from "./RouteReplayMap.svelte";
@@ -47,6 +48,7 @@ let token: unknown = { enabled: true, token: "a.b.c", expires: 4102444800, scrip
 
 beforeEach(() => {
   forgetMapkit();
+  clearRouteCache();
   fake.reset();
   frames = [];
   clock = 0;

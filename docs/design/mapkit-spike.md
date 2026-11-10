@@ -119,3 +119,13 @@ Facts about Apple's service, and what is still to confirm once there is a key (t
 - Whether Apple's attribution and legal links, which MapKit draws itself, fit the replay's card at phone width.
 
 Recommendation, revised: adopt for the route replay only, as built, behind the default-on-but-keyless flag. Revisit the rest (photo pins, Stats) separately.
+
+## 10. Driving routes (owner's decision)
+
+The owner asked for the route replay's drive legs to follow real roads, using Apple's directions for every drive leg (a car leg, `vehicle === "car"` and not a train), including legs that start or end at Home, and accepted that each drive's origin and destination coordinates go to Apple. Flights, cruises and trains are unchanged.
+
+- **What is sent.** With MapKit active, the viewer's browser calls `mapkit.Directions.route` once per drive when the replay map is made (`frontend/src/lib/driving-routes.ts`; at most four at a time, six seconds each), with the drive's exact start and end coordinates and `Automobile` transport. Answers are kept in the page for its life, keyed by coordinates rounded to four decimals, so re-opening the replay does not ask again. A failed, timed-out or empty call is not kept.
+- **Failure.** MapKit without `Directions`, an error, a timeout, a throw or no route silently keeps the bundled line for that drive; no banner. The "Showing the simple map" fallback stays for MapKit itself failing.
+- **CSP.** Not widened. Directions go to Apple's MapKit API hosts under `apple-mapkit.com`, which `connect-src https://*.apple-mapkit.com` already covers (assumed: nothing was run against Apple).
+- **Allowance.** Each drive is one service call of the 25,000 a day (section 3).
+- **Assumptions, not verified:** that `response.routes[0].path` is an array of arrays of coordinates, as read from memory of Apple's documentation; that the directions host is under `apple-mapkit.com`; and Apple's distance limit for a single route (a very long drive may be refused and then keeps the bundled line).

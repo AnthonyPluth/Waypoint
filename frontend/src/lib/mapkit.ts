@@ -11,6 +11,12 @@ export type MkMap = {
   setVisibleMapRectAnimated(rect: object, animate: boolean): void;
   destroy(): void;
 };
+export type MkRoute = { path?: MkCoordinate[][] };
+export type MkDirectionsRequest = { origin: MkCoordinate; destination: MkCoordinate; transportType: unknown };
+export type MkDirections = {
+  route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: MkRoute[] } | null) => void): number;
+  cancel?(id: number): void;
+};
 export type MkEvent = { status?: string };
 export type Mk = {
   init(options: { authorizationCallback: (done: (token: string) => void) => void; language?: string }): void;
@@ -23,6 +29,8 @@ export type Mk = {
   Annotation: new (coordinate: MkCoordinate, factory: () => HTMLElement, options?: Record<string, unknown>) => MkAnnotation;
   PolylineOverlay: new (points: MkCoordinate[], options?: { style?: object }) => MkOverlay;
   Style: new (options: Record<string, unknown>) => object;
+  // Absent in an old MapKit; callers must cope without it.
+  Directions?: { new (options?: Record<string, unknown>): MkDirections; Transport: { Automobile: unknown } };
 };
 export type Maps = { mk: Mk; onFailure(listener: () => void): () => void };
 
