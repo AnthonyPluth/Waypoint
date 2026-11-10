@@ -112,10 +112,11 @@ def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequenc
         if held is None:
             _set(conn, segment_id, mailbox_id, None, day, now, opener)
             return True
-        if held["content"] is None and day is not None and (held["day"] is None or day > held["day"]):
-            return int(conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None))
-                                    .values(opened_by=opener)).rowcount) == 1
-        return False
+        if day is None:
+            return False
+        return int(conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
+                                                          or_(SegmentCode.day.is_(None), SegmentCode.day < day))
+                                .values(opened_by=opener, day=day, created=now)).rowcount) == 1
     if held is not None and held["content"] is not None and not _replaces(day, held["day"]):
         return False
     _set(conn, segment_id, mailbox_id, images[fits[0]], day, now)
@@ -211,6 +212,13 @@ def opens_choice(conn: db.Connection, segment_id: int, stored_message_id: int | 
         return False
     return conn.execute(select(SegmentCode.segment_id).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
                                                               SegmentCode.opened_by == stored_message_id,
+                                                              exists().where(Segment.id == SegmentCode.segment_id, Segment.kind == KIND))).fetchone() is not None
+
+
+def opens_unstored(conn: db.Connection, segment_id: int, day: str | None) -> bool:
+    return conn.execute(select(SegmentCode.segment_id).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
+                                                              SegmentCode.opened_by.is_(None),
+                                                              SegmentCode.day.is_(None) if day is None else SegmentCode.day == day,
                                                               exists().where(Segment.id == SegmentCode.segment_id, Segment.kind == KIND))).fetchone() is not None
 
 

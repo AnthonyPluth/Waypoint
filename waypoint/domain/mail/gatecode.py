@@ -80,6 +80,9 @@ def _settle_pictures(segment_id: int, mailbox_id: int, pictures: Sequence[Image]
     cfg = _config(segment_id)
     if cfg is None:
         return False
+    with db.session() as conn:
+        if not gate_codes.opens_unstored(conn, segment_id, day):
+            return False
     picked = ai.pick_picture(cfg, [image["data"] for image in pictures], timeout)
     if picked is None:
         return False

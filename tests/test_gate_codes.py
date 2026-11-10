@@ -605,6 +605,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.answer('{"picture": 2}')
         pictures = [{"type": "image/png", "data": QR}, {"type": "image/png", "data": OTHER_QR}]
+        self.read(lambda conn: conn.execute(SegmentCode.__table__.update().values(opened_by=None)))
         self.fake.on_request = lambda n: self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW + 5))
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, pictures[::-1], "2026-10-16", NOW + 20))
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
@@ -651,7 +652,8 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.fake.reset()
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
-        self.assertEqual(len(self.fake.requests), 1)
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, "2026-10-16", NOW))
+        self.assertEqual(self.fake.requests, [])
 
     def test_an_older_reminder_settled_by_the_ai_never_replaces_a_newer_choice_still_waiting(self):
         self.turn_on(auto=False)
@@ -675,7 +677,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         newer = raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X"), "y": png(420, 420, b"NEWER-Y")}, day="Sat, 17 Oct 2026 09:00:00 +0100")
         self.fake.on_request = lambda n: scan.keep_message(self.mailbox, "m-newer", newer, [self.segment], NOW + 10)
         gatecode.settle(self.segment, self.mailbox, "m-two", NOW + 20)
-        self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": OTHER_QR}))
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-17"), None))
 
 
 class AiFiledTests(ScanAiCase, Kept):
@@ -833,7 +835,7 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
             scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, 0.0)
             scan.keep_code(self.mailbox, self.segment, self.NEWER, NOW + 1, 0.0)
         self.assertEqual(self.fake.requests, [])
-        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
+        self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
 
     def test_the_ordinary_scan_paths_cap_the_picture_wait_by_the_time_left(self):
         self.turn_on(auto=False)
@@ -1102,3 +1104,25 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.fake.content = '{"picture": 1}'
         scan.keep_code(self.mailbox, self.segment, self.two(day="Mon, 19 Oct 2026 09:00:00 +0100"), NOW + 3)
         self.assertEqual(len(self.fake.requests), 1)
+
+    def test_a_message_dated_between_the_first_opener_and_the_one_that_reopened_sends_nothing(self):
+        for name, setup, run in ((n, s, r) for n, (s, r) in self.paths().items()):
+            with self.subTest(path=name):
+                item = self.fresh(raw=self.two(day="Sat, 17 Oct 2026 09:00:00 +0100"), **setup)
+                scan.keep_message(self.mailbox, "m-first", self.two(day="Fri, 16 Oct 2026 09:00:00 +0100"), [self.segment], NOW - 2)
+                scan.keep_message(self.mailbox, "m-last", self.two(day="Mon, 19 Oct 2026 09:00:00 +0100"), [self.segment], NOW - 1)
+                self.fake.reset()
+                self.fake.content = '{"picture": 1}'
+                with no_leaks(self, *CANARIES, database=self.path):
+                    run(item)
+                self.assertEqual((self.fake.requests, self.state(), self.image()), ([], ("choose", "2026-10-19"), None))
+                opener = self.read(lambda conn: conn.execute(select(SegmentCode.opened_by)).scalar())
+                self.assertEqual(opener, self.read(lambda conn: gate_codes.stored_id(conn, self.mailbox, "m-last")))
+
+    def test_the_scan_paths_leave_a_message_dated_between_them_unsent(self):
+        scan.keep_message(self.mailbox, "m-first", self.two(day="Fri, 16 Oct 2026 09:00:00 +0100"), [self.segment], NOW)
+        scan.keep_message(self.mailbox, "m-last", self.two(day="Mon, 19 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 1)
+        self.fake.reset()
+        scan._keep_quietly(self.mailbox, "m-mid", self.two(day="Sat, 17 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 2)
+        scan.keep_code(self.mailbox, self.segment, self.two(day="Sat, 17 Oct 2026 09:00:00 +0100"), NOW + 3)
+        self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-19")))
