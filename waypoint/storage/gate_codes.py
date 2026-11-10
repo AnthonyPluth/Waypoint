@@ -204,6 +204,10 @@ def keep_candidate(conn: db.Connection, segment_id: int, picked: Candidate, now:
     return bool(same) and keep_chosen(conn, segment_id, same[0].mailbox_id, same[0].image, same[0].day, now)
 
 
+def opens_choice(conn: db.Connection, segment_id: int, day: str | None) -> bool:
+    return waiting(conn, segment_id) and _not_older(day, _held_day(conn, segment_id))
+
+
 def image_for(conn: db.Connection, segment_id: int) -> Image | None:
     return _unsealed(conn.execute(select(SegmentCode.content).where(SegmentCode.segment_id == segment_id)).scalar())
 

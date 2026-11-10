@@ -4,6 +4,7 @@ import itertools
 import json
 import secrets
 import struct
+import threading
 import time
 import unittest
 import zlib
@@ -582,6 +583,8 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.fake.reset()
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
+        self.assertEqual(self.fake.requests, [])
+        self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, "2026-10-16", NOW))
         self.assertEqual(len(self.fake.requests), 1)
 
     def test_an_older_reminder_settled_by_the_ai_never_replaces_a_newer_choice_still_waiting(self):
@@ -595,7 +598,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.add_mail("m-old", mail("Your parking reservation: QR code reminder", {"c": png(310, 310, b"OLDER-ONE-1"), "d": png(320, 320, b"OLDER-TWO-2")},
                                     f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Fri, 16 Oct 2026 09:00:00 +0100"))
         self.scan()
-        self.assertEqual(len(self.fake.requests), 2)
+        self.assertEqual(len(self.fake.requests), 1)
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
 
     def test_a_message_linked_while_the_ai_is_thinking_never_changes_which_picture_is_saved(self):
@@ -881,7 +884,7 @@ class ReviewPathTests(ScanAiCase, Kept):
                 run(item)
             self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
-    def test_a_slow_model_is_cut_off_at_the_cap_and_the_action_does_not_wait_for_it(self):
+    def test_a_slow_model_is_cut_off_at_the_cap_so_the_reply_waits_no_longer_than_that(self):
         with mock.patch.object(ai, "pick_picture", wraps=ai.pick_picture) as picked:
             self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, self.fresh(held=[(self.SUGGESTION, [self.segment])]))
         self.assertEqual([c.args[2] for c in picked.call_args_list], [gatecode.REVIEW_CAP])
@@ -936,3 +939,45 @@ class ReviewPathTests(ScanAiCase, Kept):
         item = self.fresh()
         self.act(review_api.api_review_dismiss, {}, None, item)
         self.assertEqual(self.fake.requests, [])
+
+    def test_an_older_message_than_the_one_that_opened_the_choice_sends_nothing(self):
+        for name, item, run in self.each():
+            scan.keep_message(self.mailbox, "m-new", raw_of("Your parking reservation", {"x": png(410, 410, b"NEWER-X"), "y": png(420, 420, b"NEWER-Y")},
+                                                             day="Mon, 19 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 10)
+            with no_leaks(self, *CANARIES, database=self.path):
+                run(item)
+            self.assertEqual((self.fake.requests, self.state(), self.image()), ([], ("choose", "2026-10-19"), None), name)
+
+    def test_one_action_that_attaches_and_then_dismisses_makes_one_request(self):
+        for content, status in (("{}", 500), ('{"picture": 2}', 200)):
+            item = self.fresh()
+            self.fake.content, self.fake.status = content, status
+            self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
+            self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, item)
+            self.assertEqual(len(self.fake.requests), 1, content)
+
+    def test_a_booking_linked_to_the_message_before_counts_toward_the_limit_of_one(self):
+        other = self.park({**PARKING, "confirmation": "PK30418"})
+        item = self.fresh()
+        self.read(lambda conn: stored_mail.link(conn, other, self.mailbox, "m-r"))
+        done = self.read(lambda conn: review.dismiss(conn, "u-jane", item, (self.jane, [self.segment])))
+        self.assertEqual((done.segments, done.parking), ((self.segment,), 2))
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_two_requests_for_the_same_item_are_resolved_one_after_the_other(self):
+        other = self.park({**PARKING, "confirmation": "PK30418"})
+        item = self.fresh()
+        outcome: list = []
+
+        def second():
+            with db.session() as conn:
+                outcome.append(review.dismiss(conn, "u-jane", item, (self.jane, [other])))
+
+        with db.session() as conn:
+            first = review.dismiss(conn, "u-jane", item, (self.jane, [self.segment]))
+            thread = threading.Thread(target=second)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+        thread.join(10)
+        self.assertEqual((first.segments, outcome), ((self.segment,), [None]))

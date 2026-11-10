@@ -7,11 +7,11 @@ from typing import Any, Literal, TypedDict
 from sqlalchemy import and_, delete, or_, select, update
 
 from ...storage import db, stored_mail
-from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, ScannedMessage, TrustedSender
+from ...storage.models import IgnoredSender, Mailbox, Person, ReviewItem, ScannedMessage, SegmentMessage, StoredMessage, TrustedSender
 from .. import trips, visibility
 from ..visibility import Viewer
 from . import ai, query, triage
-from .gatecode import Linked
+from .gatecode import Linked, parking_linked
 
 Reason = Literal["no_markup", "incomplete", "broken", "match", "generic"]
 UNKNOWN_SENDER = ""
@@ -189,12 +189,26 @@ def parking_held(row: Any) -> int:
     return sum(1 for k in kinds if k == "parking")
 
 
-def linked(row: Any, segments: Collection[int]) -> Linked:
-    return Linked(int(row["mailbox_id"]), str(row["message_id"]), tuple(dict.fromkeys(segments)), parking_held(row))
+def linked(conn: db.Connection, row: Any, segments: Collection[int]) -> Linked:
+    box, message = int(row["mailbox_id"]), str(row["message_id"])
+    return Linked(box, message, tuple(dict.fromkeys(segments)), max(parking_held(row), parking_linked(conn, box, message)))
+
+
+def lock(conn: db.Connection, item_id: int) -> None:
+    conn.execute(select(ReviewItem.id).where(ReviewItem.id == item_id).with_for_update()).fetchone()
+
+
+def unlinked(conn: db.Connection, segments: Collection[int], mailbox_id: int, message_id: str) -> list[int]:
+    ids = sorted(set(segments))
+    had = set(conn.execute(select(SegmentMessage.segment_id).join(StoredMessage, StoredMessage.id == SegmentMessage.stored_message_id)
+                           .where(StoredMessage.mailbox_id == mailbox_id, StoredMessage.message_id == message_id,
+                                  SegmentMessage.segment_id.in_(ids))).scalars()) if ids else set()
+    return [n for n in dict.fromkeys(segments) if n not in had]
 
 
 def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewer, list[int]] | None = None, trust: bool = False,
             only_this: bool = False) -> Linked | None:
+    lock(conn, item_id)
     seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain,
                                ReviewItem.reference, ReviewItem.matches, ReviewItem.suggestion)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
@@ -202,6 +216,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
     if seen is None:
         return None
     made = [n for n in bookings[1] if visibility.visible_segment(conn, bookings[0], n) is not None] if bookings is not None else []
+    fresh = unlinked(conn, made, int(seen["mailbox_id"]), str(seen["message_id"]))
     for n in made:
         stored_mail.link(conn, n, int(seen["mailbox_id"]), str(seen["message_id"]))
     if trust and made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
@@ -212,7 +227,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
                          ReviewItem.reference == seen["reference"], ReviewItem.reason.in_(GROUPED), ReviewItem.matches.is_(None)))
     conn.execute(delete(ReviewItem).where(or_(*same)))
     stored_mail.prune(conn)
-    return linked(seen, made)
+    return linked(conn, seen, fresh)
 
 
 def drop_suggestions(conn: db.Connection, owner: str, item_id: int, picks: list[int]) -> bool:
@@ -344,6 +359,7 @@ def matches(conn: db.Connection, owner: str, viewer: Viewer) -> list[MatchOut]:
 
 
 def _held(conn: db.Connection, owner: str, item_id: int) -> Any:
+    lock(conn, item_id)
     return conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches, ReviewItem.suggestion)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner), ReviewItem.matches.is_not(None))).fetchone()
@@ -368,9 +384,10 @@ def entries_of(row: Any) -> list[dict[str, Any]]:
 
 
 def finish_entry(conn: db.Connection, row: Any, entry_id: int, segment_id: int) -> Linked:
+    fresh = unlinked(conn, [segment_id], int(row["mailbox_id"]), str(row["message_id"]))
     stored_mail.link(conn, segment_id, int(row["mailbox_id"]), str(row["message_id"]))
     _leave(conn, int(row["id"]), row["reason"], [e for e in _entries(row) if e["id"] != entry_id])
-    return linked(row, [segment_id])
+    return linked(conn, row, fresh)
 
 
 def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int, segment_id: int | None,
@@ -392,9 +409,10 @@ def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
             raise trips.Invalid("That isn’t one of the bookings it could be")
         trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id)
         target = segment_id
+    fresh = unlinked(conn, [int(target)], int(row["mailbox_id"]), str(row["message_id"]))
     stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
     _leave(conn, item_id, row["reason"], [e for e in entries if e["id"] != entry_id])
-    return linked(row, [int(target)])
+    return linked(conn, row, fresh)
 
 
 def same_booking(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> tuple[bool, CandidateOut | None]:
@@ -410,6 +428,7 @@ def same_booking(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, 
 
 
 def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> Linked | None:
+    lock(conn, item_id)
     seen = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.matches, ReviewItem.suggestion)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
@@ -419,8 +438,9 @@ def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields
     if found is None:
         raise trips.Invalid("That is no longer the same as a booking you can see")
     trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=found.id)
+    fresh = unlinked(conn, [int(found.id)], int(seen["mailbox_id"]), str(seen["message_id"]))
     stored_mail.link(conn, found.id, int(seen["mailbox_id"]), str(seen["message_id"]))
-    return linked(seen, [int(found.id)])
+    return linked(conn, seen, fresh)
 
 
 def drop(conn: db.Connection, owner: str, item_id: int, entry_id: int) -> bool:
