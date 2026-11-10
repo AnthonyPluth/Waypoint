@@ -168,7 +168,8 @@ class ConfigurationTests(Keys):
             "https://waypoint.example.test:8443": "https://waypoint.example.test:8443", "http://waypoint.example.test:443": "http://waypoint.example.test:443",
             "https://waypoint.example.test:80": "https://waypoint.example.test:80", "HTTPS://Waypoint.Example.TEST": SITE, "https://[::1]:8443/x": "https://[::1]:8443",
             "https://[2001:db8::1]": "https://[2001:db8::1]", "http://[::1]:80": "http://[::1]", "  https://waypoint.example.test  ": SITE,
-            "https://user:pass@waypoint.example.test/": SITE,
+            "https://user:pass@waypoint.example.test/": SITE, "https://bücher.example": "https://xn--bcher-kva.example", "https://BÜCHER.example:8443/x": "https://xn--bcher-kva.example:8443",
+            "https://xn--bcher-kva.example": "https://xn--bcher-kva.example",
         }.items():
             with self.subTest(given):
                 self.configure(**{maps.PUBLIC_URL_ENV: given})
@@ -176,7 +177,7 @@ class ConfigurationTests(Keys):
 
     def test_an_address_that_is_not_an_http_origin_turns_it_off(self):
         for given in ("", "waypoint.example.test", "ftp://waypoint.example.test", "https://", "https://:8443", "https://waypoint.example.test:99999",
-                      "https://waypoint.example.test:abc", "javascript:alert(1)", "//waypoint.example.test"):
+                      "https://waypoint.example.test:abc", "https://" + "a" * 64 + ".example", "https://bad..example", "javascript:alert(1)", "//waypoint.example.test"):
             with self.subTest(given):
                 self.configure(**{maps.PUBLIC_URL_ENV: given})
                 self.assertIsNone(maps.origin())

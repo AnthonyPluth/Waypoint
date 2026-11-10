@@ -56,7 +56,10 @@ def origin() -> str | None:
         port = parts.port
     except ValueError:
         return None
-    shown = f"[{host}]" if ":" in host else host
+    try:
+        shown = f"[{host}]" if ":" in host else host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return None
     return f"{scheme}://{shown}" if port in (None, DEFAULT_PORTS[scheme]) else f"{scheme}://{shown}:{port}"
 
 
