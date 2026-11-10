@@ -7,9 +7,9 @@ import json
 import struct
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, exists, or_, select, update
 
 from . import db, secretbox
 from .models import Segment, SegmentCode, SegmentMessage, StoredMessage
@@ -147,6 +147,56 @@ def choose(conn: db.Connection, segment_id: int, email: int, index: int, now: fl
     received = found.get("received")
     _set(conn, segment_id, mailbox_id, pictures[index], received if isinstance(received, str) else None, now)
     return True
+
+
+def waiting(conn: db.Connection, segment_id: int) -> bool:
+    if not is_parking(conn, segment_id):
+        return False
+    row = conn.execute(select(SegmentCode.content).where(SegmentCode.segment_id == segment_id)).fetchone()
+    return row is not None and row["content"] is None
+
+
+class Candidate(NamedTuple):
+    stored_id: int
+    mailbox_id: int
+    position: int
+    image: Image
+    day: str | None
+
+
+def keep_chosen(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image, day: str | None, now: float) -> bool:
+    if not image["data"]:
+        return False
+    permits = SegmentCode.day.is_(None) if day is None else or_(SegmentCode.day.is_(None), SegmentCode.day <= day)
+    done = conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None), permits,
+                                                  exists().where(Segment.id == SegmentCode.segment_id, Segment.kind == KIND))
+                        .values(mailbox_id=mailbox_id, content=_sealed(image), day=day, created=now))
+    return int(done.rowcount) == 1
+
+
+def stored_id(conn: db.Connection, mailbox_id: int, message_id: str) -> int | None:
+    found = conn.execute(select(StoredMessage.id).where(StoredMessage.mailbox_id == mailbox_id, StoredMessage.message_id == message_id)).scalar()
+    return None if found is None else int(found)
+
+
+def candidates(conn: db.Connection, segment_id: int, stored: int) -> list[Candidate]:
+    if not waiting(conn, segment_id):
+        return []
+    row = conn.execute(select(StoredMessage.mailbox_id, StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                       .where(SegmentMessage.segment_id == segment_id, StoredMessage.id == stored)).fetchone()
+    found = _parsed(row["content"]) if row else None
+    if row is None or found is None:
+        return []
+    received = found.get("received")
+    pictures = _images(found.get("images"))
+    return [Candidate(stored, int(row["mailbox_id"]), n, pictures[n], received if isinstance(received, str) else None) for n in qualifying(pictures)]
+
+
+def keep_candidate(conn: db.Connection, segment_id: int, picked: Candidate, now: float) -> bool:
+    digest = hashlib.sha256(picked.image["data"]).digest()
+    same = [c for c in candidates(conn, segment_id, picked.stored_id)
+            if c.position == picked.position and hashlib.sha256(c.image["data"]).digest() == digest]
+    return bool(same) and keep_chosen(conn, segment_id, same[0].mailbox_id, same[0].image, same[0].day, now)
 
 
 def image_for(conn: db.Connection, segment_id: int) -> Image | None:

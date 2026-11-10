@@ -27,6 +27,7 @@ class State(TypedDict):
     person_id: int | None
     ai: bool
     show_costs: bool
+    mapkit: NotRequired[bool]
 
 
 class ShowCosts(TypedDict):
@@ -1377,3 +1378,10 @@ class AssistantMatched(TypedDict):
     ok: bool
     segment_id: int
     trip_id: int
+
+
+class MapkitToken(TypedDict):
+    enabled: bool
+    token: NotRequired[str]
+    expires: NotRequired[int]
+    script: NotRequired[str]

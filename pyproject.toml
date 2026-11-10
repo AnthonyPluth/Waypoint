@@ -12,7 +12,7 @@ dependencies = [
     "pywebpush (>=2.0,<3.0)",            # push notifications (VAPID + encrypted payloads)
     "python-dateutil (>=2.9,<3.0)",      # month arithmetic (waypoint/dates.py)
     "httpx[http2] (>=0.28.1,<0.29.0)",
-    "tzdata (>=2026.4)",                 # zoneinfo falls back to this when the host lacks a zone
+    "tzdata (>=2026.6)",                 # zoneinfo falls back to this when the host lacks a zone
 ]
 
 [tool.poetry]
@@ -22,8 +22,8 @@ package-mode = false   # an application, not a library: `poetry install` just in
 # Dependabot updates them here. `poetry install` adds them; the Docker image installs only the main dependencies.
 [tool.poetry.group.dev.dependencies]
 ruff = "0.17.3"
-mypy = "2.4.0"
-types-python-dateutil = "2.9.0.20261021"
+mypy = "2.4.1"
+types-python-dateutil = "2.9.0.20261029"
 coverage = "7.17.0"
 unittest-parallel = "1.8.6"
 pip-audit = "2.10.1"
@@ -76,7 +76,7 @@ include_external_packages = true   # so the network and database libraries can b
 id = "server-on-top"
 name = "Only the server imports the server (the domain, providers, storage and shared modules don't)"
 type = "forbidden"
-source_modules = ["waypoint.domain", "waypoint.providers", "waypoint.storage", "waypoint.tls", "waypoint.validate",
+source_modules = ["waypoint.domain", "waypoint.providers", "waypoint.storage", "waypoint.tls", "waypoint.validate", "waypoint.es256",
                   "waypoint.dates", "waypoint.monitoring", "waypoint.oidc"]
 forbidden_modules = ["waypoint.server"]
 
@@ -124,6 +124,13 @@ name = "The Immich provider imports no other provider, and none imports it"
 type = "independence"
 modules = ["waypoint.providers.immich", "waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail",
            "waypoint.providers.webpush"]
+
+[[tool.importlinter.contracts]]
+id = "mapkit-alone"
+name = "The MapKit provider imports no other provider, and none imports it"
+type = "independence"
+modules = ["waypoint.providers.mapkit", "waypoint.providers.apns", "waypoint.providers.mailimages", "waypoint.providers.flightstatus", "waypoint.providers.gmail",
+           "waypoint.providers.webpush", "waypoint.providers.immich"]
 
 [[tool.importlinter.contracts]]
 id = "storage-at-the-bottom"

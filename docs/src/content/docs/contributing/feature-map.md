@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-118 routes; 0 have no test yet.
+119 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -102,6 +102,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/reminders` | `reminders.py:api_reminders_set` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/reminders/devices` | `reminders.py:api_device_add` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `DELETE /api/reminders/devices/{id}` | `reminders.py:api_device_remove` | `lib/components/settings/RemindersSection.svelte` | `test_api_contract.py`, `test_reminders.py` | [start/reminders](/Waypoint/start/reminders/) |
+| `GET /api/mapkit/token` | `mapkit.py:api_mapkit_token` | `lib/mapkit.ts` | `test_api_contract.py`, `test_mapkit.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/reminders/app` | `reminders.py:api_app_push` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `POST /api/reminders/app/devices` | `reminders.py:api_app_device_add` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |
 | `DELETE /api/reminders/app/devices/{id}` | `reminders.py:api_app_device_remove` | - | `test_api_contract.py`, `test_app_push.py` | [start/reminders](/Waypoint/start/reminders/) |

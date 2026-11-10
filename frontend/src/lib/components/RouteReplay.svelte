@@ -2,6 +2,8 @@
   import type { Trip, TripPlaces } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
   import RouteReplayMap from "$lib/components/RouteReplayMap.svelte";
+  import { app } from "$lib/app.svelte";
+  import { loadMapkit, type Maps } from "$lib/mapkit";
   import { NO_BOUNDARIES, NO_ROADS, stopsOf, worthLocating } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
@@ -13,6 +15,15 @@
   const eligible = $derived(worthLocating(trip, today));
   const stops = $derived(eligible && places ? stopsOf(trip, places) : []);
   const year = $derived(Number(today.slice(0, 4)));
+
+  let maps = $state<Maps | null | undefined>(undefined);
+  let asked = false;
+  $effect(() => {
+    if (stops.length < 2 || asked) return;
+    asked = true;
+    if (app.state?.mapkit === false) { maps = null; return; }
+    loadMapkit().then((found) => { maps = found; });
+  });
 
   let latest = 0;
   let placesFor = 0;
@@ -32,6 +43,6 @@
 
 {#if stops.length >= 2}
   <section class="mb-6" aria-label="Route replay">
-    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={maps ?? null} />{/key}
   </section>
 {/if}

@@ -126,7 +126,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
     } else {
       add(stay(s, s.origin) ?? city(s.origin), s.start_local, s.start_local, null);
       for (const port of s.itinerary) add(city(port.name), port.arrive_local ?? s.start_local, port.depart_local ?? port.arrive_local ?? s.end_local, "cruise");
-      add(city(s.destination), s.end_local, s.end_local, "cruise");
+      const returnsToEmbarkation = s.destination && key(s.destination) === key(s.origin) ? stay(s, s.destination) : null;
+      add(returnsToEmbarkation ?? city(s.destination), s.end_local, s.end_local, "cruise");
     }
   }
   return out;
@@ -315,7 +316,7 @@ export function moverAt(leg: Leg, t: number): { x: number; y: number; angle: num
   return { x: now.x, y: now.y, angle: (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI };
 }
 
-export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, roads: Roads = NO_ROADS): GeoProjection {
+export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, roads: Roads = NO_ROADS, base: () => GeoProjection = geoEqualEarth): GeoProjection {
   const points = stops.map(lonLat);
   const geometries: Geometry[] = [{ type: "MultiPoint", coordinates: points }];
   for (let i = 1; i < points.length; i++) {
@@ -328,7 +329,7 @@ export function routeProjection(stops: Stop[], width: number, height: number, pa
     const lon = west + spanLon / 2, lat = (north + south) / 2, half = MIN_SPAN_DEGREES / 2;
     geometries.push({ type: "MultiPoint", coordinates: [[lon - half, Math.max(-80, lat - half)], [lon + half, Math.min(80, lat + half)]] });
   }
-  return geoEqualEarth().fitExtent([[padding.x, padding.y], [width - padding.x, height - padding.y]], { type: "GeometryCollection", geometries });
+  return base().fitExtent([[padding.x, padding.y], [width - padding.x, height - padding.y]], { type: "GeometryCollection", geometries });
 }
 
 export function positions(stops: Stop[], projection: GeoProjection): Spot[] {

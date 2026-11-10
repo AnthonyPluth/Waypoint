@@ -1458,6 +1458,21 @@
     },
     {
       "method": "GET",
+      "path": "/api/mapkit/token",
+      "handler": "waypoint/server/api/mapkit.py:api_mapkit_token",
+      "web": [
+        "frontend/src/lib/mapkit.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mapkit.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/reminders/app",
       "handler": "waypoint/server/api/reminders.py:api_app_push",
       "web": [],

@@ -50,7 +50,7 @@ The one thing that changes is when the message is kept (a booking was made from 
 - Only `https` addresses that resolve to public internet addresses are fetched. Private, loopback and link-local addresses are refused, including after a redirect or a changed DNS answer, and no proxy is used.
 - Images are limited to 1 MB each, 6 MB and 40 per message, and a few seconds each and 30 per message. An image that fails or is refused is left out, and the message still opens.
 - Only PNG, JPEG, GIF and WebP, decided by the file’s contents. SVG is refused, since it can carry script.
-- Images are kept encrypted with the message and deleted with it. They are shown only to those who can see the booking or review item, through Waypoint’s own sign-in-protected addresses, and are never reachable by an AI assistant over MCP or sent to the optional AI. A parking booking’s gate-code picture is sealed the same way, goes with the booking and the mailbox, is never decoded and is never in the offline copy.
+- Images are kept encrypted with the message and deleted with it. They are shown only to those who can see the booking or review item, through Waypoint’s own sign-in-protected addresses, and are never reachable by an AI assistant over MCP or sent to the optional AI, with one exception: when a parking booking’s message has several pictures that could be the gate’s QR code and the AI is set to Local, those candidate pictures go to your own Ollama server so it can choose between them ([the gate code](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking)). A parking booking’s gate-code picture is sealed the same way, goes with the booking and the mailbox, is never decoded and is never in the offline copy.
 
 ## How a booking is read
 
@@ -96,13 +96,13 @@ Local (Ollama) is a server on your own network. The text goes unredacted and unt
 
 When the model finds no booking and says the email is plainly a promotion, a loyalty or account statement or a newsletter, Waypoint dismisses that one Review item, which deletes the stored copy of the email as any dismissal does; a scan reports only how many it dismissed.
 
-Only plain text goes out, never images or markup, and prompts and replies are never logged. What is sent, and what comes back, is under [AI suggestions](/Waypoint/start/ai/).
+Only plain text goes out, never markup, and prompts and replies are never logged. The one picture exception is the gate code of a parking booking: when a parking booking’s message has several pictures that could be the gate’s QR code and the AI is set to Local, those candidate pictures alone, from that one message (no text, subject or sender, and never pictures from the booking’s other emails), go to your own Ollama server, which is asked which one is the gate’s code; they never leave your network, and a model that can’t read pictures, an error or an unclear answer leaves **Choose the code** as it was. Nothing is sent in OpenRouter mode or with the AI off. What is sent, and what comes back, is under [AI suggestions](/Waypoint/start/ai/).
 
 The same setting powers one small button that involves no email: the sparkle beside a trip’s destination. It sends only the trip’s name (without its dates) and the cities, states and countries of its bookings with their kinds, and only when you press it, to Ollama or to OpenRouter, whichever you chose ([the destination button](/Waypoint/start/ai/#the-destination-button-on-a-trip)).
 
 ## Addresses are looked up on your server
 
-A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This happens entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)). No geocoding or map service is asked and the address is not sent anywhere ([Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map)).
+A booking’s address or place is turned into a rough point on the map (the centre of its ZIP or postal code, an airport or a city) when the booking is saved, so the Stats map can show where you stayed. This happens entirely on your server from lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)). No geocoding or map service is asked and the address is not sent anywhere ([Where a booking is on the map](/Waypoint/start/trips/#where-a-booking-is-on-the-map)). The one map that can reach Apple is the route replay, and only when you add a MapKit key: then a viewer’s browser, not your server, loads Apple’s script, which runs in the page with the app’s own access and isn’t pinned, and asks Apple for tiles ([Apple’s map for the route replay](/Waypoint/start/trips/#apples-map-for-the-route-replay), including what you are trusting). Waypoint itself sends Apple no email text or address.
 
 ## Live flight status is the one other thing that leaves the server
 

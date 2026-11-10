@@ -23,7 +23,7 @@ BLOCKED = (
     "/api/reminders", "/api/flight-status/{id}", "/api/import", "/api/loyalty", "/api/segments/{id}/emails", "/api/segments/{id}/code",
     "/api/trips/{id}/emails",
     "/api/offline", "/api/trips/{id}/destination", "/api/home", "/api/photos", "/api/trips/{id}/photos", "/api/photo-sources",
-    "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions", "/api/photo-grants", "/api/photo-sharing-prefs",
+    "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions", "/api/photo-grants", "/api/photo-sharing-prefs", "/api/mapkit",
 )
 
 WRITE_READABLE = ("/api/people/claim-suggestions",)
