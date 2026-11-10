@@ -91,7 +91,6 @@
     }
   }
 
-  // Directions: a winding road between two places, answered on a later tick; the stand-in never reaches Apple.
   class Directions {
     route(request, callback) {
       const a = request.origin, b = request.destination;

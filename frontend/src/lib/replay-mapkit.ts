@@ -280,7 +280,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     }
   };
 
-  // A route from Apple replaces the leg's path wherever the leg's path is used: the line, the mover and the camera.
   const adopt = (index: number, route: number[][]) => {
     if (over) return;
     const points: Spot[] = [spots[index]];
@@ -299,7 +298,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       try { draw(lastFrame); } catch { onFailure(); }
     }
   };
-  // Every drive leg (a car between stops that are not a train's or a cruise's), including one from or to Home, once, when the map is made.
   legs.forEach((leg, i) => {
     if (leg.vehicle !== "car" || stops[i + 1].via !== null) return;
     const [a, b] = [stops[i], stops[i + 1]];

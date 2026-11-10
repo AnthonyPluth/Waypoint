@@ -7,8 +7,6 @@ export const ROUTE_TIMEOUT_MS = 6000;
 export const ROUTE_PARALLEL = 4;
 const PRECISION = 4;
 
-// Apple's allowance is 25,000 service calls a day, so a route is asked for once and kept for the life of the page: re-opening the
-// replay (or two legs between the same two places) reuses it. Only answers are kept; a failure is asked again the next time.
 const found = new Map<string, RoutePath>();
 const pending = new Map<string, Promise<RoutePath | null>>();
 const waiting: (() => void)[] = [];
@@ -31,7 +29,7 @@ function ask(mk: Mk, from: LatLon, to: LatLon, timeoutMs: number): Promise<Route
       resolve(value);
     };
     const timer = setTimeout(() => {
-      try { if (id !== undefined) directions?.cancel?.(id); } catch { /* the call is given up either way */ }
+      try { if (id !== undefined) directions?.cancel?.(id); } catch { id = undefined; }
       finish(null);
     }, timeoutMs);
     try {
@@ -63,8 +61,6 @@ function release(): void {
   waiting.shift()?.();
 }
 
-// Asks Apple for the driving route between two places: `[latitude, longitude]` pairs, or null for anything but a usable route (no
-// MapKit Directions, an error, a timeout, no route). It never throws.
 export function drivingRoute(mk: Mk, from: LatLon, to: LatLon, timeoutMs = ROUTE_TIMEOUT_MS): Promise<RoutePath | null> {
   const key = keyOf(from, to);
   const have = found.get(key);

@@ -29,7 +29,6 @@ export type Mk = {
   Annotation: new (coordinate: MkCoordinate, factory: () => HTMLElement, options?: Record<string, unknown>) => MkAnnotation;
   PolylineOverlay: new (points: MkCoordinate[], options?: { style?: object }) => MkOverlay;
   Style: new (options: Record<string, unknown>) => object;
-  // Absent in an old MapKit; callers must cope without it.
   Directions?: { new (options?: Record<string, unknown>): MkDirections; Transport: { Automobile: unknown } };
 };
 export type Maps = { mk: Mk; onFailure(listener: () => void): () => void };

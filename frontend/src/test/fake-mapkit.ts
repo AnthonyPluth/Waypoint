@@ -22,7 +22,6 @@ export class FakeMap {
 export type DirectionsMode = "ok" | "error" | "empty" | "hang" | "throw";
 export type DirectionsCall = { origin: MkCoordinate; destination: MkCoordinate; transportType: unknown };
 
-// A winding road between two places: the straight line with a sideways wave on it, the same every time.
 export const windingPath = (from: MkCoordinate, to: MkCoordinate, steps = 12): MkCoordinate[][] => {
   const part: MkCoordinate[] = [];
   for (let i = 0; i <= steps; i++) {
@@ -67,7 +66,6 @@ export const fakeMk: Mk = {
     constructor(public points: MkCoordinate[], readonly options: { style?: object } = {}) {}
   } as unknown as Mk["PolylineOverlay"],
   Style: class { constructor(readonly options: Record<string, unknown>) {} } as unknown as Mk["Style"],
-  // Answers on a later tick, as the real service does over the network.
   Directions: Object.assign(
     class {
       route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: { path?: MkCoordinate[][] }[] } | null) => void): number {
