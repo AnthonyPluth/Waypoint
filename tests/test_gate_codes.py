@@ -981,3 +981,4 @@ class ReviewPathTests(ScanAiCase, Kept):
             self.assertTrue(thread.is_alive())
         thread.join(10)
         self.assertEqual((first.segments, outcome), ((self.segment,), [None]))
+        self.assertEqual(self.read(lambda conn: stored_mail.message_ids(conn, [other])), {})
