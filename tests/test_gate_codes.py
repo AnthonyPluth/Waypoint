@@ -1159,7 +1159,7 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual((len(self.fake.requests), self.image()), (1, {"type": "image/png", "data": OTHER_QR}))
 
     def test_the_count_of_parking_bookings_the_ai_read_is_kept_and_never_lowered(self):
-        item = self.fresh()
+        self.fresh()
         reading = json.dumps({"bookings": [{"kind": "parking", "origin": f"Lot {n}", "start_local": "2026-12-01T05:15", "end_local": "2026-12-04T03:00"} for n in "AB"]})
         self.fake.content = reading
         scan._ask(self.mailbox, "m-r", "Reservation PK30417", NOW)
