@@ -126,9 +126,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
     } else {
       add(stay(s, s.origin) ?? city(s.origin), s.start_local, s.start_local, null);
       for (const port of s.itinerary) add(city(port.name), port.arrive_local ?? s.start_local, port.depart_local ?? port.arrive_local ?? s.end_local, "cruise");
-      // The stored point is the embarkation port's, so it also stands for the return only when the ship comes back to the same port.
-      const returns = s.destination && key(s.destination) === key(s.origin) ? stay(s, s.destination) : null;
-      add(returns ?? city(s.destination), s.end_local, s.end_local, "cruise");
+      const returnsToEmbarkation = s.destination && key(s.destination) === key(s.origin) ? stay(s, s.destination) : null;
+      add(returnsToEmbarkation ?? city(s.destination), s.end_local, s.end_local, "cruise");
     }
   }
   return out;
