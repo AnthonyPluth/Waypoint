@@ -1,4 +1,5 @@
 import base64
+import dataclasses
 import email.message
 import itertools
 import json
@@ -6,6 +7,7 @@ import secrets
 import struct
 import threading
 import time
+import types
 import unittest
 import zlib
 from unittest import mock
@@ -1169,3 +1171,17 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual(count(), 2)
         self.read(lambda conn: review.raise_parking(conn, self.mailbox, "m-r", 3))
         self.assertEqual(count(), 3)
+
+    def test_an_item_made_when_filing_a_two_parking_message_failed_still_holds_the_count(self):
+        self.read(lambda conn: conn.execute(ReviewItem.__table__.delete()))
+        self.add_mail("m-fail", mail("Your parking reservations", {"a": QR, "b": OTHER_QR}, f"Reservations PK30417 and PK30418. {CANARY_TEXT}"))
+        real = scan.extract.read
+        two = (types.SimpleNamespace(kind="parking"), types.SimpleNamespace(kind="parking"))
+        with mock.patch.object(scan, "_file", side_effect=RuntimeError("boom")), mock.patch.object(gatecode.monitoring, "report"), \
+                mock.patch.object(scan.extract, "read", side_effect=lambda raw: dataclasses.replace(real(raw), bookings=two)):
+            self.scan()
+        [item] = self.read(lambda conn: conn.execute(select(ReviewItem.id, ReviewItem.parking)).fetchall())
+        self.assertEqual(item["parking"], 2)
+        self.fake.reset()
+        self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, item["id"])
+        self.assertEqual(self.fake.requests, [])

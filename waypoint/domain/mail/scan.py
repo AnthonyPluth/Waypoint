@@ -687,7 +687,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     raise
                 monitoring.report(e, values=False)
                 with db.session() as conn:
-                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
+                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now,
+                               parking=_parking_in(message.bookings))
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
                 _keep_quietly(mailbox_id, message_id, raw, wanted, now, started, _parking_in(message.bookings))
