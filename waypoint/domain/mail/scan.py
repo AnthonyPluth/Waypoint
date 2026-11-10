@@ -223,9 +223,9 @@ def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float,
             return
     content, images = extract.keep(raw, mailimages.Fetcher())
     with db.session() as conn:
-        gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
+        opened = gate_codes.offer(conn, segment_id, mailbox_id, images, content["received"], now)
     left = _time_left(started)
-    if left is None or left >= MIN_SETTLE:
+    if opened and (left is None or left >= MIN_SETTLE):
         gatecode.settle_pictures(segment_id, mailbox_id, [images[n] for n in gate_codes.qualifying(images)], content["received"], now, left)
 
 
@@ -287,14 +287,15 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
             why["no structured booking data" if not message.other_markup else "structured data, but no reservation"] += 1
         reason: review.Reason = "broken" if message.broken else "incomplete" if message.markup or message.bookings else "no_markup"
         review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, reason, now, held,
-                   reference=message.found.reference, gap=glance.gap_of(lacks + list(message.gaps)) if reason == "incomplete" else None)
+                   reference=message.found.reference, gap=glance.gap_of(lacks + list(message.gaps)) if reason == "incomplete" else None,
+                   parking=_parking_in(message.bookings))
         if read:
             review.set_read_suggestions(conn, mailbox_id, message_id, read)
         if not usable and (strong or message.markup or message.bookings) and autoask.switched_on(conn):
             autoask.wait(conn, mailbox_id, message_id)
         queued = 1
     elif held:
-        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held)
+        review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "match", now, held, parking=_parking_in(message.bookings))
         queued = 1
     return made, queued, list(dict.fromkeys(touched)) if queued or touched else None, BOOKING if usable else UNREADABLE
 
@@ -383,7 +384,7 @@ def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
         return None
     read = _read(cfg, text)
     with db.session() as conn:
-        filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking)
+        filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking, read.parking)
     _settle_message(mailbox_id, message_id, filed.segments, now, parked=read.parking)
     return ai.dismissed_note(read.not_a_booking) if filed.dismissed and read.not_a_booking else None
 
@@ -443,13 +444,14 @@ class Filed(NamedTuple):
 
 
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
-             auto: bool | None, now: float, not_a_booking: str | None = None) -> Filed:
+             auto: bool | None, now: float, not_a_booking: str | None = None, parking: int = 0) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).fetchone()
     viewer = _viewer(row["owner_sub"], conn) if row else None
     if row is None or viewer is None or row["matches"]:
         return Filed()
+    review.raise_parking(conn, mailbox_id, message_id, parking)
     if not_a_booking and not suggestions and error is None:
         review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
         _record(conn, mailbox_id, message_id, UNREADABLE, now)
@@ -547,7 +549,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float) -> t
         asked += 1
         read = _read(cfg, extract.plain_text(raw), left)
         with db.session() as conn:
-            filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(), read.not_a_booking)
+            filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(), read.not_a_booking, read.parking)
             made, cleared, dismissed = made + filed.added, cleared + filed.cleared, dismissed + filed.dismissed
             if read.failed:
                 autoask.failed(conn, mailbox_id, message_id)
@@ -685,7 +687,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                     raise
                 monitoring.report(e, values=False)
                 with db.session() as conn:
-                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now)
+                    review.add(conn, mailbox_id, message_id, message.sender_domain, message.received, "incomplete", now,
+                               parking=_parking_in(message.bookings))
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
                 _keep_quietly(mailbox_id, message_id, raw, wanted, now, started, _parking_in(message.bookings))

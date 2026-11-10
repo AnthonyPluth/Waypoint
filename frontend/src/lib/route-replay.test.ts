@@ -100,9 +100,9 @@ describe("stopsOf", () => {
       { segment_id: 6, latitude: 33.77, longitude: -118.19, precision: "city" as const },
     ];
     const stops = stopsOf(trip([car, ride, cruise]), { ...places, stays });
-    expect(stops.map((s) => [s.latitude, s.longitude])).toEqual([[36.6, -121.9], [38.2975, -122.2869], [38.58, -121.49], [33.77, -118.19], [38.2975, -122.2869]]);
-    expect(names(stops)).toEqual(["Depot Two", "Napa", "Sacramento", "Pier 9", "Napa"]);
-    expect(stops.map((s) => s.via)).toEqual([null, null, "train", null, "cruise"]);
+    expect(stops.map((s) => [s.latitude, s.longitude])).toEqual([[36.6, -121.9], [38.2975, -122.2869], [38.58, -121.49], [33.77, -118.19], [38.2975, -122.2869], [33.77, -118.19]]);
+    expect(names(stops)).toEqual(["Depot Two", "Napa", "Sacramento", "Pier 9", "Napa", "Pier 9"]);
+    expect(stops.map((s) => s.via)).toEqual([null, null, "train", null, "cruise", "cruise"]);
   });
 
   it("reads a cruise's ports in order", () => {
@@ -111,6 +111,39 @@ describe("stopsOf", () => {
     const stops = stopsOf(trip([cruise]), places);
     expect(names(stops)).toEqual(["San Francisco", "Napa", "San Francisco"]);
     expect(stops[1].via).toBe("cruise");
+  });
+
+  describe("a cruise that returns to a port that is not a known city", () => {
+    const la = "America/Los_Angeles";
+    const cruise = segment({ id: 7, kind: "cruise", origin: "Pier 9", destination: "Pier 9", start_local: "2025-12-09T16:00", start_zone: la, end_local: "2025-12-13T07:00", end_zone: la,
+      itinerary: [{ name: "Napa", zone: la, arrive_local: "2025-12-11T08:00", depart_local: "2025-12-11T17:00" }] });
+    const withPier = { ...places, stays: [{ segment_id: 7, latitude: 33.77, longitude: -118.19, precision: "city" as const }] };
+
+    it("ends at the return port, reached by cruise, after the last port of call", () => {
+      const stops = stopsOf(trip([cruise]), withPier);
+      expect(names(stops)).toEqual(["Pier 9", "Napa", "Pier 9"]);
+      expect(stops.map((s) => s.via)).toEqual([null, "cruise", "cruise"]);
+      expect(stops[2].latitude).toBe(33.77);
+    });
+
+    it("gives the leg back to the port a boat and the leg on to a hotel a car", () => {
+      const inn = segment({ id: 8, kind: "hotel", origin: "Vine Inn", destination: "Napa, CA", start_local: "2025-12-13T15:00", start_zone: la, end_local: "2025-12-14T11:00", end_zone: la });
+      const set = stopsOf(trip([cruise, inn]), withPier);
+      expect(names(set)).toEqual(["Pier 9", "Napa", "Pier 9", "Vine Inn"]);
+      expect(legsOf(set, routeProjection(set, 960, 520)).map((l) => l.vehicle)).toEqual(["boat", "boat", "car"]);
+    });
+
+    it("does not use the embarkation point for a different disembarkation port", () => {
+      const oneWay = { ...cruise, destination: "Pier 12" };
+      expect(names(stopsOf(trip([oneWay]), withPier))).toEqual(["Pier 9", "Napa"]);
+    });
+
+    it("still reads a return to a known city as before", () => {
+      const home = { ...cruise, origin: "Pier 9", destination: "Napa" };
+      const stops = stopsOf(trip([home]), withPier);
+      expect(names(stops)).toEqual(["Pier 9", "Napa"]);
+      expect(stops.at(-1)?.latitude).toBe(38.2975);
+    });
   });
 });
 

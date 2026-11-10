@@ -428,6 +428,41 @@ class MigrationTests(unittest.TestCase):
         self.assertFalse({"resume_after", "inputs"} & set(names))
         self.assertEqual([(r[names.index("cursor")], r[names.index("resume_page")]) for r in rows_of(self.path, "photo_trip_syncs")], [("c1", None), (None, None)])
 
+    def test_0043_records_which_message_opened_a_gate_code_choice_and_leaves_an_earlier_one_without(self):
+        from alembic import command
+        old = sa.table("segment_codes", *(sa.column(n) for n in ("segment_id", "mailbox_id", "content", "day", "created")))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0042")
+            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="parking", status="confirmed", origin="Lot", start_local="2026-12-01T05:15",
+                                                     end_local="2026-12-04T03:00", start_zone="America/New_York", end_zone="America/New_York", source="manual"))
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="sub-x", address="a@example.com", token="enc:v1:x", status="connected", created=1.0))
+            c.execute(old.insert().values(segment_id=1, mailbox_id=1, content=None, day="2026-10-16", created=1.0))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual([r[-1] for r in rows_of(self.path, "segment_codes")], [None])
+        self.assertIn("opened_by", [col[0] for col in shape(self.path)["segment_codes"]["columns"]])
+        self.assertIn("SET NULL", {fk[0]: fk[4] for fk in shape(self.path)["segment_codes"]["fks"]}["fk_segment_codes_opened_by"])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0042")
+        self.assertNotIn("opened_by", [col[0] for col in shape(self.path)["segment_codes"]["columns"]])
+        self.assertEqual(len(rows_of(self.path, "segment_codes")), 1)
+
+    def test_0044_keeps_the_parking_count_a_message_was_read_with_and_leaves_earlier_items_without(self):
+        from alembic import command
+        old = sa.table("review_items", *(sa.column(n) for n in ("id", "mailbox_id", "message_id", "sender_domain", "reason", "created")))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0043")
+            c.execute(insert(schema.mailboxes).values(id=1, owner_sub="sub-x", address="a@example.com", token="enc:v1:x", status="connected", created=1.0))
+            c.execute(old.insert().values(id=1, mailbox_id=1, message_id="m", sender_domain="x.example", reason="no_markup", created=1.0))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual([r[-1] for r in rows_of(self.path, "review_items")], [None])
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0043")
+        self.assertNotIn("parking", [col[0] for col in shape(self.path)["review_items"]["columns"]])
+        self.assertEqual(len(rows_of(self.path, "review_items")), 1)
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:
