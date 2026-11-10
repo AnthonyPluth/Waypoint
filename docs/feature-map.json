@@ -1596,6 +1596,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [
@@ -1624,7 +1625,8 @@
         "frontend/src/pages/Review.svelte"
       ],
       "tests": [
-        "tests/test_api_contract.py"
+        "tests/test_api_contract.py",
+        "tests/test_gate_codes.py"
       ],
       "docs": [
         "start/review"
@@ -1682,6 +1684,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_mail_scan.py"
       ],
       "docs": [
@@ -1796,6 +1799,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_mcp_review.py",
         "tests/test_mcp_routes.py"
       ],
@@ -1810,6 +1814,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_gate_codes.py",
         "tests/test_mcp_review.py",
         "tests/test_mcp_routes.py"
       ],

@@ -7,7 +7,7 @@ from ... import validate
 from ...domain import people, trips
 import time
 
-from ...domain.mail import ai, review, scan
+from ...domain.mail import ai, gatecode, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
@@ -30,36 +30,47 @@ def api_review(conn, _q, _b) -> Review:
             "ai": ai.mail_config(conn) is not None}
 
 
-def api_review_dismiss(conn, _q, _b, item_id: str) -> Ok:
+def _pick(linked: gatecode.Linked | None) -> None:
+    gatecode.settle_linked(linked, time.time())
+
+
+@own_session
+def api_review_dismiss(_conn, _q, _b, item_id: str) -> Ok:
     held = (_q.get("entry") or [""])[0]
-    if held:
-        if not review.drop(conn, owner(), row_id(item_id, NO_ITEM), row_id(held, "No such booking", 400)):
-            raise ApiError(NO_ITEM, 404)
-        return {"ok": True}
     made = [a for a in _q.get("suggestion") or [] if a]
-    if made:
-        if not review.drop_suggestions(conn, owner(), row_id(item_id, NO_ITEM), [row_id(a, "No such suggestion", 400) for a in made]):
-            raise ApiError(NO_ITEM, 404)
-        return {"ok": True}
     added = [a for a in _q.get("segment") or [] if a]
-    bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
-    if not review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings, trust=(_q.get("trust") or [""])[0] == "1"):
-        raise ApiError(NO_ITEM, 404)
+    with db.session() as conn:
+        if held:
+            if not review.drop(conn, owner(), row_id(item_id, NO_ITEM), row_id(held, "No such booking", 400)):
+                raise ApiError(NO_ITEM, 404)
+            return {"ok": True}
+        if made:
+            if not review.drop_suggestions(conn, owner(), row_id(item_id, NO_ITEM), [row_id(a, "No such suggestion", 400) for a in made]):
+                raise ApiError(NO_ITEM, 404)
+            return {"ok": True}
+        bookings = (viewer(conn), [row_id(a, "No such segment", 400) for a in added]) if added else None
+        linked = review.dismiss(conn, owner(), row_id(item_id, NO_ITEM), bookings, trust=(_q.get("trust") or [""])[0] == "1")
+        if linked is None:
+            raise ApiError(NO_ITEM, 404)
+    _pick(linked)
     return {"ok": True}
 
 
-def api_review_match(conn, _q, body: MatchBody, item_id: str) -> Ok:
+@own_session
+def api_review_match(_conn, _q, body: MatchBody, item_id: str) -> Ok:
     entry = body.get("entry")
     if not isinstance(entry, int) or isinstance(entry, bool):
         raise ApiError('Send "entry" as a whole number')
     segment = body.get("segment_id")
     chosen = None if segment is None else row_id(segment, "No such booking", 400)
-    try:
-        settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), entry, chosen)
-    except trips.Invalid as e:
-        raise ApiError(str(e)) from e
-    if settled is None:
-        raise ApiError(NO_ITEM, 404)
+    with db.session() as conn:
+        try:
+            settled = review.settle(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), entry, chosen)
+        except trips.Invalid as e:
+            raise ApiError(str(e)) from e
+        if settled is None:
+            raise ApiError(NO_ITEM, 404)
+    _pick(settled)
     return {"ok": True}
 
 
@@ -74,15 +85,18 @@ def api_review_same(conn, _q, body: SegmentBody, item_id: str) -> SameBooking:
     return {"booking": cast(ReviewCandidate, found) if found else None}
 
 
-def api_review_attach(conn, _q, body: SegmentBody, item_id: str) -> Attached:
+@own_session
+def api_review_attach(_conn, _q, body: SegmentBody, item_id: str) -> Attached:
     fields = segment_fields(body)
-    try:
-        attached = review.attach(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), fields)
-    except trips.Invalid as e:
-        raise ApiError(str(e)) from e
-    if attached is None:
-        raise ApiError(NO_ITEM, 404)
-    return {"ok": True, "segment_id": attached}
+    with db.session() as conn:
+        try:
+            attached = review.attach(conn, owner(), viewer(conn), row_id(item_id, NO_ITEM), fields)
+        except trips.Invalid as e:
+            raise ApiError(str(e)) from e
+        if attached is None:
+            raise ApiError(NO_ITEM, 404)
+    _pick(attached)
+    return {"ok": True, "segment_id": int(attached.target or 0)}
 
 
 def api_review_ignore(conn, _q, _b, item_id: str) -> Ignoring:

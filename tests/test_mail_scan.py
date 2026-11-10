@@ -1126,7 +1126,7 @@ class ReviewTests(ScanCase):
         with no_leaks(self, "CANARY-SUBJECT-NOMARKUP-8B3F", "CANARY-BODY-NOMARKUP-6H9C", database=self.path):
             self.scan()
         stored = self.read(lambda conn: dict(conn.execute(select(ReviewItem)).fetchone()))
-        self.assertEqual(sorted(stored), ["auto_state", "auto_tries", "created", "gap", "id", "mailbox_id", "matches", "message_id", "reason", "received", "reference", "sender_domain", "suggestion", "suggestion_error"])
+        self.assertEqual(sorted(stored), ["auto_state", "auto_tries", "created", "gap", "id", "mailbox_id", "matches", "message_id", "parking", "reason", "received", "reference", "sender_domain", "suggestion", "suggestion_error"])
         self.assertEqual((stored["sender_domain"], stored["received"]), ("example-air.example", "2026-10-17"))
         sealed = self.read(lambda conn: conn.execute(select(StoredMessage.content)).scalar())
         self.assertTrue(secretbox.is_encrypted(sealed))

@@ -259,6 +259,7 @@ class ReviewItem(Base):
     reference: Mapped[str | None]
     auto_state: Mapped[str | None]
     auto_tries: Mapped[int]
+    parking: Mapped[int | None]
 
 
 class StoredMessage(Base):
@@ -284,6 +285,7 @@ class SegmentCode(Base):
     content: Mapped[str | None]
     day: Mapped[str | None]
     created: Mapped[float]
+    opened_by: Mapped[int | None]
 
 
 class IgnoredSender(Base):

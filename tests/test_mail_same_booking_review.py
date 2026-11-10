@@ -62,7 +62,7 @@ class SameBookingReviewTests(SameBookingCase):
         _, found = self.same(item, **loose)
         assert found is not None
         self.assertEqual(found["segment_id"], segment)
-        self.assertEqual(self.read(lambda conn: review.attach(conn, "u-jane", self.jane, item, loose)), segment)
+        self.assertEqual(self.read(lambda conn: review.attach(conn, "u-jane", self.jane, item, loose)).target, segment)
         [seg] = [s for s in self.segments() if s["kind"] == "cruise"]
         self.assertEqual((seg["origin"], seg["start_local"], seg["end_local"], seg["status"]), ("PORT EXAMPLE", "2027-03-02T15:00", "2027-03-07T08:00", "confirmed"))
 
@@ -92,7 +92,7 @@ class SameBookingReviewTests(SameBookingCase):
         segment = self.by_hand(details={"flight_number": "EX 202", "seat": "12A"}, manage_url="https://example-air.example/manage/ZZ9Y8X")
         before = self.counts()
         body = {**FLIGHT, "details": {"flight_number": "EX 202", "seat": "30F", "cabin": "Economy"}, "manage_url": "https://example-air.example/other"}
-        self.assertEqual(self.read(lambda conn: review.attach(conn, "u-jane", self.jane, item, body)), segment)
+        self.assertEqual(self.read(lambda conn: review.attach(conn, "u-jane", self.jane, item, body)).target, segment)
         [seg] = self.segments()
         self.assertEqual((seg["details"]["seat"], seg["details"]["flight_number"], seg["details"]["cabin"]), ("12A", "EX 202", "Economy"))
         self.assertEqual(seg["manage_url"], "https://example-air.example/manage/ZZ9Y8X")

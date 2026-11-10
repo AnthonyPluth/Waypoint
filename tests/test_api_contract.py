@@ -219,6 +219,7 @@ class Replies(DbCase):
         for domain, query in (("once.example", {}), ("always.example", {"trust": ["1"]})):
             made = trips.add_segment(self.c, me, {"kind": "hotel", "origin": "Seaside Inn", "start_local": "2026-11-21T15:00", "end_local": "2026-11-25T11:00",
                                            "start_zone": "Europe/London", "end_zone": "Europe/London"}, source="email")
+            self.c.commit()
             review_api.api_review_dismiss(self.c, {"segment": [str(made["id"])], **query}, {}, ids[domain])
         self.assertFalse(review.trusted(self.c, box, "once.example"))
         self.assertTrue(review.trusted(self.c, box, "always.example"))
@@ -256,6 +257,7 @@ class Replies(DbCase):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
         with mock.patch.object(scan, "suggest_now", return_value=None):
             self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
+        self.c.commit()
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
         stay = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
                 "start_zone": "Europe/London", "end_zone": "Europe/London"}
@@ -264,6 +266,7 @@ class Replies(DbCase):
         held = review_api.api_review(self.c, {}, {})
         self.assertEqual([len(m["candidates"]) for m in held["matches"]], [2])
         self.check("GET /api/review", held)
+        self.c.commit()
         self.check("POST /api/review/{id}/match", review_api.api_review_match(self.c, {}, {"entry": 1, "segment_id": pair[0]}, str(held["matches"][0]["item_id"])))
         review.add(self.c, box, "m10", "hotel.example", "2026-10-19", "no_markup", 1.0)
         item = str(next(i["id"] for i in review_api.api_review(self.c, {}, {})["items"] if i["reason"] == "no_markup" and i["received"] == "2026-10-19"))
@@ -272,6 +275,7 @@ class Replies(DbCase):
         self.assertEqual(found["booking"]["segment_id"], pair[0])   # type: ignore[index]
         self.check("POST /api/review/{id}/same", found)
         self.check("POST /api/review/{id}/same", review_api.api_review_same(self.c, {}, {**same, "confirmation": "OTHER1"}, item))
+        self.c.commit()
         self.check("POST /api/review/{id}/attach", review_api.api_review_attach(self.c, {}, same, item))
 
     def test_ai(self):
@@ -408,7 +412,9 @@ class Replies(DbCase):
         for reason in ("match", "generic", "broken"):
             self.check("GET /api/assistant/review/{id}", assistant_api.api_assistant_review_item(self.c, {}, {}, str(ids[reason])))
         self.check("GET /api/assistant/review/{id}/email", assistant_api.api_assistant_review_email(self.c, {}, {}, str(ids["match"])))
+        self.c.commit()
         self.check("POST /api/assistant/review/{id}/match", assistant_api.api_assistant_review_match(self.c, {}, {"segment_id": seg["id"]}, str(ids["match"])))
+        self.c.commit()
         self.check("POST /api/assistant/review/{id}/create", assistant_api.api_assistant_review_create(
             self.c, {}, {"details": {"room": "204"}}, str(ids["generic"])))
         stored_mail.link(self.c, seg["id"], box, "a3")
