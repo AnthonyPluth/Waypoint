@@ -173,21 +173,27 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     try { map?.destroy(); } catch { map = null; }
     map = null;
   };
-  const addAnnotation = (a: MkAnnotation) => { map?.addAnnotation(a); ends.push(() => map?.removeAnnotation(a)); };
-  let stopMarks: { annotation: MkAnnotation; ping: SVGElement }[];
+  // MapKit JS does not reliably hide a factory-made annotation through `visible`, so nothing that must disappear is hidden that way:
+  // stops are on the map only once reached, and the one mover only while a leg is moving.
+  let stopMarks: { annotation: MkAnnotation; ping: SVGElement; shown: boolean }[];
   try {
     stopMarks = stops.map((stop, i) => {
       const made = stopElement(stop);
-      const annotation = new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: false });
-      annotation.visible = false;
-      addAnnotation(annotation);
-      return { annotation, ping: made.ping };
+      return { annotation: new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: true }), ping: made.ping, shown: false };
     });
   } catch (e) {
     release();
     throw e;
   }
-  const moverMarks = new Map<number, { annotation: MkAnnotation; body: SVGElement }>();
+  ends.push(() => { for (const mark of stopMarks) if (mark.shown) map?.removeAnnotation(mark.annotation); });
+  let mover: { leg: number; annotation: MkAnnotation; body: SVGElement } | null = null;
+  const clearMover = () => {
+    if (!mover) return;
+    const gone = mover.annotation;
+    mover = null;
+    map?.removeAnnotation(gone);
+  };
+  ends.push(clearMover);
   const legMarks = new Map<number, { overlay: MkOverlay; done: number }>();
   const roadMarks = new Map<number, MkOverlay>();
   const stateMarks = new Map<number, MkOverlay>();
@@ -217,7 +223,9 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     const zoom = box.w / width;
     const now = calm ? stops.length - 1 : activeStop(stops.length, progress);
     stopMarks.forEach((mark, i) => {
-      mark.annotation.visible = calm || reached(i, stops.length, progress);
+      const show = calm || reached(i, stops.length, progress);
+      if (show && !mark.shown) { map?.addAnnotation(mark.annotation); mark.shown = true; }
+      else if (!show && mark.shown) { map?.removeAnnotation(mark.annotation); mark.shown = false; }
       mark.ping.style.display = !calm && playing && i === now ? "" : "none";
     });
     const showRoads = roadsShown(projection, zoom);
@@ -225,6 +233,7 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     sync(roadMarks, new Set(drawnRoads.map((r) => r.index)), (i) => new mk.PolylineOverlay(geographic(roads.interstates[i].points), { style: style(palette.border, ROAD_WIDTH) }));
     const drawnLines = boundariesShown(projection, zoom) ? states.filter((l) => inView(l, box)) : [];
     sync(stateMarks, new Set(drawnLines.map((l) => l.index)), (i) => new mk.PolylineOverlay(geographic(boundaries[i].points), { style: style(palette.border, BOUNDARY_WIDTH, { lineDash: BOUNDARY_DASH, strokeOpacity: 0.8 }) }));
+    let movingLeg = -1;
     legs.forEach((leg, i) => {
       const done = calm ? 1 : legProgress(i, stops.length, progress);
       const mark = legMarks.get(i);
@@ -239,23 +248,21 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
         mark.done = done;
       }
       const moving = done > 0 && done < 1;
-      let mover = moverMarks.get(i);
-      if (moving && !mover) {
-        const made = moverElement(i, leg.vehicle);
-        const annotation = new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: false });
-        addAnnotation(annotation);
-        mover = { annotation, body: made.body };
-        moverMarks.set(i, mover);
-      }
-      if (mover) {
-        mover.annotation.visible = moving;
-        if (moving) {
-          const at = moverAt(leg, done);
-          mover.annotation.coordinate = coordinate(at);
-          mover.body.setAttribute("transform", `rotate(${at.angle.toFixed(1)}) scale(${MOVER_SCALE})`);
-        }
-      }
+      if (moving && movingLeg < 0) movingLeg = i;
     });
+    if (movingLeg < 0 || (mover && mover.leg !== movingLeg)) clearMover();
+    if (movingLeg >= 0) {
+      const leg = legs[movingLeg];
+      if (!mover) {
+        const made = moverElement(movingLeg, leg.vehicle);
+        const annotation = new mk.Annotation(coordinate(spots[movingLeg]), () => made.node, { visible: true });
+        map.addAnnotation(annotation);
+        mover = { leg: movingLeg, annotation, body: made.body };
+      }
+      const at = moverAt(leg, legProgress(movingLeg, stops.length, progress));
+      mover.annotation.coordinate = coordinate(at);
+      mover.body.setAttribute("transform", `rotate(${at.angle.toFixed(1)}) scale(${MOVER_SCALE})`);
+    }
     const shapes: RoadShape[] = drawnRoads.map((r) => ({ ref: roads.interstates[r.index].ref, d: "", left: r.left, top: r.top, right: r.right, bottom: r.bottom, length: r.length, mid: r.mid }));
     const wanted = new Map(shieldsOf(shapes, box, zoom).map((s) => [`${s.ref}@${s.x.toFixed(1)},${s.y.toFixed(1)}`, s]));
     for (const [key, annotation] of [...shieldMarks]) if (!wanted.has(key)) { map?.removeAnnotation(annotation); shieldMarks.delete(key); }

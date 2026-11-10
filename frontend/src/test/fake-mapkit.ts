@@ -44,6 +44,8 @@ export const fakeMk: Mk = {
       if (y + height > 1) throw new RangeError("MapRect reaches outside the world");
     }
   } as unknown as Mk["MapRect"],
+  // Like real MapKit JS for a factory-made annotation: once added, it stays on the map until removeAnnotation. `visible` is kept
+  // as a field but hides nothing here, so code that relies on it to take something down fails its tests.
   Annotation: class {
     visible = true;
     constructor(public coordinate: MkCoordinate, readonly factory: () => HTMLElement, readonly options: Record<string, unknown> = {}) { this.visible = options.visible !== false; }
