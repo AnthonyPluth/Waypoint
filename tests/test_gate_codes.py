@@ -857,7 +857,7 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.turn_on(auto=False)
         self.fake.content = '{"picture": 2}'
 
-    def fresh(self, held=None, suggestions=None, reason="no_markup", raw=None) -> int:
+    def fresh(self, held=None, suggestions=None, reason="no_markup", raw=None, parking=None) -> int:
         def reset(conn):
             for table in (ReviewItem, SegmentCode, SegmentMessage, StoredMessage):
                 conn.execute(table.__table__.delete())
@@ -867,7 +867,7 @@ class ReviewPathTests(ScanAiCase, Kept):
         scan.keep_message(self.mailbox, "m-r", raw or self.TWO, [], NOW)
 
         def hold(conn):
-            review.add(conn, self.mailbox, "m-r", "mail.exampleparking.example", "2026-10-16", "match" if held else reason, NOW, held=held)
+            review.add(conn, self.mailbox, "m-r", "mail.exampleparking.example", "2026-10-16", "match" if held else reason, NOW, held=held, parking=parking)
             if suggestions:
                 review.set_suggestions(conn, self.mailbox, "m-r", suggestions, None)
         self.read(hold)
@@ -1136,3 +1136,36 @@ class ReviewPathTests(ScanAiCase, Kept):
         scan._keep_quietly(self.mailbox, "m-mid", self.two(day="Sat, 17 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 2)
         scan.keep_code(self.mailbox, self.segment, self.two(day="Sat, 17 Oct 2026 09:00:00 +0100"), NOW + 3)
         self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-19")))
+
+    def test_a_message_that_held_a_second_parking_booking_sends_nothing_whatever_was_dropped_or_could_not_be_read(self):
+        for name, setup, run in ((n, s, r) for n, (s, r) in self.paths().items()):
+            with self.subTest(path=name):
+                item = self.fresh(parking=2, **setup)
+                run(item)
+                self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")), name)
+
+    def test_dropping_one_of_two_parking_bookings_and_resolving_the_other_sends_nothing(self):
+        other = self.park({**PARKING, "confirmation": "PK30418"})
+        both = [(self.SUGGESTION, [self.segment]), ({**self.SUGGESTION, "confirmation": "PK30418"}, [other])]
+        for handler in (review_api.api_review_match, assistant_api.api_assistant_review_match):
+            item = self.fresh(held=both, parking=2)
+            self.act(review_api.api_review_dismiss, {"entry": ["2"]}, None, item)
+            self.act(handler, {}, {"entry": 1, "segment_id": self.segment}, item)
+            self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")))
+
+    def test_a_single_parking_message_still_picks(self):
+        item = self.fresh(held=[(self.SUGGESTION, [self.segment])], parking=1)
+        self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, item)
+        self.assertEqual((len(self.fake.requests), self.image()), (1, {"type": "image/png", "data": OTHER_QR}))
+
+    def test_the_count_of_parking_bookings_the_ai_read_is_kept_and_never_lowered(self):
+        item = self.fresh()
+        reading = json.dumps({"bookings": [{"kind": "parking", "origin": f"Lot {n}", "start_local": "2026-12-01T05:15", "end_local": "2026-12-04T03:00"} for n in "AB"]})
+        self.fake.content = reading
+        scan._ask(self.mailbox, "m-r", "Reservation PK30417", NOW)
+        count = lambda: self.read(lambda conn: conn.execute(select(ReviewItem.parking)).scalar())
+        self.assertEqual(count(), 2)
+        self.read(lambda conn: review.raise_parking(conn, self.mailbox, "m-r", 1))
+        self.assertEqual(count(), 2)
+        self.read(lambda conn: review.raise_parking(conn, self.mailbox, "m-r", 3))
+        self.assertEqual(count(), 3)

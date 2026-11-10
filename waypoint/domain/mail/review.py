@@ -48,13 +48,20 @@ class ItemOut(TypedDict):
 
 def add(conn: db.Connection, mailbox_id: int, message_id: str, sender_domain: str | None, received: str | None,
         reason: Reason, now: float, held: list[tuple[trips.SegmentIn, list[int]]] | None = None, gap: str | None = None,
-        reference: str | None = None) -> None:
+        reference: str | None = None, parking: int | None = None) -> None:
     matches = json.dumps([{"id": n, "booking": b, "candidates": c} for n, (b, c) in enumerate(held, 1)], separators=(",", ":")) if held else None
     db.insert_ignore(conn, ReviewItem, {"mailbox_id": mailbox_id, "message_id": message_id,
                                         "sender_domain": sender_domain or UNKNOWN_SENDER,
                                         "received": received, "reason": reason, "created": now, "matches": matches, "gap": gap,
-                                        "reference": stored_mail.reference_key(reference) if reference and reason in GROUPED and not held else None},
+                                        "reference": stored_mail.reference_key(reference) if reference and reason in GROUPED and not held else None,
+                                        "parking": parking or None},
                      key=["mailbox_id", "message_id"])
+
+
+def raise_parking(conn: db.Connection, mailbox_id: int, message_id: str, parking: int) -> None:
+    if parking > 0:
+        conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id,
+                                              or_(ReviewItem.parking.is_(None), ReviewItem.parking < parking)).values(parking=parking))
 
 
 def is_match(conn: db.Connection, mailbox_id: int, message_id: str) -> bool:
@@ -129,7 +136,7 @@ def pending(conn: db.Connection, owner: str) -> list[Any]:
 
 def visible(conn: db.Connection, owner: str, item_id: int) -> Any:
     return conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.sender_domain, ReviewItem.received,
-                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, Mailbox.owner_sub)
+                               ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error, ReviewItem.matches, ReviewItem.parking, Mailbox.owner_sub)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id).where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
 
 
@@ -186,7 +193,7 @@ def stored_image(conn: db.Connection, owner: str, item_id: int, index: int) -> s
 def parking_held(row: Any) -> int:
     kinds = [e["booking"].get("kind") for e in json.loads(row["matches"])] if row["matches"] else []
     kinds += [s.get("kind") for s in suggestions_of(row["suggestion"])]
-    return sum(1 for k in kinds if k == "parking")
+    return max(sum(1 for k in kinds if k == "parking"), int(row["parking"] or 0))
 
 
 def linked(conn: db.Connection, row: Any, segments: Collection[int], target: int | None = None) -> Linked:
@@ -210,7 +217,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
             only_this: bool = False) -> Linked | None:
     lock(conn, item_id)
     seen = conn.execute(select(ReviewItem.id, ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.sender_domain,
-                               ReviewItem.reference, ReviewItem.matches, ReviewItem.suggestion)
+                               ReviewItem.reference, ReviewItem.matches, ReviewItem.suggestion, ReviewItem.parking)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
     if seen is None:
@@ -359,7 +366,7 @@ def matches(conn: db.Connection, owner: str, viewer: Viewer) -> list[MatchOut]:
 
 def _held(conn: db.Connection, owner: str, item_id: int) -> Any:
     lock(conn, item_id)
-    return conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches, ReviewItem.suggestion)
+    return conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.reason, ReviewItem.matches, ReviewItem.suggestion, ReviewItem.parking)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner), ReviewItem.matches.is_not(None))).fetchone()
 
@@ -428,7 +435,7 @@ def same_booking(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, 
 
 def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields: trips.SegmentIn) -> Linked | None:
     lock(conn, item_id)
-    seen = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.matches, ReviewItem.suggestion)
+    seen = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id, ReviewItem.matches, ReviewItem.suggestion, ReviewItem.parking)
                         .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                         .where(ReviewItem.id == item_id, _seen_by(owner))).fetchone()
     if seen is None:

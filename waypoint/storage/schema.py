@@ -307,6 +307,7 @@ review_items = Table(
     Column('reference', Text, doc="a keyed hash of the reservation code the message names, so items about one reservation show as one row; never the code itself; empty when the message names none or several"),
     Column('auto_state', Text, doc='"waiting" while the scan has yet to ask the AI about this item on its own, "read" once its suggestion was made that way; empty otherwise'),
     Column('auto_tries', Integer, nullable=False, server_default='0', doc='how many times asking the AI on its own failed for this item'),
+    Column('parking', Integer, doc='the most parking bookings the message was found to hold when it was read, however many were later dropped or could not be filed; never lowered; empty for an item made before this was kept'),
     UniqueConstraint('mailbox_id', 'message_id', name='uq_review_items_mailbox_message'),
     info={'doc': "mail that looked like a booking but couldn't be read (\"Couldn't read\"), for its mailbox's owner (and the household, when they share it); the message itself is in stored_messages; `suggestion` is the booking's fields (JSON) the optional AI read from it, for the person to confirm or edit, and `suggestion_error` why it couldn't (fixed text)"},
 )
