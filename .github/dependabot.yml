@@ -56,6 +56,10 @@ updates:
       # Remove once svelte-check accepts typescript 7.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+      # bits-ui 2.20 unmounts a closed dialog, sheet or list a frame later even where there are no animations (jsdom), which breaks Vitest tests that expect it gone at once.
+      # Held at 2.19.5 (exact in package.json) until those tests wait for the close; then remove this entry and the pin.
+      - dependency-name: bits-ui
+        versions: [">=2.20.0"]
     commit-message:
       prefix: web
 
