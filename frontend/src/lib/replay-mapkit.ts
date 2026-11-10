@@ -173,8 +173,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     try { map?.destroy(); } catch { map = null; }
     map = null;
   };
-  // MapKit JS does not reliably hide a factory-made annotation through `visible`, so nothing that must disappear is hidden that way:
-  // stops are on the map only once reached, and the one mover only while a leg is moving.
   let stopMarks: { annotation: MkAnnotation; ping: SVGElement; shown: boolean }[];
   try {
     stopMarks = stops.map((stop, i) => {
