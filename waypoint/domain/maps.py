@@ -39,7 +39,7 @@ class Policy:
 
 
 NO_POLICY = Policy(script=(), connect=(), img=(), worker=())
-POLICY = Policy(script=(mapkit.SCRIPT_HOST, "'wasm-unsafe-eval'"), connect=(mapkit.SERVICE_HOSTS,), img=(mapkit.SERVICE_HOSTS, "blob:"), worker=("blob:",))
+POLICY = Policy(script=("'wasm-unsafe-eval'",), connect=(mapkit.SERVICE_HOSTS, "blob:"), img=(mapkit.SERVICE_HOSTS, "blob:"), worker=(mapkit.SERVICE_HOSTS, "blob:"))
 
 
 def flag_on() -> bool:
@@ -50,7 +50,7 @@ def origin() -> str | None:
     parts = urllib.parse.urlsplit(os.environ.get(PUBLIC_URL_ENV, "").strip())
     if parts.scheme not in ("http", "https") or not parts.hostname:
         return None
-    return f"{parts.scheme}://{parts.netloc}"
+    return parts.hostname
 
 
 @lru_cache(maxsize=4)

@@ -39,6 +39,8 @@ function scriptAt(src: string, timeoutMs: number): Promise<Mk | null> {
     const tag = document.createElement("script");
     const done = (found: Mk | null) => { clearTimeout(timer); tag.onload = null; tag.onerror = null; resolve(found); };
     const timer = setTimeout(() => { tag.remove(); done(null); }, timeoutMs);
+    const nonce = document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce;
+    if (nonce) tag.nonce = nonce;
     tag.crossOrigin = "anonymous";
     tag.async = true;
     tag.onload = () => done(window.mapkit ?? null);

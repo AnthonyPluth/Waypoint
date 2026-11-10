@@ -65,6 +65,29 @@ describe("loading MapKit", () => {
     expect(scripts).toHaveLength(1);
   });
 
+  it("gives the script the page's nonce, as Apple's policy asks, when the page has one", async () => {
+    const mine = document.createElement("script");
+    mine.nonce = "abc123";
+    mine.setAttribute("nonce", "abc123");
+    document.body.append(mine);
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    expect(scripts[0].nonce).toBe("abc123");
+    scripts[0].onerror?.(new Event("error"));
+    await pending;
+    mine.remove();
+  });
+
+  it("sets no nonce when the page has none", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    expect(scripts[0].nonce).toBe("");
+    scripts[0].onerror?.(new Event("error"));
+    await pending;
+  });
+
   it("hands MapKit a fresh token each time it asks", async () => {
     vi.mocked(api).mockResolvedValue(on as never);
     const pending = loadMapkit();

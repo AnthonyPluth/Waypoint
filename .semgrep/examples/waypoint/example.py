@@ -91,7 +91,7 @@ CONSENT = "https://accounts.google.com/o/oauth2/v2/auth"
 gmail.list_messages(conn, mailbox, query)
 
 # ruleid: waypoint-mapkit-hosts
-MAP_SCRIPT = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js"
+MAP_SCRIPT = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
 # ruleid: waypoint-mapkit-hosts
 MAP_CONNECT = "connect-src 'self' https://*.apple-mapkit.com"
 # ok: waypoint-mapkit-hosts

@@ -18,7 +18,8 @@ from waypoint.server import handler
 
 KEY_ID = "MAPKEY1234"
 TEAM_ID = "TEAMID5678"
-SITE = "https://waypoint.example.test"
+SITE = "waypoint.example.test"
+ADDRESS = "https://waypoint.example.test"
 PRIVATE = ec.generate_private_key(ec.SECP256R1())
 
 
@@ -65,7 +66,7 @@ class Keys(unittest.TestCase):
         return path
 
     def configure(self, **changes):
-        env = {maps.FLAG_ENV: "on", maps.KEY_FILE_ENV: self.path, maps.KEY_ID_ENV: KEY_ID, maps.TEAM_ID_ENV: TEAM_ID, maps.PUBLIC_URL_ENV: SITE, **changes}
+        env = {maps.FLAG_ENV: "on", maps.KEY_FILE_ENV: self.path, maps.KEY_ID_ENV: KEY_ID, maps.TEAM_ID_ENV: TEAM_ID, maps.PUBLIC_URL_ENV: ADDRESS, **changes}
         patch = mock.patch.dict(os.environ, {k: v for k, v in env.items() if v is not None})
         patch.start()
         self.addCleanup(patch.stop)
@@ -78,7 +79,7 @@ class SigningTests(Keys):
         token, expires = mapkit.sign(mapkit.Credentials(PEM, KEY_ID, TEAM_ID), SITE, 1_700_000_000.9)
         header, claims, _, _ = parts(token)
         self.assertEqual(header, {"alg": "ES256", "kid": KEY_ID, "typ": "JWT"})
-        self.assertEqual(claims, {"iss": TEAM_ID, "iat": 1_700_000_000, "exp": 1_700_000_000 + 1800, "origin": SITE})
+        self.assertEqual(claims, {"iss": TEAM_ID, "iat": 1_700_000_000, "exp": 1_700_000_000 + 1800, "scope": "mapkit_js", "origin": SITE})
         self.assertEqual(expires, claims["exp"])
         self.assertTrue(verifies(token, PRIVATE.public_key()))
         self.assertFalse(verifies(token, ec.generate_private_key(ec.SECP256R1()).public_key()))
@@ -86,7 +87,7 @@ class SigningTests(Keys):
     def test_the_header_and_claims_are_built_in_one_place_and_pinned(self):
         creds = mapkit.Credentials(PEM, KEY_ID, TEAM_ID)
         self.assertEqual(mapkit.header(creds), {"alg": "ES256", "kid": KEY_ID, "typ": "JWT"})
-        self.assertEqual(mapkit.claims(creds, SITE, 10, 20), {"iss": TEAM_ID, "iat": 10, "exp": 20, "origin": SITE})
+        self.assertEqual(mapkit.claims(creds, SITE, 10, 20), {"iss": TEAM_ID, "iat": 10, "exp": 20, "scope": "mapkit_js", "origin": SITE})
         token, _ = mapkit.sign(creds, SITE, 10.0)
         self.assertEqual(parts(token)[0], mapkit.header(creds))
         self.assertEqual(parts(token)[1], mapkit.claims(creds, SITE, 10, 10 + mapkit.TOKEN_LIFETIME))
@@ -157,9 +158,9 @@ class ConfigurationTests(Keys):
         self.assertTrue(verifies(issued.token, other.public_key()))
         self.assertFalse(verifies(issued.token, PRIVATE.public_key()))
 
-    def test_the_origin_is_the_address_without_a_path(self):
+    def test_the_origin_is_the_host_alone_as_apple_describes_it(self):
         for given, want in {"https://waypoint.example.test": SITE, "https://waypoint.example.test/": SITE, "https://waypoint.example.test/app/x?y=1": SITE,
-                            "http://192.168.1.5:8080/": "http://192.168.1.5:8080"}.items():
+                            "http://192.168.1.5:8080/": "192.168.1.5", "https://Waypoint.Example.Test:8443": SITE}.items():
             with self.subTest(given):
                 self.configure(**{maps.PUBLIC_URL_ENV: given})
                 self.assertEqual(maps.origin(), want)
@@ -170,6 +171,7 @@ class ConfigurationTests(Keys):
         assert issued
         self.assertEqual(parts(issued.token)[1]["origin"], SITE)
         self.assertEqual(issued.script, mapkit.SCRIPT_URL)
+        self.assertEqual(mapkit.SCRIPT_URL, "https://cdn.apple-mapkit.com/mk/x/mapkit.js")
         self.assertEqual(issued.expires, 1_700_001_800)
 
 
@@ -189,10 +191,11 @@ class PolicyTests(Keys):
     def test_the_policy_names_apples_hosts_only_when_enabled(self):
         self.configure()
         csp = handler.content_security_policy("N")
-        self.assertIn("script-src 'nonce-N' 'strict-dynamic' 'self' https://cdn.apple-mapkit.com 'wasm-unsafe-eval';", csp)
+        self.assertIn("script-src 'nonce-N' 'strict-dynamic' 'self' 'wasm-unsafe-eval';", csp)
         self.assertIn("img-src 'self' data: https://*.apple-mapkit.com blob:;", csp)
-        self.assertIn("connect-src 'self' https://*.apple-mapkit.com;", csp)
-        self.assertIn("worker-src 'self' blob:;", csp)
+        self.assertIn("connect-src 'self' https://*.apple-mapkit.com blob:;", csp)
+        self.assertIn("worker-src 'self' https://*.apple-mapkit.com blob:;", csp)
+        self.assertIn("frame-src 'none';", csp)
         for directive in ("default-src 'self'", "frame-src 'none'", "object-src 'none'", "base-uri 'none'", "frame-ancestors 'none'", "style-src 'self' 'unsafe-inline'"):
             self.assertIn(directive, csp)
 
@@ -232,7 +235,7 @@ class TokenRouteTests(ServerCase, Keys):
         self.assertEqual(sorted(body), ["enabled", "expires", "script", "token"])
         self.assertTrue(body["enabled"])
         header, claims, _, _ = parts(body["token"])
-        self.assertEqual(sorted(claims), ["exp", "iat", "iss", "origin"])
+        self.assertEqual(sorted(claims), ["exp", "iat", "iss", "origin", "scope"])
         self.assertEqual((header["kid"], claims["iss"], claims["origin"]), (KEY_ID, TEAM_ID, SITE))
         self.assertEqual(claims["exp"] - claims["iat"], 1800)
         self.assertEqual(body["expires"], claims["exp"])
@@ -245,7 +248,7 @@ class TokenRouteTests(ServerCase, Keys):
         text = json.dumps(body)
         for secret in (key_line(), "PRIVATE KEY", self.path):
             self.assertNotIn(secret, text)
-        self.assertEqual(sorted(parts(body["token"])[1]), ["exp", "iat", "iss", "origin"])
+        self.assertEqual(sorted(parts(body["token"])[1]), ["exp", "iat", "iss", "origin", "scope"])
 
     def test_it_is_not_cached(self):
         self.configure()

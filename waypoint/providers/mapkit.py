@@ -7,8 +7,8 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from .. import es256
 
-SCRIPT_URL = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js"
-SCRIPT_HOST = "https://cdn.apple-mapkit.com"
+SCRIPT_URL = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
+SCOPE = "mapkit_js"
 SERVICE_HOSTS = "https://*.apple-mapkit.com"
 TOKEN_LIFETIME = 30 * 60
 
@@ -25,7 +25,7 @@ def header(creds: Credentials) -> dict[str, str]:
 
 
 def claims(creds: Credentials, origin: str, issued: int, expires: int) -> dict[str, str | int]:
-    return {"iss": creds.team_id, "iat": issued, "exp": expires, "origin": origin}
+    return {"iss": creds.team_id, "iat": issued, "exp": expires, "scope": SCOPE, "origin": origin}
 
 
 def sign(creds: Credentials, origin: str, now: float) -> tuple[str, int]:
