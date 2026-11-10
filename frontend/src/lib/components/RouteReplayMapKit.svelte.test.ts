@@ -7,10 +7,11 @@ vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$li
 
 import { api } from "$lib/api";
 import type { TripPlaces } from "$lib/api-types";
+import { app } from "$lib/app.svelte";
 import { forgetMapkit } from "$lib/mapkit";
 import { stopsOf } from "$lib/route-replay";
 import { fake, fakeMaps, fakeMk } from "../../test/fake-mapkit";
-import { segment, trip } from "../../test/fixtures";
+import { segment, state, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
@@ -59,7 +60,7 @@ beforeEach(() => {
   vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mapkit/token" ? token : places) as never);
   vi.spyOn(document.head, "append").mockImplementation((...nodes) => { scripts.push(...(nodes as HTMLScriptElement[])); });
 });
-afterEach(() => { cleanup(); delete (window as { mapkit?: unknown }).mapkit; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { app.state = null; cleanup(); delete (window as { mapkit?: unknown }).mapkit; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const labels = (c: HTMLElement) => [...c.querySelectorAll("[data-label][data-visible='true']")].map((l) => l.getAttribute("data-label"));
 const svg = (c: HTMLElement) => c.querySelector("svg[data-zoomed]");
@@ -79,6 +80,25 @@ describe("RouteReplay with the flag off", () => {
     expect(scripts).toHaveLength(0);
     expect(fake.maps).toHaveLength(0);
     expect(vi.mocked(api).mock.calls.map((c) => c[0]).sort()).toEqual(["/api/mapkit/token", "/api/trips/1/places"]);
+  });
+
+  it("asks nothing about maps when the server's state says MapKit is not active, and plays at once", async () => {
+    app.state = state({ mapkit: false });
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(svg(container)).toBeTruthy();
+    expect(vi.mocked(api).mock.calls.map((c) => c[0])).toEqual(["/api/trips/1/places"]);
+  });
+
+  it("still asks when the state says MapKit is active, or doesn't say", async () => {
+    for (const mapkit of [true, undefined]) {
+      forgetMapkit();
+      vi.mocked(api).mockClear();
+      app.state = state(mapkit === undefined ? {} : { mapkit });
+      render(RouteReplay, { trip: trip(flights), now: after });
+      await waitFor(() => expect(vi.mocked(api).mock.calls.map((c) => c[0])).toContain("/api/mapkit/token"));
+      cleanup();
+    }
   });
 
   it("asks nothing about maps for a trip that has no replay", async () => {
@@ -181,6 +201,8 @@ describe("RouteReplayMap on MapKit", () => {
     const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, maps });
     await waitFor(() => expect(svg(container)).toBeTruthy());
     expect(maps.watching()).toBe(0);
+    expect(fake.last().destroyed).toBe(true);
+    expect(fake.listening("error")).toBe(0);
   });
 
   it("falls back when MapKit fails through the session, and takes the map down", async () => {

@@ -20,7 +20,7 @@ Open `http://localhost:8765` and add household members and bookings straight awa
 
 The Compose file publishes port 8765 on localhost only. Without sign-in, anyone who can reach the app sees the household’s trips and can change its settings, so before you publish the port to other devices, keep it on a trusted private network or turn on sign-in. Never publish an unauthenticated instance to the internet.
 
-Gmail, AI suggestions, live flight status, connected assistants and push notifications are optional and each has its own page. [Brand logos](/Waypoint/start/logos/) and the trip map are bundled and need no connection (the route replay can use Apple’s map if you add a MapKit key, [with what that tells Apple](/Waypoint/start/trips/#apples-map-for-the-route-replay)).
+Gmail, AI suggestions, live flight status, connected assistants and push notifications are optional and each has its own page. [Brand logos](/Waypoint/start/logos/) and the trip map are bundled and need no connection (the route replay can use Apple’s map if you add a MapKit key, [with what that tells Apple and who you then trust](/Waypoint/start/trips/#apples-map-for-the-route-replay)).
 
 The image is `ghcr.io/anthonypluth/waypoint:latest`, for Intel/AMD and ARM. To stay on a version, pin a tag in `docker-compose.yml`: `image: ghcr.io/anthonypluth/waypoint:2` follows a major version, `:2.131` a minor one and `:2.131.5` one release.
 

@@ -79,6 +79,14 @@ class SigningTests(Keys):
         self.assertTrue(verifies(token, PRIVATE.public_key()))
         self.assertFalse(verifies(token, ec.generate_private_key(ec.SECP256R1()).public_key()))
 
+    def test_the_header_and_claims_are_built_in_one_place_and_pinned(self):
+        creds = mapkit.Credentials(PEM, KEY_ID, TEAM_ID)
+        self.assertEqual(mapkit.header(creds), {"alg": "ES256", "kid": KEY_ID, "typ": "JWT"})
+        self.assertEqual(mapkit.claims(creds, SITE, 10, 20), {"iss": TEAM_ID, "iat": 10, "exp": 20, "origin": SITE})
+        token, _ = mapkit.sign(creds, SITE, 10.0)
+        self.assertEqual(parts(token)[0], mapkit.header(creds))
+        self.assertEqual(parts(token)[1], mapkit.claims(creds, SITE, 10, 10 + mapkit.TOKEN_LIFETIME))
+
     def test_a_token_lives_thirty_minutes(self):
         self.assertEqual(mapkit.TOKEN_LIFETIME, 1800)
 
@@ -169,6 +177,7 @@ class PolicyTests(Keys):
                 self.configure(**changes)
                 self.assertEqual(handler.content_security_policy("N"), plain)
         self.assertNotIn("apple", plain)
+        self.assertNotIn("wasm-unsafe-eval", plain)
         self.assertIn("img-src 'self' data:;", plain)
         self.assertIn("connect-src 'self';", plain)
         self.assertIn("worker-src 'self';", plain)
@@ -176,7 +185,7 @@ class PolicyTests(Keys):
     def test_the_policy_names_apples_hosts_only_when_enabled(self):
         self.configure()
         csp = handler.content_security_policy("N")
-        self.assertIn("script-src 'nonce-N' 'strict-dynamic' 'self' https://cdn.apple-mapkit.com;", csp)
+        self.assertIn("script-src 'nonce-N' 'strict-dynamic' 'self' https://cdn.apple-mapkit.com 'wasm-unsafe-eval';", csp)
         self.assertIn("img-src 'self' data: https://*.apple-mapkit.com blob:;", csp)
         self.assertIn("connect-src 'self' https://*.apple-mapkit.com;", csp)
         self.assertIn("worker-src 'self' blob:;", csp)

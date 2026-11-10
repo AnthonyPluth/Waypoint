@@ -1,12 +1,18 @@
 (() => {
-  const WORLD = 2 ** 28;
+  const WORLD = 1;
   const SVG = "http://www.w3.org/2000/svg";
   const listeners = {};
   const state = { tokens: [], maps: [] };
   const toPoint = (c) => ({ x: ((c.longitude + 180) / 360) * WORLD, y: (0.5 - Math.log(Math.tan(Math.PI / 4 + (Math.max(-85, Math.min(85, c.latitude)) * Math.PI) / 360)) / (2 * Math.PI)) * WORLD });
 
   class Coordinate { constructor(latitude, longitude) { this.latitude = latitude; this.longitude = longitude; } }
-  class MapRect { constructor(x, y, width, height) { this.x = x; this.y = y; this.width = width; this.height = height; } }
+  class MapRect {
+    constructor(x, y, width, height) {
+      for (const v of [x, y, width, height]) if (!(v >= 0 && v <= 1)) throw new RangeError("MapRect values are normalized to 0..1, got " + v);
+      if (x + width > 1 || y + height > 1) throw new RangeError("MapRect reaches outside the world");
+      this.x = x; this.y = y; this.width = width; this.height = height;
+    }
+  }
   class Style { constructor(options) { Object.assign(this, options); } }
   class Annotation {
     constructor(coordinate, factory, options = {}) { this.coordinate = coordinate; this.factory = factory; this.visible = options.visible !== false; }

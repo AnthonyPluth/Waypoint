@@ -33,9 +33,10 @@ describe("the map's projection", () => {
   it("places the world's corners in MapKit's units", () => {
     expect(mapPoint(0, -180)).toEqual({ x: 0, y: WORLD / 2 });
     expect(mapPoint(0, 180).x).toBe(WORLD);
-    expect(mapPoint(MAX_LATITUDE, 0).y).toBeLessThan(500);
+    expect(mapPoint(MAX_LATITUDE, 0).y).toBeLessThan(1e-5);
     expect(mapPoint(90, 0)).toEqual(mapPoint(MAX_LATITUDE, 0));
-    expect(mapPoint(-90, 0).y).toBeGreaterThan(WORLD - 500);
+    expect(mapPoint(-90, 0).y).toBeGreaterThan(WORLD - 1e-5);
+    expect(WORLD).toBe(1);
   });
 
   it("is a Mercator fit of the same stops the flat map shows", () => {
@@ -46,6 +47,30 @@ describe("the map's projection", () => {
     const back = projection.invert!([x, y])!;
     expect(back[0]).toBeCloseTo(-93.22, 3);
     expect(back[1]).toBeCloseTo(44.88, 3);
+  });
+});
+
+describe("the fake MapKit's rectangles", () => {
+  it("refuse values outside 0 to 1, as MapKit JS's normalized units do", () => {
+    expect(() => new fakeMk.MapRect(0.1, 0.2, 0.3, 0.3)).not.toThrow();
+    expect(() => new fakeMk.MapRect(2 ** 27, 0, 100, 100)).toThrow(RangeError);
+    expect(() => new fakeMk.MapRect(0.9, 0, 0.2, 0.1)).toThrow(/outside the world/);
+    expect(() => new fakeMk.MapRect(-0.1, 0, 0.2, 0.1)).toThrow(RangeError);
+  });
+
+  it("see every camera move the replay makes inside the world", () => {
+    const stops = [stopAt("Denver", 39.86, -104.67), stopAt("Salt Lake City", 40.79, -111.98, "flight"), stopAt("Park City", 40.65, -111.5, null, "stay")];
+    const { replay } = start({ stops });
+    for (const progress of [0, 0.2, 0.5, 0.8, 1]) replay.update({ progress, playing: true, calm: false });
+    replay.update({ progress: 1, playing: false, calm: true });
+    const rects = fake.last().rects;
+    expect(rects.length).toBeGreaterThan(2);
+    for (const r of rects) {
+      expect(r.x).toBeGreaterThanOrEqual(0);
+      expect(r.y).toBeGreaterThanOrEqual(0);
+      expect(r.x + r.width).toBeLessThanOrEqual(1);
+      expect(r.y + r.height).toBeLessThanOrEqual(1);
+    }
   });
 });
 
@@ -248,6 +273,14 @@ describe("the MapKit map", () => {
     fake.broken = true;
     expect(() => replay.update({ progress: 0.5, playing: true, calm: false })).not.toThrow();
     expect(opts.onFailure).toHaveBeenCalled();
+  });
+
+  it("tears down a half-built map before it throws, leaving no listener behind", () => {
+    fake.broken = true;
+    expect(() => createReplayMap(fakeMk, document.createElement("div"), options())).toThrow("MapKit failed");
+    expect(fake.last().destroyed).toBe(true);
+    expect(fake.last().annotations.size).toBe(0);
+    expect(fake.listening("error")).toBe(0);
   });
 
   it("keeps a throwing teardown from stopping the rest", () => {

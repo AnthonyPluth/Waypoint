@@ -20,12 +20,19 @@ class Credentials:
     team_id: str
 
 
+def header(creds: Credentials) -> dict[str, str]:
+    return {"alg": "ES256", "kid": creds.key_id, "typ": "JWT"}
+
+
+def claims(creds: Credentials, origin: str, issued: int, expires: int) -> dict[str, str | int]:
+    return {"iss": creds.team_id, "iat": issued, "exp": expires, "origin": origin}
+
+
 def sign(creds: Credentials, origin: str, now: float) -> tuple[str, int]:
     key = serialization.load_pem_private_key(creds.key_pem, password=None)
     if not isinstance(key, ec.EllipticCurvePrivateKey):
         raise ValueError("the MapKit key isn't an elliptic-curve key")
     issued = int(now)
     expires = issued + TOKEN_LIFETIME
-    token = es256.sign_jwt(key, {"alg": "ES256", "kid": creds.key_id, "typ": "JWT"},
-                           {"iss": creds.team_id, "iat": issued, "exp": expires, "origin": origin})
+    token = es256.sign_jwt(key, header(creds), claims(creds, origin, issued, expires))
     return token, expires

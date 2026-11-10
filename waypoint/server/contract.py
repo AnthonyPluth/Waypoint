@@ -27,6 +27,7 @@ class State(TypedDict):
     person_id: int | None
     ai: bool
     show_costs: bool
+    mapkit: NotRequired[bool]
 
 
 class ShowCosts(TypedDict):

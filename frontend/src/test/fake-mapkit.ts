@@ -38,7 +38,12 @@ export const fakeMk: Mk = {
   Map: Object.assign(FakeMap as unknown as Mk["Map"], { ColorSchemes: { Dark: "dark" } }),
   FeatureVisibility: { Hidden: "hidden" },
   Coordinate: class { constructor(readonly latitude: number, readonly longitude: number) {} } as unknown as Mk["Coordinate"],
-  MapRect: class { constructor(readonly x: number, readonly y: number, readonly width: number, readonly height: number) {} } as unknown as Mk["MapRect"],
+  MapRect: class {
+    constructor(readonly x: number, readonly y: number, readonly width: number, readonly height: number) {
+      for (const v of [x, y, width, height]) if (!(v >= 0 && v <= 1)) throw new RangeError(`MapRect values are normalized to 0..1, got ${v}`);
+      if (x + width > 1 || y + height > 1) throw new RangeError("MapRect reaches outside the world");
+    }
+  } as unknown as Mk["MapRect"],
   Annotation: class {
     visible = true;
     constructor(public coordinate: MkCoordinate, readonly factory: () => HTMLElement, readonly options: Record<string, unknown> = {}) { this.visible = options.visible !== false; }

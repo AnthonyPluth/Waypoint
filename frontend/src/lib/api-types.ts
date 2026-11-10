@@ -1049,6 +1049,7 @@ export interface State {
   person_id: number | null;
   ai: boolean;
   show_costs: boolean;
+  mapkit?: boolean;
 }
 
 export interface Stats {

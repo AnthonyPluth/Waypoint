@@ -361,7 +361,7 @@ rules:
     message: >-
       Only waypoint/providers/mapkit.py names Apple's MapKit hosts, so the page's Content-Security-Policy, the script the
       browser loads and the token's origin stay in one place and nothing reaches Apple unless a MapKit key is configured
-      (AGENTS.md, "You see the trips you're on"): use what that module exports rather than naming the hosts elsewhere.
+      (AGENTS.md, "You see the trips you're on": with MapKit active Apple's unpinned script runs in the page with the app's own access): use what that module exports rather than naming the hosts elsewhere.
     severity: ERROR
     languages: [generic]
     pattern-regex: (?i)apple-mapkit

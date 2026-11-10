@@ -10,7 +10,7 @@ export type Palette = { route: string; stay: string; border: string };
 export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
-export const WORLD = 2 ** 28;
+export const WORLD = 1;
 export const MAX_LATITUDE = 85.0511;
 export const SAMPLES = 64;
 export const FLIGHT_WIDTH = 2.5;
@@ -159,14 +159,26 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   mk.addEventListener("error", watch);
 
   const ends: (() => void)[] = [];
+  const release = () => {
+    mk.removeEventListener("error", watch);
+    for (const end of ends) { try { end(); } catch { continue; } }
+    try { map?.destroy(); } catch { map = null; }
+    map = null;
+  };
   const addAnnotation = (a: MkAnnotation) => { map?.addAnnotation(a); ends.push(() => map?.removeAnnotation(a)); };
-  const stopMarks = stops.map((stop, i) => {
-    const made = stopElement(stop);
-    const annotation = new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: false });
-    annotation.visible = false;
-    addAnnotation(annotation);
-    return { annotation, ping: made.ping };
-  });
+  let stopMarks: { annotation: MkAnnotation; ping: SVGElement }[];
+  try {
+    stopMarks = stops.map((stop, i) => {
+      const made = stopElement(stop);
+      const annotation = new mk.Annotation(coordinate(spots[i]), () => made.node, { visible: false });
+      annotation.visible = false;
+      addAnnotation(annotation);
+      return { annotation, ping: made.ping };
+    });
+  } catch (e) {
+    release();
+    throw e;
+  }
   const moverMarks = new Map<number, { annotation: MkAnnotation; body: SVGElement }>();
   const legMarks = new Map<number, { overlay: MkOverlay; done: number }>();
   const roadMarks = new Map<number, MkOverlay>();
@@ -253,11 +265,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
     update(frame) {
       try { draw(frame); } catch { onFailure(); }
     },
-    destroy() {
-      mk.removeEventListener("error", watch);
-      for (const end of ends) { try { end(); } catch { continue; } }
-      try { map?.destroy(); } catch { map = null; }
-      map = null;
-    },
+    destroy: release,
   };
 }

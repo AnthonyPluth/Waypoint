@@ -8618,6 +8618,9 @@
           },
           "show_costs": {
             "type": "boolean"
+          },
+          "mapkit": {
+            "type": "boolean"
           }
         },
         "required": [

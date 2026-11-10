@@ -24,6 +24,12 @@ class StateTests(DbCase):
         with mock.patch.object(db, "using_postgres", return_value=True):
             self.assertEqual(state.api_state(self.c, {}, {})["database"], "postgres")
 
+    def test_it_says_whether_mapkit_is_active(self):
+        with mock.patch.dict(os.environ, {"WAYPOINT_MAPKIT_KEY_FILE": "", "WAYPOINT_MAPKIT_ENABLED": ""}):
+            self.assertIs(state.api_state(self.c, {}, {})["mapkit"], False)
+        with mock.patch("waypoint.domain.maps.enabled", return_value=True):
+            self.assertIs(state.api_state(self.c, {}, {})["mapkit"], True)
+
     def test_costs_show_until_switched_off(self):
         self.assertTrue(state.api_state(self.c, {}, {})["show_costs"])
         self.assertEqual(state.api_show_costs_save(self.c, {}, {"show_costs": False}), {"show_costs": False})
@@ -66,4 +72,4 @@ class LocalStateTests(ServerCase):
         self.assertEqual(code, 200)
         self.assertEqual(st, {"version": "v9.8.7", "database": "postgres" if db.using_postgres() else "sqlite",
                               "user": {"name": None, "email": None, "local": True}, "last_backup": None,
-                              "review_count": 0, "person_id": None, "ai": False, "show_costs": True})
+                              "review_count": 0, "person_id": None, "ai": False, "show_costs": True, "mapkit": False})
