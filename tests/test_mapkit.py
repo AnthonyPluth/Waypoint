@@ -29,6 +29,10 @@ def pem_of(key) -> bytes:
 PEM = pem_of(PRIVATE)
 
 
+def key_line() -> str:
+    return PEM.decode().splitlines()[1]
+
+
 def unb64(text: str) -> bytes:
     return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
 
@@ -239,7 +243,7 @@ class TokenRouteTests(ServerCase, Keys):
         self.configure()
         _, body = self.token("/api/mapkit/token?trip=1&segment=2&near=39.7,-104.9")
         text = json.dumps(body)
-        for secret in (SECRET_LINE, "PRIVATE KEY", self.path):
+        for secret in (key_line(), "PRIVATE KEY", self.path):
             self.assertNotIn(secret, text)
         self.assertEqual(sorted(parts(body["token"])[1]), ["exp", "iat", "iss", "origin"])
 
@@ -252,10 +256,10 @@ class TokenRouteTests(ServerCase, Keys):
     def test_the_key_and_the_token_are_never_logged_or_sent_on(self):
         self.configure()
         sealed = "TOKEN.CANARY.0123456789abcdef"
-        with no_leaks(self, SECRET_LINE, sealed, self.path, KEY_ID, TEAM_ID):
+        with no_leaks(self, key_line(), sealed, self.path, KEY_ID, TEAM_ID):
             with mock.patch.object(mapkit, "sign", return_value=(sealed, 5)):
                 status, body = self.token()
-            self.configure(**{maps.KEY_FILE_ENV: self.write("junk.p8", SECRET_LINE.encode() + b"\n")})
+            self.configure(**{maps.KEY_FILE_ENV: self.write("junk.p8", b"junk not-a-key\n")})
             self.token()
             self.configure(**{maps.KEY_FILE_ENV: os.path.join(self.folder, "gone.p8")})
             self.token()
