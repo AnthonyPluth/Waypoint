@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from waypoint import verify
+from waypoint.domain import maps
 
 REAL_POPEN = subprocess.Popen
 
@@ -183,6 +184,16 @@ class InstanceTests(unittest.TestCase):
             datas = [call.kwargs["env"]["WAYPOINT_DATA"] for call in popen.call_args_list]
             self.assertEqual(datas, [i.data for i in instances])
             self.assertTrue(all(call.kwargs["env"]["FAKETIME"] == verify.FROZEN_NOW for call in popen.call_args_list))
+
+    def test_the_last_server_alone_is_the_mapkit_one(self):
+        with tempfile.TemporaryDirectory() as root:
+            _, run, popen_patch, port, ready, popen = self.fakes(root)
+            with run, popen_patch, port, ready:
+                instances = verify.start_instances(root, 2, "/lib/f.so", None, True)
+            self.assertEqual(len(instances), 3)
+            envs = [call.kwargs["env"] for call in popen.call_args_list]
+            self.assertEqual([maps.KEY_FILE_ENV in e for e in envs], [False, False, True])
+            self.assertEqual(envs[2][maps.PUBLIC_URL_ENV], instances[2].url)
 
     def test_one_server_is_served_from_the_seeded_folder_itself(self):
         with tempfile.TemporaryDirectory() as root:
@@ -397,6 +408,35 @@ class SignedInTests(unittest.TestCase):
         self.assertNotIn("--signed-url", plain)
         both = verify.node_command("node", "/f", ["http://a"], [], [], "http://b")
         self.assertEqual(both[both.index("--signed-url") + 1], "http://b")
+
+    def test_a_mapkit_server_is_started_only_when_a_selected_flow_asks_for_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, body in (("a.json", {"name": "a", "steps": []}), ("b.json", {"name": "b", "page": "trips", "mapkit": "fake", "steps": []})):
+                with open(os.path.join(tmp, name), "w") as f:
+                    json.dump(body, f)
+            need = lambda pages=None, only=None: verify.flows_need_mapkit(pages, only, tmp)
+            self.assertTrue(need())
+            self.assertTrue(need(None, ["b"]))
+            self.assertFalse(need(None, ["a"]))
+            self.assertTrue(need(["trips"]))
+            self.assertFalse(need(["settings"]))
+            self.assertFalse(verify.flows_need_signed_in(None, None, tmp))
+
+    def test_the_mapkit_server_gets_a_throwaway_key_and_the_default_flag_and_no_other_server_does(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = verify.mapkit_env({"A": "1"}, root, "http://127.0.0.1:9")
+            self.assertEqual(verify.mapkit_env({"A": "1"}, root, None), {"A": "1"})
+            self.assertNotIn(maps.FLAG_ENV, env)
+            self.assertEqual((env[maps.KEY_ID_ENV], env[maps.TEAM_ID_ENV], env[maps.PUBLIC_URL_ENV]), (verify.MAPKIT_KEY_ID, verify.MAPKIT_TEAM_ID, "http://127.0.0.1:9"))
+            with open(env[maps.KEY_FILE_ENV], "rb") as f:
+                self.assertIn(b"PRIVATE KEY", f.read())
+            with mock.patch.dict(os.environ, env):
+                self.assertTrue(maps.enabled())
+
+    def test_the_node_command_names_the_mapkit_server_only_when_there_is_one(self):
+        self.assertNotIn("--mapkit-url", verify.node_command("node", "/f", ["http://a"], [], []))
+        command = verify.node_command("node", "/f", ["http://a"], [], [], None, "http://c")
+        self.assertEqual(command[command.index("--mapkit-url") + 1], "http://c")
 
 
 if __name__ == "__main__":

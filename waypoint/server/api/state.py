@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime
 
-from ...domain import trips
+from ...domain import maps, trips
 from ...domain.mail import ai, review
 from ...storage import db
 from ...storage import settings_keys as sk
@@ -25,6 +25,7 @@ def api_state(conn, _q, _b) -> State:
         "person_id": viewer(conn).person_id,
         "ai": ai.config(conn) is not None,
         "show_costs": shows_costs(conn),
+        "mapkit": maps.enabled(),
     }
 
 

@@ -1,0 +1,41 @@
+{
+  "name": "trip-route-replay-mapkit-blocked",
+  "page": "trips",
+  "mapkit": "blocked",
+  "allow_console": [
+    "net::ERR_BLOCKED_BY_CLIENT"
+  ],
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Trips"
+      }
+    },
+    {
+      "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true"
+    },
+    {
+      "wait_for": "h1:has-text('Orlando')"
+    },
+    {
+      "wait_for": "section[aria-label='Route replay'] [data-testid='replay-map'] svg[data-zoomed]",
+      "timeout": 15000
+    },
+    {
+      "press": {
+        "selector": "input[aria-label='Position along the route']",
+        "key": "End"
+      }
+    },
+    {
+      "wait_for": "[data-testid='stop-list'] li:last-child[data-current='true']"
+    },
+    {
+      "wait_for": "[data-testid='legs'] path[data-leg]"
+    },
+    {
+      "screenshot": "replay-simple-map"
+    }
+  ]
+}

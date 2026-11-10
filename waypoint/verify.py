@@ -15,7 +15,11 @@ import urllib.request
 from collections.abc import Mapping
 from typing import Any, NamedTuple
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
 from . import tls
+from .domain import maps
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "artifacts", "verify")
@@ -31,6 +35,9 @@ FAKETIME_LIBRARIES = (
 FAKETIME_INSTALL = "sudo apt-get install libfaketime"
 SIGNED_IN_AS = ("jane", "sam")
 SIGNED_IN_ENV = "WAYPOINT_VERIFY_AS"
+MAPKIT_KEY_FILE = "mapkit-key.p8"
+MAPKIT_KEY_ID = "VERIFYKEY1"
+MAPKIT_TEAM_ID = "VERIFYTEAM"
 DEMO_MARKER = ".waypoint-verify-demo"
 FLOWS = os.path.join(ROOT, "frontend", "verify", "flows")
 
@@ -67,7 +74,25 @@ def signed_in_env(env: dict[str, str], who: str | None) -> dict[str, str]:
     return {**env, SIGNED_IN_ENV: who}
 
 
+def mapkit_env(env: dict[str, str], folder: str, url: str | None) -> dict[str, str]:
+    if url is None:
+        return env
+    key = ec.generate_private_key(ec.SECP256R1())
+    path = os.path.join(folder, MAPKIT_KEY_FILE)
+    with open(path, "wb") as f:
+        f.write(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    return {**env, maps.KEY_FILE_ENV: path, maps.KEY_ID_ENV: MAPKIT_KEY_ID, maps.TEAM_ID_ENV: MAPKIT_TEAM_ID, maps.PUBLIC_URL_ENV: url}
+
+
 def flows_need_signed_in(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
+    return flows_asking("signed_in", pages, only, folder)
+
+
+def flows_need_mapkit(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
+    return flows_asking("mapkit", pages, only, folder)
+
+
+def flows_asking(key: str, pages: list[str] | None, only: list[str] | None, folder: str) -> bool:
     try:
         names = sorted(n for n in os.listdir(folder) if n.endswith(".json"))
     except OSError:
@@ -78,7 +103,7 @@ def flows_need_signed_in(pages: list[str] | None = None, only: list[str] | None 
                 flow = json.load(f)
         except (OSError, ValueError):
             continue
-        if not isinstance(flow, dict) or flow.get("signed_in") is not True:
+        if not isinstance(flow, dict) or flow.get(key) in (None, False):
             continue
         if only:
             selected = flow.get("name") in only
@@ -126,12 +151,14 @@ def resolve_jobs(flag: int | None, env: Mapping[str, str] | None = None, cpus: i
     return jobs
 
 
-def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str], signed_url: str | None = None) -> list[str]:
+def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str], signed_url: str | None = None, mapkit_url: str | None = None) -> list[str]:
     command = [node, os.path.join(frontend, "verify", "verify.mjs")]
     for url in urls:
         command += ["--url", url]
     if signed_url:
         command += ["--signed-url", signed_url]
+    if mapkit_url:
+        command += ["--mapkit-url", mapkit_url]
     for flow in flows:
         command += ["--flow", flow]
     return [*command, "--out", OUT, "--images", IMAGES, "--now", FROZEN_NOW_ISO, *pages]
@@ -184,8 +211,8 @@ def mark_demo(folder: str) -> None:
         pass
 
 
-def start_instances(root: str, jobs: int, library: str, signed_in: str | None = None) -> list[Instance]:
-    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs + (signed_in is not None))]
+def start_instances(root: str, jobs: int, library: str, signed_in: str | None = None, with_mapkit: bool = False) -> list[Instance]:
+    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs + (signed_in is not None) + with_mapkit)]
     os.mkdir(folders[0])
     seeded = seed_demo(folders[0], library)
     if seeded.returncode:
@@ -198,7 +225,10 @@ def start_instances(root: str, jobs: int, library: str, signed_in: str | None = 
         for i, folder in enumerate(folders):
             port = free_port()
             log = os.path.join(folder, "server.log")
-            env = signed_in_env(frozen_env(clean_env(folder), library), signed_in if i == jobs else None)
+            asks_signed = signed_in is not None and i == jobs
+            asks_mapkit = with_mapkit and i == len(folders) - 1
+            env = signed_in_env(frozen_env(clean_env(folder), library), signed_in if asks_signed else None)
+            env = mapkit_env(env, folder, f"http://127.0.0.1:{port}" if asks_mapkit else None)
             with open(log, "w") as out:
                 server = subprocess.Popen(server_command(port), env=env, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
             started.append(Instance(folder, f"http://127.0.0.1:{port}", server, log))
@@ -238,16 +268,19 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     instances: list[Instance] = []
     try:
         signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) else None
+        with_mapkit = flows_need_mapkit(pages, flows)
         try:
-            instances = start_instances(root, count, library, signed)
+            instances = start_instances(root, count, library, signed, with_mapkit)
         except RuntimeError as e:
             print(f"verify: {e}", file=sys.stderr)
             return 2
         urls = [i.url for i in instances[:count]]
         signed_url = instances[count].url if signed else None
+        mapkit_url = instances[-1].url if with_mapkit else None
         print(f"verify: demo data served at {', '.join(urls)}" + (f" ({count} servers, each with its own copy of the data)" if count > 1 else "")
-              + (f"; signed in as {signed} at {signed_url} for the flows that ask for it" if signed_url else ""))
-        code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
+              + (f"; signed in as {signed} at {signed_url} for the flows that ask for it" if signed_url else "")
+              + (f"; MapKit on, with a throwaway key and a stand-in for Apple's script, at {mapkit_url} for the flows that ask for it" if mapkit_url else ""))
+        code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url, mapkit_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
         for instance in instances:
             if instance.server.poll() is not None:
                 print(f"verify: the server at {instance.url} exited with code {instance.server.returncode}\n{log_tail(instance.log)}", file=sys.stderr)

@@ -90,6 +90,13 @@ CONSENT = "https://accounts.google.com/o/oauth2/v2/auth"
 # ok: waypoint-google-hosts
 gmail.list_messages(conn, mailbox, query)
 
+# ruleid: waypoint-mapkit-hosts
+MAP_SCRIPT = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
+# ruleid: waypoint-mapkit-hosts
+MAP_CONNECT = "connect-src 'self' https://*.apple-mapkit.com"
+# ok: waypoint-mapkit-hosts
+policy = maps.POLICY
+
 # ruleid: waypoint-flightstatus-hosts
 STATUS_URL = "https://aerodatabox.p.rapidapi.com/flights/number/EX101/2026-11-20"
 # ruleid: waypoint-flightstatus-hosts

@@ -14,7 +14,7 @@ from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from ..domain import demo
+from ..domain import demo, maps
 from ..storage import db, secretbox
 from .. import monitoring, oidc
 from . import feed, jobs, mcp_access, mcp_http, mcp_oauth, mcp_server, oauth_http, routes, static
@@ -35,14 +35,22 @@ NOT_SAME_SITE = ("Blocked a request that didn’t come from Waypoint’s own add
 NO_APP_HEADER = ("Blocked a change that didn’t come from Waypoint’s app (it was missing the X-Waypoint header). Reload the page "
                  "and try again; if you run Waypoint behind a proxy, make sure it passes that header on.")
 
+def _sources(base: str, more: tuple[str, ...]) -> str:
+    return " ".join((base, *more))
+
+
 def content_security_policy(nonce: str | None = None) -> str:
-    scripts = f"'nonce-{nonce}' 'strict-dynamic' 'self'" if nonce else "'self'"
+    allowed = maps.POLICY if maps.enabled() else maps.NO_POLICY
+    scripts = _sources(f"'nonce-{nonce}' 'strict-dynamic' 'self'" if nonce else "'self'", allowed.script)
+    images = _sources("'self' data:", allowed.img)
+    connect = _sources("'self'", allowed.connect)
+    workers = _sources("'self'", allowed.worker)
     return ("default-src 'self'; "
             f"script-src {scripts}; "
             "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data:; font-src 'self'; "
-            "connect-src 'self'; "
-            "frame-src 'none'; worker-src 'self'; manifest-src 'self'; "
+            f"img-src {images}; font-src 'self'; "
+            f"connect-src {connect}; "
+            f"frame-src 'none'; worker-src {workers}; manifest-src 'self'; "
             "object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 
 

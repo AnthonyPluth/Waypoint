@@ -492,6 +492,13 @@ export interface MailboxList {
   mailboxes: Mailbox[];
 }
 
+export interface MapkitToken {
+  enabled: boolean;
+  token?: string;
+  expires?: number;
+  script?: string;
+}
+
 export interface MatchBody {
   entry: number;
   segment_id: number | null;
@@ -1042,6 +1049,7 @@ export interface State {
   person_id: number | null;
   ai: boolean;
   show_costs: boolean;
+  mapkit?: boolean;
 }
 
 export interface Stats {
@@ -1495,6 +1503,7 @@ export interface Endpoints {
   "POST /api/reminders": { body: RemindersBody; reply: Reminders };
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
   "DELETE /api/reminders/devices/{id}": { body: never; reply: Ok };
+  "GET /api/mapkit/token": { body: never; reply: MapkitToken };
   "GET /api/reminders/app": { body: never; reply: AppPush };
   "POST /api/reminders/app/devices": { body: AppDeviceBody; reply: ReminderDevice };
   "DELETE /api/reminders/app/devices/{id}": { body: never; reply: Ok };
