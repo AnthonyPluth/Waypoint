@@ -27,7 +27,6 @@ def pem_of(key) -> bytes:
 
 
 PEM = pem_of(PRIVATE)
-SECRET_LINE = PEM.decode().splitlines()[1]
 
 
 def unb64(text: str) -> bytes:
@@ -207,7 +206,7 @@ class TokenRouteTests(ServerCase, Keys):
 
     def test_it_answers_off_when_the_key_is_missing_or_wrong(self):
         for changes in ({maps.KEY_FILE_ENV: None}, {maps.KEY_FILE_ENV: os.path.join(self.folder, "gone.p8")}, {maps.KEY_ID_ENV: "x"},
-                        {maps.PUBLIC_URL_ENV: None}, {maps.KEY_FILE_ENV: self.write("junk.p8", b"junk " + SECRET_LINE.encode())}):
+                        {maps.PUBLIC_URL_ENV: None}, {maps.KEY_FILE_ENV: self.write("junk.p8", b"junk not-a-key")}):
             with self.subTest(changes):
                 self.configure(**changes)
                 status, body = self.token()
