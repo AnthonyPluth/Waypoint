@@ -383,7 +383,7 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
         stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
         left = [x for n, x in enumerate(suggestions, 1) if n != pick]
         review.set_suggestions(conn, int(row["mailbox_id"]), str(row["message_id"]), left, row["suggestion_error"])  # type: ignore[arg-type]
-        linked = review.linked(conn, row, fresh)
+        linked = review.linked(conn, row, fresh, target)
     else:
         linked = review.dismiss(conn, owner, item_id, (viewer, [target])) or review.linked(conn, row, [])
     made = trips.get_segment(conn, viewer, target)

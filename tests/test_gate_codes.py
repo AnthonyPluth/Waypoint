@@ -956,6 +956,13 @@ class ReviewPathTests(ScanAiCase, Kept):
             self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, item)
             self.assertEqual(len(self.fake.requests), 1, content)
 
+    def test_repeating_an_attach_that_already_committed_succeeds_the_same_way_and_asks_nothing(self):
+        item = self.fresh()
+        self.fake.content, self.fake.status = "{}", 500
+        first = self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
+        again = self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
+        self.assertEqual((first, again, len(self.fake.requests)), ({"ok": True, "segment_id": self.segment}, {"ok": True, "segment_id": self.segment}, 1))
+
     def test_a_booking_linked_to_the_message_before_counts_toward_the_limit_of_one(self):
         other = self.park({**PARKING, "confirmation": "PK30418"})
         item = self.fresh()

@@ -19,6 +19,7 @@ class Linked(NamedTuple):
     message_id: str
     segments: tuple[int, ...]
     parking: int = 0
+    target: int | None = None
 
 
 def _quietly(work: Callable[[], bool]) -> bool:

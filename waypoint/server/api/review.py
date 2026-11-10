@@ -96,7 +96,7 @@ def api_review_attach(_conn, _q, body: SegmentBody, item_id: str) -> Attached:
         if attached is None:
             raise ApiError(NO_ITEM, 404)
     _pick(attached)
-    return {"ok": True, "segment_id": attached.segments[0]}
+    return {"ok": True, "segment_id": int(attached.target or 0)}
 
 
 def api_review_ignore(conn, _q, _b, item_id: str) -> Ignoring:

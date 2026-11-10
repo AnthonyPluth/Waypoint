@@ -113,7 +113,7 @@ def _match(conn, body: AssistantMatchBody, item_id: str) -> tuple[gatecode.Linke
         raise ApiError(str(e)) from None
     if done is None:
         raise ApiError("That isn’t one of the bookings in this message")
-    target = done.segments[0]
+    target = int(done.target or 0)
     placed = visibility.visible_segment(conn, who, target)
     return done, {"ok": True, "segment_id": target, "trip_id": placed.trip_id if placed else 0}
 
