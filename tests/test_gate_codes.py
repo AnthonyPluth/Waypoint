@@ -885,7 +885,8 @@ class ReviewPathTests(ScanAiCase, Kept):
         seg = str(self.segment)
         return {
             "match": (dict(held=held), lambda i: self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, i)),
-            "attach": ({}, lambda i: self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), i)),
+            "attach then dismiss": ({}, lambda i: (self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), i),
+                                                   self.act(review_api.api_review_dismiss, {"segment": [seg]}, None, i))),
             "dismiss with the booking": ({}, lambda i: self.act(review_api.api_review_dismiss, {"segment": [seg]}, None, i)),
             "assistant match": (dict(held=held), lambda i: self.act(assistant_api.api_assistant_review_match, {}, {"entry": 1, "segment_id": self.segment}, i)),
             "assistant create from a held booking": (dict(held=held), lambda i: self.act(assistant_api.api_assistant_review_create, {}, {"entry": 1}, i)),
@@ -1026,10 +1027,19 @@ class ReviewPathTests(ScanAiCase, Kept):
 
     def test_repeating_an_attach_that_already_committed_succeeds_the_same_way_and_asks_nothing(self):
         item = self.fresh()
-        self.fake.content, self.fake.status = "{}", 500
         first = self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
         again = self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
-        self.assertEqual((first, again, len(self.fake.requests)), ({"ok": True, "segment_id": self.segment}, {"ok": True, "segment_id": self.segment}, 1))
+        self.assertEqual((first, again, self.fake.requests), ({"ok": True, "segment_id": self.segment}, {"ok": True, "segment_id": self.segment}, []))
+
+    def test_two_attaches_of_one_item_to_different_bookings_send_nothing_when_each_is_finished(self):
+        other = self.park({**PARKING, "confirmation": "PK30418"})
+        item = self.fresh()
+        self.act(review_api.api_review_attach, {}, dict(self.SUGGESTION), item)
+        self.act(review_api.api_review_attach, {}, {**self.SUGGESTION, "confirmation": "PK30418"}, item)
+        self.assertEqual(self.fake.requests, [])
+        self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, item)
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual(self.state(other), ("choose", "2026-10-16"))
 
     def test_a_booking_linked_to_the_message_before_counts_toward_the_limit_of_one(self):
         other = self.park({**PARKING, "confirmation": "PK30418"})

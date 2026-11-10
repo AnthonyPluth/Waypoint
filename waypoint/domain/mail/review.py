@@ -216,7 +216,6 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
     if seen is None:
         return None
     made = [n for n in bookings[1] if visibility.visible_segment(conn, bookings[0], n) is not None] if bookings is not None else []
-    fresh = unlinked(conn, made, int(seen["mailbox_id"]), str(seen["message_id"]))
     for n in made:
         stored_mail.link(conn, n, int(seen["mailbox_id"]), str(seen["message_id"]))
     if trust and made and seen["reason"] == "generic" and seen["sender_domain"] != UNKNOWN_SENDER:
@@ -227,7 +226,7 @@ def dismiss(conn: db.Connection, owner: str, item_id: int, bookings: tuple[Viewe
                          ReviewItem.reference == seen["reference"], ReviewItem.reason.in_(GROUPED), ReviewItem.matches.is_(None)))
     conn.execute(delete(ReviewItem).where(or_(*same)))
     stored_mail.prune(conn)
-    return linked(conn, seen, fresh)
+    return linked(conn, seen, made)
 
 
 def drop_suggestions(conn: db.Connection, owner: str, item_id: int, picks: list[int]) -> bool:
@@ -438,9 +437,8 @@ def attach(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, fields
     if found is None:
         raise trips.Invalid("That is no longer the same as a booking you can see")
     trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=found.id)
-    fresh = unlinked(conn, [int(found.id)], int(seen["mailbox_id"]), str(seen["message_id"]))
     stored_mail.link(conn, found.id, int(seen["mailbox_id"]), str(seen["message_id"]))
-    return linked(conn, seen, fresh, int(found.id))
+    return linked(conn, seen, [], int(found.id))
 
 
 def drop(conn: db.Connection, owner: str, item_id: int, entry_id: int) -> bool:
