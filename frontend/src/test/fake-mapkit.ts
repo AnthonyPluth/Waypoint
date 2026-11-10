@@ -19,7 +19,7 @@ export class FakeMap {
   destroy() { this.destroyed = true; }
 }
 
-export type DirectionsMode = "ok" | "flat" | "steps" | "error" | "empty" | "hang" | "throw" | "malformed" | "nan" | "short" | "mixed";
+export type DirectionsMode = "ok" | "slow" | "flat" | "steps" | "error" | "empty" | "hang" | "throw" | "malformed" | "nan" | "short" | "mixed";
 export type DirectionsCall = { origin: MkCoordinate; destination: MkCoordinate; transportType: unknown };
 
 export const windingPath = (from: MkCoordinate, to: MkCoordinate, steps = 12): MkCoordinate[][] => {
@@ -84,7 +84,7 @@ export const fakeMk: Mk = {
           else if (mode === "short") callback(null, { routes: [{ path: [[request.origin]] }] });
           else if (mode === "mixed") callback(null, { routes: [{ path: [[request.origin, [1, 2], request.destination]] }] });
           else callback(null, { routes: [{ path: windingPath(request.origin, request.destination) }] });
-        }, 0);
+        }, mode === "slow" ? 100 : 0);
         return id;
       }
       cancel(id: number): void { fake.directions.cancelled.push(id); }

@@ -15,14 +15,16 @@ afterEach(() => { vi.useRealTimers(); });
 
 describe("clearing the cache while requests are in flight", () => {
   it("keeps the old answers out, and keeps the limit of parallel calls for what comes next", async () => {
+    fake.directions.mode = "slow";
     const old = Array.from({ length: ROUTE_PARALLEL + 2 }, (_, n) => drivingRoute(fakeMk, from, to(n)));
     await vi.advanceTimersByTimeAsync(0);
     expect(fake.directions.calls).toHaveLength(ROUTE_PARALLEL);
     clearRouteCache();
-    await vi.advanceTimersByTimeAsync(20);
+    await vi.advanceTimersByTimeAsync(200);
     expect((await Promise.all(old)).every((r) => r === null)).toBe(true);
     expect(fake.directions.calls).toHaveLength(ROUTE_PARALLEL);
 
+    fake.directions.mode = "ok";
     const again = drivingRoute(fakeMk, from, to(0));
     await vi.advanceTimersByTimeAsync(20);
     expect(await again).not.toBeNull();
