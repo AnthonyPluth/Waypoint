@@ -56,7 +56,7 @@ jobs:
       statuses: write          # the "Merge gate" status
       actions: write           # read the pull request's workflow runs, and start main's release after a merge
       checks: read             # other apps' check runs
-    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/merge-gate.yml@b256f95f618d7bebdfe03016e20fdf8b906cd53d   # v3.2.0
     with:
       sha: ${{ github.event.workflow_run.head_sha || github.event.check_suite.head_sha }}
       pr: ${{ inputs.pr }}
