@@ -225,7 +225,7 @@ jobs:
   fleet-checks:
     permissions:
       contents: read
-    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/checks.yml@b256f95f618d7bebdfe03016e20fdf8b906cd53d   # v3.2.0
     with:
       # The runner, as JSON. The key is quoted because the workflow conventions check holds every `runs-on:` line to a
       # job's form, and this one is an input.
@@ -305,7 +305,7 @@ jobs:
     permissions:
       contents: write          # the ceiling for fleet's jobs; its build job takes contents: read
       packages: write
-    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b256f95f618d7bebdfe03016e20fdf8b906cd53d   # v3.2.0
     with:
       image: waypoint
       smoke-env: WAYPOINT_ALLOW_NO_AUTH=1
@@ -317,7 +317,7 @@ jobs:
     permissions:
       contents: write          # the tag and the release
       packages: write          # the push, and the cleanup of untagged versions
-    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b9f64fa5fd2859c87eabbbcda7b62e02b3dd0764   # v3.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/docker.yml@b256f95f618d7bebdfe03016e20fdf8b906cd53d   # v3.2.0
     with:
       image: waypoint
       publish: true
