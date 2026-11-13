@@ -36,7 +36,6 @@ PERMISSIONS = ("asset.read", "asset.view", "user.read", "map.read", "asset.downl
 class Refused(Exception):
     pass
 
-
 class NoSuchPerson(Exception):
     pass
 
