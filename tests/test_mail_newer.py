@@ -134,6 +134,16 @@ class ANewerEmailReplacesTheAttachedOne(NewerCase):
         self.assertEqual((seg["status"], seg["email_update"]), ("cancelled", None))
         self.assertEqual(self.held(segment), {"msg-flight_jsonld", "cancelled"})
 
+    def test_a_cancellation_with_no_date_still_cancels_the_booking(self):
+        segment = self.first()
+        undated = revised(name="cancelled").replace(b"ReservationConfirmed", b"ReservationCancelled").replace(f"Date: {LATER_DAY}\n".encode(), b"")
+        self.assertNotIn(b"Date:", undated)
+        self.add_mail("cancelled", undated)
+        self.scan(now=NOW + 60)
+        [seg] = self.segments()
+        self.assertEqual((seg["status"], seg["email_update"]), ("cancelled", None))
+        self.assertIn("msg-flight_jsonld", self.held(segment))
+
     def test_a_message_that_says_it_changed_but_cannot_be_read_goes_to_review_and_changes_nothing(self):
         segment = self.first()
         before = self.segments()[0]
@@ -209,8 +219,15 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
         self.sent: list[dict] = []
         self.read(lambda conn: reminders.add_device(conn, "u-jane", *subscription(), time.time()))
 
+    failing = False
+
     def send(self, _device, message):
+        if self.failing:
+            raise RuntimeError("unreachable")
         self.sent.append(message)
+
+    def retrying(self) -> int:
+        return self.read(lambda conn: conn.execute(select(func.count()).select_from(ReminderSent).where(ReminderSent.kind == "times_retry")).scalar())
 
     def due(self, now: datetime, since: float = NOW) -> int:
         return self.read(lambda conn: reminders.times_due(conn, since, now, lambda: self.send))
@@ -254,3 +271,39 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
         self.changed()
         self.read(lambda conn: reminders.set_prefs(conn, "u-jane", {"check_in": False, "day_of": True, "review": True}))
         self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
+
+    def test_a_failed_push_is_retried_by_a_later_scan_until_it_is_delivered(self):
+        self.changed()
+        later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+        self.failing = True
+        self.assertEqual(self.due(later), 0)
+        self.assertEqual((self.sent, self.retrying()), ([], 1))
+        self.failing = False
+        self.assertEqual(self.due(later, since=NOW + 3600), 1)
+        self.assertEqual((len(self.sent), self.retrying()), (1, 0))
+        self.assertEqual(self.due(later, since=NOW + 7200), 0)
+
+    def test_a_retry_is_forgotten_once_the_flight_has_left_or_the_person_turned_it_off(self):
+        self.changed()
+        self.failing = True
+        self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
+        self.assertEqual(self.retrying(), 1)
+        self.failing = False
+        self.assertEqual(self.due(datetime(2026, 11, 21, 12, 0, tzinfo=UTC), since=NOW + 3600), 0)
+        self.assertEqual((self.sent, self.retrying()), ([], 0))
+        self.failing = True
+        self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC))
+        self.read(lambda conn: reminders.set_prefs(conn, "u-jane", {"check_in": False, "day_of": True, "review": True}))
+        self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC), since=NOW + 3600)
+        self.assertEqual(self.retrying(), 0)
+
+    def test_the_changed_confirmation_is_pushed_when_another_confirmation_of_the_same_flight_is_unchanged(self):
+        self.first()
+        [original] = self.segments()
+        copy = {k: original[k] for k in ("kind", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin", "destination", "details")}
+        added = self.read(lambda conn: trips.add_segment(conn, self.jane, {**copy, "status": "confirmed", "confirmation": "ZZ9Y8X"}))
+        assert added is not None
+        self.read(lambda conn: conn.execute(Segment.__table__.update().where(Segment.id == added["id"]).values(
+            email_updated=NOW + 60, email_update=json.dumps({"updated": ["start_local"], "disagreed": []}))))
+        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 1)
+        self.assertEqual(len(self.sent), 1)

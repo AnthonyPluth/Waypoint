@@ -21,7 +21,7 @@ from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
 
-Kind = Literal["check_in", "day_of", "review", "review_retry", "times"]
+Kind = Literal["check_in", "day_of", "review", "review_retry", "times", "times_retry"]
 CHECK_IN_AHEAD = timedelta(hours=24)
 DAY_OF_HOUR = 7
 LOCAL_OWNER = "local"
@@ -286,25 +286,56 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
     return sent
 
 
+def _times_waiting(conn: db.Connection, owner: str) -> set[str]:
+    return set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "times_retry")).scalars())
+
+
+def _times_forget(conn: db.Connection, owner: str, refs: Collection[str]) -> None:
+    if refs:
+        conn.execute(delete(ReminderSent).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "times_retry", ReminderSent.ref.in_(sorted(refs))))
+
+
+def _times_changed(conn: db.Connection, owner: str, since: float, now: datetime, waiting: set[str]) -> dict[str, SegmentOut]:
+    found: dict[str, SegmentOut] = {}
+    for trip in trips.listing(conn, viewer_for(conn, owner)):
+        flights = [s for s in trip["segments"] if s["kind"] == "flight" and s["status"] != "cancelled" and not trips.untimed(s["details"])]
+        for group in trips.flight_groups(flights):
+            for seg in group:
+                update = seg["email_update"]
+                if update is None or not {"start_local", "start_zone"} & set(update["updated"]):
+                    continue
+                leaves = trips.instant(seg["start_local"], seg["start_zone"])
+                ref = f"{seg['id']}@{seg['start_local']}"
+                if leaves - CHECK_IN_AHEAD <= now < leaves and (update["at"] >= since or ref in waiting):
+                    found[ref] = seg
+                    break
+    return found
+
+
 def times_due(conn: db.Connection, since: float, now: datetime, sender_for: Callable[[], Send]) -> int:
-    if conn.execute(select(Segment.id).where(Segment.email_updated >= since, Segment.kind == "flight")).fetchone() is None:
+    changed = conn.execute(select(Segment.id).where(Segment.email_updated >= since, Segment.kind == "flight")).fetchone() is not None
+    waiting_any = conn.execute(select(ReminderSent.id).where(ReminderSent.kind == "times_retry")).fetchone() is not None
+    if not changed and not waiting_any:
         return 0
     send = sender_for()
     stamp = now.timestamp()
     sent = 0
     for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
+        waiting = _times_waiting(conn, owner)
         if not prefs(conn, owner)["check_in"]:
+            _times_forget(conn, owner, waiting)
             continue
-        for trip in trips.listing(conn, viewer_for(conn, owner)):
-            for seg in (s for s in _live(trip["segments"]) if s["kind"] == "flight" and not trips.untimed(s["details"])):
-                update = seg["email_update"]
-                if update is None or update["at"] < since or not {"start_local", "start_zone"} & set(update["updated"]):
-                    continue
-                leaves = trips.instant(seg["start_local"], seg["start_zone"])
-                ref = f"{seg['id']}@{seg['start_local']}"
-                if leaves - CHECK_IN_AHEAD <= now < leaves and not _sent(conn, owner, "times", ref) and _deliver(conn, owner, times_message(seg), send):
-                    _record(conn, owner, "times", ref, stamp)
-                    sent += 1
+        found = _times_changed(conn, owner, since, now, waiting)
+        _times_forget(conn, owner, waiting - set(found))
+        for ref, seg in found.items():
+            if _sent(conn, owner, "times", ref):
+                _times_forget(conn, owner, [ref])
+            elif _deliver(conn, owner, times_message(seg), send):
+                _record(conn, owner, "times", ref, stamp)
+                _times_forget(conn, owner, [ref])
+                sent += 1
+            else:
+                _record(conn, owner, "times_retry", ref, stamp)
     return sent
 
 

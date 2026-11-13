@@ -29,7 +29,7 @@ def decide(conn: db.Connection, viewer: Viewer, fields: trips.SegmentIn, receive
     if not dated:
         return None
     if received is None:
-        return Decision("undated", seg.id)
+        return None if cancels else Decision("undated", seg.id)
     if received < max(dated):
         return Decision("older", seg.id)
     if received == max(dated) or cancels:
