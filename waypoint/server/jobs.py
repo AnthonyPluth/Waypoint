@@ -73,6 +73,14 @@ def notify_review(since: float, mailbox_ids: list[int]) -> None:
         monitoring.report(e, values=False)
 
 
+def notify_times(since: float) -> None:
+    try:
+        with db.session() as conn:
+            reminders.times_due(conn, since, datetime.now(UTC), lambda: reminders.sender(conn, oidc.config()["public_url"] or SUBJECT))
+    except Exception as e:
+        monitoring.report(e, values=False)
+
+
 def check_flights() -> None:
     try:
         with db.session() as conn:
@@ -91,6 +99,7 @@ def scan_mailboxes() -> None:
     except Exception as e:
         monitoring.report(e, values=False)
     notify_review(started, scanned)
+    notify_times(started)
 
 
 def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False, sender: str | None = None) -> bool:
@@ -105,6 +114,7 @@ def scan_now(mailbox_id: int, again: bool = False, backfill: bool = False, sende
         except Exception as e:
             monitoring.report(e, values=False)
         notify_review(started, scanned)
+        notify_times(started)
     threading.Thread(target=run, daemon=True, name="mail-scan-now").start()
     return True
 

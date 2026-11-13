@@ -160,6 +160,8 @@ segments = Table(
     Column('price_minor', Integer, doc="the booking's total in the currency's smallest unit, never converted; null when no cost is known"),
     Column('price_currency', Text, doc='the ISO 4217 code of price_minor; null exactly when price_minor is'),
     Column('price_source', Text, doc="'email' (read from a confirmation or receipt, an email may replace it) or 'manual' (set by a person, an email never replaces it); null exactly when price_minor is"),
+    Column('email_updated', Float, doc='when a newer email last changed this booking (epoch seconds); null when none has'),
+    Column('email_update', Text, doc="JSON with the names of the fields that newer email changed ('updated') and of the locked fields it disagreed with ('disagreed'), never their values; null exactly when email_updated is"),
     Index('ix_segments_trip_id', 'trip_id'),
     Index('ix_segments_booked_by', 'booked_by'),
     info={'doc': "one flight leg, hotel stay, car rental or train; times are local wall-clock times with the place's IANA zone"},

@@ -114,6 +114,10 @@ A confirmation that arrives twice, in one mailbox or in two members’ mailboxes
 
 When you change a field of a booking, Waypoint remembers it was you and a later email never overwrites it. An email about a booking Waypoint already has updates that booking instead of adding another, and marks it *changed* when its times or places moved, or *cancelled* when the provider says so.
 
+## Updated from a newer email
+
+When a newer email for a booking changes its times or places, the booking says **Updated from a newer email** with what changed, beside its *changed* status. If you had edited one of those fields, it keeps your value and the booking says that a newer email disagreed, so you can edit it yourself. See [Merging into your trips](/Waypoint/start/gmail/#merging-into-your-trips) for when an email counts as newer.
+
 ## Past trips
 
 Once a trip has ended, its page shows condensed cards: the kind, provider, dates and times, place, confirmation number and travellers stay, and what only helps while you travel (the manage link, Directions, Call, View email, live status, loyalty numbers) goes. Edit, Move and Remove stay until the trip is marked [Done](#done-with-a-trip).

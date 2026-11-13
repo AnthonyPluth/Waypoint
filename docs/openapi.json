@@ -5219,6 +5219,46 @@
         ],
         "additionalProperties": false
       },
+      "EmailUpdate": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number"
+          },
+          "updated": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "start_local",
+                "start_zone",
+                "end_local",
+                "end_zone",
+                "origin",
+                "destination"
+              ]
+            }
+          },
+          "disagreed": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "start_local",
+                "start_zone",
+                "end_local",
+                "end_zone",
+                "origin",
+                "destination"
+              ]
+            }
+          }
+        },
+        "required": [
+          "at",
+          "updated",
+          "disagreed"
+        ],
+        "additionalProperties": false
+      },
       "EmailsCleared": {
         "type": "object",
         "properties": {
@@ -8165,6 +8205,16 @@
           "has_email": {
             "type": "boolean"
           },
+          "email_update": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmailUpdate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "gate_code": {
             "anyOf": [
               {
@@ -8215,6 +8265,7 @@
           "logo_label",
           "hotel_brand",
           "has_email",
+          "email_update",
           "gate_code",
           "price",
           "links"
