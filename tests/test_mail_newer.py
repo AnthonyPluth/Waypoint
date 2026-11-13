@@ -23,6 +23,8 @@ BODY_CANARY = "CANARY-BODY-NEWER-9D2P"
 
 def revised(day: str = LATER_DAY, departure: str | None = NEW_DEPARTURE, name: str = "newer") -> bytes:
     out = eml("flight_jsonld").replace(FIRST_DAY, day.encode()).replace(b"fx-flight-jsonld", name.encode())
+    out = out.replace(b"Thanks for booking with Example Air. CANARY-BODY-FLIGHT-JSONLD-7Q2X", BODY_CANARY.encode())
+    out = out.replace(b"Your e-ticket receipt and itinerary QX7M2K", f"Itinerary changed {SUBJECT_CANARY}".encode())
     return out.replace(OLD_DEPARTURE, departure.encode()) if departure else out
 
 
@@ -189,9 +191,7 @@ class ANewerEmailReplacesTheAttachedOne(NewerCase):
 class NothingOfTheMessageIsKept(NewerCase):
     def test_the_replaced_message_is_deleted_and_the_new_one_leaves_no_text_in_the_clear(self):
         self.first()
-        text = revised().replace(b"Thanks for booking with Example Air. CANARY-BODY-FLIGHT-JSONLD-7Q2X", BODY_CANARY.encode())
-        text = text.replace(b"Your e-ticket receipt and itinerary QX7M2K", f"Itinerary changed {SUBJECT_CANARY}".encode())
-        self.add_mail("newer", text)
+        self.add_mail("newer", revised())
         with no_leaks(self, SUBJECT_CANARY, BODY_CANARY, database=self.path):
             self.scan(now=NOW + 60)
         [seg] = self.segments()
@@ -305,11 +305,11 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
         self.first()
         self.add_mail("newer", revised())
         self.add_mail("arrival", self.arrival_only("arrival", "Thu, 15 Oct 2026 09:30:00 -0400"))
-        self.scan(now=NOW + 60)
-        [seg] = self.segments()
-        self.assertEqual(seg["email_update"]["updated"], ["end_local"])
         later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
-        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY):
+        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY, database=self.path):
+            self.scan(now=NOW + 60)
+            [seg] = self.segments()
+            self.assertEqual(seg["email_update"]["updated"], ["end_local"])
             self.assertEqual(self.due(later), 1)
             self.assertEqual(self.due(later), 0)
             self.assertEqual(self.due(later, since=NOW + 3600), 0)
@@ -318,28 +318,31 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
 
     def test_a_departure_change_is_kept_when_two_mailboxes_record_news_in_one_scan(self):
         segment = self.first()
-        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["start_local"], "disagreed": []}, NOW + 60))
-        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 61))
-        raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
-        self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": [], "moved_at": NOW + 60})
-        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 1)
-        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
+        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY, database=self.path):
+            self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["start_local"], "disagreed": []}, NOW + 60))
+            self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 61))
+            raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
+            self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": [], "moved_at": NOW + 60})
+            self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 1)
+            self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
 
     def test_an_arrival_only_email_in_a_later_scan_does_not_repeat_a_delivered_alert(self):
-        self.changed()
         later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
-        self.assertEqual(self.due(later), 1)
-        self.add_mail("arrival", self.arrival_only("arrival", "Thu, 15 Oct 2026 09:30:00 -0400"))
-        self.scan(now=NOW + 3600)
-        self.assertEqual(self.due(later, since=NOW + 3600), 0)
+        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY, database=self.path):
+            self.changed()
+            self.assertEqual(self.due(later), 1)
+            self.add_mail("arrival", self.arrival_only("arrival", "Thu, 15 Oct 2026 09:30:00 -0400"))
+            self.scan(now=NOW + 3600)
+            self.assertEqual(self.due(later, since=NOW + 3600), 0)
         self.assertEqual(len(self.sent), 1)
 
     def test_an_arrival_only_news_with_no_earlier_departure_change_records_none(self):
         segment = self.first()
-        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 60))
-        raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
-        self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": []})
-        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
+        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY, database=self.path):
+            self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 60))
+            raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
+            self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": []})
+            self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
 
     def test_a_retry_is_forgotten_once_the_flight_has_left_or_the_person_turned_it_off(self):
         self.changed()
