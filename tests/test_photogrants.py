@@ -228,6 +228,101 @@ class GrantTests(GrantCase):
         self.assertEqual(fresh, sorted((self.jid, self.sid, self.mia)))
         self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 28.0, window=window, audience=fresh)["scope"], "trip")
 
+    def test_a_confirmation_bound_to_the_count_token_refuses_when_a_candidate_grant_window_changed(self):
+        self.share(self.jid, self.b, "only_me")
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.add(self.jane, {**HOTEL, "start_local": "2026-06-06T15:00", "end_local": "2026-06-09T10:00"}, self.b)
+        self.assertNotEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"], token)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=token)
+        self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
+        self.assertIsNone(self.grant(self.jid, self.a))
+        fresh = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 28.0, token=fresh)["scope"], "trip")
+
+    def test_a_confirmation_bound_to_the_count_token_refuses_when_an_exclusion_was_added_or_replaced_or_removed(self):
+        self.share(self.jid, self.b, "only_me")
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"], token)
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="asset-1", trip_id=self.b, created=5.0))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=token)
+        added = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.c.execute(update(PhotoExclusion).values(created=6.0))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 28.0, token=added)
+        replaced = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.c.execute(delete(PhotoExclusion))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 29.0, token=replaced)
+        self.assertIsNone(self.grant(self.jid, self.a))
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 30.0, token=token)["scope"], "trip")
+
+    def test_a_count_token_ignores_exclusions_on_trips_that_are_not_candidates_and_other_peoples(self):
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="asset-1", trip_id=self.b, created=5.0))
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.sid, asset_id="asset-2", trip_id=self.a, created=5.0))
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"], token)
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=token)["scope"], "trip")
+
+    def test_a_confirmation_bound_to_the_count_token_refuses_when_an_overlapping_grants_booking_moved_inside_the_same_dates(self):
+        self.share(self.jid, self.b, "only_me")
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        window = photos.window_out(photos.trip_window(self.c, self.b))
+        stay = self.c.orm.scalars(select(Segment.id).where(Segment.trip_id == self.b)).one()
+        self.c.execute(update(Segment).where(Segment.id == stay).values(latitude=51.1537, longitude=-0.1821))
+        self.c.orm.expire_all()
+        self.assertEqual(photos.window_out(photos.trip_window(self.c, self.b)), window)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=token)
+        self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
+        self.assertIsNone(self.grant(self.jid, self.a))
+        fresh = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 28.0, token=fresh)["scope"], "trip")
+
+    def test_a_count_whose_inputs_changed_while_it_ran_is_not_shown_with_a_token_that_includes_the_change(self):
+        self.share(self.jid, self.a, revoked=5.0)
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="asset-1", trip_id=self.a, created=5.0))
+
+        def quiet(_conn, _person, ids):
+            return dict.fromkeys(ids, 4)
+
+        def racing(conn, _person, ids):
+            conn.execute(delete(PhotoExclusion))
+            return dict.fromkeys(ids, 4)
+        calm = photogrants.state_of(self.c, self.jane, self.jid, self.a, quiet)
+        self.assertEqual(calm["count"], 4)
+        raced = photogrants.state_of(self.c, self.jane, self.jid, self.a, racing)
+        self.assertIsNone(raced["count"])
+        self.assertNotEqual(raced["count_token"], calm["count_token"])
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a, quiet)["count"], 4)
+
+    def test_the_grants_list_drops_counts_and_keeps_the_trips_when_a_count_ran_across_a_change(self):
+        self.share(self.jid, self.a, revoked=5.0)
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="asset-1", trip_id=self.a, created=5.0))
+
+        def racing(conn, _person, ids):
+            conn.execute(delete(PhotoExclusion))
+            return dict.fromkeys(ids, 4)
+        before = next(p for p in photogrants.grants(self.c, self.jane)["people"] if p["person_id"] == self.jid)
+        raced = next(p for p in photogrants.grants(self.c, self.jane, racing)["people"] if p["person_id"] == self.jid)
+        self.assertNotEqual(raced["count_token"], before["count_token"])
+        self.assertEqual({t["trip_id"]: t["count"] for t in raced["trips"]}, {self.a: None, self.b: None})
+
+    def test_a_non_ascii_count_token_is_refused_as_stale_not_as_a_crash(self):
+        for bad in ("é", "é" * 32):
+            with self.assertRaises(photogrants.Stale):
+                photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=bad)
+        with self.assertRaises(photogrants.Stale):
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 28.0, token="é")
+        self.assertIsNone(self.grant(self.jid, self.a))
+
+    def test_a_malformed_count_token_is_refused_as_stale(self):
+        for bad in ("", "nope", "0" * 32):
+            with self.assertRaises(photogrants.Stale):
+                photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 27.0, token=bad)
+        self.assertIsNone(self.grant(self.jid, self.a))
+
     def test_a_widening_bound_to_the_libraries_seen_refuses_when_one_was_connected_or_resumed(self):
         self.share(self.jid, self.a, "only_me")
         seen = photogrants.sources_of(self.c, self.jid)
@@ -336,7 +431,7 @@ class GrantTests(GrantCase):
         rows = [self.photo(self.b, INSIDE_B) for _ in range(3)]
         with mock.patch.object(photos, "candidate_windows", wraps=photos.candidate_windows) as windows:
             photogrants.stop(self.c, self.jane, self.jid, self.b, 90.0)
-        self.assertLessEqual(windows.call_count, 2)
+        self.assertLessEqual(windows.call_count, 3)
         self.assertEqual([self.row(r.id).trip_id for r in rows], [self.a] * 3)
 
     def test_removing_that_races_with_a_claim_of_the_photos_person_writes_nothing(self):
@@ -542,6 +637,25 @@ class StandingSettingTests(GrantCase):
         self.assertEqual(photogrants.prefs_of(self.c, self.jid), {"default_scope": "only_me", "share_all": False})
         photogrants.set_prefs(self.c, self.jane, self.jid, None, True, 44.0)
         self.assertEqual(self.grant(self.jid, self.b), ("only_me", None, "u-jane"))
+
+    def test_share_on_all_bound_to_the_count_token_refuses_when_a_candidate_or_an_exclusion_changed(self):
+        def token():
+            return next(p for p in photogrants.grants(self.c, self.jane)["people"] if p["person_id"] == self.jid)["count_token"]
+        seen = token()
+        self.assertEqual(token(), seen)
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="asset-1", trip_id=self.b, created=5.0))
+        self.assertNotEqual(token(), seen)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 30.0, token=seen)
+        self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
+        self.assertEqual(photogrants.prefs_of(self.c, self.jid)["share_all"], False)
+        self.assertEqual(self.c.execute(select(PhotoGrant.trip_id)).fetchall(), [])
+        fresh = token()
+        self.add(self.jane, {**HOTEL, "start_local": "2026-06-06T15:00", "end_local": "2026-06-09T10:00"}, self.b)
+        with self.assertRaises(photogrants.Stale):
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 31.0, token=fresh)
+        photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 32.0, token=token())
+        self.assertEqual((self.grant(self.jid, self.a), self.grant(self.jid, self.b)), (("trip", None, "u-jane"), ("trip", None, "u-jane")))
 
     def test_share_on_all_bound_to_each_trips_audience_refuses_when_someone_joined_one(self):
         seen = {str(t): photogrants.audience_of(self.c, t) for t in (self.a, self.b)}

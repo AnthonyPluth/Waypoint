@@ -629,6 +629,7 @@ export interface PhotoExclusionsBody {
 export interface PhotoGrantPerson {
   person_id: number;
   prefs: PhotoPrefs;
+  count_token: string;
   trips: PhotoGrantTrip[];
 }
 
@@ -663,6 +664,7 @@ export interface PhotoPrefsBody {
   windows?: Record<string, PhotoWindow>;
   audiences?: Record<string, number[]>;
   sources?: PhotoSourceVersion[];
+  count_token?: string;
 }
 
 export interface PhotoResumeGrant {
@@ -685,6 +687,7 @@ export interface PhotoSharing {
   changed: number | null;
   audience: number[];
   sources: PhotoSourceVersion[];
+  count_token: string;
 }
 
 export interface PhotoSharingBody {
@@ -695,6 +698,7 @@ export interface PhotoSharingBody {
   expected_changed?: number;
   audience?: number[];
   sources?: PhotoSourceVersion[];
+  count_token?: string;
 }
 
 export interface PhotoSource {
