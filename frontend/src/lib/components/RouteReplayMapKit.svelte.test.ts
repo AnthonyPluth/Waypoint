@@ -145,6 +145,39 @@ describe("RouteReplay with the flag on", () => {
     expect(fake.last().overlays.size).toBe(0);
   });
 
+  it("keeps a Play press made while MapKit loads, instead of restarting from the beginning", async () => {
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    await fireEvent.click(await screen.findByRole("button", { name: "Play" }));
+    advance(4500);
+    await Promise.resolve();
+    expect(labels(container)).toEqual(["San Francisco"]);
+    await loadScript();
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(labels(container)).toEqual(["San Francisco"]);
+    expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
+  });
+
+  it("keeps a scrub made while MapKit loads, without starting playback", async () => {
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    await fireEvent.input(await screen.findByRole("slider", { name: "Position along the route" }), { target: { value: "4000" } });
+    await loadScript();
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Replay" })).toBeTruthy();
+  });
+
+  it("tries MapKit again for the next trip after a transient failure", async () => {
+    const view = render(RouteReplay, { trip: trip(flights), now: after });
+    await waitFor(() => expect(scripts).toHaveLength(1));
+    scripts[0].onerror?.(new Event("error"));
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+    expect(view.container.querySelector("[data-mapkit]")).toBeNull();
+    await view.rerender({ trip: trip(flights, { id: 2 }), now: after });
+    await waitFor(() => expect(scripts).toHaveLength(2));
+    (window as { mapkit?: unknown }).mapkit = fakeMk;
+    scripts[1].onload?.(new Event("load"));
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+  });
+
   it("shows the whole route with reduced motion", async () => {
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     render(RouteReplay, { trip: trip(flights), now: after });
