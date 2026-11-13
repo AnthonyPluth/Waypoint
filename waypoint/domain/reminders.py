@@ -15,13 +15,13 @@ from sqlalchemy import delete, select
 from .. import monitoring, oidc
 from ..providers import webpush
 from ..storage import db
-from ..storage.models import AppDevice, CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, User
+from ..storage.models import AppDevice, CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, Segment, User
 from . import app_push, calendar, people, trips
 from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
 
-Kind = Literal["check_in", "day_of", "review", "review_retry"]
+Kind = Literal["check_in", "day_of", "review", "review_retry", "times"]
 CHECK_IN_AHEAD = timedelta(hours=24)
 DAY_OF_HOUR = 7
 LOCAL_OWNER = "local"
@@ -218,6 +218,11 @@ def day_of_message(today_trips: list[tuple[SegmentOut, TripOut]], day: str) -> d
             "body": "\n".join(lines)}
 
 
+def times_message(seg: SegmentOut) -> dict[str, Any]:
+    return {"title": "Flight times changed", "tag": f"times-{seg['id']}", "url": f"/#trip/{seg['trip_id']}",
+            "body": f"{_label(seg)} now leaves {_day(seg['start_local'])} at {_clock(seg['start_local'])}."}
+
+
 def review_message(waiting: int) -> dict[str, Any]:
     return {"title": "Booking emails to review", "tag": "review", "url": "/#review",
             "body": f"{waiting} booking email{' needs' if waiting == 1 else 's need'} your review"}
@@ -278,6 +283,28 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
             if starting and _deliver(conn, owner, day_of_message(starting, day), send):
                 _record(conn, owner, "day_of", day, stamp)
                 sent += 1
+    return sent
+
+
+def times_due(conn: db.Connection, since: float, now: datetime, sender_for: Callable[[], Send]) -> int:
+    if conn.execute(select(Segment.id).where(Segment.email_updated >= since, Segment.kind == "flight")).fetchone() is None:
+        return 0
+    send = sender_for()
+    stamp = now.timestamp()
+    sent = 0
+    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
+        if not prefs(conn, owner)["check_in"]:
+            continue
+        for trip in trips.listing(conn, viewer_for(conn, owner)):
+            for seg in (s for s in _live(trip["segments"]) if s["kind"] == "flight" and not trips.untimed(s["details"])):
+                update = seg["email_update"]
+                if update is None or update["at"] < since or not {"start_local", "start_zone"} & set(update["updated"]):
+                    continue
+                leaves = trips.instant(seg["start_local"], seg["start_zone"])
+                ref = f"{seg['id']}@{seg['start_local']}"
+                if leaves - CHECK_IN_AHEAD <= now < leaves and not _sent(conn, owner, "times", ref) and _deliver(conn, owner, times_message(seg), send):
+                    _record(conn, owner, "times", ref, stamp)
+                    sent += 1
     return sent
 
 

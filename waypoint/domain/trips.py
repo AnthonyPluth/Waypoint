@@ -41,6 +41,8 @@ def untimed(details: Mapping[str, str]) -> bool:
 FIELDS = ("kind", "status", "confirmation", "provider", "start_local", "start_zone", "end_local", "end_zone", "origin",
           "destination", "details", "manage_url", "travelers", "itinerary")
 TIME_FIELDS = ("start_local", "start_zone", "end_local", "end_zone")
+NewsField = Literal["start_local", "start_zone", "end_local", "end_zone", "origin", "destination"]
+EMAIL_NEWS_FIELDS: tuple[NewsField, ...] = ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination")
 GAP_DAYS = 2
 AWAY_DAYS = 60
 FLIGHT_NUMBER = re.compile(r"([A-Z0-9]{2,3}?)0*(\d{1,4}[A-Z]?)")
@@ -157,6 +159,17 @@ class GateCodeOut(TypedDict):
     day: str | None
 
 
+class EmailUpdateOut(TypedDict):
+    at: float
+    updated: list[NewsField]
+    disagreed: list[NewsField]
+
+
+class EmailNews(TypedDict):
+    updated: list[NewsField]
+    disagreed: list[NewsField]
+
+
 class SegmentOut(TypedDict):
     id: int
     trip_id: int
@@ -183,6 +196,7 @@ class SegmentOut(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    email_update: EmailUpdateOut | None
     gate_code: GateCodeOut | None
     price: PriceOut | None
     links: links.Links
@@ -339,6 +353,29 @@ def decode_details(raw: str | None) -> dict[str, str]:
     except ValueError:
         return {}
     return {k: v for k, v in found.items() if isinstance(v, str)} if isinstance(found, dict) else {}
+
+
+def email_update_of(seg: Segment) -> EmailUpdateOut | None:
+    if seg.email_updated is None:
+        return None
+    try:
+        found = json.loads(seg.email_update) if seg.email_update else {}
+    except ValueError:
+        found = {}
+    found = found if isinstance(found, dict) else {}
+
+    def named(key: str) -> list[NewsField]:
+        listed = found.get(key)
+        return [f for f in EMAIL_NEWS_FIELDS if isinstance(listed, list) and f in listed]
+    return {"at": seg.email_updated, "updated": named("updated"), "disagreed": named("disagreed")}
+
+
+def note_email_news(conn: db.Connection, segment_id: int, news: EmailNews, now: float) -> bool:
+    if not news["updated"] and not news["disagreed"]:
+        return False
+    conn.execute(update(Segment).where(Segment.id == segment_id).values(
+        email_updated=now, email_update=json.dumps({"updated": news["updated"], "disagreed": news["disagreed"]}, separators=(",", ":"))))
+    return True
 
 
 def decode_locked(raw: str | None) -> list[str]:
@@ -591,6 +628,7 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "logo_label": logos.chip(s.kind, s.origin, brand) if brand and logos.key(brand) in with_logo else None,
          "hotel_brand": logos.sub_brand(s.origin) if s.kind == "hotel" else None,
          "has_email": s.id in with_mail,
+         "email_update": email_update_of(s),
          "gate_code": {"state": codes[s.id][0], "day": codes[s.id][1]} if s.id in codes else None,
          "price": priced(s),
          "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
@@ -1151,7 +1189,7 @@ def attach_to_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentI
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
                         touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
-                        into: int | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
+                        into: int | None = None, news: EmailNews | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     if into is not None:
@@ -1221,6 +1259,9 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     changed_values = check(conn, merged)
     changed = [f for f in FIELDS if f in changed_values and (decode_details(changed_values[f]) != decode_details(seg.details)
                                                             if f == "details" else changed_values[f] != getattr(seg, f))]
+    if news is not None:
+        news["updated"] = [f for f in changed if f in EMAIL_NEWS_FIELDS]
+        news["disagreed"] = [] if fill_only else [f for f in EMAIL_NEWS_FIELDS if f in locked and values[f] != getattr(seg, f)]
     new_ports: list[PortIn] | None = None
     if fields.get("itinerary") and "itinerary" not in locked and not ports_of(conn, [seg.id]).get(seg.id):
         try:

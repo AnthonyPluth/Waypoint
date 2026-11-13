@@ -439,6 +439,16 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByRole("note")).toBeNull();
   });
 
+  it("says what a newer email changed on a booking and what it left alone, and says nothing on another", async () => {
+    held = trip([{ ...flight, email_update: { at: 1, updated: ["start_local", "end_local"], disagreed: ["start_zone"] } }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    const notes = within(cards[0]).getAllByRole("note");
+    expect(notes[0]).toHaveTextContent("Updated from a newer email: the start and the end changed.");
+    expect(notes[1]).toHaveTextContent(/A newer email disagreed with what you set for the start\./);
+    expect(within(cards[1]).queryByRole("note")).toBeNull();
+  });
+
   it("shows a flight with no times by its day: “time not recorded” at both ends, and no live status", async () => {
     held = trip([segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-03-08T00:00", start_zone: "America/Los_Angeles",
       end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })]);

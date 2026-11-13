@@ -9,9 +9,10 @@ sidebar:
 
 ## Reminders
 
-Waypoint sends three kinds of notification, and each person chooses which they get (all are on until you choose):
+Waypoint sends four kinds of notification, and each person chooses which they get (all are on until you choose):
 
 - **Check-in opens**, 24 hours before a flight leaves. It names the flight, the airports and the departure time at the airport. A flight moved to another time gets a new reminder.
+- **Flight times changed**, when a mail scan finds a newer email that moved a flight leaving within the next 24 hours ([how](/Waypoint/start/gmail/#merging-into-your-trips)). It names the flight, the airports and the new departure time, and follows the **Check-in opens** choice. It carries nothing of the email.
 - **Day-of summary**, from 7:00 on Waypoint’s clock (`TZ`) on any day something starts: your flights, hotel check-ins, car pickups, trains, cruises and parking entries, each with its own local time.
 - **Booking emails to review**, after a mail scan that finds a booking email you need to settle in [Review](/Waypoint/start/review/): a booking Waypoint couldn’t finish (**Some details missing**), a match to confirm or a suggestion from the [AI](/Waypoint/start/ai/) to check. An email Waypoint couldn’t read at all, or that the AI read and found no booking in, only might be a booking, so it doesn’t send one. It says only how many (“2 booking emails need your review”) and opens Review. It is one notification per person per scan, goes to the people who can see those items, and an email is never announced twice. If sending it fails (the push service or the phone couldn’t be reached), the email stays unannounced and is counted in the next scan’s notification. Emails the AI dismissed as not bookings aren’t counted, and **Ask AI** doesn’t send one, since you’re already there.
 

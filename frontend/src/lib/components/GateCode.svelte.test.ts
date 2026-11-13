@@ -15,7 +15,7 @@ const NOW = Date.parse("2026-12-01T12:00:00Z");
 const lot = segment({
   id: 7, kind: "parking", origin: "Example Airport Long-Term Lot", destination: null, provider: "Example Parking", confirmation: "PK30417",
   start_local: "2026-12-01T05:15", start_zone: "America/New_York", end_local: "2026-12-04T03:00", end_zone: "America/New_York",
-  details: {}, has_email: true, gate_code: { state: "ready", day: "2026-10-16" },
+  details: {}, has_email: true, email_update: null, gate_code: { state: "ready", day: "2026-10-16" },
 });
 const QR = "data:image/png;base64,QUJD";
 const OTHER = "data:image/png;base64,REVG";

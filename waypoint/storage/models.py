@@ -132,6 +132,8 @@ class Segment(Base):
     price_minor: Mapped[int | None]
     price_currency: Mapped[str | None]
     price_source: Mapped[str | None]
+    email_updated: Mapped[float | None]
+    email_update: Mapped[str | None]
 
 
 class SegmentTraveler(Base):

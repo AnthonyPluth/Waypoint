@@ -147,6 +147,37 @@ def link(conn: db.Connection, segment_id: int, mailbox_id: int, message_id: str)
     return True
 
 
+class Attached(TypedDict):
+    stored_id: int
+    mailbox_id: int
+    message_id: str
+    sender_domain: str | None
+    received: str | None
+
+
+def attached(conn: db.Connection, segment_id: int) -> list[Attached]:
+    rows = conn.execute(select(StoredMessage.id, StoredMessage.mailbox_id, StoredMessage.message_id, StoredMessage.content)
+                        .join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
+                        .where(SegmentMessage.segment_id == segment_id).order_by(StoredMessage.id)).fetchall()
+    out: list[Attached] = []
+    for r in rows:
+        opened = _open(r["content"])
+        out.append({"stored_id": int(r["id"]), "mailbox_id": int(r["mailbox_id"]), "message_id": str(r["message_id"]),
+                    "sender_domain": opened["sender_domain"] if opened else None, "received": opened["received"] if opened else None})
+    return out
+
+
+def drop_older(conn: db.Connection, segment_id: int, mailbox_id: int, sender_domain: str | None, received: str, keeping: str) -> int:
+    held = attached(conn, segment_id)
+    older = [a["stored_id"] for a in held
+             if a["mailbox_id"] == mailbox_id and a["sender_domain"] == sender_domain and a["message_id"] != keeping
+             and a["received"] is not None and a["received"] < received]
+    if not older or not any(a["mailbox_id"] == mailbox_id and a["message_id"] == keeping for a in held):
+        return 0
+    conn.execute(delete(SegmentMessage).where(SegmentMessage.segment_id == segment_id, SegmentMessage.stored_message_id.in_(older)))
+    return int(conn.execute(delete(StoredMessage).where(StoredMessage.id.in_(older), *_needed())).rowcount)
+
+
 def for_segment(conn: db.Connection, segment_id: int) -> list[Content]:
     rows = conn.execute(select(StoredMessage.content).join(SegmentMessage, SegmentMessage.stored_message_id == StoredMessage.id)
                         .where(SegmentMessage.segment_id == segment_id).order_by(StoredMessage.created.desc(), StoredMessage.id.desc())).scalars()

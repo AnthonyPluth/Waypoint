@@ -3,6 +3,7 @@
   import { app, route } from "$lib/app.svelte";
   import { tick } from "svelte";
   import { apiCall } from "$lib/contract";
+  import { emailNews } from "$lib/email-news";
   import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
@@ -401,6 +402,10 @@
 {/snippet}
 
 {#snippet links(s: Segment)}
+  {#if s.email_update}{@const news = emailNews(s.email_update)}
+    {#if news.updated}<p class="text-sm text-signal-ink" role="note">Updated from a newer email: {news.updated} changed.</p>{/if}
+    {#if news.disagreed}<p class="text-sm text-signal-ink" role="note">A newer email disagreed with what you set for {news.disagreed}. It was left as you set it; edit the booking if it should change.</p>{/if}
+  {/if}
   {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
   {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
     {#if s.details.address && !(s.kind === "car" && samePlace(s.details.address, s.origin))}
