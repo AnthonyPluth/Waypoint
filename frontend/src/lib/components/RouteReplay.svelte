@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { Trip, TripPlaces } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
   import RouteReplayMap from "$lib/components/RouteReplayMap.svelte";
@@ -17,12 +18,14 @@
   const year = $derived(Number(today.slice(0, 4)));
 
   let maps = $state<Maps | null | undefined>(undefined);
-  let asked = false;
+  let askedFor: number | null = null;
   $effect(() => {
-    if (stops.length < 2 || asked) return;
-    asked = true;
+    const id = trip.id;
+    if (stops.length < 2 || askedFor === id) return;
+    askedFor = id;
+    untrack(() => { if (maps === null) maps = undefined; });
     if (app.state?.mapkit === false) { maps = null; return; }
-    loadMapkit().then((found) => { maps = found; });
+    loadMapkit().then((found) => { if (askedFor === id) maps = found; });
   });
 
   let latest = 0;

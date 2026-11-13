@@ -1,4 +1,4 @@
-import { geoMercator, type GeoProjection } from "d3-geo";
+import { geoBounds, geoMercator, type GeoProjection } from "d3-geo";
 import { drivingRoute } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
@@ -38,7 +38,17 @@ export function mapRectFor(projection: GeoProjection, box: Box): { x: number; y:
   return { x, y: Math.min(a.y, b.y), width: Math.min(1, box.w / (projection.scale() * 2 * Math.PI)), height: Math.abs(b.y - a.y) };
 }
 
-export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads): GeoProjection => routeProjection(stops, width, height, undefined, roads, geoMercator);
+function centreLongitude(stops: Stop[]): number {
+  if (stops.length === 0) return 0;
+  const [[west], [east]] = geoBounds({ type: "MultiPoint", coordinates: stops.map((s) => [s.longitude, s.latitude]) });
+  const span = ((east - west) % 360 + 360) % 360;
+  return west + span / 2;
+}
+
+export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads): GeoProjection => {
+  const centre = centreLongitude(stops);
+  return routeProjection(stops, width, height, undefined, roads, () => geoMercator().rotate([-centre, 0]));
+};
 
 type Path = { points: Spot[]; along: number[] };
 

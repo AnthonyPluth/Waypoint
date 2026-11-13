@@ -42,9 +42,11 @@
   const nextSpeed = () => { speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length]; };
   $effect(() => { if (calm) { progress = 1; playing = false; } });
   let started = false;
+  let touched = false;
   $effect(() => {
     if (!autoplay || calm || started) return;
     started = true;
+    if (touched) return;
     progress = 0;
     playing = true;
   });
@@ -68,9 +70,10 @@
   });
 
   function toggle() {
+    touched = true;
     if (progress >= 1) { progress = 0; tail = 0; playing = true; } else playing = !playing;
   }
-  const scrub = (e: Event) => { playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
+  const scrub = (e: Event) => { touched = true; playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));

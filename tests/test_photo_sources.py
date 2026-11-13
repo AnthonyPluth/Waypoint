@@ -379,6 +379,40 @@ class SourceRoutes(RouteCase):
         self.assertIn("write", order)
         self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
 
+    def test_a_new_key_and_a_pause_in_one_request_take_home_the_person_and_the_library_before_writing(self):
+        made = self.connect()
+        order = []
+        home, person, row, keyed, marked = photogrants.lock_home, photo_sources.lock_person, photo_sources.lock, photo_sources.set_key, photo_sources.mark
+        with mock.patch.object(photogrants, "lock_home", side_effect=lambda conn: order.append("home") or home(conn)), \
+                mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
+                mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
+                mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY, "paused": True})["status"], "off")
+        self.assertEqual(order[:4], ["home", "person", "source", "write"])
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_new_key_and_a_pause_wait_for_a_sync_holding_home_without_holding_the_library(self):
+        made = self.connect()
+        outcome: list = []
+
+        def edit():
+            with ping():
+                outcome.append(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY, "paused": True})[0])
+
+        with db.session() as conn:
+            photogrants.lock_home(conn)
+            thread = threading.Thread(target=edit)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+            self.assertTrue(photo_sources.lock(conn, made["id"]))
+        thread.join(10)
+        self.assertEqual(outcome, [200])
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
     def test_a_library_whose_key_was_lost_stays_off_through_a_pause_until_the_key_is_entered_again(self):
         made = self.connect()
         with db.session() as conn:
@@ -1185,6 +1219,26 @@ class Races(DbCase):
                 assert unlocked is not None
                 self.assertEqual(unlocked.key, KEY)
 
+    def test_testing_a_library_takes_the_person_before_the_library_and_a_placement_the_person_before_the_grants(self):
+        _, mia, source = self.stewarded_library(0)
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": mia, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=mia, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        far = photo(source, trip["trip_id"], 1, "far")
+        self.c.orm.add(far)
+        self.c.orm.flush()
+        self.c.commit()
+        order = []
+        person, row, grants = photo_sources.lock_person, photo_sources.lock, photos.lock_grants
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
+                mock.patch.object(photos, "lock_grants", side_effect=lambda conn, person_id, ids: order.append("grants") or grants(conn, person_id, ids)), ping():
+            photosources.test(self.c, self.ana, source, None)
+            self.assertEqual(order, ["person", "source"])
+            order.clear()
+            self.assertIsNotNone(photos.decide(self.c, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
+            self.assertEqual(order, ["person", "grants"])
+
     @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
     def test_a_former_stewards_placement_made_during_a_claim_waits_for_it_and_is_refused(self):
         member, mia, source = self.stewarded_library(0)
@@ -1335,6 +1389,67 @@ class Races(DbCase):
             self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
         self.assertEqual(order[:2], ["person", "source"])
         self.assertIn("write", order)
+
+    def lost(self):
+        source = photo_sources.save(self.c, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        assert source is not None
+        photo_sources.mark(self.c, source, "refused", photosources.KEY_LOST)
+        self.c.commit()
+        return source
+
+    def state(self, source):
+        self.c.rollback()
+        found = photo_sources.get(self.c, source)
+        assert found is not None
+        return found["status"], found["last_error"]
+
+    def test_a_key_entered_after_a_pause_read_the_lost_key_is_not_undone_by_the_pause(self):
+        source = self.lost()
+        checked = photosources.owned
+        read = []
+
+        def owned_then_keyed(conn, actor, source_id):
+            found = checked(conn, actor, source_id)
+            if not read:
+                read.append(found["last_error"])
+                with db.session(self.path) as other, ping():
+                    photosources.change_key(other, self.ana, source_id, NEW_KEY)
+            return found
+        with mock.patch.object(photosources, "owned", side_effect=owned_then_keyed):
+            self.assertEqual(photosources.edit(self.c, self.ana, source, None, True, False)["last_error"], None)
+        self.c.commit()
+        self.assertEqual(read, [photosources.KEY_LOST])
+        self.assertEqual(self.state(source), ("off", None))
+        self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
+
+    def test_a_pause_takes_home_then_the_person_then_the_library(self):
+        source = self.lost()
+        order = []
+        home, person, row = photogrants.lock_home, photo_sources.lock_person, photo_sources.lock
+        with mock.patch.object(photogrants, "lock_home", side_effect=lambda conn: order.append("home") or home(conn)), \
+                mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)):
+            self.assertEqual(photosources.edit(self.c, self.ana, source, None, True, False)["last_error"], photosources.KEY_LOST)
+        self.assertEqual(order, ["home", "person", "source"])
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_pause_waits_for_a_key_change_in_flight_and_keeps_its_cleared_error(self):
+        source = self.lost()
+        outcome: list = []
+
+        def pause():
+            with db.session(self.path) as conn:
+                outcome.append(photosources.edit(conn, self.ana, source, None, True, False)["last_error"])
+
+        with db.session(self.path) as conn, ping():
+            photosources.change_key(conn, self.ana, source, NEW_KEY)
+            thread = threading.Thread(target=pause)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+        thread.join(10)
+        self.assertEqual(outcome, [None])
+        self.assertEqual(self.state(source), ("off", None))
 
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):
