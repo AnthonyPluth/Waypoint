@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Literal, NamedTuple, TypedDict
 
@@ -36,6 +36,13 @@ NEEDS_SETTING_SNAPSHOT = 'Send the "windows", "audiences" and "sources" the conf
 
 class Stale(Exception):
     pass
+
+
+Counter = Callable[[db.Connection, int, Sequence[int]], dict[int, int | None]]
+
+
+def uncounted(_conn: db.Connection, _person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+    return dict.fromkeys(trip_ids)
 
 
 def _window_matches(conn: db.Connection, trip_id: int, window: Mapping[str, str]) -> bool:
@@ -80,7 +87,7 @@ def _sources_match(conn: db.Connection, person_id: int, seen: Sequence[Mapping[s
 class Sharing(TypedDict):
     state: State
     scope: photos.Scope | None
-    count: int
+    count: int | None
     removed_count: int
     removed: list[photos.TripPhoto]
     window: photos.WindowOut | None
@@ -94,9 +101,9 @@ class GrantedTrip(TypedDict):
     name: str
     start_date: str | None
     end_date: str | None
-    state: Literal["shared", "declined"]
+    state: Literal["shared", "declined", "none"]
     scope: photos.Scope | None
-    count: int
+    count: int | None
     removed_count: int
 
 
@@ -219,7 +226,7 @@ def dated_trips(conn: db.Connection) -> list[int]:
     return list(conn.execute(select(Trip.id).where(Trip.start_date.is_not(None), Trip.end_date.is_not(None), Trip.id.not_in(booked)).order_by(Trip.id)).scalars())
 
 
-def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> Sharing:
+def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted) -> Sharing:
     row = conn.orm.get(PhotoGrant, (person_id, trip_id))
     placed = photos.segment_points(conn, visibility.visible_segments(conn, viewer, [trip_id]))
     stamps = dict(conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.created)
@@ -230,17 +237,17 @@ def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -
             out = photos.photo_out(p, person, placed)
             out["removed_at"] = stamps.get(p.asset_id)
             gone.append(out)
-    count = sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
     state: State = NONE if row is None else DECLINED if row.revoked is not None else ASK if row.ask_again else SHARED
+    counted = count(conn, person_id, [trip_id])[trip_id] if state == DECLINED else sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
     return {"state": state, "scope": row.scope if row is not None and row.revoked is None else None,  # type: ignore[typeddict-item]
-            "count": count, "removed_count": len(gone), "removed": gone, "window": photos.window_out(photos.trip_window(conn, trip_id)),
+            "count": counted, "removed_count": len(gone), "removed": gone, "window": photos.window_out(photos.trip_window(conn, trip_id)),
             "changed": row.changed if row is not None else None, "audience": audience_of(conn, trip_id), "sources": sources_of(conn, person_id)}
 
 
-def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int) -> Sharing | None:
+def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted) -> Sharing | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id) or visibility.visible_trip(conn, viewer, trip_id) is None:
         return None
-    return sharing(conn, viewer, person_id, trip_id)
+    return sharing(conn, viewer, person_id, trip_id, count)
 
 
 def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None,
@@ -392,7 +399,7 @@ def _eligible(conn: db.Connection, person_id: int, by: str) -> list[int]:
     return [t for t in mine if t not in active and photos.trip_window(conn, t) is not None]
 
 
-def _unshared(conn: db.Connection, person_id: int, by: str) -> list[int]:
+def _not_yet_shared(conn: db.Connection, person_id: int, by: str) -> list[int]:
     setter = _setter(conn, by)
     if setter is None:
         return []
@@ -427,7 +434,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     effective = default_scope if default_scope is not None else found.default_scope if found is not None else photos.ONLY_ME
     if strict and share_all and not was_on and effective == photos.TRIP and (windows is None or audiences is None or sources is None):
         raise trips.Invalid(NEEDS_SETTING_SNAPSHOT)
-    pending = _unshared(conn, person_id, by) if share_all and not was_on else []
+    pending = _not_yet_shared(conn, person_id, by) if share_all and not was_on else []
     if windows is not None and any(str(t) not in windows or not _window_matches(conn, t, windows[str(t)]) for t in pending):
         raise Stale(STALE_SETTING)
     if audiences is not None and any(str(t) not in audiences or not _audience_matches(conn, t, audiences[str(t)]) for t in pending):
@@ -719,9 +726,7 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str, now: flo
     conn.orm.flush()
     conn.execute(delete(PhotoGrant).where(PhotoGrant.person_id == guest_id, PhotoGrant.trip_id.in_(list(mine))))
     conn.execute(update(PhotoGrant).where(PhotoGrant.person_id == guest_id).values(person_id=member_id, granted_by=sub))
-    for e in conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.person_id == guest_id)).all():
-        db.insert_ignore(conn, PhotoExclusion, {"person_id": member_id, "asset_id": e.asset_id, "trip_id": e.trip_id, "created": e.created, "was_trip_id": e.was_trip_id},
-                         key=["person_id", "asset_id", "trip_id"])
+    _claim_exclusions(conn, guest_id, member_id)
     if conn.orm.get(PhotoSharingPrefs, member_id) is None:
         conn.execute(update(PhotoSharingPrefs).where(PhotoSharingPrefs.person_id == guest_id).values(person_id=member_id, set_by=sub, steward_sub=None))
     _claim_sources(conn, guest_id, member_id, sub)
@@ -732,6 +737,18 @@ def claim(conn: db.Connection, guest_id: int, member_id: int, sub: str, now: flo
         _drop_derived(conn, member_id, trip_id)
     for trip_id in reachable:
         reconcile(conn, trip_id)
+
+
+def _claim_exclusions(conn: db.Connection, guest_id: int, member_id: int) -> None:
+    theirs = list(conn.orm.scalars(select(PhotoExclusion).where(PhotoExclusion.person_id == guest_id)
+                                   .order_by(PhotoExclusion.asset_id, PhotoExclusion.trip_id)).all())
+    for e in theirs:
+        mine = conn.orm.get(PhotoExclusion, (member_id, e.asset_id, e.trip_id))
+        if mine is None:
+            conn.orm.add(PhotoExclusion(person_id=member_id, asset_id=e.asset_id, trip_id=e.trip_id, created=e.created, was_trip_id=e.was_trip_id))
+        elif mine.was_trip_id is None and e.was_trip_id is not None:
+            mine.created, mine.was_trip_id = e.created, e.was_trip_id
+    conn.orm.flush()
 
 
 def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -> None:
@@ -755,6 +772,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
             conn.orm.delete(s)
         else:
             s.source_id = mine.id
+            s.cursor, s.resume_after, s.fetch_started, s.relist_gen = None, None, None, None
     conn.orm.flush()
     conn.orm.delete(theirs)
     conn.orm.flush()
@@ -767,7 +785,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
 def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
     same_window = (kept.window_start, kept.window_end) == (gone.window_start, gone.window_end)
     kept.cursor = min(kept.cursor, gone.cursor) if same_window and kept.cursor and gone.cursor else None
-    kept.resume_after, kept.fetch_started = None, None
+    kept.resume_after, kept.fetch_started, kept.relist_gen = None, None, None
 
 
 def _library(source: PhotoSource) -> tuple[str, str]:
@@ -803,19 +821,25 @@ def _reachable(conn: db.Connection, person_id: int) -> list[int]:
     return sorted(found)
 
 
-def grants(conn: db.Connection, viewer: Viewer) -> Grants:
+def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> Grants:
     if viewer.household:
         return {"people": []}
     out: list[PersonGrants] = []
     seen = {t.id: t for t in visibility.visible_trips(conn, viewer)}
+    aboard = trippeople.of(conn, list(seen))
     for person in photos.persons_of(conn, viewer):
-        rows = conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == person, PhotoGrant.trip_id.in_(list(seen))).order_by(PhotoGrant.trip_id)).all()
+        rows = {g.trip_id: g for g in conn.orm.scalars(select(PhotoGrant).where(PhotoGrant.person_id == person, PhotoGrant.trip_id.in_(list(seen)))).all()}
+        unshared = sorted(t for t in seen if (t in rows and rows[t].revoked is not None) or (t not in rows and person in aboard[t]))
+        counted = count(conn, person, unshared)
         listed: list[GrantedTrip] = []
-        for row in rows:
-            trip, state = seen[row.trip_id], sharing(conn, viewer, person, row.trip_id)
-            listed.append({"trip_id": trip.id, "name": trip.name, "start_date": trip.start_date, "end_date": trip.end_date,
-                           "state": "shared" if row.revoked is None else "declined", "scope": state["scope"],
-                           "count": state["count"], "removed_count": state["removed_count"]})
+        for trip_id in sorted(set(rows) | set(unshared)):
+            row, counts = rows.get(trip_id), counted.get(trip_id)
+            if (row is None or row.revoked is not None) and counts == 0:
+                continue
+            trip, state = seen[trip_id], sharing(conn, viewer, person, trip_id)
+            shown: Literal["shared", "declined", "none"] = "none" if row is None else "shared" if row.revoked is None else "declined"
+            listed.append({"trip_id": trip.id, "name": trip.name, "start_date": trip.start_date, "end_date": trip.end_date, "state": shown,
+                           "scope": state["scope"], "count": state["count"] if shown == "shared" else counts, "removed_count": state["removed_count"]})
         listed.sort(key=lambda t: (t["start_date"] is None, t["start_date"] or "", t["trip_id"]))
         out.append({"person_id": person, "prefs": prefs_of(conn, person), "trips": listed})
     return {"people": out}

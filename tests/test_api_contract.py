@@ -41,7 +41,7 @@ from waypoint.storage.models import Photo, PhotoGrant, PhotoSource
 from waypoint.server.api import loyalty
 from waypoint.server.api import reminders as reminders_api
 from waypoint.server.common import _current
-from tests.shared import DbCase
+from tests.shared import DbCase, empty_immich
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("api_contract", ROOT / "tools" / "api_contract.py")
@@ -107,6 +107,7 @@ class Replies(DbCase):
 
     def setUp(self):
         super().setUp()
+        empty_immich(self)
         self.addCleanup(setattr, _current, "user", getattr(_current, "user", None))
         self.checked: set[str] = set()
 

@@ -825,3 +825,34 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
                              key=["person_id", "asset_id", "trip_id"])
     conn.orm.flush()
     return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
+
+
+
+
+@dataclass(frozen=True)
+class Unshared:
+    person_id: int
+    trip_id: int
+    window: TripWindow
+    excluded: tuple[tuple[str, int], ...]
+    sources: tuple[tuple[int, str, str], ...]
+    libraries: tuple[tuple[int, str, str, str, float], ...]
+
+    def left_out(self) -> dict[str, frozenset[int]]:
+        out: dict[str, set[int]] = {}
+        for asset_id, trip_id in self.excluded:
+            out.setdefault(asset_id, set()).add(trip_id)
+        return {a: frozenset(t) for a, t in out.items()}
+
+
+def unshared_inputs(conn: db.Connection, person_id: int, trip_id: int) -> Unshared | None:
+    found = trip_window(conn, trip_id)
+    if found is None:
+        return None
+    reading = [s for s in photo_sources.for_person(conn, person_id) if s["status"] != photo_sources.OFF]
+    sources = tuple((s["id"], s["status"], s["url"]) for s in reading)
+    libraries = tuple((s["id"], s["status"], photo_sources.address(s["url"]), s["immich_user_id"], s["created"]) for s in reading)
+    excluded = conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.trip_id).where(PhotoExclusion.person_id == person_id)
+                            .order_by(PhotoExclusion.asset_id, PhotoExclusion.trip_id)).fetchall()
+    return Unshared(person_id=person_id, trip_id=trip_id, window=found, excluded=tuple((str(a), int(t)) for a, t in excluded), sources=sources,
+                    libraries=libraries)

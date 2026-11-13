@@ -637,9 +637,9 @@ export interface PhotoGrantTrip {
   name: string;
   start_date: string | null;
   end_date: string | null;
-  state: "shared" | "declined";
+  state: "shared" | "declined" | "none";
   scope: "only_me" | "trip" | null;
-  count: number;
+  count: number | null;
   removed_count: number;
 }
 
@@ -678,7 +678,7 @@ export interface PhotoReview {
 export interface PhotoSharing {
   state: "shared" | "declined" | "ask" | "none";
   scope: "only_me" | "trip" | null;
-  count: number;
+  count: number | null;
   removed_count: number;
   removed: TripPhoto[];
   window: PhotoWindow | null;

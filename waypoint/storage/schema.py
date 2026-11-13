@@ -575,6 +575,7 @@ photo_trip_syncs = Table(
     Column('synced', Float),
     Column('resume_after', Text, doc='the capture time a stopped traversal continues from (keyset paging, inclusive)'),
     Column('inputs', Text, doc="a digest of what the matcher reads for this trip and the Home point, so a change to them re-places the trip's rows"),
+    Column('relist_gen', Integer, doc="the source's re-list generation this window last completed a full traversal under; null before one"),
     info={'doc': "what each photo source has fetched for each trip's window, so a changed window is fetched again and an unchanged one incrementally"},
 )
 

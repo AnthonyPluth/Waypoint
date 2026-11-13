@@ -4,6 +4,7 @@ import unittest
 from datetime import UTC
 
 from tests.privacy import no_leaks
+from tests.shared import empty_immich
 from tests.test_trips import CRUISE, HOTEL, OUT, Household, RouteCase
 from sqlalchemy import select, update
 
@@ -72,6 +73,7 @@ def stored(photo_id):
 class PhotoRoutes(RouteCase):
     def setUp(self):
         super().setUp()
+        empty_immich(self)
         self.flight = self.book("ana", travelers=[{"person_id": self.person["ana"]}, {"person_id": self.person["ben"]}])
         self.trip = self.flight["trip_id"]
         self.stay = self.book("ana", HOTEL, trip_id=self.trip)

@@ -23,8 +23,9 @@ from .photomatch import HomeIn, MatchKind, TripWindow
 TIME_BUDGET = 600.0
 CLOCK_SKEW = timedelta(minutes=10)
 TOO_DENSE = photosources.TOO_DENSE
-Traversal = Literal["done", "stopped", "dense", "changed", "paused"]
+Traversal = Literal["done", "stopped", "dense", "changed", "paused", "unsure"]
 PAUSED: Traversal = "paused"
+UNSURE: Traversal = "unsure"
 Written = Literal["written", "gone", "changed", "moved", "dropped"]
 CHANGED: Traversal = "changed"
 DONE: Traversal = "done"
@@ -91,6 +92,7 @@ class _Run:
     sealed: str | None = None
     dropped: int = 0
     relist: float | None = None
+    gen: int | None = None
 
     @property
     def person(self) -> int:
@@ -113,6 +115,14 @@ def _stamp(conn: db.Connection, name: str, source_id: int) -> float | None:
     raw = db.get_setting(conn, _key(name, source_id))
     try:
         return float(raw) if raw else None
+    except ValueError:
+        return None
+
+
+def _generation(conn: db.Connection, source_id: int) -> int | None:
+    raw = db.get_setting(conn, _key(sk.PHOTOS_RELIST_GEN, source_id))
+    try:
+        return int(raw) if raw else None
     except ValueError:
         return None
 
@@ -172,7 +182,7 @@ def _hold(run: _Run, trip_ids: Iterable[int] | None = None) -> dict[int, PhotoGr
     return grants
 
 
-def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
+def _prepare(run: _Run, restart: bool, pending: int | None = None) -> bool:
     conn = run.conn
     photogrants.lock_home(conn)
     if _hold(run) is None:
@@ -182,6 +192,7 @@ def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
     run.windows = {w.trip_id: w for w in photos.candidate_windows(conn, run.person)}
     if restart and run.windows:
         db.set_setting(conn, _key(sk.PHOTOS_RELIST_STARTED, run.source_id), repr(run.now.timestamp()))
+        db.set_setting(conn, _key(sk.PHOTOS_RELIST_GEN, run.source_id), str(run.gen))
     restart = restart and bool(run.windows)
     owned = _rows(conn, run.source_id)
     syncs = _syncs(conn, run.source_id)
@@ -195,13 +206,14 @@ def _prepare(run: _Run, restart: bool, started: float | None = None) -> bool:
         start, end, inputs = _iso(w.start), _iso(w.end), _digest(w, run.home)
         if row is None:
             conn.orm.add(PhotoTripSync(source_id=run.source_id, trip_id=trip_id, window_start=start, window_end=end, inputs=inputs,
-                                       cursor=None, resume_after=None, fetch_started=None, synced=None))
+                                       cursor=None, resume_after=None, fetch_started=None, synced=None, relist_gen=None))
             changed = True
             continue
         moved = (row.window_start, row.window_end) != (start, end)
-        behind = started is not None and row.cursor is not None and (row.synced is None or row.synced < started)
+        behind = pending is not None and row.cursor is not None and row.relist_gen != pending
         if moved or restart or behind:
             row.window_start, row.window_end, row.cursor, row.resume_after, row.fetch_started = start, end, None, None, None
+            row.relist_gen = None
         if moved or row.inputs != inputs:
             row.inputs = inputs
             changed = True
@@ -249,7 +261,7 @@ def _digest(window: TripWindow, at_home: HomeIn | None) -> str:
     return hashlib.sha256(repr((window.start, window.end, window.points, at_home)).encode()).hexdigest()
 
 
-def _write(run: _Run, trip_id: int, got: immich.Page, stepped: bool = False) -> Written:
+def _write(run: _Run, trip_id: int, got: immich.Page, stepped: bool = False, catching_up: bool = False) -> Written:
     conn = run.conn
     grants = _hold(run)
     if grants is None:
@@ -277,10 +289,16 @@ def _write(run: _Run, trip_id: int, got: immich.Page, stepped: bool = False) -> 
     if got.dropped:
         conn.commit()
         return "dropped"
+    if catching_up:
+        conn.commit()
+        return "written"
     if got.next_page is None:
         unsure = stepped and _stamp(conn, sk.PHOTOS_RELIST_STARTED, run.source_id) is not None
+        read_in_full = row.cursor is None
         row.cursor, row.resume_after, row.fetch_started = row.fetch_started, None, None
         row.synced = row.synced if unsure else run.now.timestamp()
+        if run.gen is not None and run.relist is not None and read_in_full and not unsure:
+            row.relist_gen = run.gen
     elif got.last_taken is not None and not stepped:
         row.resume_after = _utc(got.last_taken)
     conn.commit()
@@ -291,17 +309,21 @@ def _utc(at: datetime) -> str:
     return at.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _traverse(run: _Run, trip_id: int) -> Traversal:
+def _traverse(run: _Run, trip_id: int, since: datetime | None = None) -> Traversal:
     conn = run.conn
     row = conn.orm.get(PhotoTripSync, (run.source_id, trip_id))
     if row is None:
         return DONE
-    if row.fetch_started is None:
+    catching_up = since is not None
+    if row.fetch_started is None and not catching_up:
         row.fetch_started, row.resume_after = _iso(run.now), None
         conn.commit()
-    updated = photos.instant(row.cursor) - CLOCK_SKEW if row.cursor else None
     window = run.windows[trip_id]
-    after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
+    if catching_up:
+        updated, after = since, window.start
+    else:
+        updated = photos.instant(row.cursor) - CLOCK_SKEW if row.cursor else None
+        after = max(window.start, photos.instant(row.resume_after)) if row.resume_after else window.start
     page, stepped = 1, False
     while True:
         if photo_sources.status(conn, run.source_id) in (OFF, None):
@@ -310,22 +332,24 @@ def _traverse(run: _Run, trip_id: int) -> Traversal:
         got = run.provider.search(run.unlocked, after, window.end, updated_after=updated, page=page)
         run.summary.pages += 1
         stepped = stepped or page > 1
-        written = _write(run, trip_id, got, stepped)
+        written = _write(run, trip_id, got, stepped, catching_up)
         if written == "changed":
             return CHANGED
         if written == "moved":
             return PAUSED
         if written == "dropped":
             return DENSE
-        if written == "gone" or got.next_page is None:
+        if written == "gone":
             return DONE
+        if got.next_page is None:
+            return UNSURE if catching_up and stepped else DONE
         if got.last_taken is None or (got.one_instant and page == 1 and not got.foreign):
             return DENSE
         if got.one_instant:
             page += 1
         else:
             after, page = max(after, got.last_taken), 1
-        if _clock() >= run.deadline:
+        if _clock() >= run.deadline and not catching_up:
             return STOPPED
 
 
@@ -349,14 +373,25 @@ def _finish_relist(run: _Run, started: float) -> bool:
     return True
 
 
-def _relist(conn: db.Connection, source_id: int, now: datetime, full: bool) -> tuple[float | None, bool]:
+def _relist(conn: db.Connection, source_id: int, now: datetime, full: bool) -> tuple[float | None, int | None, bool]:
     last = _stamp(conn, sk.PHOTOS_LAST_RELIST, source_id)
     if not full and last is not None and now.timestamp() - last < FULL_RELIST_DAYS * DAY:
-        return None, False
-    started = _stamp(conn, sk.PHOTOS_RELIST_STARTED, source_id)
-    if started is not None:
-        return started, False
-    return now.timestamp(), True
+        return None, None, False
+    started, gen = _stamp(conn, sk.PHOTOS_RELIST_STARTED, source_id), _generation(conn, source_id)
+    if started is not None and gen is not None:
+        return started, gen, False
+    return now.timestamp(), (gen or 0) + 1, True
+
+
+def _catch_up(run: _Run, started: float, spent: bool) -> Traversal:
+    if spent and _clock() >= run.deadline:
+        return STOPPED
+    since = datetime.fromtimestamp(started, UTC) - CLOCK_SKEW
+    for trip_id in sorted(run.windows):
+        outcome = _traverse(run, trip_id, since)
+        if outcome != DONE:
+            return outcome
+    return DONE
 
 
 def _order(conn: db.Connection, source_id: int, trip_ids: list[int]) -> list[int]:
@@ -366,9 +401,9 @@ def _order(conn: db.Connection, source_id: int, trip_ids: list[int]) -> list[int
     return sorted(trip_ids, key=lambda t: (done(t), (syncs[t].synced or 0.0) if t in syncs else 0.0, t))
 
 
-def _done_since(conn: db.Connection, source_id: int, trip_ids: Iterable[int], started: float) -> set[int]:
+def _done_under(conn: db.Connection, source_id: int, trip_ids: Iterable[int], gen: int) -> set[int]:
     syncs = _syncs(conn, source_id)
-    return {t for t in trip_ids if t in syncs and syncs[t].cursor is not None and syncs[t].fetch_started is None and (syncs[t].synced or 0.0) >= started}
+    return {t for t in trip_ids if t in syncs and syncs[t].relist_gen == gen}
 
 
 def _failed(conn: db.Connection, source: Stored, error: immich.ImmichError, sealed: str | None) -> None:
@@ -401,17 +436,19 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
     if unlocked is None:
         return summary
     job = _Run(conn, source, unlocked, provider, now, _clock() + TIME_BUDGET, None, {}, summary, sealed)
-    started, fresh = _relist(conn, source_id, now, full) if trips is None else (None, False)
-    if not _prepare(job, fresh, started if not fresh else None):
+    started, gen, fresh = _relist(conn, source_id, now, full) if trips is None else (None, None, False)
+    job.gen = gen
+    if not _prepare(job, fresh, gen if not fresh else None):
         return summary
     if fresh and not job.windows:
-        started = None
+        started, gen = None, None
     windows = job.windows
-    job.relist = started
+    job.relist, job.gen = started, gen
     finished, dense, moved = True, False, False
     wanted = [t for t in windows if trips is None or t in trips]
-    if started is not None:
-        wanted = [t for t in wanted if t not in _done_since(conn, source_id, wanted, started)]
+    if gen is not None:
+        wanted = [t for t in wanted if t not in _done_under(conn, source_id, wanted, gen)]
+    caught: Traversal | None = None
     try:
         for n, trip_id in enumerate(_order(conn, source_id, wanted)):
             outcome = STOPPED if n and _clock() >= job.deadline else _traverse(job, trip_id)
@@ -422,13 +459,22 @@ def run(conn: db.Connection, source_id: int, provider: Provider, now: datetime, 
                 return summary
             dense = dense or outcome == DENSE
             moved = moved or outcome == CHANGED
+        if job.dropped:
+            started = None
+        if started is not None and gen is not None and finished and not dense and not moved and _done_under(conn, source_id, windows, gen) == set(windows):
+            caught = _catch_up(job, started, bool(wanted))
     except immich.ImmichError as e:
         _failed(conn, source, e, job.sealed)
         summary.failed = 1
         return summary
+    if caught == PAUSED:
+        return summary
     if job.dropped:
         started = None
-    if started is not None and not dense and not moved and _done_since(conn, source_id, windows, started) == set(windows):
+    finished = finished and caught != STOPPED
+    dense = dense or caught == DENSE
+    moved = moved or caught == CHANGED
+    if started is not None and caught == DONE and not job.dropped:
         if not _finish_relist(job, started):
             return summary
         started = None

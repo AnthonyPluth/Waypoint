@@ -657,7 +657,7 @@ class PhotoSourceVersion(TypedDict):
 class PhotoSharing(TypedDict):
     state: Literal["shared", "declined", "ask", "none"]
     scope: Literal["only_me", "trip"] | None
-    count: int
+    count: int | None
     removed_count: int
     removed: list[TripPhoto]
     window: PhotoWindow | None
@@ -698,9 +698,9 @@ class PhotoGrantTrip(TypedDict):
     name: str
     start_date: str | None
     end_date: str | None
-    state: Literal["shared", "declined"]
+    state: Literal["shared", "declined", "none"]
     scope: Literal["only_me", "trip"] | None
-    count: int
+    count: int | None
     removed_count: int
 
 

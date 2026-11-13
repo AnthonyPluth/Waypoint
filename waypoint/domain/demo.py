@@ -465,6 +465,10 @@ def _photo(conn: db.Connection, trip_id: int, shot: _Shot, source_id: int, numbe
                  decided_by=photos.AUTO if shot.note == "ambiguous" else None, seen=now)
 
 
+def unshared_inventory(person_id: int, trip_id: int) -> int:
+    return 10 + int(hashlib.sha256(f"demo-unshared:{person_id}:{trip_id}".encode()).hexdigest(), 16) % 90
+
+
 def _photo_library(conn: db.Connection, members: dict[str, int]) -> None:
     now = time.time()
     sources = {}

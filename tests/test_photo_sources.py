@@ -13,7 +13,7 @@ from unittest import mock
 from sqlalchemy import delete, select, update
 
 from tests.privacy import no_leaks
-from tests.shared import DbCase, ServerCase
+from tests.shared import DbCase, ServerCase, empty_immich
 from tests.test_trips import BACK, OUT, RouteCase, guest
 from waypoint import oidc
 from waypoint.domain import people, photogrants, photomatch, photos, photosources, trips
@@ -951,6 +951,7 @@ class SourceRoutes(RouteCase):
 class SnapshotRoutes(RouteCase):
     def setUp(self):
         super().setUp()
+        empty_immich(self)
         self.trip = self.book("ana", travelers=[{"person_id": self.person["ana"]}])["trip_id"]
         with ping():
             self.library = self.ok("ana", "POST", "/api/photo-sources", {"url": URL, "key": KEY})

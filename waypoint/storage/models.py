@@ -453,6 +453,7 @@ class PhotoTripSync(Base):
     inputs: Mapped[str | None]
     fetch_started: Mapped[str | None]
     synced: Mapped[float | None]
+    relist_gen: Mapped[int | None]
 
 
 class PhotoGrant(Base):
