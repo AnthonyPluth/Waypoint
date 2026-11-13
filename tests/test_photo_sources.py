@@ -378,6 +378,40 @@ class SourceRoutes(RouteCase):
         self.assertIn("write", order)
         self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
 
+    def test_a_new_key_and_a_pause_in_one_request_take_home_the_person_and_the_library_before_writing(self):
+        made = self.connect()
+        order = []
+        home, person, row, keyed, marked = photogrants.lock_home, photo_sources.lock_person, photo_sources.lock, photo_sources.set_key, photo_sources.mark
+        with mock.patch.object(photogrants, "lock_home", side_effect=lambda conn: order.append("home") or home(conn)), \
+                mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
+                mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
+                mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
+            self.assertEqual(self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY, "paused": True})["status"], "off")
+        self.assertEqual(order[:4], ["home", "person", "source", "write"])
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_new_key_and_a_pause_wait_for_a_sync_holding_home_without_holding_the_library(self):
+        made = self.connect()
+        outcome: list = []
+
+        def edit():
+            with ping():
+                outcome.append(self.call("ana", "POST", f"/api/photo-sources/{made['id']}", {"key": NEW_KEY, "paused": True})[0])
+
+        with db.session() as conn:
+            photogrants.lock_home(conn)
+            thread = threading.Thread(target=edit)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+            self.assertTrue(photo_sources.lock(conn, made["id"]))
+        thread.join(10)
+        self.assertEqual(outcome, [200])
+        self.assertEqual(self.raw(made["id"])[1:3], ("off", None))
+        self.assertEqual(self.unlocked(made["id"]), NEW_KEY)
+
     def test_a_library_whose_key_was_lost_stays_off_through_a_pause_until_the_key_is_entered_again(self):
         made = self.connect()
         with db.session() as conn:
@@ -1251,7 +1285,7 @@ class Races(DbCase):
                 mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
                 mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
                 mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
-            photosources.change_key(self.c, self.ana, source, NEW_KEY, resuming=True)
+            photosources.change_key(self.c, self.ana, source, NEW_KEY, ordered=True)
             self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
         self.assertEqual(order[:2], ["person", "source"])
         self.assertIn("write", order)
