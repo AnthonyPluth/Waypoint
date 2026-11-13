@@ -8,6 +8,7 @@ struct WaypointApp: App {
     enum Phase: Equatable {
         case starting
         case connect
+        case signedOut
         case shell
         case failed(String)
     }
@@ -20,6 +21,9 @@ struct WaypointApp: App {
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active { Task { await renewWebSession() } }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .webViewUnauthorized)) { _ in
+                Task { await endSession() }
+            }
         }
     }
 
@@ -30,6 +34,8 @@ struct WaypointApp: App {
             ProgressView().task { await open() }
         case .connect:
             ConnectView { await open() }
+        case .signedOut:
+            SignedOutView { phase = .connect }
         case .shell:
             Shell().ignoresSafeArea()
         case .failed(let why):
@@ -39,7 +45,7 @@ struct WaypointApp: App {
                 Button("Use another Waypoint", role: .destructive) {
                     Task {
                         await ServerSession.shared.signOut()
-                        phase = .connect
+                        phase = .signedOut
                     }
                 }
             }
@@ -63,6 +69,13 @@ struct WaypointApp: App {
         } catch {
             phase = .failed(error.localizedDescription)
         }
+    }
+
+    @MainActor
+    private func endSession() async {
+        guard phase == .shell else { return }
+        phase = .signedOut
+        await ServerSession.shared.signOut()
     }
 
     @MainActor
