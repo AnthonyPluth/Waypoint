@@ -193,6 +193,50 @@ class ConfirmationTests(Kept):
         self.keep("m2", raw_of("Reminder", {"qr": OTHER_QR}, day="Mon, 19 Oct 2026 09:00:00 +0100"))
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-19"), {"type": "image/png", "data": OTHER_QR}))
 
+    def test_a_message_from_another_mailbox_that_reopens_the_choice_takes_the_choice_with_it(self):
+        other = self.connect("u-sam", "sam@example.com", "refresh-sam")
+        two = lambda day: raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR}, day=day)
+        owner = lambda: self.read(lambda conn: conn.execute(select(SegmentCode.mailbox_id)).scalar())
+        scan.keep_message(self.mailbox, "m1", two("Fri, 16 Oct 2026 09:00:00 +0100"), [self.segment], NOW)
+        self.assertEqual(owner(), self.mailbox)
+        scan.keep_message(other, "m0", two("Wed, 14 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 1)
+        self.assertEqual(owner(), self.mailbox)
+        scan.keep_message(other, "m2", two("Mon, 19 Oct 2026 09:00:00 +0100"), [self.segment], NOW + 2)
+        self.assertEqual((owner(), self.state()), (other, ("choose", "2026-10-19")))
+        opener = self.read(lambda conn: conn.execute(select(SegmentCode.opened_by)).scalar())
+        self.assertEqual(opener, self.read(lambda conn: gate_codes.stored_id(conn, other, "m2")))
+        self.read(lambda conn: conn.execute(Mailbox.__table__.delete().where(Mailbox.id == self.mailbox)))
+        self.assertEqual(self.state(), ("choose", "2026-10-19"))
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_an_older_opener_never_overwrites_a_newer_one_that_inserted_first(self):
+        images = [{"type": "image/png", "data": QR}, {"type": "image/png", "data": OTHER_QR}]
+        scan.keep_message(self.mailbox, "m-old", raw_of("Your parking reservation", {"a": QR}), [], NOW)
+        scan.keep_message(self.mailbox, "m-new", raw_of("Your parking reservation", {"a": OTHER_QR}), [], NOW + 1)
+        old, new = (self.read(lambda conn, m=m: gate_codes.stored_id(conn, self.mailbox, m)) for m in ("m-old", "m-new"))
+        outcome: list = []
+
+        def older():
+            with db.session() as conn:
+                outcome.append(gate_codes.offer(conn, self.segment, self.mailbox, images, "2026-10-16", NOW, old))
+
+        thread = threading.Thread(target=older)
+        with db.session() as conn:
+            won = gate_codes.offer(conn, self.segment, self.mailbox, images, "2026-10-19", NOW + 1, new)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+        thread.join(15)
+        row = self.read(lambda conn: conn.execute(select(SegmentCode.day, SegmentCode.opened_by)).fetchone())
+        self.assertEqual((won, outcome, tuple(row)), (True, [False], ("2026-10-19", new)))
+        self.assertEqual(self.read(lambda conn: (gate_codes.opens_choice(conn, self.segment, new), gate_codes.opens_choice(conn, self.segment, old))), (True, False))
+
+    def test_the_first_opener_wins_an_empty_choice_and_a_second_with_no_newer_day_does_not(self):
+        images = [{"type": "image/png", "data": QR}, {"type": "image/png", "data": OTHER_QR}]
+        offer = lambda day, opener: self.read(lambda conn: gate_codes.offer(conn, self.segment, self.mailbox, images, day, NOW, opener))
+        self.assertEqual([offer("2026-10-16", None), offer("2026-10-16", None), offer(None, None), offer("2026-10-15", None)], [True, False, False, False])
+        self.assertEqual([offer("2026-10-17", None)], [True])
+
     def test_choosing_takes_only_a_picture_of_this_bookings_emails(self):
         self.keep("m1", raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR}))
         for email_at, picture in ((1, 0), (-1, 0), (0, 2), (0, -1)):
@@ -1069,6 +1113,77 @@ class ReviewPathTests(ScanAiCase, Kept):
         thread.join(10)
         self.assertEqual((first.segments, outcome), ((self.segment,), [None]))
         self.assertEqual(self.read(lambda conn: stored_mail.message_ids(conn, [other])), {})
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_filing_a_suggestion_waits_for_the_items_lock_before_touching_the_booking(self):
+        item = self.fresh()
+        later = {**self.SUGGESTION, "end_local": "2026-12-05T03:00"}
+        errors: list = []
+
+        def file():
+            try:
+                with db.session() as conn:
+                    scan._file_ai(conn, self.mailbox, "m-r", [later], None, False, NOW)
+            except Exception as e:
+                errors.append(e)
+
+        thread = threading.Thread(target=file)
+        with db.session() as conn:
+            review.lock(conn, item)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+            conn.execute(select(Segment.id).where(Segment.id == self.segment).with_for_update()).fetchone()
+        thread.join(15)
+        self.assertEqual((errors, thread.is_alive()), ([], False))
+
+    def two_items(self):
+        older = png(410, 410, b"OLDER-CANDIDATE-1")
+        older_too = png(420, 420, b"OLDER-CANDIDATE-2")
+        self.fresh()
+        self.read(lambda conn: conn.execute(ReviewItem.__table__.delete()))
+        scan.keep_message(self.mailbox, "m-old", self.two(day="Fri, 16 Oct 2026 09:00:00 +0100"), [], NOW)
+        scan.keep_message(self.mailbox, "m-new", raw_of("Your parking reservation", {"x": older, "y": older_too}, day="Mon, 19 Oct 2026 09:00:00 +0100"), [], NOW + 1)
+
+        def hold(conn):
+            for mid in ("m-old", "m-new"):
+                review.add(conn, self.mailbox, mid, "mail.exampleparking.example", "2026-10-16", "no_markup", NOW)
+        self.read(hold)
+        ids = {r["message_id"]: int(r["id"]) for r in self.read(lambda conn: conn.execute(select(ReviewItem.id, ReviewItem.message_id)).fetchall())}
+        return ids["m-old"], ids["m-new"], base64.b64encode(older).decode(), base64.b64encode(older_too).decode()
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_two_review_items_resolved_at_once_leave_the_newer_message_as_the_opener_and_send_only_its_pictures(self):
+        old_item, new_item, newer, newer_too = self.two_items()
+        old_done: list = []
+
+        def resolve_old():
+            old_done.append(self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, old_item))
+
+        thread = threading.Thread(target=resolve_old)
+        with no_leaks(self, CANARY_TEXT, CANARY_PIXELS.decode(), CANARY_OTHER.decode(), database=self.path, sent_ok=True):
+            with db.session() as conn:
+                linked = review.dismiss(conn, "u-jane", new_item, (self.jane, [self.segment]))
+                thread.start()
+                thread.join(1.0)
+                self.assertTrue(thread.is_alive())
+            thread.join(15)
+            gatecode.settle_linked(linked, NOW + 5)
+        sent = json.dumps(self.fake.requests)
+        self.assertEqual((len(self.fake.requests), newer in sent, newer_too in sent, base64.b64encode(QR).decode() in sent,
+                          base64.b64encode(OTHER_QR).decode() in sent), (1, True, True, False, False))
+        self.assertEqual(self.state(), ("ready", "2026-10-19") if self.image() else ("choose", "2026-10-19"))
+
+    def test_the_older_message_resolved_first_is_replaced_by_the_newer_and_sends_nothing_after(self):
+        old_item, new_item, newer, newer_too = self.two_items()
+        self.fake.status = 500
+        self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, old_item)
+        self.assertEqual(self.state(), ("choose", "2026-10-16"))
+        self.fake.reset()
+        self.fake.content = '{"picture": 1}'
+        self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, new_item)
+        sent = json.dumps(self.fake.requests)
+        self.assertEqual((len(self.fake.requests), newer in sent, base64.b64encode(QR).decode() in sent), (1, True, False))
 
     def two(self, **more) -> dict:
         return raw_of("Your parking reservation", {"a": QR, "b": OTHER_QR}, text=f"Reservation PK30417. {CANARY_TEXT}", **more)

@@ -100,6 +100,19 @@ def _set(conn: db.Connection, segment_id: int, mailbox_id: int, image: Image | N
               key=["segment_id"], update=["mailbox_id", "content", "day", "created", "opened_by"])
 
 
+def _open_choice(conn: db.Connection, segment_id: int, mailbox_id: int, day: str | None, now: float, opener: int | None) -> bool:
+    first = (db.dialect_insert(conn, SegmentCode)
+             .values(segment_id=segment_id, mailbox_id=mailbox_id, content=None, day=day, created=now, opened_by=opener)
+             .on_conflict_do_nothing(index_elements=["segment_id"]).returning(SegmentCode.segment_id))
+    if conn.execute(first).fetchone() is not None:
+        return True
+    if day is None:
+        return False
+    return int(conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
+                                                      or_(SegmentCode.day.is_(None), SegmentCode.day < day))
+                            .values(mailbox_id=mailbox_id, opened_by=opener, day=day, created=now)).rowcount) == 1
+
+
 def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequence[Image], day: str | None, now: float,
           opener: int | None = None) -> bool:
     if not is_parking(conn, segment_id):
@@ -107,16 +120,9 @@ def offer(conn: db.Connection, segment_id: int, mailbox_id: int, images: Sequenc
     fits = qualifying(images)
     if not fits:
         return False
-    held = conn.execute(select(SegmentCode.content, SegmentCode.day).where(SegmentCode.segment_id == segment_id)).fetchone()
     if len(fits) > 1:
-        if held is None:
-            _set(conn, segment_id, mailbox_id, None, day, now, opener)
-            return True
-        if day is None:
-            return False
-        return int(conn.execute(update(SegmentCode).where(SegmentCode.segment_id == segment_id, SegmentCode.content.is_(None),
-                                                          or_(SegmentCode.day.is_(None), SegmentCode.day < day))
-                                .values(opened_by=opener, day=day, created=now)).rowcount) == 1
+        return _open_choice(conn, segment_id, mailbox_id, day, now, opener)
+    held = conn.execute(select(SegmentCode.content, SegmentCode.day).where(SegmentCode.segment_id == segment_id)).fetchone()
     if held is not None and held["content"] is not None and not _replaces(day, held["day"]):
         return False
     _set(conn, segment_id, mailbox_id, images[fits[0]], day, now)
