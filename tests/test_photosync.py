@@ -137,9 +137,11 @@ class FirstRunTests(SyncCase):
         self.assertEqual(rows[self.lib.items[1]["id"]].trip_id, self.b)
         inferred = rows[self.lib.items[2]["id"]]
         self.assertEqual((inferred.trip_id, inferred.match, inferred.location_source), (self.a, "time", "inferred"))
-        windows = {q["takenBefore"] for q in self.lib.asked()}
-        self.assertEqual(len(windows), 2)
-        self.assertTrue(all("updatedAfter" not in q for q in self.lib.asked()))
+        read = [q for q in self.lib.asked() if "updatedAfter" not in q]
+        self.assertEqual(len({q["takenBefore"] for q in read}), 2)
+        caught = [q for q in self.lib.asked() if "updatedAfter" in q]
+        self.assertEqual({q["takenBefore"] for q in caught}, {q["takenBefore"] for q in read})
+        self.assertEqual({at(q["updatedAfter"]) for q in caught}, {NOW - photosync.CLOCK_SKEW})
         self.assertEqual(set(self.syncs()), {self.a, self.b})
         self.assertTrue(all(s.cursor == NOW.isoformat() and s.resume_after is None and s.fetch_started is None for s in self.syncs().values()))
         self.assertEqual((got.sources, got.new, got.inferred, got.failed, got.budget_hit), (1, 3, 1, 0, 0))
@@ -841,11 +843,14 @@ class FourthReviewTests(SyncCase):
         self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
         self.sync()
         db.set_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}", repr((NOW + timedelta(days=7)).timestamp()))
+        db.set_setting(self.c, f"{sk.PHOTOS_RELIST_GEN}:{self.source}", "5")
         self.c.commit()
         self.lib.items = self.lib.items[:1]
         calls = len(self.lib.asked())
         self.sync(NOW + timedelta(days=8))
-        self.assertTrue(all("updatedAfter" not in q for q in self.lib.asked()[calls:]))
+        since = {at(q["updatedAfter"]) for q in self.lib.asked()[calls:] if "updatedAfter" in q}
+        self.assertEqual(since, {NOW + timedelta(days=7) - photosync.CLOCK_SKEW})
+        self.assertEqual(len([q for q in self.lib.asked()[calls:] if "updatedAfter" not in q]), 2)
         self.assertEqual(list(self.rows()), [self.lib.items[0]["id"]])
 
     def test_a_scheduled_run_that_finds_the_library_busy_runs_next_and_wins_over_queued_trips(self):
@@ -1367,4 +1372,116 @@ class SteppedInstantTests(SyncCase):
             self.assertIn(shifted, self.rows())
         self.lib.on_search = None
         self.assertIn(self.lib.items[-1]["id"], self.rows())
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+
+class RelistGenerationTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.share(self.other)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO),
+                          asset(3, "2026-08-01T22:00:00Z", gps=SOHO)]
+        self.sync()
+
+    def gen(self):
+        return db.get_setting(self.c, f"{sk.PHOTOS_RELIST_GEN}:{self.source}")
+
+    def test_each_window_records_the_generation_it_was_read_in_full_under(self):
+        self.assertEqual(self.gen(), "1")
+        self.assertEqual({t: s.relist_gen for t, s in self.syncs().items()}, {self.a: 1, self.b: 1, self.other: 1})
+        self.sync(NOW + timedelta(hours=6))
+        self.assertEqual({s.relist_gen for s in self.syncs().values()}, {1})
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8))
+        self.assertEqual(self.gen(), "2")
+        self.assertEqual(sorted((s.relist_gen for s in self.syncs().values()), key=str), [2, None, None])
+        read = next(t for t, s in self.syncs().items() if s.relist_gen == 2)
+        calls = len(self.lib.asked())
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8, hours=1))
+        fetched_again = [q for q in self.lib.asked()[calls:] if "updatedAfter" not in q]
+        self.assertNotIn(photos.window_out(photos.trip_window(self.c, read))["end"][:16], {q["takenBefore"][:16] for q in fetched_again})
+        self.assertEqual(self.gen(), "2")
+
+    def test_an_incremental_read_during_a_pending_relist_does_not_count_as_read_in_full(self):
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8))
+        pending = [t for t, s in self.syncs().items() if s.relist_gen != 2]
+        self.sync(NOW + timedelta(days=8, minutes=5), trips=set(pending))
+        self.assertTrue(all(self.syncs()[t].relist_gen is None for t in pending))
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_a_pending_relist_without_a_generation_starts_again(self):
+        db.set_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}", repr(NOW.timestamp()))
+        db.set_setting(self.c, f"{sk.PHOTOS_RELIST_GEN}:{self.source}", None)
+        self.c.commit()
+        calls = len(self.lib.asked())
+        self.sync(NOW + timedelta(days=8))
+        self.assertEqual(len([q for q in self.lib.asked()[calls:] if "updatedAfter" not in q]), 3)
+        self.assertEqual(self.gen(), "1")
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+
+class CatchUpTests(SyncCase):
+    def setUp(self):
+        super().setUp()
+        self.share(self.other)
+        self.c.commit()
+        self.moved = asset(3, "2026-08-01T22:00:00Z", gps=SOHO)
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), self.moved]
+        self.sync()
+
+    def move_back_when_august_is_read(self, asked):
+        if asked["takenBefore"].startswith("2026-08") and "updatedAfter" not in asked:
+            self.lib.items[1] = asset(3, "2026-06-03T09:00:00Z", gps=SOHO, updated="2026-07-09T12:05:00.000Z")
+
+    def test_an_asset_moved_back_into_a_window_already_read_is_kept_by_the_catch_up(self):
+        self.lib.on_search = self.move_back_when_august_is_read
+        got = self.sync(NOW + timedelta(days=8))
+        rows = self.rows()
+        self.assertIn(self.moved["id"], rows)
+        self.assertEqual(rows[self.moved["id"]].taken_utc, "2026-06-03T09:00:00.000Z")
+        self.assertIn(rows[self.moved["id"]].trip_id, {self.a, self.b})
+        self.assertEqual(got.deleted, 0)
+        caught = [q for q in self.lib.asked() if q.get("updatedAfter") and at(q["updatedAfter"]) == NOW + timedelta(days=8) - photosync.CLOCK_SKEW]
+        self.assertEqual(len({q["takenBefore"] for q in caught}), 3)
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_an_asset_gone_from_immich_is_still_deleted_after_the_catch_up(self):
+        self.lib.items = self.lib.items[:1]
+        got = self.sync(NOW + timedelta(days=8))
+        self.assertEqual(list(self.rows()), [self.lib.items[0]["id"]])
+        self.assertEqual(got.deleted, 1)
+
+    def test_a_catch_up_that_fails_deletes_nothing_and_the_next_run_finishes_it(self):
+        self.lib.items = self.lib.items[:1]
+        relisted = db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}")
+
+        def fail_in_catch_up(asked):
+            if "updatedAfter" in asked:
+                self.lib.fail(503)
+        self.lib.on_search = fail_in_catch_up
+        got = self.sync(NOW + timedelta(days=8))
+        self.assertEqual((got.failed, got.deleted, len(self.rows())), (1, 0, 2))
+        self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_LAST_RELIST}:{self.source}"), relisted)
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        self.lib.on_search = None
+        self.lib.heal()
+        calls = len(self.lib.asked())
+        got = self.sync(NOW + timedelta(days=8, hours=6))
+        self.assertTrue(all("updatedAfter" in q for q in self.lib.asked()[calls:]))
+        self.assertEqual((got.deleted, list(self.rows())), (1, [self.lib.items[0]["id"]]))
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+    def test_a_catch_up_stepping_through_one_instant_by_page_deletes_nothing(self):
+        self.lib.items = self.lib.items[:1]
+        crowd = [asset(100 + n, "2026-06-02T18:00:00Z", owner=PARTNER, updated="2026-07-09T12:05:00.000Z") for n in range(PER_PAGE + 1)]
+
+        def crowd_in_catch_up(asked):
+            if "updatedAfter" in asked and crowd[0] not in self.lib.items:
+                self.lib.items.extend(crowd)
+        self.lib.on_search = crowd_in_catch_up
+        got = self.sync(NOW + timedelta(days=8))
+        self.assertEqual((got.deleted, len(self.rows())), (0, 2))
         self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))

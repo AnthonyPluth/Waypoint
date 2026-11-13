@@ -157,7 +157,9 @@ def database_path(case, name="waypoint.db") -> str:
 
 
 def own_database(case, **env) -> str:
+    from waypoint.domain import photos
     from waypoint.storage import db
+    photos.forget_counts()
     later = case.addClassCleanup if isinstance(case, type) else case.addCleanup
     tmp = tempfile.TemporaryDirectory()
     later(tmp.cleanup)

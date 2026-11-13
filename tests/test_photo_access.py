@@ -1,15 +1,22 @@
 import json
+import threading
+import time
 import unittest
+from datetime import datetime
+from unittest import mock
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import ServerCase
 from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
+from waypoint.domain import photocount, photos, trips
+from waypoint.domain.visibility import Viewer
+from waypoint.providers import immich
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db
-from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoTripSync, SegmentRecipient, TripPerson
+from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, SegmentRecipient, TripPerson
 
 STATE, COUNTRY = "Canaryshire-7q2x", "Canaryland-3k9v"
 EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": []}
@@ -27,6 +34,20 @@ class AccessCase(RouteCase):
         self.trip = self.flight["trip_id"]
         self.stay = self.book("ana", HOTEL, trip_id=self.trip)
         self.sources = {who: self.keep(source_row(self.person[who], f"sub-{who}")) for who in ("ana", "ben")}
+        self.in_immich: list[dict] = []
+        photos.forget_counts()
+        searching = mock.patch.object(immich, "search", side_effect=self.search)
+        searching.start()
+        self.addCleanup(searching.stop)
+
+    def search(self, source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+        found = [a for a in self.in_immich if taken_after <= datetime.fromisoformat(a["fileCreatedAt"]) <= taken_before]
+        return immich.parse_page({"assets": {"items": found, "nextPage": None}}, page, source.user_id)
+
+    def in_library(self, number, taken="2026-06-03T09:00:00.000Z"):
+        self.in_immich.append({"id": f"0a000000-0000-4000-8000-{number:012d}", "type": "IMAGE", "ownerId": "immich-user-1", "localDateTime": taken,
+                               "fileCreatedAt": taken, "updatedAt": "2026-06-20T00:00:00.000Z",
+                               "exifInfo": {"timeZone": None, "latitude": SOHO[0], "longitude": SOHO[1], "state": None, "country": None}})
 
     def keep(self, row):
         with db.session() as conn:
@@ -219,8 +240,10 @@ class RemovalTests(AccessCase):
         with db.session() as conn:
             conn.execute(insert(PhotoTripSync).values(source_id=self.sources["ben"], trip_id=self.trip, window_start="a", window_end="b"))
         self.assertEqual(self.call("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing?person_id={self.person['ben']}"), (404, NO_TRIP))
+        self.in_library(1)
         got = self.ok("ben", "DELETE", f"/api/trips/{self.trip}/photo-sharing")
-        self.assertEqual((got["state"], got["scope"], got["count"], got["removed_count"], got["removed"]), ("declined", None, 0, 0, []))
+        self.assertEqual((got["state"], got["scope"], got["count"], got["removed_count"], got["removed"]), ("declined", None, None, 0, []))
+        self.assertEqual(self.sharing("ben")["count"], 1)
         for who in ("ana", "ben"):
             self.assertEqual(self.seen_by(who), [self.hers], who)
             self.assertEqual(self.listing(who)["people"], [{"person_id": self.person["ana"], "count": 1}], who)
@@ -229,7 +252,8 @@ class RemovalTests(AccessCase):
             self.assertEqual(conn.execute(select(PhotoTripSync.trip_id)).fetchall(), [])
             kept = conn.execute(select(PhotoExclusion.person_id, PhotoExclusion.trip_id)).fetchall()
         self.assertEqual(kept, [(self.person["ben"], self.trip)])
-        self.assertEqual(self.ok("ben", "GET", "/api/photo-grants")["people"][0]["trips"][0]["state"], "declined")
+        listed = self.ok("ben", "GET", "/api/photo-grants")["people"][0]["trips"]
+        self.assertEqual([(t["trip_id"], t["state"], t["count"]) for t in listed], [(self.trip, "declined", 1)])
         again = self.confirm("ben")
         self.assertEqual((again["state"], again["scope"], again["count"]), ("shared", "trip", 0))
         with db.session() as conn:
@@ -453,6 +477,145 @@ class LeakTests(AccessCase):
         for method, pattern in PHOTO_ROUTES:
             self.assertTrue(mcp_access.blocked(pattern), pattern)
             self.assertIsNone(mcp_http.needs(method, pattern), f"{method} {pattern}")
+
+
+class UnsharedCountTests(AccessCase):
+    def setUp(self):
+        super().setUp()
+        self.share("ben", revoked=5.0)
+
+    def count(self, who="ben", trip=None):
+        with db.session() as conn:
+            return photocount.unshared_counts(conn, self.person[who], [trip or self.trip])[trip or self.trip]
+
+    def test_a_declined_trip_counts_what_the_sync_would_put_on_it_once_per_asset(self):
+        self.keep(PhotoSource(person_id=self.person["ben"], owner_sub="sub-ben", url="https://second-canary.example", immich_user_id="immich-user-1",
+                              api_key=source_row(self.person["ben"], "sub-ben").api_key, status="ok", created=1.0))
+        self.keep(PhotoSource(person_id=self.person["ben"], owner_sub="sub-ben", url="https://paused-canary.example", immich_user_id="immich-user-1",
+                              api_key=source_row(self.person["ben"], "sub-ben").api_key, status="off", created=1.0))
+        for n in range(1, 4):
+            self.in_library(n)
+        self.in_library(4, "2026-07-20T09:00:00.000Z")
+        self.in_immich.append({**self.in_immich[0], "id": "0a000000-0000-4000-8000-000000000099", "ownerId": "someone-else"})
+        self.keep(PhotoExclusion(person_id=self.person["ben"], asset_id="0a000000-0000-4000-8000-000000000003", trip_id=self.trip, created=1.0))
+        self.assertEqual(self.count(), 2)
+        got = self.sharing("ben")
+        self.assertEqual((got["state"], got["count"]), ("declined", 2))
+        self.assertEqual(immich.search.call_count, 2)
+
+    def test_a_library_that_cannot_be_checked_fails_the_whole_count(self):
+        self.in_library(1)
+        for status in ("refused", "unreachable"):
+            with self.subTest(status=status):
+                with db.session() as conn:
+                    conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status=status))
+                photos.forget_counts()
+                self.assertIsNone(self.count())
+                self.assertIsNone(self.sharing("ben")["count"])
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="ok", api_key="enc:v1:not-a-token"))
+        self.assertIsNone(self.count())
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(api_key=source_row(1, "x").api_key))
+        immich.search.side_effect = immich.Unavailable(immich.UNREACHABLE)
+        self.assertIsNone(self.count())
+        with db.session() as conn:
+            with self.assertRaises(photocount.Unchecked):
+                photocount.unshared_count(conn, self.person["ben"], self.trip)
+        immich.search.side_effect = self.search
+        with db.session() as conn:
+            self.assertEqual(photocount.unshared_count(conn, self.person["ben"], self.trip), 1)
+
+    def test_a_dense_instant_fails_the_count_and_a_partners_one_is_stepped_through(self):
+        def dense(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            items = [{**self.in_immich[0], "id": f"0a000000-0000-4000-8000-{n:012d}", "ownerId": owner} for n in range(3)]
+            return immich.parse_page({"assets": {"items": items, "nextPage": "2"}}, page, source.user_id)
+        self.in_library(1)
+        for owner in ("immich-user-1", "someone-else"):
+            with self.subTest(owner=owner):
+                photos.forget_counts()
+                immich.search.side_effect = dense
+                with mock.patch.object(photocount, "COUNT_SECONDS", 0.5):
+                    self.assertIsNone(self.count())
+
+    def test_no_library_a_paused_or_demo_library_or_no_window_counts_nothing_without_asking(self):
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="off"))
+        self.in_library(1)
+        self.assertEqual(self.count(), 0)
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="ok", url="demo"))
+        self.assertEqual(self.count(), 0)
+        with db.session() as conn:
+            dateless = trips.create_trip(conn, Viewer(self.person["ben"]), {"name": "Someday", "people": [self.person["ben"]]})["id"]
+            self.assertEqual(photocount.unshared_counts(conn, self.person["ben"], [dateless]), {dateless: 0})
+        immich.search.assert_not_called()
+
+    def test_a_count_is_kept_ten_minutes_for_the_same_window_libraries_and_removals(self):
+        self.in_library(1)
+        clock = [1000.0]
+        with mock.patch.object(photos.time, "monotonic", side_effect=lambda: clock[0]):
+            self.assertEqual(self.count(), 1)
+            self.in_library(2)
+            self.assertEqual(self.count(), 1)
+            with db.session() as conn:
+                self.assertEqual(photos.held_unshared_counts(conn, self.person["ben"], [self.trip]), {self.trip: 1})
+            self.assertEqual(self.ok("ben", "DELETE", f"/api/trips/{self.trip}/photo-sharing")["count"], 1)
+            self.keep(PhotoExclusion(person_id=self.person["ben"], asset_id="unrelated-asset", trip_id=self.trip, created=1.0))
+            with db.session() as conn:
+                self.assertEqual(photos.held_unshared_counts(conn, self.person["ben"], [self.trip]), {self.trip: None})
+            self.assertEqual(self.count(), 2)
+            self.in_library(3)
+            clock[0] += photos.COUNT_KEPT - 1
+            self.assertEqual(self.count(), 2)
+            clock[0] += 1
+            self.assertEqual(self.count(), 3)
+        self.assertEqual(immich.search.call_count, 3)
+
+    def test_settings_lists_a_trip_not_shared_only_when_it_has_photos_and_says_when_it_could_not_check(self):
+        later = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])["trip_id"]
+        quiet = self.book("ana", {**OUT, "start_local": "2027-02-01T19:00", "end_local": "2027-02-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])["trip_id"]
+        shared = self.book("ana", {**OUT, "start_local": "2027-05-01T19:00", "end_local": "2027-05-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])["trip_id"]
+        self.book("ana", {**OUT, "start_local": "2027-08-01T19:00", "end_local": "2027-08-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
+        self.share("ben", shared, scope="only_me")
+        self.in_library(1)
+        self.in_library(2, "2026-09-02T09:00:00.000Z")
+        self.in_library(3, "2026-09-02T10:00:00.000Z")
+        listed = lambda: [(t["trip_id"], t["state"], t["scope"], t["count"]) for t in self.ok("ben", "GET", "/api/photo-grants")["people"][0]["trips"]]
+        self.assertEqual(listed(), [(self.trip, "declined", None, 1), (later, "none", None, 2), (shared, "shared", "only_me", 0)])
+        self.assertNotIn(quiet, [t[0] for t in listed()])
+        photos.forget_counts()
+        with db.session() as conn:
+            conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="unreachable"))
+        self.assertEqual(listed(), [(self.trip, "declined", None, None), (later, "none", None, None), (quiet, "none", None, None),
+                                    (shared, "shared", "only_me", 0)])
+
+    def test_at_most_four_trips_are_counted_at_once(self):
+        trips_of_ben = [self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"},
+                                  travelers=[{"person_id": self.person["ben"]}])["trip_id"] for m in range(1, 8)]
+        lock, now, peak = threading.Lock(), [0], [0]
+
+        def slow(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            with lock:
+                now[0] += 1
+                peak[0] = max(peak[0], now[0])
+            time.sleep(0.05)
+            with lock:
+                now[0] -= 1
+            return immich.parse_page({"assets": {"items": [], "nextPage": None}}, page, source.user_id)
+        immich.search.side_effect = slow
+        with db.session() as conn:
+            got = photocount.unshared_counts(conn, self.person["ben"], trips_of_ben)
+        self.assertEqual(got, {t: 0 for t in trips_of_ben})
+        self.assertEqual(peak[0], photocount.COUNT_AT_ONCE)
+
+    def test_nothing_private_is_logged_when_a_count_fails(self):
+        immich.search.side_effect = immich.Refused(immich.REFUSED)
+        with no_leaks(self, URL, KEY, ASSET):
+            replies = [self.sharing("ben"), self.ok("ben", "GET", "/api/photo-grants")]
+        self.assertIsNone(replies[0]["count"])
+        for canary in (URL, KEY):
+            self.assertNotIn(canary, json.dumps(replies))
 
 
 class LocalModeTests(ServerCase):

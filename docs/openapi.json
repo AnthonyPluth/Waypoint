@@ -6701,7 +6701,8 @@
           "state": {
             "enum": [
               "shared",
-              "declined"
+              "declined",
+              "none"
             ]
           },
           "scope": {
@@ -6712,7 +6713,10 @@
             ]
           },
           "count": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "removed_count": {
             "type": "integer"
@@ -6878,7 +6882,10 @@
             ]
           },
           "count": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "null"
+            ]
           },
           "removed_count": {
             "type": "integer"

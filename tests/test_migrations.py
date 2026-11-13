@@ -463,6 +463,26 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("parking", [col[0] for col in shape(self.path)["review_items"]["columns"]])
         self.assertEqual(len(rows_of(self.path, "review_items")), 1)
 
+    def test_0045_records_the_relist_generation_of_each_photo_sync_and_leaves_earlier_rows_without(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0044")
+            c.execute(insert(schema.people).values(id=1, display_name="One"))
+            c.execute(insert(schema.trips).values(id=1, name="Trip 1", auto=True))
+            c.execute(insert(schema.photo_sources).values(id=1, person_id=1, owner_sub="sub-x", url="https://photos.example", immich_user_id="u",
+                                                         api_key="enc:v1:x", status="ok", created=1.0))
+            c.execute(sa.table("photo_trip_syncs", *(sa.column(n) for n in ("source_id", "trip_id", "window_start", "window_end", "cursor"))).insert()
+                      .values(source_id=1, trip_id=1, window_start="a", window_end="b", cursor="c1"))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        names = [col[0] for col in shape(self.path)["photo_trip_syncs"]["columns"]]
+        self.assertEqual([r[names.index("relist_gen")] for r in rows_of(self.path, "photo_trip_syncs")], [None])
+        with db.engine(self.path).begin() as c:
+            c.execute(sa.update(schema.photo_trip_syncs).values(relist_gen=3))
+            command.downgrade(db.alembic_config(c), "0044")
+        self.assertNotIn("relist_gen", [col[0] for col in shape(self.path)["photo_trip_syncs"]["columns"]])
+        self.assertEqual([r[:5] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1")])
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

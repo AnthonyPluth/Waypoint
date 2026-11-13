@@ -4,6 +4,7 @@ import functools
 import hashlib
 import heapq
 import math
+import threading
 import time
 from collections import Counter
 from enum import Enum
@@ -15,7 +16,7 @@ from typing import Literal, TypedDict, cast
 
 from sqlalchemy import ColumnElement, and_, delete, false, or_, select
 
-from ..storage import db, geocode
+from ..storage import db, geocode, photo_sources
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
 from . import home, photomatch, pixels, place_zones, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
@@ -820,3 +821,65 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
                              key=["person_id", "asset_id", "trip_id"])
     conn.orm.flush()
     return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
+
+
+
+COUNT_KEPT = 600.0
+_counted: dict[tuple[object, ...], tuple[float, int]] = {}
+_counted_lock = threading.Lock()
+
+
+@dataclass(frozen=True)
+class Unshared:
+    person_id: int
+    trip_id: int
+    window: TripWindow
+    excluded: tuple[tuple[str, int], ...]
+    sources: tuple[tuple[int, str, str], ...]
+
+    @property
+    def key(self) -> tuple[object, ...]:
+        kept = hashlib.sha256(repr(self.excluded).encode()).hexdigest()
+        return (self.person_id, self.trip_id, self.window.start, self.window.end, tuple((i, status) for i, status, _ in self.sources), kept)
+
+    def left_out(self) -> dict[str, frozenset[int]]:
+        out: dict[str, set[int]] = {}
+        for asset_id, trip_id in self.excluded:
+            out.setdefault(asset_id, set()).add(trip_id)
+        return {a: frozenset(t) for a, t in out.items()}
+
+
+def unshared_inputs(conn: db.Connection, person_id: int, trip_id: int) -> Unshared | None:
+    found = trip_window(conn, trip_id)
+    if found is None:
+        return None
+    sources = tuple((s["id"], s["status"], s["url"]) for s in photo_sources.for_person(conn, person_id) if s["status"] != photo_sources.OFF)
+    excluded = conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.trip_id).where(PhotoExclusion.person_id == person_id)
+                            .order_by(PhotoExclusion.asset_id, PhotoExclusion.trip_id)).fetchall()
+    return Unshared(person_id=person_id, trip_id=trip_id, window=found, excluded=tuple((str(a), int(t)) for a, t in excluded), sources=sources)
+
+
+def held_count(key: tuple[object, ...], now: float) -> int | None:
+    with _counted_lock:
+        kept = _counted.get(key)
+        return kept[1] if kept is not None and now - kept[0] < COUNT_KEPT else None
+
+
+def hold_count(key: tuple[object, ...], count: int, now: float) -> None:
+    with _counted_lock:
+        for old in [k for k, (at, _) in _counted.items() if now - at >= COUNT_KEPT]:
+            del _counted[old]
+        _counted[key] = (now, count)
+
+
+def forget_counts() -> None:
+    with _counted_lock:
+        _counted.clear()
+
+
+def held_unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+    out: dict[int, int | None] = {}
+    for trip_id in trip_ids:
+        inputs = unshared_inputs(conn, person_id, trip_id)
+        out[trip_id] = 0 if inputs is None or not inputs.sources else held_count(inputs.key, time.monotonic())
+    return out

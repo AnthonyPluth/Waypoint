@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ... import validate
-from ...domain import photogrants, photoproxy, photos, photosources
+from ...domain import photocount, photogrants, photoproxy, photos, photosources
 from ...domain.photosources import Actor
 from ...domain.visibility import Viewer
 from ...providers import immich
@@ -174,7 +174,7 @@ def api_photo_original(conn, _q, _b, photo_id) -> Response:
 def api_photo_sharing(conn, q, _b, trip_id) -> PhotoSharing:
     who, trip = _viewer(conn), row_id(trip_id, NO_TRIP)
     person = _person(conn, who, (q.get("person_id") or [None])[0])
-    return _sharing(lambda: photogrants.state_of(conn, who, person, trip))
+    return _sharing(lambda: photogrants.state_of(conn, who, person, trip, photocount.unshared_counts))
 
 
 def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSharing:
@@ -242,7 +242,7 @@ def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
 
 
 def api_photo_grants(conn, _q, _b) -> PhotoGrants:
-    return photogrants.grants(conn, _viewer(conn))
+    return photogrants.grants(conn, _viewer(conn), photocount.unshared_counts)
 
 
 def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs:

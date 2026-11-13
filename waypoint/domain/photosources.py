@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import time
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TypedDict
@@ -15,7 +14,7 @@ from ..providers import immich
 from ..storage import db, photo_sources, secretbox
 from ..storage.models import Person, PhotoExclusion, PhotoGrant, User
 from ..storage.photo_sources import OFF, OK, REFUSED, UNREACHABLE, Status, Stored
-from . import photogrants, photomatch, photoqueue, photos
+from . import photocount, photogrants, photomatch, photoqueue, photos
 
 NO_SOURCE = "No such photo library"
 NO_PERSON = "No such person"
@@ -285,26 +284,6 @@ def _shown(asset: immich.Asset, counted: _Counted, left_out: set[int]) -> int | 
     return placed.trip_id if placed.match in SHOWN else None
 
 
-def _pages(source: immich.Source, window: photomatch.TripWindow, deadline: float) -> Iterator[immich.Page]:
-    after, page = window.start, 1
-    while True:
-        left = deadline - time.monotonic()
-        if left <= 0:
-            raise immich.Unavailable(immich.TOO_SLOW)
-        got = immich.search(source, after, window.end, page=page, seconds=left)
-        if time.monotonic() >= deadline or got.dropped:
-            raise immich.Unavailable(TOO_DENSE)
-        yield got
-        if got.next_page is None:
-            return
-        if got.last_taken is None or (got.one_instant and page == 1 and not got.foreign):
-            raise immich.Unavailable(TOO_DENSE)
-        if got.one_instant:
-            page += 1
-        else:
-            after, page = max(after, got.last_taken), 1
-
-
 def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
     wanted = set(counted.shared)
     targets = [w for w in counted.windows if w.trip_id in wanted]
@@ -319,7 +298,7 @@ def _count(conn: db.Connection, source: Stored, counted: _Counted) -> int:
     total = 0
     try:
         for window in targets:
-            for got in _pages(unlocked, window, deadline):
+            for got in photocount.search_pages(unlocked, window.start, window.end, deadline, TOO_DENSE):
                 for asset in got.assets:
                     if asset.id not in seen:
                         seen.add(asset.id)

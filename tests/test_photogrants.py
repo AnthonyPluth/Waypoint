@@ -300,7 +300,7 @@ class GrantTests(GrantCase):
         self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id=only_a.asset_id, trip_id=self.b, created=1.0))
         self.assertEqual(self.seen(self.jane, self.b), [both.id])
         got = photogrants.stop(self.c, self.jane, self.jid, self.b, 20.0)
-        self.assertEqual((got["state"], got["count"]), ("declined", 0))
+        self.assertEqual((got["state"], got["count"]), ("declined", None))
         moved = self.row(both.id)
         self.assertEqual((moved.trip_id, moved.match, moved.decided_by), (self.a, "place", "auto"))
         self.assertEqual((self.row(torn.id).trip_id, self.row(torn.id).match), (self.a, "place"))
@@ -1737,6 +1737,25 @@ class ClaimTests(GrantCase):
                          sorted([(self.jid, "https://immich-canary-8h2k.example:2283", "immich-user-1", "u-jane"), (self.jid, "https://other.example", "u2", "u-jane"),
                                  (self.jid, "https://other.example", "u3", "u-jane")]))
         self.assertIsNone(self.c.orm.get(Person, self.mia))
+
+    def test_a_claimed_exclusion_keeps_the_row_with_a_hand_placement_and_otherwise_the_members(self):
+        trips.edit_trip(self.c, self.jane, self.b, {"people": [self.jid, self.mia]}, confirmed=True)
+        self.c.orm.add_all([PhotoExclusion(person_id=self.mia, asset_id="theirs-placed", trip_id=self.b, created=2.0, was_trip_id=self.a),
+                            PhotoExclusion(person_id=self.jid, asset_id="theirs-placed", trip_id=self.b, created=1.0, was_trip_id=None),
+                            PhotoExclusion(person_id=self.mia, asset_id="mine-placed", trip_id=self.b, created=4.0, was_trip_id=None),
+                            PhotoExclusion(person_id=self.jid, asset_id="mine-placed", trip_id=self.b, created=3.0, was_trip_id=self.b),
+                            PhotoExclusion(person_id=self.mia, asset_id="both-placed", trip_id=self.b, created=6.0, was_trip_id=self.a),
+                            PhotoExclusion(person_id=self.jid, asset_id="both-placed", trip_id=self.b, created=5.0, was_trip_id=self.b),
+                            PhotoExclusion(person_id=self.mia, asset_id="none-placed", trip_id=self.b, created=8.0, was_trip_id=None),
+                            PhotoExclusion(person_id=self.jid, asset_id="none-placed", trip_id=self.b, created=7.0, was_trip_id=None),
+                            PhotoExclusion(person_id=self.mia, asset_id="only-theirs", trip_id=self.a, created=9.0, was_trip_id=self.a)])
+        self.c.orm.flush()
+        people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
+        got = sorted(self.c.execute(select(PhotoExclusion.person_id, PhotoExclusion.asset_id, PhotoExclusion.trip_id, PhotoExclusion.created,
+                                           PhotoExclusion.was_trip_id)).fetchall())
+        self.assertEqual(got, sorted([(self.jid, "theirs-placed", self.b, 2.0, self.a), (self.jid, "mine-placed", self.b, 3.0, self.b),
+                                      (self.jid, "both-placed", self.b, 5.0, self.b), (self.jid, "none-placed", self.b, 7.0, None),
+                                      (self.jid, "only-theirs", self.a, 9.0, self.a)]))
 
     def test_a_member_with_preferences_keeps_them(self):
         self.c.orm.add_all([PhotoSharingPrefs(person_id=self.jid, default_scope="only_me", share_all=False, set_by=None, share_all_since=None, steward_sub=None),
