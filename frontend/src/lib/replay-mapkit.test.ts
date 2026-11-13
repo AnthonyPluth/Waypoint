@@ -114,7 +114,9 @@ describe("the camera's rectangle across the date line", () => {
       expect(r.x).toBeLessThan(1);
       expect(r.width).toBeLessThanOrEqual(1);
       expect(r.x + r.width).toBeLessThanOrEqual(2);
+      expect(r.width).toBeLessThan(0.15);
     }
+    expect(fake.last().rects.some((r) => r.x + r.width > 1)).toBe(true);
   });
 });
 
