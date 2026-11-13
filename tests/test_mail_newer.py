@@ -283,6 +283,21 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
         self.assertEqual((len(self.sent), self.retrying()), (1, 0))
         self.assertEqual(self.due(later, since=NOW + 7200), 0)
 
+    def test_a_pending_retry_survives_a_later_email_that_changed_only_the_arrival(self):
+        self.changed()
+        later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+        self.failing = True
+        self.assertEqual(self.due(later), 0)
+        self.assertEqual(self.retrying(), 1)
+        self.add_mail("arrival", revised(day="Thu, 15 Oct 2026 09:30:00 -0400", name="arrival").replace(
+            b"2026-11-20T19:00:00-05:00", NEW_DEPARTURE.encode()).replace(b"2026-11-21T07:10:00+00:00", b"2026-11-21T07:40:00+00:00"))
+        self.scan(now=NOW + 120)
+        [seg] = self.segments()
+        self.assertEqual(seg["email_update"]["updated"], ["end_local"])
+        self.failing = False
+        self.assertEqual(self.due(later, since=NOW + 3600), 1)
+        self.assertEqual((len(self.sent), self.retrying()), (1, 0))
+
     def test_a_retry_is_forgotten_once_the_flight_has_left_or_the_person_turned_it_off(self):
         self.changed()
         self.failing = True

@@ -302,11 +302,12 @@ def _times_changed(conn: db.Connection, owner: str, since: float, now: datetime,
         for group in trips.flight_groups(flights):
             for seg in group:
                 update = seg["email_update"]
-                if update is None or not {"start_local", "start_zone"} & set(update["updated"]):
+                ref = f"{seg['id']}@{seg['start_local']}"
+                moved = update is not None and update["at"] >= since and bool({"start_local", "start_zone"} & set(update["updated"]))
+                if not (moved or ref in waiting):
                     continue
                 leaves = trips.instant(seg["start_local"], seg["start_zone"])
-                ref = f"{seg['id']}@{seg['start_local']}"
-                if leaves - CHECK_IN_AHEAD <= now < leaves and (update["at"] >= since or ref in waiting):
+                if leaves - CHECK_IN_AHEAD <= now < leaves:
                     found[ref] = seg
                     break
     return found
