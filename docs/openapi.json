@@ -6703,6 +6703,9 @@
           "prefs": {
             "$ref": "#/components/schemas/PhotoPrefs"
           },
+          "count_token": {
+            "type": "string"
+          },
           "trips": {
             "type": "array",
             "items": {
@@ -6713,6 +6716,7 @@
         "required": [
           "person_id",
           "prefs",
+          "count_token",
           "trips"
         ],
         "additionalProperties": false
@@ -6856,6 +6860,9 @@
             "items": {
               "$ref": "#/components/schemas/PhotoSourceVersion"
             }
+          },
+          "count_token": {
+            "type": "string"
           }
         },
         "required": [],
@@ -6963,6 +6970,9 @@
             "items": {
               "$ref": "#/components/schemas/PhotoSourceVersion"
             }
+          },
+          "count_token": {
+            "type": "string"
           }
         },
         "required": [
@@ -6974,7 +6984,8 @@
           "window",
           "changed",
           "audience",
-          "sources"
+          "sources",
+          "count_token"
         ],
         "additionalProperties": false
       },
@@ -7010,6 +7021,9 @@
             "items": {
               "$ref": "#/components/schemas/PhotoSourceVersion"
             }
+          },
+          "count_token": {
+            "type": "string"
           }
         },
         "required": [],

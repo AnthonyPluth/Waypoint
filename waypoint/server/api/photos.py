@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -21,6 +22,7 @@ NOTHING_TO_DO = 'Send "trip_id" to put the photo on a trip, or "excluded" to lea
 NOTHING_TO_SHARE = 'Send "scope" to share, or "declined" for Not now'
 MAX_ID = 10 ** 18
 MAX_REMOVED = 500
+TOKEN = re.compile(r"[0-9a-f]{32}")
 NOT_A_TRIP = "The trip must be a whole number"
 OFF = "Photos are off without sign-in."
 BAD_URL = "The Immich address must be a web address, such as https://immich.local:2283, with no path or sign-in in it"
@@ -41,6 +43,7 @@ RENDITION_CACHE = "private, no-cache"
 ORIGINAL_CACHE = "private, no-store"
 NOT_AN_AUDIENCE = 'Send "audience" as a list of person ids'
 NOT_AUDIENCES = 'Send "audiences" as a map of trip ids to lists of person ids'
+NOT_A_TOKEN = 'Send "count_token" as the text the count came with'
 NOT_SOURCES = 'Send "sources" as a list of {id, status}'
 NOT_A_SNAPSHOT = 'Send "snapshot" as the text the confirmation showed'
 SNAPSHOT_LIMIT = 64
@@ -183,11 +186,19 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
     if scope is None and not declined:
         raise ApiError(NOTHING_TO_SHARE)
     window, expected = _window(body.get("window")), _stamp(body.get("expected_changed"), NOT_A_STAMP)
-    audience, sources = _ids(body.get("audience"), NOT_AN_AUDIENCE), _sources(body.get("sources"))
+    audience, sources, token = _ids(body.get("audience"), NOT_AN_AUDIENCE), _sources(body.get("sources")), _token(body.get("count_token"))
     if declined:
         return _sharing(lambda: photogrants.decline(conn, who, person, trip))
     return _sharing(lambda: photogrants.grant(conn, who, person, trip, scope or photos.ONLY_ME, window=window, expected_changed=expected,
-                                              sources=sources, audience=audience, strict=True))
+                                              sources=sources, audience=audience, strict=True, token=token))
+
+
+def _token(value: Any) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not TOKEN.fullmatch(value):
+        raise ApiError(NOT_A_TOKEN)
+    return value
 
 
 def _ids(value: Any, label: str) -> list[int] | None:
@@ -264,7 +275,8 @@ def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs
     audiences = {str(k): a for k, v in heard.items() if (a := _ids(v, NOT_AUDIENCES)) is not None} if heard is not None else None
     sources = _sources(body.get("sources"))
     try:
-        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows, sources=sources, audiences=audiences, strict=True), NO_TRIP)
+        return _run(lambda: photogrants.set_prefs(conn, who, person, scope, share_all, windows=windows, sources=sources, audiences=audiences, strict=True,
+                                                    token=_token(body.get("count_token"))), NO_TRIP)
     except photogrants.Stale as e:
         raise ApiError(str(e), 409) from None
 
