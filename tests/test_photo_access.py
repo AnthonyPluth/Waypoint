@@ -11,7 +11,7 @@ from tests.privacy import no_leaks
 from tests.shared import ServerCase
 from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
-from waypoint.domain import photocount, trips
+from waypoint.domain import demo, photocount, trips
 from waypoint.domain.visibility import Viewer
 from waypoint import tls
 from waypoint.providers import immich
@@ -352,6 +352,23 @@ class StewardTests(AccessCase):
         self.sources["kid"] = self.keep(source_row(self.kid, "sub-ana"))
         self.keep(PhotoSharingPrefs(person_id=self.kid, default_scope="only_me", share_all=False, set_by=None, share_all_since=None, steward_sub="sub-ana"))
 
+    def test_one_cap_covers_every_person_settings_counts_for(self):
+        for m in range(1, 6):
+            self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"},
+                      travelers=[{"person_id": self.person["ana"]}, {"person_id": self.kid}])
+
+        def slow(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            time.sleep(0.5)
+            return self.search(source, taken_after, taken_before, page=page)
+        immich.search.side_effect = slow
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), mock.patch.object(photocount, "COUNT_TOTAL", 0.6):
+            began = time.monotonic()
+            got = self.ok("ana", "GET", "/api/photo-grants")["people"]
+            spent = time.monotonic() - began
+        self.assertEqual([p["person_id"] for p in got], [self.person["ana"], self.kid])
+        self.assertTrue(all(t["count"] is None for p in got for t in p["trips"]))
+        self.assertLess(spent, 1.5)
+
     def kids(self, trip=None, **fields):
         return self.keep(photo_row(self.sources["kid"], trip or self.trip, "2026-06-02T12:00", where=SOHO, **fields))
 
@@ -542,14 +559,15 @@ class UnsharedCountTests(AccessCase):
                 with mock.patch.object(photocount, "COUNT_SECONDS", 0.5):
                     self.assertIsNone(self.count())
 
-    def test_no_library_a_paused_or_demo_library_or_no_window_counts_nothing_without_asking(self):
+    def test_a_demo_library_counts_its_fixed_inventory_and_nothing_else_asks_immich(self):
         with db.session() as conn:
             conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="off"))
         self.in_library(1)
         self.assertEqual(self.count(), 0)
         with db.session() as conn:
             conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="ok", url="demo"))
-        self.assertEqual(self.count(), 0)
+        self.assertEqual(self.count(), demo.unshared_inventory(self.person["ben"], self.trip))
+        self.assertGreater(self.count(), 0)
         with db.session() as conn:
             dateless = trips.create_trip(conn, Viewer(self.person["ben"]), {"name": "Someday", "people": [self.person["ben"]]})["id"]
             self.assertEqual(photocount.unshared_counts(conn, self.person["ben"], [dateless]), {dateless: 0})

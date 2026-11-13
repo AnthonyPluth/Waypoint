@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import threading
 import time
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 from .. import oidc
 from ..providers import immich
 from ..storage import db, photo_sources, secretbox
-from . import photomatch, photos
+from . import demo, photomatch, photos
 from .photomatch import PhotoIn, TripWindow
 
 COUNT_SECONDS = 30.0
@@ -96,6 +96,7 @@ class _Counting:
     home: photomatch.HomeIn | None
     left_out: Mapping[str, frozenset[int]]
     libraries: tuple[immich.Source, ...]
+    demo: int
 
 
 def _libraries(conn: db.Connection, inputs: photos.Unshared) -> list[immich.Source]:
@@ -118,11 +119,13 @@ def _libraries(conn: db.Connection, inputs: photos.Unshared) -> list[immich.Sour
 
 def _counting(conn: db.Connection, inputs: photos.Unshared, key: Key, granted: Sequence[TripWindow], at_home: photomatch.HomeIn | None) -> _Counting:
     candidates = tuple(sorted([*(w for w in granted if w.trip_id != inputs.trip_id), inputs.window], key=lambda w: w.trip_id))
-    return _Counting(inputs=inputs, key=key, candidates=candidates, home=at_home, left_out=inputs.left_out(), libraries=tuple(_libraries(conn, inputs)))
+    shown = demo.unshared_inventory(inputs.person_id, inputs.trip_id) if any(url == DEMO_URL for _, _, url in inputs.sources) else 0
+    return _Counting(inputs=inputs, key=key, candidates=candidates, home=at_home, left_out=inputs.left_out(), libraries=tuple(_libraries(conn, inputs)),
+                     demo=shown)
 
 
 def _count_live(job: _Counting, deadline: float) -> int:
-    inputs, seen, total = job.inputs, set[str](), 0
+    inputs, seen, total = job.inputs, set[str](), job.demo
     try:
         for library in job.libraries:
             for got in search_pages(library, inputs.window.start, inputs.window.end, deadline, immich.TOO_SLOW):
@@ -140,7 +143,7 @@ def _count_live(job: _Counting, deadline: float) -> int:
     return total
 
 
-def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int], cap: float | None = None) -> dict[int, int | None]:
     out: dict[int, int | None] = {}
     waiting: list[tuple[photos.Unshared, Key]] = []
     granted: list[TripWindow] | None = None
@@ -169,7 +172,7 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
             out[inputs.trip_id] = None
     started = time.monotonic()
     pending.sort(key=lambda job: _tried_at(job.key, started) or 0.0)
-    cap = started + COUNT_TOTAL
+    cap = started + COUNT_TOTAL if cap is None else cap
 
     def one(job: _Counting) -> int | None:
         begun = time.monotonic()
@@ -186,6 +189,16 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
             if counted is not None:
                 _hold(job.key, counted, time.monotonic())
     return out
+
+
+def one_cap() -> Callable[[db.Connection, int, Sequence[int]], dict[int, int | None]]:
+    ends: list[float] = []
+
+    def count(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+        if not ends:
+            ends.append(time.monotonic() + COUNT_TOTAL)
+        return unshared_counts(conn, person_id, trip_ids, ends[0])
+    return count
 
 
 def unshared_count(conn: db.Connection, person_id: int, trip_id: int) -> int:

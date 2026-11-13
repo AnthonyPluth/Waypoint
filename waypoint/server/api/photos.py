@@ -242,7 +242,7 @@ def api_photo_put_back(conn, q, _b, trip_id, photo_id) -> PhotoSharing:
 
 
 def api_photo_grants(conn, _q, _b) -> PhotoGrants:
-    return photogrants.grants(conn, _viewer(conn), photocount.unshared_counts)
+    return photogrants.grants(conn, _viewer(conn), photocount.one_cap())
 
 
 def api_photo_prefs_set(conn, _q, body: PhotoPrefsBody, person_id) -> PhotoPrefs:
