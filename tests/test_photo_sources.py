@@ -3,6 +3,7 @@ import gc
 import io
 import json
 import os
+import threading
 import time
 import unittest
 import weakref
@@ -1254,6 +1255,67 @@ class Races(DbCase):
             self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
         self.assertEqual(order[:2], ["person", "source"])
         self.assertIn("write", order)
+
+    def lost(self):
+        source = photo_sources.save(self.c, self.ana.person_id, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        assert source is not None
+        photo_sources.mark(self.c, source, "refused", photosources.KEY_LOST)
+        self.c.commit()
+        return source
+
+    def state(self, source):
+        self.c.rollback()
+        found = photo_sources.get(self.c, source)
+        assert found is not None
+        return found["status"], found["last_error"]
+
+    def test_a_key_entered_after_a_pause_read_the_lost_key_is_not_undone_by_the_pause(self):
+        source = self.lost()
+        checked = photosources.owned
+        read = []
+
+        def owned_then_keyed(conn, actor, source_id):
+            found = checked(conn, actor, source_id)
+            if not read:
+                read.append(found["last_error"])
+                with db.session(self.path) as other, ping():
+                    photosources.change_key(other, self.ana, source_id, NEW_KEY)
+            return found
+        with mock.patch.object(photosources, "owned", side_effect=owned_then_keyed):
+            self.assertEqual(photosources.edit(self.c, self.ana, source, None, True, False)["last_error"], None)
+        self.c.commit()
+        self.assertEqual(read, [photosources.KEY_LOST])
+        self.assertEqual(self.state(source), ("off", None))
+        self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
+
+    def test_a_pause_takes_home_then_the_person_then_the_library(self):
+        source = self.lost()
+        order = []
+        home, person, row = photogrants.lock_home, photo_sources.lock_person, photo_sources.lock
+        with mock.patch.object(photogrants, "lock_home", side_effect=lambda conn: order.append("home") or home(conn)), \
+                mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)):
+            self.assertEqual(photosources.edit(self.c, self.ana, source, None, True, False)["last_error"], photosources.KEY_LOST)
+        self.assertEqual(order, ["home", "person", "source"])
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_pause_waits_for_a_key_change_in_flight_and_keeps_its_cleared_error(self):
+        source = self.lost()
+        outcome: list = []
+
+        def pause():
+            with db.session(self.path) as conn:
+                outcome.append(photosources.edit(conn, self.ana, source, None, True, False)["last_error"])
+
+        with db.session(self.path) as conn, ping():
+            photosources.change_key(conn, self.ana, source, NEW_KEY)
+            thread = threading.Thread(target=pause)
+            thread.start()
+            thread.join(1.0)
+            self.assertTrue(thread.is_alive())
+        thread.join(10)
+        self.assertEqual(outcome, [None])
+        self.assertEqual(self.state(source), ("off", None))
 
     def test_connecting_for_a_guest_who_was_claimed_meanwhile_finds_nobody(self):
         def claimed(conn):
