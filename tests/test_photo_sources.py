@@ -1239,6 +1239,26 @@ class Races(DbCase):
             self.assertIsNotNone(photos.decide(self.c, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
             self.assertEqual(order, ["person", "grants"])
 
+    def test_a_placement_whose_library_is_removed_before_it_locks_the_person_finds_no_photo(self):
+        _, mia, source = self.stewarded_library(0)
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": mia, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=mia, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        far = photo(source, trip["trip_id"], 1, "far")
+        self.c.orm.add(far)
+        self.c.orm.flush()
+        self.c.commit()
+        person = photo_sources.lock_person
+
+        def removed_first(conn, person_id):
+            with db.session(self.path) as other:
+                photo_sources.remove(other, source)
+            return person(conn, person_id)
+        with mock.patch.object(photo_sources, "lock_person", side_effect=removed_first):
+            self.assertIsNone(photos.decide(self.c, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
+        self.c.rollback()
+        self.assertEqual(self.c.execute(select(Photo.id)).scalars(), [])
+
     @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
     def test_a_former_stewards_placement_made_during_a_claim_waits_for_it_and_is_refused(self):
         member, mia, source = self.stewarded_library(0)
