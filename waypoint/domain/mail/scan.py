@@ -447,7 +447,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
              auto: bool | None, now: float, not_a_booking: str | None = None, parking: int = 0) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
-                       .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).fetchone()
+                       .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id).with_for_update(of=ReviewItem)).fetchone()
     viewer = _viewer(row["owner_sub"], conn) if row else None
     if row is None or viewer is None or row["matches"]:
         return Filed()
