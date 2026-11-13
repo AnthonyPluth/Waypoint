@@ -1704,13 +1704,12 @@ class HomeChangeTests(GrantCase):
         self.share(self.sid, self.a, by="u-sam")
         self.share(self.jid, self.b, "only_me")
         self.share(self.mia, self.a, "trip", revoked=5.0)
-        before = self.c.orm.get(PhotoGrant, (self.jid, self.b)).changed
         self.save_home(None)
         self.assertEqual([self.grant(p, self.a) for p in (self.jid, self.sid)], [("only_me", None, "u-jane"), ("only_me", None, "u-sam")])
         self.assertEqual(self.grant(self.mia, self.a), ("trip", 5.0, "u-jane"))
         self.assertFalse(self.asking(self.jid, self.b))
         self.assertEqual(self.grant(self.jid, self.b), ("only_me", None, "u-jane"))
-        self.assertGreaterEqual(self.c.orm.get(PhotoGrant, (self.jid, self.b)).changed, before)
+        self.assertEqual(self.c.orm.get(PhotoGrant, (self.jid, self.b)).changed, 1.0)
 
     def test_home_widening_is_decided_by_whether_the_new_home_suppresses_all_the_old_one_did(self):
         zip_home = photomatch.HomeIn(SOHO[0], SOHO[1], "zip")
@@ -1789,6 +1788,89 @@ class HomeChangeTests(GrantCase):
             photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=token)
         self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
         self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+
+    def test_a_confirmation_made_before_the_sync_counts_the_photos_a_cleared_home_no_longer_hides(self):
+        self.save_home("Near")
+        self.share(self.jid, self.a)
+        at_home = self.photo(None, INSIDE_B, match="home")
+        self.save_home(None)
+        self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match, self.row(at_home.id).decided_by), (self.a, "place", "auto"))
+        asked = photogrants.state_of(self.c, self.jane, self.jid, self.a)
+        self.assertEqual((asked["state"], asked["count"]), ("ask", 1))
+        self.assertEqual(self.seen(self.sam, self.a), [])
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=asked["count_token"])
+        self.assertEqual(len(self.seen(self.sam, self.a)), asked["count"])
+        self.assertEqual(self.seen(self.sam, self.a), [at_home.id])
+
+    def test_a_confirmation_made_before_the_sync_counts_the_photos_a_moved_home_no_longer_hides(self):
+        self.save_home("Near")
+        self.share(self.jid, self.a)
+        at_home = self.photo(None, INSIDE_B, match="home")
+        elsewhere = self.photo(None, "2026-12-01T12:00", match="home")
+        self.save_home("Away")
+        self.assertEqual(self.row(at_home.id).trip_id, self.a)
+        self.assertIsNone(self.row(elsewhere.id))
+        asked = photogrants.state_of(self.c, self.jane, self.jid, self.a)
+        self.assertEqual(asked["count"], 1)
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=asked["count_token"])
+        self.assertEqual(self.seen(self.sam, self.a), [at_home.id])
+
+    def test_a_home_change_that_hides_less_locks_the_union_of_grant_and_dated_trips_in_id_order(self):
+        dated = trips.create_trip(self.c, self.jane, {"name": "Dated", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"})["id"]
+        booked = trips.create_trip(self.c, self.jane, {"name": "Booked", "people": [self.jid]})["id"]
+        self.add(self.jane, {**HOTEL, "start_local": "2026-07-03T15:00", "end_local": "2026-07-05T10:00"}, booked)
+        self.assertLess(dated, booked)
+        self.save_home("Near")
+        self.share(self.jid, booked)
+        order: list[tuple[str, int]] = []
+        real_trip, real_grant = photogrants._lock_trip, photos.lock_grants
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=lambda conn, trip: order.append(("trip", trip)) or real_trip(conn, trip)), \
+                mock.patch.object(photos, "lock_grants", side_effect=lambda conn, person, ids: order.append(("grant", person)) or real_grant(conn, person, ids)):
+            self.save_home(None)
+        first_grant = next(i for i, (kind, _) in enumerate(order) if kind == "grant")
+        self.assertEqual(order[:first_grant], [("trip", dated), ("trip", booked)])
+        self.assertEqual(self.grant(self.jid, booked), ("only_me", None, "u-jane"))
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_home_change_and_a_merge_locking_the_same_two_trips_do_not_deadlock(self):
+        dated = trips.create_trip(self.c, self.jane, {"name": "Dated", "people": [self.jid], "start_date": "2026-06-07", "end_date": "2026-06-07"})["id"]
+        booked = trips.create_trip(self.c, self.jane, {"name": "Booked", "people": [self.jid]})["id"]
+        self.add(self.jane, {**HOTEL, "start_local": "2026-07-03T15:00", "end_local": "2026-07-05T10:00"}, booked)
+        self.save_home("Near")
+        self.share(self.jid, booked)
+        self.c.commit()
+        reached, held, errors = threading.Event(), threading.Event(), []
+        real = photogrants.lock_trips
+
+        def noting(conn, trip_ids):
+            reached.set()
+            return real(conn, trip_ids)
+
+        def merging():
+            try:
+                with db.session(self.path) as conn:
+                    photogrants._lock_trip(conn, dated)
+                    held.set()
+                    reached.wait(10)
+                    threading.Event().wait(1.0)
+                    photogrants._lock_trip(conn, booked)
+            except Exception as failed:
+                errors.append(type(failed).__name__)
+
+        def clearing():
+            try:
+                with db.session(self.path) as conn:
+                    held.wait(10)
+                    home.clear(conn)
+            except Exception as failed:
+                errors.append(type(failed).__name__)
+        with mock.patch.object(photogrants, "lock_trips", side_effect=noting):
+            first, second = threading.Thread(target=merging), threading.Thread(target=clearing)
+            first.start()
+            second.start()
+            first.join(30)
+            second.join(30)
+        self.assertEqual(errors, [])
 
     def test_reconciling_a_trip_locks_the_trip_before_any_grant(self):
         self.share(self.jid, self.a)

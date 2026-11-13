@@ -253,26 +253,44 @@ def home_widened(was: photomatch.HomeIn | None, now: photomatch.HomeIn | None) -
     return distance_km((was.latitude, was.longitude), (now.latitude, now.longitude)) + radius > reach
 
 
-def _narrow_trip_grants(conn: db.Connection, now: float) -> None:
-    def holders() -> list[PhotoGrant]:
-        q = select(PhotoGrant).where(PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP).order_by(PhotoGrant.person_id, PhotoGrant.trip_id)
-        return list(conn.orm.scalars(q.execution_options(populate_existing=True)).all())
-    for person in sorted({g.person_id for g in holders()}):
+def _trip_grants(conn: db.Connection) -> list[PhotoGrant]:
+    q = select(PhotoGrant).where(PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP).order_by(PhotoGrant.person_id, PhotoGrant.trip_id)
+    return list(conn.orm.scalars(q.execution_options(populate_existing=True)).all())
+
+
+def _lock_trip_grant_holders(conn: db.Connection) -> list[int]:
+    for person in sorted({g.person_id for g in _trip_grants(conn)}):
         people.lock(conn, person)
-    trip_ids = sorted({g.trip_id for g in holders()})
-    held = lock_trips(conn, trip_ids)
+    return sorted({g.trip_id for g in _trip_grants(conn)})
+
+
+def _place_uncovered(conn: db.Connection, person_id: int, at_home: photomatch.HomeIn | None) -> None:
+    windows = photos.candidate_windows(conn, person_id)
+    q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
+        .where(PhotoSource.person_id == person_id, Photo.trip_id.is_(None), Photo.match == photos.HOME).order_by(Photo.id)
+    for row in conn.orm.scalars(q).all():
+        photos.re_place(conn, row, person_id, windows, home=at_home)
+
+
+def _narrow_trip_grants(conn: db.Connection, held: Sequence[int], at_home: photomatch.HomeIn | None, now: float) -> None:
     lock_grants_for(conn, held)
     conn.orm.expire_all()
+    holders = sorted({g.person_id for g in _trip_grants(conn)})
     for trip_id in held:
         _ask_again(conn, trip_id, now)
+    for person in holders:
+        _place_uncovered(conn, person, at_home)
 
 
 def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], was: photomatch.HomeIn | None, now: float | None = None) -> None:
     stamp = time.time() if now is None else now
-    if home_widened(was, home_now(conn)):
-        _narrow_trip_grants(conn, stamp)
+    at_home = home_now(conn)
+    widened = home_widened(was, at_home)
+    holding = _lock_trip_grant_holders(conn) if widened else []
     known = list(dated)
-    lock_trips(conn, known)
+    held = lock_trips(conn, [*holding, *known])
+    if widened:
+        _narrow_trip_grants(conn, [t for t in held if t in holding], at_home, stamp)
     fresh = [trip_id for trip_id in dated_trips(conn) if trip_id not in before]
     if fresh:
         aboard = trippeople.of(conn, fresh)
