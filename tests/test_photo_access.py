@@ -11,7 +11,7 @@ from tests.privacy import no_leaks
 from tests.shared import ServerCase
 from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
-from waypoint.domain import demo, photocount, photosources, trips
+from waypoint.domain import demo, photocount, trips
 from waypoint.domain.visibility import Viewer
 from waypoint import tls
 from waypoint.providers import immich
@@ -625,10 +625,6 @@ class UnsharedCountTests(AccessCase):
         self.assertEqual(self.count(), 0)
         self.keep(PhotoExclusion(person_id=self.person["ben"], asset_id="0a000000-0000-4000-8000-000000000001", trip_id=day, created=1.0))
         self.assertEqual(self.count(), 1)
-
-    def test_the_count_opens_a_library_as_the_source_rules_do(self):
-        for url in ("https://immich-canary.example", "http://192.168.1.20:2283", "http://immich-canary.example"):
-            self.assertEqual(photocount.provider_source(url, "k", "u"), photosources.provider_source(url, "k", "u"))
 
     def test_a_trip_granted_meanwhile_that_takes_the_photos_is_counted_afresh(self):
         self.in_library(1, "2026-06-04T09:00:00.000Z")

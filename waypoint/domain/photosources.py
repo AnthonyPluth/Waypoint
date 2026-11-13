@@ -5,7 +5,6 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TypedDict
-from urllib.parse import urlsplit
 
 from sqlalchemy import select
 
@@ -15,6 +14,7 @@ from ..storage import db, photo_sources, secretbox
 from ..storage.models import Person, PhotoExclusion, PhotoGrant, User
 from ..storage.photo_sources import OFF, OK, REFUSED, UNREACHABLE, Status, Stored
 from . import photocount, photogrants, photomatch, photoqueue, photos
+from .photocount import allow_http as allow_http, provider_source
 
 NO_SOURCE = "No such photo library"
 NO_PERSON = "No such person"
@@ -86,10 +86,6 @@ class Tested(TypedDict):
     same_account: bool | None
 
 
-def allow_http(url: str) -> bool:
-    return oidc.local_host(urlsplit(url).hostname or "")
-
-
 def _when(stamp: float | None) -> str | None:
     return datetime.fromtimestamp(stamp, UTC).isoformat(timespec="seconds") if stamp else None
 
@@ -136,10 +132,6 @@ def _steward_ok(conn: db.Connection, actor: Actor, person_id: int) -> bool:
     if held - {None, actor.sub}:
         raise Refused(OTHER_STEWARD)
     return True
-
-
-def provider_source(url: str, key: str, user_id: str | None = None) -> immich.Source:
-    return immich.Source(url=url, key=key, allow_http=allow_http(url), user_id=user_id)
 
 
 def _ping(source: immich.Source) -> immich.Account:
