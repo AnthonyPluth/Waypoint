@@ -192,9 +192,11 @@ def _unlocked(conn: db.Connection, stored: Stored) -> immich.Source:
 
 
 def _record(conn: db.Connection, source: Stored, status: Status, error: str | None, synced: float | None = None) -> None:
-    current: Stored | None = source
+    if not photo_sources.lock_person(conn, source["person_id"]) or not photo_sources.lock(conn, source["id"]):
+        raise NoSuchSource()
+    current = photo_sources.get(conn, source["id"])
     for _ in range(RECORD_TRIES):
-        if current is None or current["owner_sub"] != source["owner_sub"]:
+        if current is None or current["owner_sub"] != source["owner_sub"] or current["person_id"] != source["person_id"]:
             break
         kept = OFF if current["status"] == OFF else status
         if photo_sources.mark(conn, source["id"], kept, error, synced, owner=source["owner_sub"], was=(current["status"], current["last_error"])):
@@ -228,13 +230,12 @@ def test(conn: db.Connection, actor: Actor, source_id: int, key: str | None) -> 
     return {"name": account.name, "same_account": account.user_id == source["immich_user_id"]}
 
 
-def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str, ordered: bool = False) -> Listed:
+def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str) -> Listed:
     source = owned(conn, actor, source_id)
     account = _ping(provider_source(source["url"], key))
     if account.user_id != source["immich_user_id"]:
         raise Refused(OTHER_ACCOUNT)
-    if ordered:
-        source = _held(conn, actor, source)
+    source = _held(conn, actor, source)
     if not photo_sources.set_key(conn, source_id, key, owner=source["owner_sub"]):
         raise NoSuchSource()
     _record(conn, source, OK, None)
@@ -344,9 +345,7 @@ def _confirmed(conn: db.Connection, source: Stored, snapshot: str | None) -> Non
 
 def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool,
          snapshot: str | None = None) -> Listed:
-    source = owned(conn, actor, source_id)
-    if (paused is False and source["status"] == OFF) or (paused is True and source["status"] != OFF):
-        source = _held(conn, actor, source)
+    source = _held(conn, actor, owned(conn, actor, source_id))
     resuming = paused is False and source["status"] == OFF
     if resuming and source["last_error"] == KEY_LOST:
         raise Refused(KEY_LOST)
@@ -367,7 +366,7 @@ def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, p
 
 
 def remove(conn: db.Connection, actor: Actor, source_id: int) -> None:
-    source = owned(conn, actor, source_id)
+    source = _held(conn, actor, owned(conn, actor, source_id))
     if not photo_sources.remove(conn, source_id, owner=source["owner_sub"]):
         raise NoSuchSource()
 

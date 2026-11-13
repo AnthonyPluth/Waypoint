@@ -191,6 +191,7 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     guest = conn.orm.get(Person, guest_id)
     if guest is None:
         raise NoSuchGuest()
+    photo_sources.lock_all_of(conn, [member_id, guest_id])
     photogrants.lock_trips_of(conn, guest_id, member_id)
     if guest.user_sub is not None:
         raise NotAGuest()
