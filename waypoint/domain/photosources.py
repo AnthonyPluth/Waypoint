@@ -229,13 +229,13 @@ def test(conn: db.Connection, actor: Actor, source_id: int, key: str | None) -> 
     return {"name": account.name, "same_account": account.user_id == source["immich_user_id"]}
 
 
-def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str, resuming: bool = False) -> Listed:
+def change_key(conn: db.Connection, actor: Actor, source_id: int, key: str, ordered: bool = False) -> Listed:
     source = owned(conn, actor, source_id)
     account = _ping(provider_source(source["url"], key))
     if account.user_id != source["immich_user_id"]:
         raise Refused(OTHER_ACCOUNT)
-    if resuming:
-        source = _held_for_resume(conn, actor, source)
+    if ordered:
+        source = _held(conn, actor, source)
     if not photo_sources.set_key(conn, source_id, key, owner=source["owner_sub"]):
         raise NoSuchSource()
     _record(conn, source, OK, None)
@@ -339,7 +339,7 @@ def resume_check(conn: db.Connection, actor: Actor, source_id: int) -> Resume:
     return {"asks": asks, "count": _count(conn, source, counted) if asks else 0, "grants": counted.listed(), "snapshot": counted.digest}
 
 
-def _held_for_resume(conn: db.Connection, actor: Actor, source: Stored) -> Stored:
+def _held(conn: db.Connection, actor: Actor, source: Stored) -> Stored:
     photogrants.lock_home(conn)
     if not photo_sources.lock_person(conn, source["person_id"]) or not photo_sources.lock(conn, source["id"]):
         raise NoSuchSource()
@@ -366,8 +366,8 @@ def _confirmed(conn: db.Connection, source: Stored, snapshot: str | None) -> Non
 def edit(conn: db.Connection, actor: Actor, source_id: int, label: str | None, paused: bool | None, had_label: bool,
          snapshot: str | None = None) -> Listed:
     source = owned(conn, actor, source_id)
-    if paused is False and source["status"] == OFF:
-        source = _held_for_resume(conn, actor, source)
+    if (paused is False and source["status"] == OFF) or (paused is True and source["status"] != OFF):
+        source = _held(conn, actor, source)
     resuming = paused is False and source["status"] == OFF
     if resuming and source["last_error"] == KEY_LOST:
         raise Refused(KEY_LOST)
