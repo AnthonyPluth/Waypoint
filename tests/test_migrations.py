@@ -463,6 +463,25 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("parking", [col[0] for col in shape(self.path)["review_items"]["columns"]])
         self.assertEqual(len(rows_of(self.path, "review_items")), 1)
 
+    def test_0045_leaves_earlier_bookings_without_a_newer_email_update_and_downgrades_cleanly(self):
+        from alembic import command
+        old = sa.table("segments", *(sa.column(n) for n in ("id", "trip_id", "kind", "status", "start_local", "start_zone", "end_local", "end_zone", "source")))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0044")
+            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            c.execute(old.insert().values(id=1, trip_id=1, kind="hotel", status="confirmed", start_local="2027-01-01T15:00", start_zone="UTC",
+                                          end_local="2027-01-02T10:00", end_zone="UTC", source="manual"))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        with db.engine(self.path).connect() as c:
+            self.assertEqual(tuple(c.execute(select(schema.segments.c.email_updated, schema.segments.c.email_update)).fetchone()), (None, None))
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0044")
+        names = [col[0] for col in shape(self.path)["segments"]["columns"]]
+        self.assertNotIn("email_updated", names)
+        self.assertNotIn("email_update", names)
+        self.assertEqual(len(rows_of(self.path, "segments")), 1)
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

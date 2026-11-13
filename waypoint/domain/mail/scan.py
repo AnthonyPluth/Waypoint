@@ -19,7 +19,7 @@ from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
 from .. import airports, people, trips
 from ..visibility import Viewer
-from . import ai, autoask, extract, followup, gatecode, glance, ingest, query, review, triage
+from . import ai, autoask, extract, followup, gatecode, glance, ingest, newer, query, review, triage
 from .booking import Passenger
 
 State = Literal["done", "failed", "not_started", "busy"]
@@ -217,6 +217,17 @@ def _keep_quietly(mailbox_id: int, message_id: str, raw: dict[str, Any], segment
         monitoring.report(e, values=False)
 
 
+def _retire_quietly(mailbox_id: int, message_id: str, sender_domain: str | None, refreshed: list[Refreshed]) -> None:
+    try:
+        with db.session() as conn:
+            for segment_id, received in dict.fromkeys(refreshed):
+                stored_mail.drop_older(conn, segment_id, mailbox_id, sender_domain, received, message_id)
+    except Exception as e:
+        if db.is_busy(e):
+            raise
+        monitoring.report(e, values=False)
+
+
 def keep_code(mailbox_id: int, segment_id: int, raw: dict[str, Any], now: float, started: float | None = None) -> None:
     with db.session() as conn:
         if not gate_codes.is_parking(conn, segment_id):
@@ -238,10 +249,36 @@ def _keep_code_quietly(mailbox_id: int, segment_id: int, raw: dict[str, Any], no
         monitoring.report(e, values=False)
 
 
+Refreshed = tuple[int, str]
+
+
+def _file_booking(conn: db.Connection, viewer: Viewer, booking: extract.Booking, message: extract.Message, again: bool, backfill: bool,
+                  touched: list[int], held: list[ingest.Held], now: float,
+                  refreshed: list[Refreshed] | None) -> Literal["added", "updated", "unchanged", "ambiguous", "attached"] | None:
+    found = None if backfill else ingest.fields(conn, booking)
+    decision = None if found is None else newer.decide(conn, viewer, found, message.received, booking.status == "cancelled")
+    if decision is None or found is None:
+        return ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
+    if decision.action == "older":
+        return "unchanged"
+    if decision.action == "undated":
+        return ingest.file_booking(conn, viewer, booking, again, touched, True, held)
+    news: trips.EmailNews = {"updated": [], "disagreed": []}
+    try:
+        outcome = trips.merge_email_segment(conn, viewer, found, again, touched, into=decision.segment_id, news=news)
+    except trips.Invalid:
+        return None
+    trips.note_email_news(conn, decision.segment_id, news, now)
+    if refreshed is not None and message.received:
+        refreshed.append((decision.segment_id, message.received))
+    return outcome
+
+
 def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str, message: extract.Message,
           ignored: list[str], now: float, why: Counter[str] | None = None, again: bool = False,
           backfill: bool = False, strong: bool = True, follow: list[followup.Followed] | None = None,
-          joined: list[int] | None = None, gaps: list[str] | None = None) -> tuple[int, int, list[int] | None, str | None]:
+          joined: list[int] | None = None, gaps: list[str] | None = None,
+          refreshed: list[Refreshed] | None = None) -> tuple[int, int, list[int] | None, str | None]:
     why = Counter() if why is None else why
     if again:
         conn.execute(delete(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id))
@@ -257,7 +294,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
     read: list[ai.Suggestion] = []
     for booking in message.bookings:
         before = len(touched)
-        filed = ingest.file_booking(conn, viewer, booking, again, touched, backfill, held)
+        filed = _file_booking(conn, viewer, booking, message, again, backfill, touched, held, now, refreshed)
         if filed is None:
             failed += 1
             lacks.append(ingest.explain(conn, booking))
@@ -679,9 +716,10 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 continue
             followed: list[followup.Followed] = []
             joined: list[int] = []
+            refreshed: list[Refreshed] = []
             try:
                 with _filing, db.session() as conn:
-                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed, joined, gaps if filling else None)
+                    a, b, wanted, outcome = _file(conn, mailbox_id, viewer, message_id, message, ignored, now, why, again, backfill, strong, followed, joined, gaps if filling else None, refreshed)
             except Exception as e:
                 if db.is_busy(e):
                     raise
@@ -692,6 +730,8 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
                 a, b, wanted, outcome = 0, 1, [], UNREADABLE
             if wanted is not None:
                 _keep_quietly(mailbox_id, message_id, raw, wanted, now, started, _parking_in(message.bookings))
+            if refreshed:
+                _retire_quietly(mailbox_id, message_id, message.sender_domain, refreshed)
             if followed:
                 _keep_code_quietly(mailbox_id, followed[0].segment_id, raw, now, started)
             if outcome is not None:

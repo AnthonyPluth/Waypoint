@@ -15,13 +15,13 @@ from sqlalchemy import delete, select
 from .. import monitoring, oidc
 from ..providers import webpush
 from ..storage import db
-from ..storage.models import AppDevice, CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, User
+from ..storage.models import AppDevice, CalendarFeed, PushDevice, ReminderPrefs, ReminderSent, Segment, User
 from . import app_push, calendar, people, trips
 from .mail import review
 from .trips import SegmentOut, TripOut
 from .visibility import Viewer
 
-Kind = Literal["check_in", "day_of", "review", "review_retry"]
+Kind = Literal["check_in", "day_of", "review", "review_retry", "times", "times_retry"]
 CHECK_IN_AHEAD = timedelta(hours=24)
 DAY_OF_HOUR = 7
 LOCAL_OWNER = "local"
@@ -218,6 +218,11 @@ def day_of_message(today_trips: list[tuple[SegmentOut, TripOut]], day: str) -> d
             "body": "\n".join(lines)}
 
 
+def times_message(seg: SegmentOut) -> dict[str, Any]:
+    return {"title": "Flight times changed", "tag": f"times-{seg['id']}", "url": f"/#trip/{seg['trip_id']}",
+            "body": f"{_label(seg)} now leaves {_day(seg['start_local'])} at {_clock(seg['start_local'])}."}
+
+
 def review_message(waiting: int) -> dict[str, Any]:
     return {"title": "Booking emails to review", "tag": "review", "url": "/#review",
             "body": f"{waiting} booking email{' needs' if waiting == 1 else 's need'} your review"}
@@ -278,6 +283,60 @@ def run_due(conn: db.Connection, now: datetime, today: date, hour: int, send: Se
             if starting and _deliver(conn, owner, day_of_message(starting, day), send):
                 _record(conn, owner, "day_of", day, stamp)
                 sent += 1
+    return sent
+
+
+def _times_waiting(conn: db.Connection, owner: str) -> set[str]:
+    return set(conn.execute(select(ReminderSent.ref).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "times_retry")).scalars())
+
+
+def _times_forget(conn: db.Connection, owner: str, refs: Collection[str]) -> None:
+    if refs:
+        conn.execute(delete(ReminderSent).where(ReminderSent.owner_sub == owner, ReminderSent.kind == "times_retry", ReminderSent.ref.in_(sorted(refs))))
+
+
+def _times_changed(conn: db.Connection, owner: str, since: float, now: datetime, waiting: set[str]) -> dict[str, SegmentOut]:
+    found: dict[str, SegmentOut] = {}
+    for trip in trips.listing(conn, viewer_for(conn, owner)):
+        flights = [s for s in trip["segments"] if s["kind"] == "flight" and s["status"] != "cancelled" and not trips.untimed(s["details"])]
+        for group in trips.flight_groups(flights):
+            for seg in group:
+                update = seg["email_update"]
+                ref = f"{seg['id']}@{seg['start_local']}"
+                moved = update is not None and update["at"] >= since and bool({"start_local", "start_zone"} & set(update["updated"]))
+                if not (moved or ref in waiting):
+                    continue
+                leaves = trips.instant(seg["start_local"], seg["start_zone"])
+                if leaves - CHECK_IN_AHEAD <= now < leaves:
+                    found[ref] = seg
+                    break
+    return found
+
+
+def times_due(conn: db.Connection, since: float, now: datetime, sender_for: Callable[[], Send]) -> int:
+    changed = conn.execute(select(Segment.id).where(Segment.email_updated >= since, Segment.kind == "flight")).fetchone() is not None
+    waiting_any = conn.execute(select(ReminderSent.id).where(ReminderSent.kind == "times_retry")).fetchone() is not None
+    if not changed and not waiting_any:
+        return 0
+    send = sender_for()
+    stamp = now.timestamp()
+    sent = 0
+    for owner in sorted(set(conn.execute(select(PushDevice.owner_sub)).scalars()) | app_push.owners(conn)):
+        waiting = _times_waiting(conn, owner)
+        if not prefs(conn, owner)["check_in"]:
+            _times_forget(conn, owner, waiting)
+            continue
+        found = _times_changed(conn, owner, since, now, waiting)
+        _times_forget(conn, owner, waiting - set(found))
+        for ref, seg in found.items():
+            if _sent(conn, owner, "times", ref):
+                _times_forget(conn, owner, [ref])
+            elif _deliver(conn, owner, times_message(seg), send):
+                _record(conn, owner, "times", ref, stamp)
+                _times_forget(conn, owner, [ref])
+                sent += 1
+            else:
+                _record(conn, owner, "times_retry", ref, stamp)
     return sent
 
 

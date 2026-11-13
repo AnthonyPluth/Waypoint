@@ -276,6 +276,12 @@ export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
 }
 
+export interface EmailUpdate {
+  at: number;
+  updated: ("start_local" | "start_zone" | "end_local" | "end_zone" | "origin" | "destination")[];
+  disagreed: ("start_local" | "start_zone" | "end_local" | "end_zone" | "origin" | "destination")[];
+}
+
 export interface EmailsCleared {
   removed: number;
 }
@@ -959,6 +965,7 @@ export interface Segment {
   logo_label: string | null;
   hotel_brand: string | null;
   has_email: boolean;
+  email_update: EmailUpdate | null;
   gate_code: GateCode | null;
   price: Price | null;
   links: SegmentLinks;

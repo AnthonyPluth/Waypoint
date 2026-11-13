@@ -459,6 +459,12 @@ class GateCode(TypedDict):
     day: str | None
 
 
+class EmailUpdate(TypedDict):
+    at: float
+    updated: list[Literal["start_local", "start_zone", "end_local", "end_zone", "origin", "destination"]]
+    disagreed: list[Literal["start_local", "start_zone", "end_local", "end_zone", "origin", "destination"]]
+
+
 class GateCodeBody(TypedDict):
     email: int
     image: int
@@ -490,6 +496,7 @@ class Segment(TypedDict):
     logo_label: str | None
     hotel_brand: str | None
     has_email: bool
+    email_update: EmailUpdate | None
     gate_code: GateCode | None
     price: Price | None
     links: SegmentLinks
