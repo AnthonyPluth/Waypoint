@@ -292,7 +292,7 @@ class RemovalTests(AccessCase):
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "count_token": state["count_token"]}),
                          (409, {"error": "Your photos or trips changed since they were counted. Review the count before sharing."}))
         self.assertEqual(self.sharing("ben")["scope"], state["scope"])
-        for bad in (1, "", "x" * 65, True, ["a"]):
+        for bad in (1, "", "x" * 65, True, ["a"], "é", "é" * 32, "A" * 32, "0" * 31):
             self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "count_token": bad})[0], 400, bad)
         fresh = self.sharing("ben")["count_token"]
         self.assertNotEqual(fresh, state["count_token"])
@@ -306,6 +306,8 @@ class RemovalTests(AccessCase):
         body = {"default_scope": "trip", "share_all": True, **self.setting_snapshots("ana", [self.trip])}
         self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": mine["count_token"]})[0], 409)
         self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": 5})[0], 400)
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": "é"})[0], 400)
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": "0" * 32})[0], 409)
         fresh = self.ok("ana", "GET", "/api/photo-grants")["people"][0]["count_token"]
         self.assertEqual(self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": fresh}), {"default_scope": "trip", "share_all": True})
 

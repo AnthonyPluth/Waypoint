@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -21,7 +22,7 @@ NOTHING_TO_DO = 'Send "trip_id" to put the photo on a trip, or "excluded" to lea
 NOTHING_TO_SHARE = 'Send "scope" to share, or "declined" for Not now'
 MAX_ID = 10 ** 18
 MAX_REMOVED = 500
-MAX_TOKEN = 64
+TOKEN = re.compile(r"[0-9a-f]{32}")
 NOT_A_TRIP = "The trip must be a whole number"
 OFF = "Photos are off without sign-in."
 BAD_URL = "The Immich address must be a web address, such as https://immich.local:2283, with no path or sign-in in it"
@@ -195,7 +196,7 @@ def api_photo_sharing_set(conn, _q, body: PhotoSharingBody, trip_id) -> PhotoSha
 def _token(value: Any) -> str | None:
     if value is None:
         return None
-    if not isinstance(value, str) or not value or len(value) > MAX_TOKEN:
+    if not isinstance(value, str) or not TOKEN.fullmatch(value):
         raise ApiError(NOT_A_TOKEN)
     return value
 
