@@ -11,7 +11,7 @@ from tests.privacy import no_leaks
 from tests.shared import ServerCase
 from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
-from waypoint.domain import demo, photocount, trips
+from waypoint.domain import demo, photocount, photosources, trips
 from waypoint.domain.visibility import Viewer
 from waypoint import tls
 from waypoint.providers import immich
@@ -371,6 +371,27 @@ class StewardTests(AccessCase):
         self.assertTrue(all(t["count"] is None for p in got for t in p["trips"]))
         self.assertEqual(len(started), photocount.COUNT_AT_ONCE)
 
+    def test_a_steward_whose_trips_always_time_out_does_not_starve_the_child(self):
+        for m in range(1, 6):
+            self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"}, travelers=[{"person_id": self.person["ana"]}])
+        child = self.book("ana", {**OUT, "start_local": "2028-01-01T19:00", "end_local": "2028-01-02T07:10"}, travelers=[{"person_id": self.kid}])["trip_id"]
+        self.in_library(1, "2028-01-02T03:00:00.000Z")
+
+        def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            if taken_after.isoformat().startswith("2027-0"):
+                time.sleep(seconds or 0)
+                raise immich.Unavailable(immich.TOO_SLOW)
+            return self.search(source, taken_after, taken_before, page=page)
+        immich.search.side_effect = search
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.8), mock.patch.object(photocount, "COUNT_TOTAL", 1.2):
+            for _ in range(2):
+                photocount.forget_counts()
+                got = self.ok("ana", "GET", "/api/photo-grants")["people"]
+                kid = next(p for p in got if p["person_id"] == self.kid)
+                self.assertEqual([t["count"] for t in kid["trips"] if t["trip_id"] == child], [1])
+                steward = next(p for p in got if p["person_id"] == self.person["ana"])
+                self.assertTrue(all(t["count"] is None for t in steward["trips"] if t["trip_id"] != self.trip))
+
     def kids(self, trip=None, **fields):
         return self.keep(photo_row(self.sources["kid"], trip or self.trip, "2026-06-02T12:00", where=SOHO, **fields))
 
@@ -592,6 +613,22 @@ class UnsharedCountTests(AccessCase):
             clock[0] += 1
             self.assertEqual(self.count(), 3)
         self.assertEqual(immich.search.call_count, 3)
+
+    def test_a_photo_the_owner_placed_on_a_shared_trip_is_not_counted_for_another_trip(self):
+        with db.session() as conn:
+            day = trips.create_trip(conn, Viewer(self.person["ben"]), {"name": "Day out", "people": [self.person["ben"]],
+                                                                      "start_date": "2026-07-03", "end_date": "2026-07-03"})["id"]
+        self.in_library(1, "2026-06-03T09:00:00.000Z")
+        self.share("ben", day, scope="only_me")
+        self.assertEqual(self.count(), 1)
+        self.keep(photo_row(self.sources["ben"], day, "2026-06-03T09:00", where=SOHO, decided="owner", asset="0a000000-0000-4000-8000-000000000001"))
+        self.assertEqual(self.count(), 0)
+        self.keep(PhotoExclusion(person_id=self.person["ben"], asset_id="0a000000-0000-4000-8000-000000000001", trip_id=day, created=1.0))
+        self.assertEqual(self.count(), 1)
+
+    def test_the_count_opens_a_library_as_the_source_rules_do(self):
+        for url in ("https://immich-canary.example", "http://192.168.1.20:2283", "http://immich-canary.example"):
+            self.assertEqual(photocount.provider_source(url, "k", "u"), photosources.provider_source(url, "k", "u"))
 
     def test_a_trip_granted_meanwhile_that_takes_the_photos_is_counted_afresh(self):
         self.in_library(1, "2026-06-04T09:00:00.000Z")

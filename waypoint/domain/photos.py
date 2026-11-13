@@ -347,6 +347,14 @@ def _excluded() -> ColumnElement[bool]:
                                                  PhotoExclusion.trip_id == Photo.trip_id).exists()
 
 
+def owner_pins(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> frozenset[tuple[str, int]]:
+    if not trip_ids:
+        return frozenset()
+    rows = conn.execute(select(Photo.asset_id, Photo.trip_id).join(PhotoSource, PhotoSource.id == Photo.source_id)
+                        .where(PhotoSource.person_id == person_id, Photo.decided_by == OWNER, Photo.trip_id.in_(trip_ids), ~_excluded())).fetchall()
+    return frozenset((str(a), int(t)) for a, t in rows)
+
+
 def _aboard() -> ColumnElement[bool]:
     return select(TripPerson.trip_id).where(TripPerson.trip_id == Photo.trip_id, TripPerson.person_id == PhotoSource.person_id).exists()
 
