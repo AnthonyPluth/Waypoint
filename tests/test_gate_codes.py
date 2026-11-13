@@ -1175,7 +1175,7 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual(self.state(), ("ready", "2026-10-19") if self.image() else ("choose", "2026-10-19"))
 
     def test_the_older_message_resolved_first_is_replaced_by_the_newer_and_sends_nothing_after(self):
-        old_item, new_item, newer, newer_too = self.two_items()
+        old_item, new_item, newer, _newer_too = self.two_items()
         self.fake.status = 500
         self.act(review_api.api_review_dismiss, {"segment": [str(self.segment)]}, None, old_item)
         self.assertEqual(self.state(), ("choose", "2026-10-16"))
