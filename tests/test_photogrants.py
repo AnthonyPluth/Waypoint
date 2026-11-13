@@ -1,4 +1,5 @@
 import os
+import threading
 import time
 import unittest
 from unittest import mock
@@ -7,7 +8,7 @@ from sqlalchemy import delete, insert, select, update
 
 from tests.test_photos_api import LONDON, SOHO, grant_row, photo_row, source_row, utc
 from tests.test_trips import HOTEL, OUT, Household
-from waypoint.domain import home, people, photogrants, photos, trippeople, trips, visibility
+from waypoint.domain import home, people, photogrants, photomatch, photos, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.storage import db
@@ -703,16 +704,22 @@ class StandingSettingTests(GrantCase):
 
     def test_share_on_all_locks_the_person_then_trips_then_grants_and_the_preferences_row_last(self):
         order: list[str] = []
-        real_person, real_trip, real_grant, real_insert = people.lock, photogrants._lock_trip, photos.lock_grants, db.insert_ignore
+        real_home, real_person, real_trip, real_grant, real_insert = photogrants.lock_home, people.lock, photogrants._lock_trip, photos.lock_grants, db.insert_ignore
 
         def noting(name, real):
             return lambda *args, **kw: order.append(name) or real(*args, **kw)
-        with mock.patch.object(people, "lock", side_effect=noting("person", real_person)), \
+
+        def noting_prefs(conn, entity, values, key=None):
+            if entity is PhotoSharingPrefs:
+                order.append("prefs")
+            return real_insert(conn, entity, values, key)
+        with mock.patch.object(photogrants, "lock_home", side_effect=noting("home", real_home)), \
+                mock.patch.object(people, "lock", side_effect=noting("person", real_person)), \
                 mock.patch.object(photogrants, "_lock_trip", side_effect=noting("trip", real_trip)), \
                 mock.patch.object(photos, "lock_grants", side_effect=noting("grant", real_grant)), \
-                mock.patch.object(photogrants.db, "insert_ignore", side_effect=noting("prefs", real_insert)):
+                mock.patch.object(photogrants.db, "insert_ignore", side_effect=noting_prefs):
             photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 81.0)
-        self.assertEqual(order[0], "person")
+        self.assertEqual(order[:2], ["home", "person"])
         self.assertLess(order.index("trip"), order.index("grant"))
         self.assertGreater(order.index("prefs"), max(i for i, name in enumerate(order) if name in ("trip", "grant")))
         self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
@@ -1631,6 +1638,206 @@ class DecisionTests(GrantCase):
         with mock.patch.object(photos, "lock_grants", wraps=photos.lock_grants) as lock:
             self.assertEqual(photos.decide(self.c, self.jane, both.id, self.a, None)["trip_id"], self.a)
         self.assertEqual(lock.call_args_list[0].args[1:], (self.jid, [self.a, self.b]))
+
+
+class HomeChangeTests(GrantCase):
+    SPOTS = {"Near": (*SOHO, "zip"), "Away": (SOHO[0] + 0.3, SOHO[1], "zip"), "Town": (*SOHO, "city")}
+
+    def setUp(self):
+        super().setUp()
+        located = mock.patch.object(home, "located", side_effect=self.stored_spot)
+        located.start()
+        self.addCleanup(located.stop)
+
+    def stored_spot(self, conn):
+        stored = home._stored(conn)
+        return None if stored is None else home.geocode.Point(*self.SPOTS[stored["city"]])
+
+    def save_home(self, name=None):
+        if name is None:
+            home.clear(self.c)
+        else:
+            home.save(self.c, {"city": name, "state": "", "zip": "", "country": "US"})
+
+    def asking(self, person, trip):
+        return self.c.orm.get(PhotoGrant, (person, trip)).ask_again
+
+    def test_clearing_home_narrows_trip_grants_before_a_newly_covered_photo_can_reach_the_trip(self):
+        self.save_home("Near")
+        self.share(self.jid, self.a)
+        at_home = self.photo(None, INSIDE_B, match="home")
+        self.save_home("Near")
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+        self.save_home(None)
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+        self.assertTrue(self.asking(self.jid, self.a))
+        self.assertTrue(photos.re_place(self.c, self.row(at_home.id), self.jid, None, None, None))
+        self.assertEqual((self.row(at_home.id).trip_id, self.row(at_home.id).match), (self.a, "place"))
+        self.assertEqual(self.seen(self.sam, self.a), [])
+        self.assertEqual(self.seen(self.jane, self.a), [at_home.id])
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0)
+        self.assertEqual(self.seen(self.sam, self.a), [at_home.id])
+
+    def test_saving_a_home_that_covers_less_narrows_trip_grants(self):
+        for was, now in (("Near", "Away"), ("Near", "Town"), ("Near", None)):
+            with self.subTest(now=now):
+                self.save_home(None)
+                self.save_home(was)
+                self.share(self.jid, self.a)
+                self.save_home(now)
+                self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+                self.assertTrue(self.asking(self.jid, self.a))
+
+    def test_saving_a_home_that_covers_everything_it_did_leaves_trip_grants_alone(self):
+        for was, now in ((None, "Near"), ("Near", "Near"), (None, "Town"), ("Town", "Near"), ("Town", None)):
+            with self.subTest(was=was, now=now):
+                self.save_home(None)
+                self.save_home(was)
+                self.share(self.jid, self.a)
+                self.save_home(now)
+                self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+                self.assertFalse(self.asking(self.jid, self.a))
+
+    def test_only_active_trip_scope_grants_are_narrowed_and_every_person_with_one_is(self):
+        self.save_home("Near")
+        self.share(self.jid, self.a)
+        self.share(self.sid, self.a, by="u-sam")
+        self.share(self.jid, self.b, "only_me")
+        self.share(self.mia, self.a, "trip", revoked=5.0)
+        before = self.c.orm.get(PhotoGrant, (self.jid, self.b)).changed
+        self.save_home(None)
+        self.assertEqual([self.grant(p, self.a) for p in (self.jid, self.sid)], [("only_me", None, "u-jane"), ("only_me", None, "u-sam")])
+        self.assertEqual(self.grant(self.mia, self.a), ("trip", 5.0, "u-jane"))
+        self.assertFalse(self.asking(self.jid, self.b))
+        self.assertEqual(self.grant(self.jid, self.b), ("only_me", None, "u-jane"))
+        self.assertGreaterEqual(self.c.orm.get(PhotoGrant, (self.jid, self.b)).changed, before)
+
+    def test_home_widening_is_decided_by_whether_the_new_home_suppresses_all_the_old_one_did(self):
+        zip_home = photomatch.HomeIn(SOHO[0], SOHO[1], "zip")
+        city = photomatch.HomeIn(SOHO[0], SOHO[1], "city")
+        moved = photomatch.HomeIn(SOHO[0] + 0.01, SOHO[1], "zip")
+        self.assertEqual([photogrants.home_widened(was, now) for was, now in
+                          ((None, None), (None, zip_home), (city, None), (city, zip_home), (zip_home, zip_home), (zip_home, moved), (zip_home, city), (zip_home, None))],
+                         [False, False, False, False, False, True, True, True])
+
+    def test_a_home_change_locks_home_then_people_then_trips_then_grants(self):
+        self.save_home("Near")
+        self.share(self.jid, self.a)
+        self.share(self.sid, self.a, by="u-sam")
+        order: list[str] = []
+        real_home, real_person, real_trip, real_grant = photogrants.lock_home, people.lock, photogrants._lock_trip, photos.lock_grants
+
+        def noting(name, real):
+            return lambda *args, **kw: order.append(name) or real(*args, **kw)
+        with mock.patch.object(photogrants, "lock_home", side_effect=noting("home", real_home)), \
+                mock.patch.object(people, "lock", side_effect=noting("person", real_person)), \
+                mock.patch.object(photogrants, "_lock_trip", side_effect=noting("trip", real_trip)), \
+                mock.patch.object(photos, "lock_grants", side_effect=noting("grant", real_grant)):
+            self.save_home(None)
+        self.assertEqual(order[0], "home")
+        self.assertEqual(order.count("person"), 2)
+        self.assertLess(max(i for i, name in enumerate(order) if name == "person"), order.index("trip"))
+        self.assertLess(order.index("trip"), order.index("grant"))
+        self.assertEqual(self.grant(self.sid, self.a), ("only_me", None, "u-sam"))
+
+    def locking_order(self, act):
+        order: list[str] = []
+        real_home, real_person = photogrants.lock_home, people.lock
+
+        def home_first(conn):
+            order.append("home")
+            return real_home(conn)
+
+        def person_next(conn, person):
+            order.append("person")
+            return real_person(conn, person)
+        with mock.patch.object(photogrants, "lock_home", side_effect=home_first), mock.patch.object(people, "lock", side_effect=person_next):
+            act()
+        return order
+
+    def test_granting_and_turning_on_share_on_all_lock_home_before_the_person(self):
+        granting = self.locking_order(lambda: photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0))
+        self.assertEqual(granting[:2], ["home", "person"])
+        sharing_all = self.locking_order(lambda: photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 91.0))
+        self.assertEqual(sharing_all[:2], ["home", "person"])
+
+    def test_a_confirmation_bound_to_the_count_token_refuses_when_home_changed(self):
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        for name in ("Near", None):
+            self.save_home(name)
+            moved = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+            self.assertEqual(moved == token, name is None)
+        self.save_home("Near")
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=token)
+        self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
+        self.assertIsNone(self.grant(self.jid, self.a))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 91.0, token=token)
+        fresh = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.assertEqual(photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 92.0, token=fresh)["scope"], "trip")
+
+    def test_a_confirmation_bound_to_the_count_token_refuses_when_the_owner_placed_a_photo_by_hand(self):
+        self.share(self.jid, self.a, "only_me")
+        self.share(self.jid, self.b, "only_me")
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        held = self.photo(self.a, INSIDE_B)
+        self.assertEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"], token)
+        self.assertEqual(photos.decide(self.c, self.jane, held.id, self.b, None)["trip_id"], self.b)
+        self.assertNotEqual(photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"], token)
+        with self.assertRaises(photogrants.Stale) as refused:
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=token)
+        self.assertEqual(str(refused.exception), photogrants.STALE_COUNT)
+        self.assertEqual(self.grant(self.jid, self.a), ("only_me", None, "u-jane"))
+
+    def test_reconciling_a_trip_locks_the_trip_before_any_grant(self):
+        self.share(self.jid, self.a)
+        self.share(self.joan, self.a)
+        order: list[str] = []
+        real_trip, real_grant = photogrants._lock_trip, photos.lock_grants
+        with mock.patch.object(photogrants, "_lock_trip", side_effect=lambda conn, trip: order.append("trip") or real_trip(conn, trip)), \
+                mock.patch.object(photos, "lock_grants", side_effect=lambda conn, person, ids: order.append("grant") or real_grant(conn, person, ids)):
+            self.assertEqual(photogrants.reconcile(self.c, self.a, 90.0), 1)
+        self.assertEqual(order[0], "trip")
+        self.assertLess(order.index("trip"), order.index("grant"))
+        self.assertIsNone(self.grant(self.joan, self.a))
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_grant_made_while_home_is_being_saved_waits_for_it_and_is_refused_on_the_old_token(self):
+        token = photogrants.state_of(self.c, self.jane, self.jid, self.a)["count_token"]
+        self.c.commit()
+        started, go, outcome = threading.Event(), threading.Event(), []
+        changed = photogrants.home_changed
+
+        def paused(conn, *rest):
+            started.set()
+            go.wait(10)
+            return changed(conn, *rest)
+
+        def saving():
+            with db.session(self.path) as conn:
+                home.save(conn, {"city": "Near", "state": "", "zip": "", "country": "US"})
+
+        def granting():
+            with db.session(self.path) as conn:
+                try:
+                    photogrants.grant(conn, self.jane, self.jid, self.a, "trip", 90.0, token=token)
+                except photogrants.Stale as stale:
+                    outcome.append(str(stale))
+        with mock.patch.object(photogrants, "home_changed", side_effect=paused):
+            saver = threading.Thread(target=saving)
+            saver.start()
+            self.assertTrue(started.wait(10))
+            granter = threading.Thread(target=granting)
+            granter.start()
+            granter.join(1.0)
+            waited = granter.is_alive()
+            go.set()
+            saver.join(10)
+            granter.join(10)
+        self.assertEqual((waited, outcome), (True, [photogrants.STALE_COUNT]))
+        self.c.rollback()
+        self.assertIsNone(self.grant(self.jid, self.a))
 
 
 class ClaimTests(GrantCase):

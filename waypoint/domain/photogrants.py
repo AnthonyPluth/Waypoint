@@ -13,7 +13,8 @@ from .. import oidc
 from ..storage import db, photo_sources, secretbox
 from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
-from . import people, photoqueue, photos, trippeople, trips, visibility
+from . import people, photomatch, photoqueue, photos, trippeople, trips, visibility
+from .stats import distance_km
 from .visibility import Viewer
 
 if TYPE_CHECKING:
@@ -238,14 +239,45 @@ def lock_trips_of(conn: db.Connection, *person_ids: int) -> list[int]:
     return lock_trips(conn, {t for person_id in person_ids for t in _reachable(conn, person_id)})
 
 
-def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], now: float | None = None) -> None:
+def home_now(conn: db.Connection) -> photomatch.HomeIn | None:
+    return photos.home_in(conn)
+
+
+def home_widened(was: photomatch.HomeIn | None, now: photomatch.HomeIn | None) -> bool:
+    radius = photomatch.HOME[was.precision] if was is not None else None
+    if was is None or radius is None:
+        return False
+    reach = photomatch.HOME[now.precision] if now is not None else None
+    if now is None or reach is None:
+        return True
+    return distance_km((was.latitude, was.longitude), (now.latitude, now.longitude)) + radius > reach
+
+
+def _narrow_trip_grants(conn: db.Connection, now: float) -> None:
+    def holders() -> list[PhotoGrant]:
+        q = select(PhotoGrant).where(PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP).order_by(PhotoGrant.person_id, PhotoGrant.trip_id)
+        return list(conn.orm.scalars(q.execution_options(populate_existing=True)).all())
+    for person in sorted({g.person_id for g in holders()}):
+        people.lock(conn, person)
+    trip_ids = sorted({g.trip_id for g in holders()})
+    held = lock_trips(conn, trip_ids)
+    lock_grants_for(conn, held)
+    conn.orm.expire_all()
+    for trip_id in held:
+        _ask_again(conn, trip_id, now)
+
+
+def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], was: photomatch.HomeIn | None, now: float | None = None) -> None:
+    stamp = time.time() if now is None else now
+    if home_widened(was, home_now(conn)):
+        _narrow_trip_grants(conn, stamp)
     known = list(dated)
     lock_trips(conn, known)
     fresh = [trip_id for trip_id in dated_trips(conn) if trip_id not in before]
     if fresh:
         aboard = trippeople.of(conn, fresh)
         before = {**before, **{trip_id: Before(None, frozenset(aboard[trip_id]), ()) for trip_id in fresh}}
-    trips_changed(conn, [*known, *fresh], before, now)
+    trips_changed(conn, [*known, *fresh], before, stamp)
 
 
 def dated_trips(conn: db.Connection) -> list[int]:
@@ -287,6 +319,9 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
           window: Mapping[str, str] | None = None, expected_changed: float | None = None,
           sources: Sequence[Mapping[str, object]] | None = None, audience: Sequence[object] | None = None, strict: bool = False,
           token: str | None = None) -> Sharing | None:
+    if viewer.household or not photos.acts_for(conn, viewer, person_id):
+        return None
+    lock_home(conn)
     acting = _acting(conn, viewer, person_id, trip_id)
     if acting is None or scope not in photos.SCOPES:
         return None
@@ -462,6 +497,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     by = photos.viewer_sub(conn, viewer)
     if by is None or (default_scope is not None and default_scope not in photos.SCOPES):
         return None
+    lock_home(conn)
     if not people.lock(conn, person_id) or not photos.acts_for(conn, viewer, person_id):
         return None
     stamp = time.time() if now is None else now
@@ -539,6 +575,9 @@ def _gone(conn: db.Connection, trip_id: int) -> list[int]:
 
 
 def reconcile(conn: db.Connection, trip_id: int, now: float | None = None) -> int:
+    if lock_trips(conn, [trip_id]) != [trip_id]:
+        return 0
+    lock_grants_for(conn, [trip_id])
     stamp = time.time() if now is None else now
     ended = [(p, trip_id) for p in _gone(conn, trip_id)]
     for person, trip in ended:
