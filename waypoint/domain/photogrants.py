@@ -771,7 +771,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
             _merge_sync(synced[s.trip_id], s)
             conn.orm.delete(s)
         else:
-            s.source_id = mine.id
+            s.source_id, s.relist_gen = mine.id, None
     conn.orm.flush()
     conn.orm.delete(theirs)
     conn.orm.flush()
@@ -784,7 +784,7 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
 def _merge_sync(kept: PhotoTripSync, gone: PhotoTripSync) -> None:
     same_window = (kept.window_start, kept.window_end) == (gone.window_start, gone.window_end)
     kept.cursor = min(kept.cursor, gone.cursor) if same_window and kept.cursor and gone.cursor else None
-    kept.resume_after, kept.fetch_started = None, None
+    kept.resume_after, kept.fetch_started, kept.relist_gen = None, None, None
 
 
 def _library(source: PhotoSource) -> tuple[str, str]:

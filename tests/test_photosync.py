@@ -1485,3 +1485,32 @@ class CatchUpTests(SyncCase):
         got = self.sync(NOW + timedelta(days=8))
         self.assertEqual((got.deleted, len(self.rows())), (0, 2))
         self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+
+
+class ClaimDuringRelistTests(SyncCase):
+    def test_a_guests_window_merged_during_a_pending_relist_is_read_in_full_before_the_sweep(self):
+        mia = self.mia
+        self.c.execute(update(trips.Trip).where(trips.Trip.id == self.other).values(name="Other"))
+        trips.edit_trip(self.c, self.jane, self.other, {"people": [self.jid, mia]}, confirmed=True)
+        guests = photo_sources.save(self.c, mia, "u-jane", self.lib.url, OWNER, KEY, None, 1.0)
+        self.share(self.other, person=mia)
+        kept = asset(3, "2026-08-01T22:00:00Z", gps=SOHO)
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), kept]
+        self.c.commit()
+        photosync.run(self.c, guests, immich, NOW)
+        self.sync()
+        self.assertEqual(self.syncs()[self.a].relist_gen, 1)
+        self.assertEqual(self.c.orm.get(PhotoTripSync, (guests, self.other)).relist_gen, 1)
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8))
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8, minutes=1))
+        photosync.run(self.c, guests, immich, NOW + timedelta(days=7, hours=20), full=True)
+        self.assertEqual(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_GEN}:{self.source}"), "2")
+        self.assertEqual(self.c.orm.get(PhotoTripSync, (guests, self.other)).relist_gen, 2)
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        people.claim_guest(self.c, self.jid, mia, "2026-07-09")
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8, hours=6))
+        self.assertIn(kept["id"], self.rows())
+        self.assertEqual(self.syncs()[self.other].relist_gen, 2)

@@ -357,17 +357,19 @@ class StewardTests(AccessCase):
             self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"},
                       travelers=[{"person_id": self.person["ana"]}, {"person_id": self.kid}])
 
+        started, lock = [], threading.Lock()
+
         def slow(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
-            time.sleep(0.5)
+            with lock:
+                started.append(taken_after)
+            time.sleep(0.7)
             return self.search(source, taken_after, taken_before, page=page)
         immich.search.side_effect = slow
         with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), mock.patch.object(photocount, "COUNT_TOTAL", 0.6):
-            began = time.monotonic()
             got = self.ok("ana", "GET", "/api/photo-grants")["people"]
-            spent = time.monotonic() - began
         self.assertEqual([p["person_id"] for p in got], [self.person["ana"], self.kid])
         self.assertTrue(all(t["count"] is None for p in got for t in p["trips"]))
-        self.assertLess(spent, 1.5)
+        self.assertEqual(len(started), photocount.COUNT_AT_ONCE)
 
     def kids(self, trip=None, **fields):
         return self.keep(photo_row(self.sources["kid"], trip or self.trip, "2026-06-02T12:00", where=SOHO, **fields))
@@ -646,20 +648,20 @@ class UnsharedCountTests(AccessCase):
 
         def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
             if not taken_after.isoformat().startswith(fast):
-                time.sleep(0.5)
+                time.sleep(1.0)
             return self.search(source, taken_after, taken_before, page=page)
         immich.search.side_effect = search
         return made
 
     def test_slow_trips_counted_first_do_not_use_up_the_budget_of_the_trips_after_them(self):
         made = self.slow_trips(5)
-        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), db.session() as conn:
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.8), db.session() as conn:
             got = photocount.unshared_counts(conn, self.person["ben"], made)
         self.assertEqual(got, {**{t: None for t in made[:4]}, made[4]: 1})
 
     def test_trips_left_unchecked_at_the_overall_cap_go_first_the_next_time(self):
         made = self.slow_trips(5)
-        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), mock.patch.object(photocount, "COUNT_TOTAL", 0.4):
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.8), mock.patch.object(photocount, "COUNT_TOTAL", 0.9):
             with db.session() as conn:
                 self.assertEqual(photocount.unshared_counts(conn, self.person["ben"], made), {t: None for t in made})
             with db.session() as conn:
