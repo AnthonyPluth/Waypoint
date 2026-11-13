@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict, cast
@@ -370,11 +370,42 @@ def email_update_of(seg: Segment) -> EmailUpdateOut | None:
     return {"at": seg.email_updated, "updated": named("updated"), "disagreed": named("disagreed")}
 
 
+DEPARTURE_FIELDS = frozenset({"start_local", "start_zone"})
+
+
+def _stored_update(raw: str | None) -> dict[str, object]:
+    try:
+        found = json.loads(raw) if raw else {}
+    except ValueError:
+        return {}
+    return found if isinstance(found, dict) else {}
+
+
+def _moved_at(stored: dict[str, object], at: float | None) -> float | None:
+    moved = stored.get("moved_at")
+    if isinstance(moved, (int, float)) and not isinstance(moved, bool):
+        return float(moved)
+    listed = stored.get("updated")
+    if at is not None and isinstance(listed, list) and DEPARTURE_FIELDS & set(listed):
+        return at
+    return None
+
+
+def departure_moved_at(conn: db.Connection, segment_ids: Collection[int]) -> dict[int, float]:
+    rows = conn.execute(select(Segment.id, Segment.email_updated, Segment.email_update).where(Segment.id.in_(sorted(segment_ids)))).fetchall()
+    found = {row["id"]: _moved_at(_stored_update(row["email_update"]), row["email_updated"]) for row in rows}
+    return {i: at for i, at in found.items() if at is not None}
+
+
 def note_email_news(conn: db.Connection, segment_id: int, news: EmailNews, now: float) -> bool:
     if not news["updated"] and not news["disagreed"]:
         return False
-    conn.execute(update(Segment).where(Segment.id == segment_id).values(
-        email_updated=now, email_update=json.dumps({"updated": news["updated"], "disagreed": news["disagreed"]}, separators=(",", ":"))))
+    stored = conn.execute(select(Segment.email_updated, Segment.email_update).where(Segment.id == segment_id)).fetchone()
+    moved = now if DEPARTURE_FIELDS & set(news["updated"]) else (_moved_at(_stored_update(stored["email_update"]), stored["email_updated"]) if stored else None)
+    found: dict[str, object] = {"updated": news["updated"], "disagreed": news["disagreed"]}
+    if moved is not None:
+        found["moved_at"] = moved
+    conn.execute(update(Segment).where(Segment.id == segment_id).values(email_updated=now, email_update=json.dumps(found, separators=(",", ":"))))
     return True
 
 

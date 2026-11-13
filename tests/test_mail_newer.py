@@ -209,7 +209,7 @@ class NothingOfTheMessageIsKept(NewerCase):
         self.add_mail("newer", revised())
         self.scan(now=NOW + 60)
         raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
-        self.assertEqual(json.loads(raw), {"updated": ["start_local"], "disagreed": []})
+        self.assertEqual(json.loads(raw), {"updated": ["start_local"], "disagreed": [], "moved_at": NOW + 60})
         self.assertNotIn("21:30", raw)
 
 
@@ -297,6 +297,49 @@ class AChangedFlightWithinTheDayIsPushed(NewerCase):
         self.failing = False
         self.assertEqual(self.due(later, since=NOW + 3600), 1)
         self.assertEqual((len(self.sent), self.retrying()), (1, 0))
+
+    def arrival_only(self, name: str, day: str) -> bytes:
+        return revised(day=day, name=name).replace(b"2026-11-21T07:10:00+00:00", b"2026-11-21T07:40:00+00:00")
+
+    def test_a_departure_change_is_kept_when_a_later_email_in_the_same_scan_changes_only_the_arrival(self):
+        self.first()
+        self.add_mail("newer", revised())
+        self.add_mail("arrival", self.arrival_only("arrival", "Thu, 15 Oct 2026 09:30:00 -0400"))
+        self.scan(now=NOW + 60)
+        [seg] = self.segments()
+        self.assertEqual(seg["email_update"]["updated"], ["end_local"])
+        later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+        with no_leaks(self, SUBJECT_CANARY, BODY_CANARY):
+            self.assertEqual(self.due(later), 1)
+            self.assertEqual(self.due(later), 0)
+            self.assertEqual(self.due(later, since=NOW + 3600), 0)
+        self.assertEqual(len(self.sent), 1)
+        self.assertIn("21:30", self.sent[0]["body"])
+
+    def test_a_departure_change_is_kept_when_two_mailboxes_record_news_in_one_scan(self):
+        segment = self.first()
+        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["start_local"], "disagreed": []}, NOW + 60))
+        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 61))
+        raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
+        self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": [], "moved_at": NOW + 60})
+        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 1)
+        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
+
+    def test_an_arrival_only_email_in_a_later_scan_does_not_repeat_a_delivered_alert(self):
+        self.changed()
+        later = datetime(2026, 11, 20, 12, 0, tzinfo=UTC)
+        self.assertEqual(self.due(later), 1)
+        self.add_mail("arrival", self.arrival_only("arrival", "Thu, 15 Oct 2026 09:30:00 -0400"))
+        self.scan(now=NOW + 3600)
+        self.assertEqual(self.due(later, since=NOW + 3600), 0)
+        self.assertEqual(len(self.sent), 1)
+
+    def test_an_arrival_only_news_with_no_earlier_departure_change_records_none(self):
+        segment = self.first()
+        self.read(lambda conn: trips.note_email_news(conn, segment, {"updated": ["end_local"], "disagreed": []}, NOW + 60))
+        raw = self.read(lambda conn: conn.execute(select(Segment.email_update)).scalar())
+        self.assertEqual(json.loads(raw), {"updated": ["end_local"], "disagreed": []})
+        self.assertEqual(self.due(datetime(2026, 11, 20, 12, 0, tzinfo=UTC)), 0)
 
     def test_a_retry_is_forgotten_once_the_flight_has_left_or_the_person_turned_it_off(self):
         self.changed()
