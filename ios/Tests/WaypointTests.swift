@@ -206,3 +206,38 @@ final class ConnectFormTests: XCTestCase {
         XCTAssertTrue(ConnectView.canConnect(address: "https://x.example", working: false))
     }
 }
+
+final class UnauthorizedReportTests: XCTestCase {
+    private let server = URL(string: "https://waypoint.example.com")!
+
+    private func ended(_ body: Any = ["status": 401, "path": "/api/trips"], origin: String = "waypoint.example.com",
+                       server: URL? = URL(string: "https://waypoint.example.com"), main: Bool = true) -> Bool {
+        UnauthorizedReport.isSessionEnded(body: body, origin: origin, server: server, isMainFrame: main)
+    }
+
+    func testAnApiCallAnswering401EndsTheSession() {
+        XCTAssertTrue(ended())
+        XCTAssertTrue(ended(["status": 401, "path": "/api/trips/12/segments"], origin: "Waypoint.Example.com"))
+    }
+
+    func testOtherStatusesAndPathsAreIgnored() {
+        XCTAssertFalse(ended(["status": 403, "path": "/api/trips"]))
+        XCTAssertFalse(ended(["status": 401, "path": "/oauth/token"]))
+        XCTAssertFalse(ended(["status": 401, "path": "/apix"]))
+    }
+
+    func testAReportFromAnotherOriginOrFrameIsIgnored() {
+        XCTAssertFalse(ended(origin: "other.example.com"))
+        XCTAssertFalse(ended(main: false))
+    }
+
+    func testNothingEndsWhenNoServerIsConnected() {
+        XCTAssertFalse(ended(server: nil))
+    }
+
+    func testAMalformedReportIsIgnored() {
+        XCTAssertFalse(ended("401"))
+        XCTAssertFalse(ended(["status": "401", "path": "/api/trips"]))
+        XCTAssertFalse(ended(["status": 401]))
+    }
+}

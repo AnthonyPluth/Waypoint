@@ -26,6 +26,8 @@ Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholde
 | `ServerClient.swift` | Talks to the server: address check, OAuth metadata, token exchange and refresh, revoke, web session. |
 | `SignIn.swift` | `ASWebAuthenticationSession` with PKCE (S256), `state` and `iss` checks, redirect `waypoint://auth`. |
 | `ServerSession.swift` | Keeps the server and tokens in the Keychain, refreshes tokens one at a time (refresh tokens rotate; reuse revokes the grant), hands the web view its session cookie. |
+| `UnauthorizedReport.swift` | Script injected into the web view that reports a same-origin `/api/` answer of 401 to the shell, and the checks on that report. |
+| `SignedOutView.swift` | The screen shown after sign-out; its button goes back to the connect screen. |
 | `ShellViewController.swift` | `CAPBridgeViewController` that loads the person's server instead of bundled files. |
 | `Keychain.swift`, `PKCE.swift` | Helpers. |
 | `Tests/WaypointTests.swift` | PKCE (RFC 7636 vector), address normalising, sign-in reply checks. |
@@ -35,15 +37,15 @@ Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholde
 1. `GET <server>/api/trips` with no credentials. `200` means the server has no sign-in of its own: the app just opens it.
 2. Otherwise read `/.well-known/oauth-authorization-server` (needs `WAYPOINT_PUBLIC_URL` on the server) and open `/oauth/authorize` for the built-in client `wpc_waypoint_ios`, scope `app`, resource `<issuer>/app`, in the system sheet. The person signs in through their provider and taps Allow.
 3. The sheet returns `waypoint://auth?code=…`; the app swaps the code for tokens (`wpa_` access, `wpr_` refresh), stored in the Keychain.
-4. Each launch, `POST /auth/app-session` with the access token gives the web view its normal session cookie.
+4. While the web app is showing, a `401` from its own `/api/` ends the session: the shell signs out (revoking the refresh token) and shows "You are signed out of Waypoint." with a **Sign in** button back to the connect screen. It does not try to renew, so there is no renewal loop.
+5. Each launch, `POST /auth/app-session` with the access token gives the web view its normal session cookie.
 
 ## Not built yet
 
 - Offline encrypted store behind the web app's trip data, local reminders, Face ID lock.
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.
-- A sign-out button. `ServerSession.signOut` exists, but the only screen that calls it is the error screen's **Use another Waypoint** (and it runs on its own when the server says the sign-in is no longer valid); there is no sign-out in Settings or the web UI.
-- Renewing the web session when a request answers 401 while the app is already in the foreground (renewal runs only when the app becomes active).
+- A sign-out button in Settings or the web UI. `ServerSession.signOut` is called by the error screen's **Use another Waypoint**, when the server says the sign-in is no longer valid and when the web view reports a 401 in the foreground; each then shows the signed-out screen.
 - Servers behind a forward-auth proxy, and self-signed certificates (App Transport Security only relaxes local-network addresses).
 - File picker, downloads and `webcal://` handling in the web view.
 - Running the app on a simulator or device in CI (the iOS workflow builds it and runs the unit tests only).

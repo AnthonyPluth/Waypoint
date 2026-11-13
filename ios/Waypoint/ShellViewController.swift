@@ -1,5 +1,6 @@
 import Capacitor
 import SwiftUI
+import WebKit
 
 final class ShellViewController: CAPBridgeViewController {
     static var serverURL: URL?
@@ -13,6 +14,13 @@ final class ShellViewController: CAPBridgeViewController {
             }
         }
         return descriptor
+    }
+
+    override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
+        configuration.userContentController.add(UnauthorizedHandler(), name: UnauthorizedReport.handlerName)
+        configuration.userContentController.addUserScript(
+            WKUserScript(source: UnauthorizedReport.script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        return super.webView(with: frame, configuration: configuration)
     }
 }
 
