@@ -614,6 +614,44 @@ class UnsharedCountTests(AccessCase):
                 with mock.patch.object(photocount, "COUNT_SECONDS", 0.5):
                     self.assertIsNone(self.count())
 
+    def paged(self, size, clock=None, tick=0.0):
+        asked = []
+
+        def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            asked.append((taken_after, page))
+            if clock is not None:
+                clock[0] += tick
+            found = sorted((a for a in self.in_immich if taken_after <= datetime.fromisoformat(a["fileCreatedAt"]) <= taken_before),
+                           key=lambda a: (a["fileCreatedAt"], a["id"]))
+            items = found[(page - 1) * size:page * size]
+            more = str(page + 1) if page * size < len(found) else None
+            return immich.parse_page({"assets": {"items": items, "nextPage": more}}, page, source.user_id)
+        immich.search.side_effect = search
+        return asked
+
+    def partners(self, first, count, taken):
+        for number in range(first, first + count):
+            self.in_library(number, taken)
+            self.in_immich[-1]["ownerId"] = "someone-else"
+
+    def test_a_dense_instant_made_up_of_a_partners_assets_is_stepped_through_and_the_count_is_right(self):
+        self.in_library(1, "2026-06-02T09:00:00.000Z")
+        self.partners(10, 7, "2026-06-02T12:00:00.000Z")
+        self.in_library(2, "2026-06-03T09:00:00.000Z")
+        asked = self.paged(3)
+        with no_leaks(self, ASSET, URL, KEY, STATE, COUNTRY):
+            self.assertEqual(self.count(), 2)
+        self.assertEqual([page for _, page in asked], [1, 1, 2, 3])
+
+    def test_a_partners_dense_instant_that_outlasts_the_time_budget_fails_the_count(self):
+        self.in_library(1, "2026-06-02T09:00:00.000Z")
+        self.partners(10, 40, "2026-06-02T12:00:00.000Z")
+        clock = [1000.0]
+        asked = self.paged(3, clock, 10.0)
+        with mock.patch.object(photocount.time, "monotonic", side_effect=lambda: clock[0]):
+            self.assertIsNone(self.count())
+        self.assertEqual(len(asked), 3)
+
     def test_a_demo_library_counts_its_fixed_inventory_and_nothing_else_asks_immich(self):
         with db.session() as conn:
             conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="off"))
