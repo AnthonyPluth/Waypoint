@@ -12,13 +12,12 @@ from urllib.parse import urlsplit
 from .. import oidc
 from ..providers import immich
 from ..storage import db, photo_sources, secretbox
-from . import demo, photomatch, photos
+from . import demo, photomatch, photoqueue, photos
 from .photomatch import PhotoIn, TripWindow
 
 COUNT_SECONDS = 30.0
 COUNT_TOTAL = 60.0
 COUNT_AT_ONCE = 4
-DEMO_URL = "demo"
 COUNT_KEPT = 600.0
 UNCHECKED = (photo_sources.REFUSED, photo_sources.UNREACHABLE)
 Key = tuple[object, ...]
@@ -27,8 +26,8 @@ _tried: dict[Key, float] = {}
 _memory = threading.Lock()
 
 
-def _key(inputs: photos.Unshared, granted: Sequence[TripWindow], at_home: photomatch.HomeIn | None) -> Key:
-    matched = hashlib.sha256(repr((inputs.window, sorted(granted, key=lambda w: w.trip_id), at_home, inputs.excluded)).encode()).hexdigest()
+def _key(inputs: photos.Unshared, granted: Sequence[TripWindow], at_home: photomatch.HomeIn | None, pins: frozenset[tuple[str, int]]) -> Key:
+    matched = hashlib.sha256(repr((inputs.window, sorted(granted, key=lambda w: w.trip_id), at_home, inputs.excluded, sorted(pins))).encode()).hexdigest()
     return (inputs.person_id, inputs.trip_id, inputs.window.start, inputs.window.end, inputs.libraries, matched)
 
 
@@ -97,6 +96,15 @@ class _Counting:
     left_out: Mapping[str, frozenset[int]]
     libraries: tuple[immich.Source, ...]
     demo: int
+    pinned: frozenset[str]
+
+
+def allow_http(url: str) -> bool:
+    return oidc.local_host(urlsplit(url).hostname or "")
+
+
+def provider_source(url: str, key: str, user_id: str | None = None) -> immich.Source:
+    return immich.Source(url=url, key=key, allow_http=allow_http(url), user_id=user_id)
 
 
 def _libraries(conn: db.Connection, inputs: photos.Unshared) -> list[immich.Source]:
@@ -104,7 +112,7 @@ def _libraries(conn: db.Connection, inputs: photos.Unshared) -> list[immich.Sour
     for source_id, status, url in inputs.sources:
         if status in UNCHECKED:
             raise Unchecked()
-        if url == DEMO_URL:
+        if url == photoqueue.DEMO:
             continue
         try:
             unlocked = photo_sources.source_for_provider(conn, source_id)
@@ -112,16 +120,16 @@ def _libraries(conn: db.Connection, inputs: photos.Unshared) -> list[immich.Sour
             raise Unchecked() from None
         if unlocked is None:
             raise Unchecked()
-        found.append(immich.Source(url=unlocked.url, key=unlocked.key, allow_http=oidc.local_host(urlsplit(unlocked.url).hostname or ""),
-                                   user_id=unlocked.user_id))
+        found.append(provider_source(unlocked.url, unlocked.key, unlocked.user_id))
     return found
 
 
-def _counting(conn: db.Connection, inputs: photos.Unshared, key: Key, granted: Sequence[TripWindow], at_home: photomatch.HomeIn | None) -> _Counting:
+def _counting(conn: db.Connection, inputs: photos.Unshared, key: Key, granted: Sequence[TripWindow], at_home: photomatch.HomeIn | None,
+              pins: frozenset[tuple[str, int]]) -> _Counting:
     candidates = tuple(sorted([*(w for w in granted if w.trip_id != inputs.trip_id), inputs.window], key=lambda w: w.trip_id))
-    shown = demo.unshared_inventory(inputs.person_id, inputs.trip_id) if any(url == DEMO_URL for _, _, url in inputs.sources) else 0
+    shown = demo.unshared_inventory(inputs.person_id, inputs.trip_id) if any(url == photoqueue.DEMO for _, _, url in inputs.sources) else 0
     return _Counting(inputs=inputs, key=key, candidates=candidates, home=at_home, left_out=inputs.left_out(), libraries=tuple(_libraries(conn, inputs)),
-                     demo=shown)
+                     demo=shown, pinned=frozenset(asset for asset, _ in pins))
 
 
 def _count_live(job: _Counting, deadline: float) -> int:
@@ -133,6 +141,8 @@ def _count_live(job: _Counting, deadline: float) -> int:
                     if asset.id in seen:
                         continue
                     seen.add(asset.id)
+                    if asset.id in job.pinned:
+                        continue
                     shot = PhotoIn(photos.instant(asset.taken_utc), asset.latitude, asset.longitude, inputs.person_id)
                     skipped = job.left_out.get(asset.id, frozenset())
                     inside = [w for w in job.candidates if w.start <= shot.taken <= w.end and w.trip_id not in skipped]
@@ -147,6 +157,7 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
     out: dict[int, int | None] = {}
     waiting: list[tuple[photos.Unshared, Key]] = []
     granted: list[TripWindow] | None = None
+    pins: frozenset[tuple[str, int]] = frozenset()
     at_home: photomatch.HomeIn | None = None
     now = time.monotonic()
     for trip_id in trip_ids:
@@ -156,7 +167,8 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
             continue
         if granted is None:
             granted, at_home = photos.candidate_windows(conn, person_id), photos.home_in(conn)
-        key = _key(inputs, [w for w in granted if w.trip_id != trip_id], at_home)
+            pins = photos.owner_pins(conn, person_id, [w.trip_id for w in granted])
+        key = _key(inputs, [w for w in granted if w.trip_id != trip_id], at_home, pins)
         kept = _held(key, now)
         if kept is not None:
             out[trip_id] = kept
@@ -167,7 +179,7 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
     pending: list[_Counting] = []
     for inputs, key in waiting:
         try:
-            pending.append(_counting(conn, inputs, key, granted, at_home))
+            pending.append(_counting(conn, inputs, key, granted, at_home, pins))
         except Unchecked:
             out[inputs.trip_id] = None
     started = time.monotonic()
@@ -191,13 +203,17 @@ def unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]
     return out
 
 
-def one_cap() -> Callable[[db.Connection, int, Sequence[int]], dict[int, int | None]]:
+def one_cap(people: int = 1) -> Callable[[db.Connection, int, Sequence[int]], dict[int, int | None]]:
     ends: list[float] = []
+    asked = [0]
 
     def count(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+        now = time.monotonic()
         if not ends:
-            ends.append(time.monotonic() + COUNT_TOTAL)
-        return unshared_counts(conn, person_id, trip_ids, ends[0])
+            ends.append(now + COUNT_TOTAL)
+        left = max(1, people - asked[0])
+        asked[0] += 1
+        return unshared_counts(conn, person_id, trip_ids, min(ends[0], now + max(0.0, ends[0] - now) / left))
     return count
 
 
