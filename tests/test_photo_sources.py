@@ -589,6 +589,34 @@ class SourceRoutes(RouteCase):
         status, seen = self.check(made["id"], [item(n, ident=f"asset-{n}") for n in (1, 2, 3, 4)])
         self.assertEqual((status, seen["count"]), (200, 2))
 
+    def test_a_photo_the_owner_pinned_to_an_only_me_trip_is_not_counted_for_a_shared_trip_it_now_matches(self):
+        made = self.connect()
+        self.ok("ana", "POST", f"/api/photo-sources/{made['id']}", {"paused": True})
+        trip = self.shared("ana")
+        quiet = self.shared("ana", scope="only_me", segment=LATER)
+        with db.session() as conn:
+            pinned = photo(made["id"], quiet, 1)
+            pinned.decided_by = "owner"
+            conn.orm.add_all([pinned, photo(made["id"], quiet, 2)])
+        status, seen = self.check(made["id"], [item(1, ident="asset-1"), item(2, ident="asset-2"), item(3, ident="asset-3")])
+        self.assertEqual((status, seen["asks"], seen["count"], [g["trip_id"] for g in seen["grants"]]), (200, True, 2, [trip]))
+
+    def test_shown_assets_returns_an_owner_pin_on_any_trip_but_ordinary_rows_only_on_the_counted_trips(self):
+        made = self.connect()
+        trip = self.shared("ana")
+        quiet = self.shared("ana", scope="only_me", segment=LATER)
+        with db.session() as conn:
+            pinned = photo(made["id"], quiet, 1)
+            pinned.decided_by = "owner"
+            far = photo(made["id"], quiet, 2, "far")
+            far.decided_by = "owner"
+            none = photo(made["id"], quiet, 3, "none")
+            none.decided_by = "owner"
+            conn.orm.add_all([pinned, far, none, photo(made["id"], quiet, 4), photo(made["id"], trip, 5)])
+            conn.orm.add(PhotoExclusion(person_id=self.person["ana"], asset_id="asset-2", trip_id=quiet, created=2.0, was_trip_id=None))
+            conn.orm.flush()
+            self.assertEqual(photo_sources.shown_assets(conn, made["id"], {trip}), {"asset-1": (quiet, True), "asset-5": (trip, False)})
+
     def test_a_photo_stored_for_another_library_does_not_lower_this_librarys_count(self):
         made, trip = self.paused_with_stored(("trip", 1, "place"))
         theirs = self.connect(who="ben")
