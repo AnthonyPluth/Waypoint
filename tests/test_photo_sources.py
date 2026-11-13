@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import gc
 import io
 import json
@@ -1156,6 +1157,125 @@ class Races(DbCase):
             self.assertEqual((found["owner_sub"], found["person_id"], found["label"], found["status"], found["last_error"]), ("sub-ben", self.ben.person_id, None, "ok", None))
 
 
+    def stewarded_library(self, n):
+        sub = f"sub-member-{n}"
+        oidc.remember_user(self.c, sub, f"member{n}@example.com", f"Member {n}", None)
+        member = people.person_for_sub(self.c, sub)
+        mia = people.add_guest(self.c, guest(f"Mia Doe {n}"))["id"]
+        source = photo_sources.save(self.c, mia, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        photo_sources.set_steward(self.c, mia, "sub-ana")
+        self.c.commit()
+        assert source is not None
+        return member, mia, source
+
+    def during_a_claim(self, member, mia, write):
+        started, go, outcome = threading.Event(), threading.Event(), []
+        move = photogrants.claim
+
+        def paused(conn, *rest):
+            started.set()
+            go.wait(10)
+            return move(conn, *rest)
+
+        def claiming():
+            with db.session(self.path) as conn:
+                people.claim_guest(conn, member, mia, "2026-10-05")
+
+        def stewarding():
+            with db.session(self.path) as conn:
+                try:
+                    outcome.append(write(conn))
+                except (photosources.NoSuchSource, photosources.NoSuchPerson) as refused:
+                    outcome.append(type(refused))
+        with mock.patch.object(photogrants, "claim", side_effect=paused), ping():
+            claimer = threading.Thread(target=claiming)
+            claimer.start()
+            self.assertTrue(started.wait(10))
+            writer = threading.Thread(target=stewarding)
+            writer.start()
+            writer.join(1.0)
+            waited = writer.is_alive()
+            go.set()
+            claimer.join(10)
+            writer.join(10)
+        return waited, outcome
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_former_stewards_library_change_made_during_a_claim_waits_for_it_and_is_refused(self):
+        changes = {"label": lambda conn, source: photosources.edit(conn, self.ana, source, "Stolen", None, True),
+                   "pause": lambda conn, source: photosources.edit(conn, self.ana, source, None, True, False),
+                   "key": lambda conn, source: photosources.change_key(conn, self.ana, source, NEW_KEY),
+                   "test": lambda conn, source: photosources.test(conn, self.ana, source, None),
+                   "remove": lambda conn, source: photosources.remove(conn, self.ana, source)}
+        for n, (name, change) in enumerate(changes.items()):
+            with self.subTest(change=name):
+                member, mia, source = self.stewarded_library(n)
+                waited, outcome = self.during_a_claim(member, mia, functools.partial(change, source=source))
+                self.assertEqual((waited, outcome), (True, [photosources.NoSuchSource]))
+                found = photo_sources.get(self.c, source)
+                assert found is not None
+                self.assertEqual((found["owner_sub"], found["person_id"], found["label"], found["status"]), (f"sub-member-{n}", member, None, "ok"))
+                unlocked = photo_sources.source_for_provider(self.c, source)
+                assert unlocked is not None
+                self.assertEqual(unlocked.key, KEY)
+
+    def test_testing_a_library_takes_the_person_before_the_library_and_a_placement_the_person_before_the_grants(self):
+        _, mia, source = self.stewarded_library(0)
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": mia, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=mia, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        far = photo(source, trip["trip_id"], 1, "far")
+        self.c.orm.add(far)
+        self.c.orm.flush()
+        self.c.commit()
+        order = []
+        person, row, grants = photo_sources.lock_person, photo_sources.lock, photos.lock_grants
+        with mock.patch.object(photo_sources, "lock_person", side_effect=lambda conn, person_id: order.append("person") or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
+                mock.patch.object(photos, "lock_grants", side_effect=lambda conn, person_id, ids: order.append("grants") or grants(conn, person_id, ids)), ping():
+            photosources.test(self.c, self.ana, source, None)
+            self.assertEqual(order, ["person", "source"])
+            order.clear()
+            self.assertIsNotNone(photos.decide(self.c, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
+            self.assertEqual(order, ["person", "grants"])
+
+    def test_a_placement_whose_library_is_removed_before_it_locks_the_person_finds_no_photo(self):
+        _, mia, source = self.stewarded_library(0)
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": mia, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=mia, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        far = photo(source, trip["trip_id"], 1, "far")
+        self.c.orm.add(far)
+        self.c.orm.flush()
+        self.c.commit()
+        person = photo_sources.lock_person
+
+        def removed_first(conn, person_id):
+            with db.session(self.path) as other:
+                photo_sources.remove(other, source)
+            return person(conn, person_id)
+        with mock.patch.object(photo_sources, "lock_person", side_effect=removed_first):
+            self.assertIsNone(photos.decide(self.c, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
+        self.c.rollback()
+        self.assertEqual(self.c.execute(select(Photo.id)).scalars(), [])
+
+    @unittest.skipUnless(db.using_postgres(), "Postgres only: SQLite serializes writers itself")
+    def test_a_former_stewards_placement_made_during_a_claim_waits_for_it_and_is_refused(self):
+        member, mia, source = self.stewarded_library(0)
+        trip = trips.add_segment(self.c, Viewer(self.ana.person_id), {**OUT, "travelers": [{"person_id": mia, "name": None}]})
+        assert trip is not None
+        self.c.orm.add(PhotoGrant(person_id=mia, trip_id=trip["trip_id"], scope="trip", revoked=None, changed=1.0, granted_by="sub-ana"))
+        far = photo(source, trip["trip_id"], 1, "far")
+        self.c.orm.add(far)
+        self.c.orm.flush()
+        self.c.commit()
+        waited, outcome = self.during_a_claim(member, mia, lambda conn: photos.decide(conn, Viewer(self.ana.person_id), far.id, trip["trip_id"], None))
+        self.assertEqual((waited, outcome), (True, [None]))
+        self.c.orm.expire_all()
+        placed = self.c.orm.get(Photo, far.id)
+        assert placed is not None
+        self.assertEqual((placed.decided_by, placed.match), (None, "far"))
+
     def test_the_sweep_leaves_a_library_handed_to_a_member_who_still_signs_in(self):
         source = photo_sources.save(self.c, self.guest, "sub-ana", URL, ACCOUNT.user_id, KEY, None, 1.0)
         self.c.commit()
@@ -1285,7 +1405,7 @@ class Races(DbCase):
                 mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append("source") or row(conn, source_id)), \
                 mock.patch.object(photo_sources, "set_key", side_effect=lambda *a, **k: order.append("write") or keyed(*a, **k)), \
                 mock.patch.object(photo_sources, "mark", side_effect=lambda *a, **k: order.append("write") or marked(*a, **k)), ping():
-            photosources.change_key(self.c, self.ana, source, NEW_KEY, ordered=True)
+            photosources.change_key(self.c, self.ana, source, NEW_KEY)
             self.assertEqual(photosources.edit(self.c, self.ana, source, None, False, False)["status"], "ok")
         self.assertEqual(order[:2], ["person", "source"])
         self.assertIn("write", order)
@@ -1412,6 +1532,18 @@ class Claiming(DbCase):
                 mock.patch.object(photogrants, "claim", side_effect=lambda conn, *rest: order.append(("move", rest[0])) or move(conn, *rest)):
             people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
         self.assertEqual(order, [("lock", self.guest), ("move", self.guest)])
+
+    def test_claiming_locks_the_people_then_their_libraries_then_the_trips(self):
+        theirs = photo_sources.save(self.c, self.guest, "sub-steward", URL, ACCOUNT.user_id, KEY, None, 1.0)
+        mine = photo_sources.save(self.c, self.member, "u1", LAN, ACCOUNT.user_id, KEY, None, 1.0)
+        order = []
+        person, source, trip = people.lock, photo_sources.lock, photogrants.lock_trips
+        with mock.patch.object(people, "lock", side_effect=lambda conn, person_id: order.append(("person", person_id)) or person(conn, person_id)), \
+                mock.patch.object(photo_sources, "lock", side_effect=lambda conn, source_id: order.append(("source", source_id)) or source(conn, source_id)), \
+                mock.patch.object(photogrants, "lock_trips", side_effect=lambda conn, ids: order.append(("trips", None)) or trip(conn, ids)):
+            people.claim_guest(self.c, self.member, self.guest, "2026-10-05")
+        self.assertEqual(order[:5], [("person", min(self.member, self.guest)), ("person", max(self.member, self.guest)),
+                                     ("source", min(theirs, mine)), ("source", max(theirs, mine)), ("trips", None)])
 
     def test_claiming_writes_no_key_anywhere(self):
         photo_sources.save(self.c, self.guest, "sub-steward", URL, ACCOUNT.user_id, KEY, None, 1.0)

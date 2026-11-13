@@ -15,7 +15,7 @@ from typing import Literal, TypedDict, cast
 
 from sqlalchemy import ColumnElement, and_, delete, false, or_, select
 
-from ..storage import db, geocode
+from ..storage import db, geocode, photo_sources
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
 from . import home, photomatch, pixels, place_zones, trippeople, trips, visibility
 from .photomatch import CLUSTER, GAP, NEAR, MatchKind, PhotoIn, Point, SegmentPoint, TripWindow, window
@@ -758,6 +758,11 @@ def _settled_under_lock(conn: db.Connection, viewer: Viewer, photo_id: int, trip
     if found is None:
         return None
     person = found[1]
+    if not photo_sources.lock_person(conn, person):
+        return None
+    found = _own_photo(conn, viewer, photo_id)
+    if found is None or found[1] != person:
+        return None
     locked = granted_trips(conn, person) | {t for t in (found[0].trip_id, trip_id) if t is not None}
     lock_grants(conn, person, sorted(locked))
     conn.orm.expire_all()

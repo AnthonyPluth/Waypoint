@@ -360,7 +360,7 @@ def api_photo_source_edit(conn, _q, body: PhotoSourceEdit, source_id) -> PhotoSo
     if snapshot is not None and (not isinstance(snapshot, str) or len(snapshot) > SNAPSHOT_LIMIT):
         raise ApiError(NOT_A_SNAPSHOT)
     if key is not None:
-        _ask(lambda: photosources.change_key(conn, me, this, key, ordered=paused is not None))
+        _ask(lambda: photosources.change_key(conn, me, this, key))
     return PhotoSource(**_ask(lambda: photosources.edit(conn, me, this, label, paused, "label" in body, snapshot)))
 
 
