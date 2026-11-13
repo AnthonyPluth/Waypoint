@@ -1514,3 +1514,26 @@ class ClaimDuringRelistTests(SyncCase):
         self.sync(NOW + timedelta(days=8, hours=6))
         self.assertIn(kept["id"], self.rows())
         self.assertEqual(self.syncs()[self.other].relist_gen, 2)
+
+
+    def test_a_guests_window_moved_mid_traversal_is_read_from_its_start_before_the_sweep(self):
+        mia = self.mia
+        trips.edit_trip(self.c, self.jane, self.other, {"people": [self.jid, mia]}, confirmed=True)
+        guests = photo_sources.save(self.c, mia, "u-jane", self.lib.url, OWNER, KEY, None, 1.0)
+        self.share(self.other, person=mia)
+        early = asset(3, "2026-08-01T20:00:00Z", gps=SOHO)
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), early]
+        self.c.commit()
+        photosync.run(self.c, guests, immich, NOW)
+        self.sync()
+        self.c.execute(update(PhotoTripSync).where(PhotoTripSync.source_id == guests)
+                       .values(cursor=None, resume_after="2026-08-01T21:00:00.000Z", fetch_started=NOW.isoformat(), relist_gen=None))
+        self.c.commit()
+        with mock.patch.object(photosync, "TIME_BUDGET", 0.0):
+            self.sync(NOW + timedelta(days=8))
+        self.assertIsNotNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))
+        people.claim_guest(self.c, self.jid, mia, "2026-07-09")
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8, hours=6))
+        self.assertIn(early["id"], self.rows())
+        self.assertIsNone(db.get_setting(self.c, f"{sk.PHOTOS_RELIST_STARTED}:{self.source}"))

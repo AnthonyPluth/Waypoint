@@ -1608,14 +1608,14 @@ class ClaimTests(GrantCase):
         same = self.c.orm.scalars(select(PhotoSource.id).where(PhotoSource.person_id == self.mia)).one()
         self.c.execute(insert(PhotoTripSync), [
             {"source_id": self.janes, "trip_id": self.b, "window_start": "s", "window_end": "e", "cursor": "2026-06-05T00:00:00Z", "resume_after": "2026-06-05T00:00:00Z",
-             "fetch_started": "2026-06-06T00:00:00Z", "synced": 9.0},
+             "fetch_started": "2026-06-06T00:00:00Z", "synced": 9.0, "relist_gen": 2},
             {"source_id": same, "trip_id": self.b, "window_start": "s", "window_end": "e", "cursor": "2026-06-04T00:00:00Z", "resume_after": None,
-             "fetch_started": None, "synced": 8.0}])
+             "fetch_started": None, "synced": 8.0, "relist_gen": 2}])
         people.claim_guest(self.c, self.jid, self.mia, "2026-10-05")
         self.c.orm.expire_all()
         rows = self.c.orm.scalars(select(PhotoTripSync)).all()
         self.assertEqual([(s.source_id, s.trip_id) for s in rows], [(self.janes, self.b)])
-        self.assertEqual((rows[0].cursor, rows[0].resume_after, rows[0].fetch_started), ("2026-06-04T00:00:00Z", None, None))
+        self.assertEqual((rows[0].cursor, rows[0].resume_after, rows[0].fetch_started, rows[0].relist_gen), ("2026-06-04T00:00:00Z", None, None, None))
 
     def test_a_guest_rows_hand_placement_reaches_the_members_other_source_when_the_merged_one_has_no_twin(self):
         self.share(self.jid, self.a)

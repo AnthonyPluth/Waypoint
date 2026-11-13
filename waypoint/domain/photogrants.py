@@ -771,7 +771,8 @@ def _merge_source(conn: db.Connection, theirs: PhotoSource, mine: PhotoSource) -
             _merge_sync(synced[s.trip_id], s)
             conn.orm.delete(s)
         else:
-            s.source_id, s.relist_gen = mine.id, None
+            s.source_id = mine.id
+            s.cursor, s.resume_after, s.fetch_started, s.relist_gen = None, None, None, None
     conn.orm.flush()
     conn.orm.delete(theirs)
     conn.orm.flush()
