@@ -300,10 +300,10 @@ def _times_changed(conn: db.Connection, owner: str, since: float, now: datetime,
     for trip in trips.listing(conn, viewer_for(conn, owner)):
         flights = [s for s in trip["segments"] if s["kind"] == "flight" and s["status"] != "cancelled" and not trips.untimed(s["details"])]
         for group in trips.flight_groups(flights):
+            moved_at = trips.departure_moved_at(conn, [s["id"] for s in group])
             for seg in group:
-                update = seg["email_update"]
                 ref = f"{seg['id']}@{seg['start_local']}"
-                moved = update is not None and update["at"] >= since and bool({"start_local", "start_zone"} & set(update["updated"]))
+                moved = moved_at.get(seg["id"], -1.0) >= since
                 if not (moved or ref in waiting):
                     continue
                 leaves = trips.instant(seg["start_local"], seg["start_zone"])
