@@ -664,6 +664,7 @@ class PhotoSharing(TypedDict):
     changed: float | None
     audience: list[int]
     sources: list[PhotoSourceVersion]
+    count_token: str
 
 
 class PhotoSharingBody(TypedDict):
@@ -674,6 +675,7 @@ class PhotoSharingBody(TypedDict):
     expected_changed: NotRequired[float]
     audience: NotRequired[list[int]]
     sources: NotRequired[list[PhotoSourceVersion]]
+    count_token: NotRequired[str]
 
 
 class PhotoExclusionsBody(TypedDict):
@@ -691,6 +693,7 @@ class PhotoPrefsBody(TypedDict):
     windows: NotRequired[dict[str, PhotoWindow]]
     audiences: NotRequired[dict[str, list[int]]]
     sources: NotRequired[list[PhotoSourceVersion]]
+    count_token: NotRequired[str]
 
 
 class PhotoGrantTrip(TypedDict):
@@ -707,6 +710,7 @@ class PhotoGrantTrip(TypedDict):
 class PhotoGrantPerson(TypedDict):
     person_id: int
     prefs: PhotoPrefs
+    count_token: str
     trips: list[PhotoGrantTrip]
 
 

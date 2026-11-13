@@ -96,7 +96,7 @@ class AccessCase(RouteCase):
         return {"windows": {t: s["window"] for t, s in seen.items() if s["window"] is not None}, "audiences": {t: s["audience"] for t, s in seen.items()}, "sources": sources}
 
     def core(self, state):
-        return {k: v for k, v in state.items() if k not in ("window", "changed", "audience", "sources")}
+        return {k: v for k, v in state.items() if k not in ("window", "changed", "audience", "sources", "count_token")}
 
     def seen_by(self, who, trip=None):
         got = self.listing(who, trip)
@@ -159,7 +159,8 @@ class ScopeTests(AccessCase):
         self.assertEqual(self.call("ana", "POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [mine]}), (404, NO_PHOTO))
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": trip}), (404, NO_PHOTO))
         self.assertEqual(self.seen_by("ben", trip), [mine])
-        self.assertEqual(self.ok("ana", "GET", "/api/photo-grants")["people"], [{"person_id": self.person["ana"], "prefs": {"default_scope": "only_me", "share_all": False}, "trips": []}])
+        self.assertEqual([{k: v for k, v in p.items() if k != "count_token"} for p in self.ok("ana", "GET", "/api/photo-grants")["people"]],
+                         [{"person_id": self.person["ana"], "prefs": {"default_scope": "only_me", "share_all": False}, "trips": []}])
 
     def test_trip_scope_reaches_the_trips_people_alone_not_a_confirmation_recipient(self):
         self.share("ben")
@@ -278,6 +279,35 @@ class RemovalTests(AccessCase):
             self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", bad)[0], 400, bad)
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.person["ana"], "scope": "trip"}), (404, NO_TRIP))
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": 99999, "scope": "trip"}), (404, NO_TRIP))
+
+    def test_a_share_can_be_bound_to_the_count_token_the_count_came_with(self):
+        state = self.sharing("ben")
+        self.assertRegex(state["count_token"], r"^[0-9a-f]{32}$")
+        self.assertEqual(self.sharing("ben")["count_token"], state["count_token"])
+        shown = {"scope": "trip", "window": state["window"], "audience": state["audience"], "sources": state["sources"]}
+        if state["changed"] is not None:
+            shown["expected_changed"] = state["changed"]
+        with db.session() as conn:
+            conn.execute(insert(PhotoExclusion).values(person_id=self.person["ben"], asset_id="asset-x", trip_id=self.trip, created=3.0))
+        self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "count_token": state["count_token"]}),
+                         (409, {"error": "Your photos or trips changed since they were counted. Review the count before sharing."}))
+        self.assertEqual(self.sharing("ben")["scope"], state["scope"])
+        for bad in (1, "", "x" * 65, True, ["a"]):
+            self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "count_token": bad})[0], 400, bad)
+        fresh = self.sharing("ben")["count_token"]
+        self.assertNotEqual(fresh, state["count_token"])
+        self.assertEqual(self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "count_token": fresh})["scope"], "trip")
+
+    def test_share_on_all_can_be_bound_to_the_count_token_of_the_grants_reply(self):
+        mine = self.ok("ana", "GET", "/api/photo-grants")["people"][0]
+        self.assertRegex(mine["count_token"], r"^[0-9a-f]{32}$")
+        with db.session() as conn:
+            conn.execute(insert(PhotoExclusion).values(person_id=self.person["ana"], asset_id="asset-x", trip_id=self.trip, created=3.0))
+        body = {"default_scope": "trip", "share_all": True, **self.setting_snapshots("ana", [self.trip])}
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": mine["count_token"]})[0], 409)
+        self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": 5})[0], 400)
+        fresh = self.ok("ana", "GET", "/api/photo-grants")["people"][0]["count_token"]
+        self.assertEqual(self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {**body, "count_token": fresh}), {"default_scope": "trip", "share_all": True})
 
     def test_a_widening_and_a_put_back_can_be_bound_to_what_the_person_saw(self):
         self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "only_me"})

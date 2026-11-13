@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import timedelta
@@ -31,6 +34,7 @@ NO_WINDOW = "Give the trip dates or a booking before sharing photos on it"
 STALE_SOURCES = "Your libraries changed. Review them before sharing."
 NEEDS_SNAPSHOT = 'Send the "window", "audience" and "sources" the confirmation showed'
 NEEDS_VERSION = 'Send the "expected_changed" the confirmation showed'
+STALE_COUNT = "Your photos or trips changed since they were counted. Review the count before sharing."
 NEEDS_SETTING_SNAPSHOT = 'Send the "windows", "audiences" and "sources" the confirmation showed'
 
 
@@ -76,6 +80,20 @@ def _audience_matches(conn: db.Connection, trip_id: int, seen: Sequence[object])
     return wanted == set(audience_of(conn, trip_id))
 
 
+def count_token(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) -> str:
+    trips_in = sorted(photos.granted_trips(conn, person_id) | set(trip_ids))
+    windows = [[t, photos.window_out(photos.trip_window(conn, t))] for t in trips_in]
+    removed = conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.trip_id, PhotoExclusion.created)
+                           .where(PhotoExclusion.person_id == person_id, PhotoExclusion.trip_id.in_(trips_in))
+                           .order_by(PhotoExclusion.trip_id, PhotoExclusion.asset_id)).fetchall()
+    packed = json.dumps([windows, [[a, t, c] for a, t, c in removed]], sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(packed.encode()).hexdigest()[:32]
+
+
+def _token_matches(conn: db.Connection, person_id: int, trip_ids: Iterable[int], seen: object) -> bool:
+    return isinstance(seen, str) and hmac.compare_digest(seen, count_token(conn, person_id, trip_ids))
+
+
 def _sources_match(conn: db.Connection, person_id: int, seen: Sequence[Mapping[str, object]]) -> bool:
     try:
         wanted = {(int(str(s["id"])), str(s["status"])) for s in seen}
@@ -94,6 +112,7 @@ class Sharing(TypedDict):
     changed: float | None
     audience: list[int]
     sources: list[SourceVersion]
+    count_token: str
 
 
 class GrantedTrip(TypedDict):
@@ -110,6 +129,7 @@ class GrantedTrip(TypedDict):
 class PersonGrants(TypedDict):
     person_id: int
     prefs: Prefs
+    count_token: str
     trips: list[GrantedTrip]
 
 
@@ -241,7 +261,8 @@ def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, c
     counted = count(conn, person_id, [trip_id])[trip_id] if state == DECLINED else sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
     return {"state": state, "scope": row.scope if row is not None and row.revoked is None else None,  # type: ignore[typeddict-item]
             "count": counted, "removed_count": len(gone), "removed": gone, "window": photos.window_out(photos.trip_window(conn, trip_id)),
-            "changed": row.changed if row is not None else None, "audience": audience_of(conn, trip_id), "sources": sources_of(conn, person_id)}
+            "changed": row.changed if row is not None else None, "audience": audience_of(conn, trip_id), "sources": sources_of(conn, person_id),
+            "count_token": count_token(conn, person_id, [trip_id])}
 
 
 def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted) -> Sharing | None:
@@ -252,7 +273,8 @@ def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, 
 
 def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, scope: photos.Scope, now: float | None = None,
           window: Mapping[str, str] | None = None, expected_changed: float | None = None,
-          sources: Sequence[Mapping[str, object]] | None = None, audience: Sequence[object] | None = None, strict: bool = False) -> Sharing | None:
+          sources: Sequence[Mapping[str, object]] | None = None, audience: Sequence[object] | None = None, strict: bool = False,
+          token: str | None = None) -> Sharing | None:
     acting = _acting(conn, viewer, person_id, trip_id)
     if acting is None or scope not in photos.SCOPES:
         return None
@@ -274,6 +296,8 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
         raise Stale(STALE_SHARE)
     if sources is not None and not _sources_match(conn, person_id, sources):
         raise Stale(STALE_SOURCES)
+    if token is not None and not _token_matches(conn, person_id, [trip.id], token):
+        raise Stale(STALE_COUNT)
     _write(conn, person_id, trip.id, scope, by, time.time() if now is None else now)
     _re_place_automatic(conn, trip.id, person_id)
     return sharing(conn, viewer, person_id, trip.id)
@@ -420,7 +444,7 @@ def _share_all(conn: db.Connection, person_id: int, by: str, scope: photos.Scope
 def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope: photos.Scope | None, share_all: bool | None,
               now: float | None = None, windows: Mapping[str, Mapping[str, str]] | None = None,
               sources: Sequence[Mapping[str, object]] | None = None, audiences: Mapping[str, Sequence[object]] | None = None,
-              strict: bool = False) -> Prefs | None:
+              strict: bool = False, token: str | None = None) -> Prefs | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id):
         return None
     by = photos.viewer_sub(conn, viewer)
@@ -441,6 +465,8 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
         raise Stale(STALE_SETTING)
     if sources is not None and share_all and not was_on and not _sources_match(conn, person_id, sources):
         raise Stale(STALE_SOURCES)
+    if token is not None and share_all and not was_on and not _token_matches(conn, person_id, pending, token):
+        raise Stale(STALE_COUNT)
     db.insert_ignore(conn, PhotoSharingPrefs, {"person_id": person_id, "default_scope": photos.ONLY_ME, "share_all": False, "set_by": None, "share_all_since": None,
                                                "steward_sub": None}, key=["person_id"])
     row = conn.orm.get(PhotoSharingPrefs, person_id, with_for_update=True)
@@ -841,5 +867,6 @@ def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> G
             listed.append({"trip_id": trip.id, "name": trip.name, "start_date": trip.start_date, "end_date": trip.end_date, "state": shown,
                            "scope": state["scope"], "count": state["count"] if shown == "shared" else counts, "removed_count": state["removed_count"]})
         listed.sort(key=lambda t: (t["start_date"] is None, t["start_date"] or "", t["trip_id"]))
-        out.append({"person_id": person, "prefs": prefs_of(conn, person), "trips": listed})
+        by = photos.viewer_sub(conn, viewer)
+        out.append({"person_id": person, "prefs": prefs_of(conn, person), "count_token": count_token(conn, person, _eligible(conn, person, by) if by else []), "trips": listed})
     return {"people": out}
