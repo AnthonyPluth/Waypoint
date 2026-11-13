@@ -4,7 +4,6 @@ import functools
 import hashlib
 import heapq
 import math
-import threading
 import time
 from collections import Counter
 from enum import Enum
@@ -824,10 +823,6 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
 
 
 
-COUNT_KEPT = 600.0
-_counted: dict[tuple[object, ...], tuple[float, int]] = {}
-_counted_lock = threading.Lock()
-
 
 @dataclass(frozen=True)
 class Unshared:
@@ -836,11 +831,7 @@ class Unshared:
     window: TripWindow
     excluded: tuple[tuple[str, int], ...]
     sources: tuple[tuple[int, str, str], ...]
-
-    @property
-    def key(self) -> tuple[object, ...]:
-        kept = hashlib.sha256(repr(self.excluded).encode()).hexdigest()
-        return (self.person_id, self.trip_id, self.window.start, self.window.end, tuple((i, status) for i, status, _ in self.sources), kept)
+    libraries: tuple[tuple[int, str, str, str, float], ...]
 
     def left_out(self) -> dict[str, frozenset[int]]:
         out: dict[str, set[int]] = {}
@@ -853,33 +844,10 @@ def unshared_inputs(conn: db.Connection, person_id: int, trip_id: int) -> Unshar
     found = trip_window(conn, trip_id)
     if found is None:
         return None
-    sources = tuple((s["id"], s["status"], s["url"]) for s in photo_sources.for_person(conn, person_id) if s["status"] != photo_sources.OFF)
+    reading = [s for s in photo_sources.for_person(conn, person_id) if s["status"] != photo_sources.OFF]
+    sources = tuple((s["id"], s["status"], s["url"]) for s in reading)
+    libraries = tuple((s["id"], s["status"], photo_sources.address(s["url"]), s["immich_user_id"], s["created"]) for s in reading)
     excluded = conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.trip_id).where(PhotoExclusion.person_id == person_id)
                             .order_by(PhotoExclusion.asset_id, PhotoExclusion.trip_id)).fetchall()
-    return Unshared(person_id=person_id, trip_id=trip_id, window=found, excluded=tuple((str(a), int(t)) for a, t in excluded), sources=sources)
-
-
-def held_count(key: tuple[object, ...], now: float) -> int | None:
-    with _counted_lock:
-        kept = _counted.get(key)
-        return kept[1] if kept is not None and now - kept[0] < COUNT_KEPT else None
-
-
-def hold_count(key: tuple[object, ...], count: int, now: float) -> None:
-    with _counted_lock:
-        for old in [k for k, (at, _) in _counted.items() if now - at >= COUNT_KEPT]:
-            del _counted[old]
-        _counted[key] = (now, count)
-
-
-def forget_counts() -> None:
-    with _counted_lock:
-        _counted.clear()
-
-
-def held_unshared_counts(conn: db.Connection, person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
-    out: dict[int, int | None] = {}
-    for trip_id in trip_ids:
-        inputs = unshared_inputs(conn, person_id, trip_id)
-        out[trip_id] = 0 if inputs is None or not inputs.sources else held_count(inputs.key, time.monotonic())
-    return out
+    return Unshared(person_id=person_id, trip_id=trip_id, window=found, excluded=tuple((str(a), int(t)) for a, t in excluded), sources=sources,
+                    libraries=libraries)

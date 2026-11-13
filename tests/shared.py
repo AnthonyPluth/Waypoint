@@ -157,9 +157,9 @@ def database_path(case, name="waypoint.db") -> str:
 
 
 def own_database(case, **env) -> str:
-    from waypoint.domain import photos
+    from waypoint.domain import photocount
     from waypoint.storage import db
-    photos.forget_counts()
+    photocount.forget_counts()
     later = case.addClassCleanup if isinstance(case, type) else case.addCleanup
     tmp = tempfile.TemporaryDirectory()
     later(tmp.cleanup)
@@ -173,6 +173,17 @@ def own_database(case, **env) -> str:
     session.start()
     later(session.stop)
     return path
+
+
+def empty_immich(case):
+    from waypoint.providers import immich
+
+    def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+        return immich.parse_page({"assets": {"items": [], "nextPage": None}}, page, source.user_id)
+    patched = mock.patch.object(immich, "search", side_effect=search)
+    patched.start()
+    case.addCleanup(patched.stop)
+    return patched
 
 
 class DbCase(unittest.TestCase):

@@ -11,8 +11,9 @@ from tests.privacy import no_leaks
 from tests.shared import ServerCase
 from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
-from waypoint.domain import photocount, photos, trips
+from waypoint.domain import photocount, trips
 from waypoint.domain.visibility import Viewer
+from waypoint import tls
 from waypoint.providers import immich
 from waypoint.server import mcp_access, mcp_http
 from waypoint.storage import db
@@ -35,10 +36,13 @@ class AccessCase(RouteCase):
         self.stay = self.book("ana", HOTEL, trip_id=self.trip)
         self.sources = {who: self.keep(source_row(self.person[who], f"sub-{who}")) for who in ("ana", "ben")}
         self.in_immich: list[dict] = []
-        photos.forget_counts()
+        photocount.forget_counts()
         searching = mock.patch.object(immich, "search", side_effect=self.search)
         searching.start()
         self.addCleanup(searching.stop)
+        offline = mock.patch.object(tls, "urlopen", side_effect=AssertionError("a photo access test reached the network"))
+        offline.start()
+        self.addCleanup(offline.stop)
 
     def search(self, source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
         found = [a for a in self.in_immich if taken_after <= datetime.fromisoformat(a["fileCreatedAt"]) <= taken_before]
@@ -509,7 +513,7 @@ class UnsharedCountTests(AccessCase):
             with self.subTest(status=status):
                 with db.session() as conn:
                     conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status=status))
-                photos.forget_counts()
+                photocount.forget_counts()
                 self.assertIsNone(self.count())
                 self.assertIsNone(self.sharing("ben")["count"])
         with db.session() as conn:
@@ -533,7 +537,7 @@ class UnsharedCountTests(AccessCase):
         self.in_library(1)
         for owner in ("immich-user-1", "someone-else"):
             with self.subTest(owner=owner):
-                photos.forget_counts()
+                photocount.forget_counts()
                 immich.search.side_effect = dense
                 with mock.patch.object(photocount, "COUNT_SECONDS", 0.5):
                     self.assertIsNone(self.count())
@@ -554,23 +558,30 @@ class UnsharedCountTests(AccessCase):
     def test_a_count_is_kept_ten_minutes_for_the_same_window_libraries_and_removals(self):
         self.in_library(1)
         clock = [1000.0]
-        with mock.patch.object(photos.time, "monotonic", side_effect=lambda: clock[0]):
+        with mock.patch.object(photocount.time, "monotonic", side_effect=lambda: clock[0]):
             self.assertEqual(self.count(), 1)
             self.in_library(2)
             self.assertEqual(self.count(), 1)
-            with db.session() as conn:
-                self.assertEqual(photos.held_unshared_counts(conn, self.person["ben"], [self.trip]), {self.trip: 1})
-            self.assertEqual(self.ok("ben", "DELETE", f"/api/trips/{self.trip}/photo-sharing")["count"], 1)
+            self.assertEqual(self.sharing("ben")["count"], 1)
+            self.assertIsNone(self.ok("ben", "DELETE", f"/api/trips/{self.trip}/photo-sharing")["count"])
             self.keep(PhotoExclusion(person_id=self.person["ben"], asset_id="unrelated-asset", trip_id=self.trip, created=1.0))
-            with db.session() as conn:
-                self.assertEqual(photos.held_unshared_counts(conn, self.person["ben"], [self.trip]), {self.trip: None})
             self.assertEqual(self.count(), 2)
             self.in_library(3)
-            clock[0] += photos.COUNT_KEPT - 1
+            clock[0] += photocount.COUNT_KEPT - 1
             self.assertEqual(self.count(), 2)
             clock[0] += 1
             self.assertEqual(self.count(), 3)
         self.assertEqual(immich.search.call_count, 3)
+
+    def test_a_trip_granted_meanwhile_that_takes_the_photos_is_counted_afresh(self):
+        self.in_library(1, "2026-06-04T09:00:00.000Z")
+        self.assertEqual(self.count(), 1)
+        with db.session() as conn:
+            inside = trips.create_trip(conn, Viewer(self.person["ben"]), {"name": "Day out", "people": [self.person["ben"]],
+                                                                          "start_date": "2026-06-04", "end_date": "2026-06-04"})["id"]
+        self.share("ben", inside, scope="only_me")
+        self.assertEqual(self.count(), 0)
+        self.assertEqual(immich.search.call_count, 2)
 
     def test_settings_lists_a_trip_not_shared_only_when_it_has_photos_and_says_when_it_could_not_check(self):
         later = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])["trip_id"]
@@ -584,7 +595,7 @@ class UnsharedCountTests(AccessCase):
         listed = lambda: [(t["trip_id"], t["state"], t["scope"], t["count"]) for t in self.ok("ben", "GET", "/api/photo-grants")["people"][0]["trips"]]
         self.assertEqual(listed(), [(self.trip, "declined", None, 1), (later, "none", None, 2), (shared, "shared", "only_me", 0)])
         self.assertNotIn(quiet, [t[0] for t in listed()])
-        photos.forget_counts()
+        photocount.forget_counts()
         with db.session() as conn:
             conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="unreachable"))
         self.assertEqual(listed(), [(self.trip, "declined", None, None), (later, "none", None, None), (quiet, "none", None, None),
@@ -608,6 +619,45 @@ class UnsharedCountTests(AccessCase):
             got = photocount.unshared_counts(conn, self.person["ben"], trips_of_ben)
         self.assertEqual(got, {t: 0 for t in trips_of_ben})
         self.assertEqual(peak[0], photocount.COUNT_AT_ONCE)
+
+    def slow_trips(self, count):
+        made = [self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"},
+                          travelers=[{"person_id": self.person["ben"]}])["trip_id"] for m in range(1, count + 1)]
+        self.in_library(1, f"2027-0{count}-02T09:00:00.000Z")
+        fast = f"2027-0{count}"
+
+        def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
+            if not taken_after.isoformat().startswith(fast):
+                time.sleep(0.5)
+            return self.search(source, taken_after, taken_before, page=page)
+        immich.search.side_effect = search
+        return made
+
+    def test_slow_trips_counted_first_do_not_use_up_the_budget_of_the_trips_after_them(self):
+        made = self.slow_trips(5)
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), db.session() as conn:
+            got = photocount.unshared_counts(conn, self.person["ben"], made)
+        self.assertEqual(got, {**{t: None for t in made[:4]}, made[4]: 1})
+
+    def test_trips_left_unchecked_at_the_overall_cap_go_first_the_next_time(self):
+        made = self.slow_trips(5)
+        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), mock.patch.object(photocount, "COUNT_TOTAL", 0.4):
+            with db.session() as conn:
+                self.assertEqual(photocount.unshared_counts(conn, self.person["ben"], made), {t: None for t in made})
+            with db.session() as conn:
+                self.assertEqual(photocount.unshared_counts(conn, self.person["ben"], made)[made[4]], 1)
+
+    def test_a_library_connected_in_place_of_another_is_counted_afresh(self):
+        self.in_library(1)
+        self.assertEqual(self.count(), 1)
+        with db.session() as conn:
+            old = conn.orm.get(PhotoSource, self.sources["ben"])
+            conn.orm.delete(old)
+            conn.orm.flush()
+            conn.orm.add(PhotoSource(id=self.sources["ben"], person_id=self.person["ben"], owner_sub="sub-ben", url="https://replacement-canary.example",
+                                     immich_user_id="immich-user-1", api_key=source_row(1, "x").api_key, status="ok", created=2.0))
+        self.in_library(2)
+        self.assertEqual(self.count(), 2)
 
     def test_nothing_private_is_logged_when_a_count_fails(self):
         immich.search.side_effect = immich.Refused(immich.REFUSED)

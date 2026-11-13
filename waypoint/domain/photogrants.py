@@ -41,6 +41,10 @@ class Stale(Exception):
 Counter = Callable[[db.Connection, int, Sequence[int]], dict[int, int | None]]
 
 
+def uncounted(_conn: db.Connection, _person_id: int, trip_ids: Sequence[int]) -> dict[int, int | None]:
+    return dict.fromkeys(trip_ids)
+
+
 def _window_matches(conn: db.Connection, trip_id: int, window: Mapping[str, str]) -> bool:
     return photos.window_out(photos.trip_window(conn, trip_id)) == {"start": window.get("start"), "end": window.get("end")}
 
@@ -222,7 +226,7 @@ def dated_trips(conn: db.Connection) -> list[int]:
     return list(conn.execute(select(Trip.id).where(Trip.start_date.is_not(None), Trip.end_date.is_not(None), Trip.id.not_in(booked)).order_by(Trip.id)).scalars())
 
 
-def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = photos.held_unshared_counts) -> Sharing:
+def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted) -> Sharing:
     row = conn.orm.get(PhotoGrant, (person_id, trip_id))
     placed = photos.segment_points(conn, visibility.visible_segments(conn, viewer, [trip_id]))
     stamps = dict(conn.execute(select(PhotoExclusion.asset_id, PhotoExclusion.created)
@@ -240,7 +244,7 @@ def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, c
             "changed": row.changed if row is not None else None, "audience": audience_of(conn, trip_id), "sources": sources_of(conn, person_id)}
 
 
-def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = photos.held_unshared_counts) -> Sharing | None:
+def state_of(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted) -> Sharing | None:
     if viewer.household or not photos.acts_for(conn, viewer, person_id) or visibility.visible_trip(conn, viewer, trip_id) is None:
         return None
     return sharing(conn, viewer, person_id, trip_id, count)
@@ -816,7 +820,7 @@ def _reachable(conn: db.Connection, person_id: int) -> list[int]:
     return sorted(found)
 
 
-def grants(conn: db.Connection, viewer: Viewer, count: Counter = photos.held_unshared_counts) -> Grants:
+def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> Grants:
     if viewer.household:
         return {"people": []}
     out: list[PersonGrants] = []
