@@ -1,6 +1,6 @@
 # Photos on any trip, from Immich
 
-Status: accepted design, being built. On main: the photo tables (#486, migration 0038), the matcher (#488), the trip photos reply and Needs a look (#491), the trip summary (#493), per-trip consent, exclusion and sharing scope (from #504; migration 0040; #543), the sources API and the proxy routes (#489, #492; #544), the sync job (#490; #546, with migration 0042 for its keyset paging; #588, with migration 0045 for its re-list generations, and the re-list's catch-up pass), the live count of a trip not shared (#588) and the demo libraries (#548). Not built yet: the confirmation dialogs the sharing and source routes ask for in Settings (#552), the removed-photo thumbnail route and the web app (#496, #497, #498, #499). The parts already on main change as "Impact on the issues" at the end lists.
+Status: accepted design, being built. On main: the photo tables (#486, migration 0038), the matcher (#488), the trip photos reply and Needs a look (#491), the trip summary (#493), per-trip consent, exclusion and sharing scope (from #504; migration 0040; #543), the sources API and the proxy routes (#489, #492; #544), the sync job (#490; #546, with migration 0042 for its keyset paging; #588, with migration 0046 for its re-list generations, and the re-list's catch-up pass), the live count of a trip not shared (#588) and the demo libraries (#548). Not built yet: the confirmation dialogs the sharing and source routes ask for in Settings (#552), the removed-photo thumbnail route and the web app (#496, #497, #498, #499). The parts already on main change as "Impact on the issues" at the end lists.
 
 ## What it does
 
@@ -105,7 +105,7 @@ Indexes: (`trip_id`), (`segment_id`, so deleting a booking finds its photos with
 | `fetch_started` | text | UTC time the traversal in progress began; becomes `cursor` when it completes. |
 | `synced` | float | |
 | `inputs` | text | Migration 0042: a digest of what the matcher reads for this trip and the Home point, so a change to either re-places the trip's rows. |
-| `relist_gen` | int | Migration 0045: the relist generation (below) this window last completed a full traversal under; null before one, and cleared whenever the window is fetched in full again (its window moved, or a re-list reset it). Only a traversal read without `updatedAfter`, during a re-list, and not stepped through one instant by page number sets it. |
+| `relist_gen` | int | Migration 0046: the relist generation (below) this window last completed a full traversal under; null before one, and cleared whenever the window is fetched in full again (its window moved, or a re-list reset it). Only a traversal read without `updatedAfter`, during a re-list, and not stepped through one instant by page number sets it. |
 
 A row exists only for a (source, trip) whose person has an active grant for that trip; revoking deletes it.
 
@@ -146,7 +146,7 @@ Primary key (`person_id`, `asset_id`, `trip_id`), whose prefix serves the sync's
 | `share_all_since` | float | Epoch seconds `share_all` was last turned on; null while off. A revoked row older than this was a decline from before the setting, which `reconcile` may re-grant; one newer was stopped while the setting was on and stays stopped. |
 | `steward_sub` | text | For a person without a sign-in: their steward (Terms), set with their first library and kept when their libraries are removed; cleared by `photogrants.end_lapsed` and by `photos.claim`. Null for a person with a sign-in. |
 
-Settings keys (`waypoint/storage/settings_keys.py`, each suffixed with `:<source id>`): `PHOTOS_LAST_RELIST` (epoch of the last full re-list), `PHOTOS_RELIST_STARTED` (epoch the re-list in progress began; cleared when it finishes) and `PHOTOS_RELIST_GEN` (`photos_relist_gen`, the source's current generation, bumped when a re-list starts; a re-list stamp without a generation, from before 0045, starts the re-list again). No new environment variables; sources are set up in Settings so each member can add their own.
+Settings keys (`waypoint/storage/settings_keys.py`, each suffixed with `:<source id>`): `PHOTOS_LAST_RELIST` (epoch of the last full re-list), `PHOTOS_RELIST_STARTED` (epoch the re-list in progress began; cleared when it finishes) and `PHOTOS_RELIST_GEN` (`photos_relist_gen`, the source's current generation, bumped when a re-list starts; a re-list stamp without a generation, from before 0046, starts the re-list again). No new environment variables; sources are set up in Settings so each member can add their own.
 
 ## Immich, as verified
 

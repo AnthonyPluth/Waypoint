@@ -463,7 +463,7 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("parking", [col[0] for col in shape(self.path)["review_items"]["columns"]])
         self.assertEqual(len(rows_of(self.path, "review_items")), 1)
 
-    def test_0045_records_the_relist_generation_of_each_photo_sync_and_leaves_earlier_rows_without(self):
+    def test_0046_records_the_relist_generation_of_each_photo_sync_and_leaves_earlier_rows_without(self):
         from alembic import command
         with db.engine(self.path).begin() as c:
             command.upgrade(db.alembic_config(c), "0044")
