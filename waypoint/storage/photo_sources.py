@@ -129,6 +129,11 @@ def lock(conn: db.Connection, source_id: int) -> bool:
     return int(conn.execute(update(PhotoSource).where(PhotoSource.id == source_id).values(status=PhotoSource.status)).rowcount) > 0
 
 
+def lock_all_of(conn: db.Connection, person_ids: Collection[int]) -> list[int]:
+    found = conn.execute(select(PhotoSource.id).where(PhotoSource.person_id.in_(list(person_ids))).order_by(PhotoSource.id)).scalars()
+    return [source_id for source_id in list(found) if lock(conn, source_id)]
+
+
 def status(conn: db.Connection, source_id: int) -> Status | None:
     found = conn.execute(select(PhotoSource.status).where(PhotoSource.id == source_id)).scalar()
     return found if found in STATUSES else None
