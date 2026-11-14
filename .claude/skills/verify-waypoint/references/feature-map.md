@@ -252,7 +252,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/7`.
 - **Widths:** phone, desktop.
-- **Expects to see:** `Remove from this trip`, `1 of 12`, `2 selected`, `10 photos from your library`.
+- **Expects to see:** `Remove from this trip`, `1 of 12`, `2 selected`, `10 photos from your library`, `11 photos from your library`, `12 photos from your library`, `13 photos from your library`, `Removed from this trip (1)`, `13`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-remove`; or `poetry run python run.py verify --flow photos-remove`.
 
