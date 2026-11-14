@@ -703,6 +703,128 @@ describe("Settings → Photos → Photo sharing: when the libraries change elsew
   });
 });
 
+describe("Settings → Photos → Photo sharing: telling the page what changed", () => {
+  const told = () => vi.fn();
+  const loaded = (extra: Reply = () => undefined) => (path: string, opts?: Call) => extra(path, opts);
+
+  it("tells the page once a stop has gone through, and not before", async () => {
+    const onchange = told();
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })]);
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("button", { name: "Stop sharing on Four Corners loop" }));
+    expect(onchange).not.toHaveBeenCalled();
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+  });
+
+  it("tells the page when the reload after a stop fails, because the stop itself went through", async () => {
+    const onchange = told();
+    let failing = false;
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })], loaded((path, opts) => {
+      if (opts?.method === "DELETE") { failing = true; return {}; }
+      if (failing && path === "/api/photo-grants") throw new Refusal("Can’t reach Waypoint.", 0);
+    }));
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("button", { name: "Stop sharing on Four Corners loop" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+  });
+
+  it("says nothing when a stop is refused", async () => {
+    const onchange = told();
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })], loaded((_path, opts) => {
+      if (opts?.method === "DELETE") throw new Refusal("Couldn’t stop sharing", 500);
+    }));
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("button", { name: "Stop sharing on Four Corners loop" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onchange).not.toHaveBeenCalled();
+  });
+
+  it("tells the page after narrowing a trip, and after widening one", async () => {
+    const onchange = told();
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 }), trip(11, "Redstone weekend", { scope: "only_me", count: 12 })] })], loaded((path) => {
+      if (path.startsWith("/api/trips/") && path.includes("/photo-sharing")) return sharing({ state: "shared", scope: "only_me", count: 12, changed: 5 });
+    }));
+    render(PhotoSharingSettings, { onchange });
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Who sees your photos on Four Corners loop" }), "only_me");
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Who sees your photos on Redstone weekend" }), "trip");
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Show them" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(2));
+  });
+
+  it("tells the page after an Undo, but not when the Undo is refused", async () => {
+    const onchange = told();
+    let refuse = false;
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })], loaded((path, opts) => {
+      if (path.startsWith("/api/trips/10/photo-sharing") && opts?.method === "POST") {
+        if (refuse && (opts.body as Body).scope === "trip") throw new Refusal("Couldn’t undo it", 500);
+        return sharing({ state: "shared", scope: "only_me", changed: 99 });
+      }
+    }));
+    render(PhotoSharingSettings, { onchange });
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Who sees your photos on Four Corners loop" }), "only_me");
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+    const [, options] = vi.mocked(toast).mock.calls[0] as unknown as [string, { action: { onClick: () => void } }];
+    refuse = true;
+    options.action.onClick();
+    await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(onchange).toHaveBeenCalledTimes(1);
+    refuse = false;
+    options.action.onClick();
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(2));
+  });
+
+  it("tells the page after sharing a trip from its prompt, and after Not now", async () => {
+    const onchange = told();
+    serve([grantsOf({ trips: [trip(12, "Coast and hills", { state: "declined", scope: null, count: 112 }), trip(13, "Lake week", { state: "none", scope: null, count: 40 })] })]);
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("button", { name: "Share on Coast and hills" }));
+    await user.click(within(await screen.findByRole("group", { name: "You have 77 photos from this trip" })).getByRole("button", { name: "Share on this trip" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByRole("button", { name: "Share on Lake week" }));
+    await user.click(within(await screen.findByRole("group", { name: "You have 77 photos from this trip" })).getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(2));
+  });
+
+  it("tells the page when Share on all my trips is turned on or off, at either scope, and when the default changes", async () => {
+    const onchange = told();
+    serve([grantsOf({ trips: [trip(12, "Coast and hills", { state: "none", scope: null, count: 5 })] })]);
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("checkbox", { name: /Share on all my trips/ }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("checkbox", { name: /Share on all my trips/ }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByRole("radio", { name: /Everyone on the trip/ }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(3));
+  });
+
+  it("tells the page once the share-all question at the Trip scope is confirmed, not when it is cancelled", async () => {
+    const onchange = told();
+    serve([grantsOf({ prefs: { default_scope: "trip", share_all: false }, eligible: eligible(12), trips: [trip(12, "Coast and hills", { state: "none", scope: null, count: 40 })] })]);
+    render(PhotoSharingSettings, { onchange });
+    await user.click(await screen.findByRole("checkbox", { name: /Share on all my trips/ }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(onchange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("checkbox", { name: /Share on all my trips/ }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Show them" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+  });
+
+  it("does not tell the page about its own reload when the libraries change", async () => {
+    const onchange = told();
+    serve([grantsOf()]);
+    const { rerender } = render(PhotoSharingSettings, { refresh: 0, onchange });
+    await screen.findByRole("checkbox", { name: /Share on all my trips/ });
+    await rerender({ refresh: 1 });
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photo-grants")).toHaveLength(2));
+    expect(onchange).not.toHaveBeenCalled();
+  });
+});
+
 describe("Settings → Photos → Photo sharing: helpers", () => {
   it("words a trip's line, leaving the removed count to shared trips", () => {
     expect(tripLine(trip(1, "A", { count: 1 }), "Sep 6")).toBe("Sep 6 · 1 photo");
