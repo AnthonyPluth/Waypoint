@@ -1728,4 +1728,42 @@ describe("Trip summary", () => {
     await saveTerminal();
     await waitFor(() => expect(screen.queryByTestId("trip-summary")).toBeNull());
   });
+
+  it("asks for the numbers again after another trip is merged in, which replaces the trip without a reload", async () => {
+    summary = { ...summary, days: 7, nights: 6 };
+    const march = trip([segment({ id: 9, start_local: "2026-03-01T10:00", end_local: "2026-03-01T12:00" })], { id: 7, name: "Spring trip" });
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+      if (path === "/api/trips/1/merge") { summary = { ...summary, days: 40, nights: 39 }; return { ...held, segments: [...held.segments, ...march.segments] } as never; }
+      return answer(path, opts) as never;
+    });
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("7 days");
+    const u = userEvent.setup();
+    await tripOptions(u, "Merge another trip");
+    const dialog = await screen.findByRole("dialog");
+    const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
+    await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
+    await u.selectOptions(choose, "7");
+    await u.click(within(dialog).getByRole("button", { name: "Merge" }));
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("40 days"));
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(2);
+  });
+
+  it("asks for the numbers again after the trip’s own form saves a new copy of the trip", async () => {
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/trips/1" && opts?.method === "POST") { summary = { ...summary, days: 8 }; return { ...held, name: "Lisbon" } as never; }
+      return answer(path, opts) as never;
+    });
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("7 days");
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+    await u.clear(screen.getByLabelText("Name"));
+    await u.type(screen.getByLabelText("Name"), "Lisbon");
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("8 days"));
+  });
 });
