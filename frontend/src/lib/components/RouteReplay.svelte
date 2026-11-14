@@ -25,7 +25,12 @@
   let askedFor: number | null = null;
   $effect(() => {
     const id = trip.id;
-    if (stops.length < 2 || askedFor === id) return;
+    if (stops.length < 2) {
+      askedFor = null;
+      untrack(() => { maps = undefined; });
+      return;
+    }
+    if (askedFor === id) return;
     askedFor = id;
     untrack(() => { if (maps === null) maps = undefined; });
     if (app.state?.mapkit === false) { maps = null; return; }
@@ -50,6 +55,6 @@
 
 {#if stops.length >= 2 || photoOnly}
   <section class="mb-6" aria-label={stops.length >= 2 ? "Route replay" : "Trip photo map"}>
-    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={maps ?? null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={stops.length >= 2 ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
   </section>
 {/if}

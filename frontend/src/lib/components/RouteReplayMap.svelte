@@ -22,7 +22,7 @@
   const photoPlaces = $derived(infos.length > 0);
   const mapLabel = $derived(!replayable ? "Map of where this trip’s photos were taken" : photoPlaces ? "Map of the route, stop by stop, with photo places; the stops are listed below" : "Map of the route, stop by stop; the stops are listed below");
   let fellBack = $state(false);
-  const onMapkit = $derived(maps !== null && !fellBack);
+  const onMapkit = $derived(maps !== null && !fellBack && replayable);
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
