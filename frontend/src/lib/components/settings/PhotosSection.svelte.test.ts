@@ -583,4 +583,72 @@ describe("Settings → Photos, Needs a look", () => {
     expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
     expect(screen.queryByText("2 photos")).toBeNull();
   });
+
+  it("after a 409 reloads the list, and the open sheet offers the refreshed candidates, not the obsolete trip", async () => {
+    let photos = [look(21)];
+    serve([source()], (path, opts) => {
+      if (path === "/api/photos/review") return { photos };
+      if (path === "/api/photos/21" && opts?.method === "POST") {
+        photos = [look(21, 1, { candidates: [{ id: 14, name: "Mesa weekend" }, { id: 12, name: "Redstone weekend" }] })];
+        throw new Refusal("The photo’s trips changed", 409);
+      }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Pick a trip/ }));
+    await user.click(await screen.findByRole("button", { name: "Put on Canyon weekend" }));
+    const sheet = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(sheet).getByRole("radio", { name: "Mesa weekend" })).toBeInTheDocument());
+    expect(within(sheet).queryByRole("radio", { name: "Canyon weekend" })).toBeNull();
+    expect(within(sheet).getByRole("alert")).toHaveTextContent("The list is up to date");
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photos/review")).toHaveLength(2);
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("after a 409 whose reload fails, says the list may be out of date and offers Try again", async () => {
+    let fail = false;
+    serve([source()], (path, opts) => {
+      if (path === "/api/photos/review") { if (fail) throw new Refusal("Can’t reach Waypoint.", 0); return { photos: [look(21)] }; }
+      if (path === "/api/photos/21" && opts?.method === "POST") { fail = true; throw new Refusal("The photo’s trips changed", 409); }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Leave off, the photo/ }));
+    expect(await screen.findByText("Couldn’t refresh which photos need a look, so that list may be out of date.")).toBeInTheDocument();
+    expect(screen.getByText(/Couldn’t refresh the list, so it may be out of date\./)).toBeInTheDocument();
+    expect(screen.queryByText(/The list is up to date/)).toBeNull();
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByText(/may be out of date/)).toBeNull());
+  });
+
+  it("ignores a late reload after a 409 when a newer one has answered", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let synced = "2026-11-06T11:12:00+00:00";
+    let n = 0;
+    let release: (v: unknown) => void = () => {};
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ last_sync: synced })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/sync" && opts?.method === "POST") return { started: true };
+      if (path === "/api/photos/21" && opts?.method === "POST") throw new Refusal("The photo’s trips changed", 409);
+      if (path === "/api/photos/review") {
+        n += 1;
+        if (n === 1) return { photos: [look(21)] };
+        if (n === 2) return new Promise((resolve) => (release = resolve));
+        return { photos: [] };
+      }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.click(await screen.findByRole("button", { name: /^Leave off, the photo/ }));
+    await waitFor(() => expect(n).toBe(2));
+    await user.click(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" }));
+    synced = "2026-11-06T12:12:00+00:00";
+    await flush(() => vi.advanceTimersByTimeAsync(5000));
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+    release({ photos: [look(21)] });
+    await flush(() => vi.advanceTimersByTimeAsync(50));
+    expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Photos that need a look" })).toBeNull();
+  });
 });

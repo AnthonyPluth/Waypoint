@@ -36,10 +36,11 @@ const JUNE = whoIs(3, 1, PEOPLE);
 type Call = { method?: string; body?: unknown };
 const posted = (path: string) => vi.mocked(api).mock.calls.filter(([p, o]) => p === path && (o as Call | undefined)?.method === "POST");
 
-function show(photos: ReviewPhoto[], who = ADA, ondecided: (id: number) => Promise<unknown> = async () => {}) {
+function show(photos: ReviewPhoto[], who = ADA, ondecided: (id: number) => Promise<unknown> = async () => {}, onreload: () => Promise<boolean> = async () => true) {
   const spy = vi.fn(ondecided);
-  const view = render(PhotosNeedsLook, { photos, who, ondecided: spy });
-  return { spy, ...view };
+  const reload = vi.fn(onreload);
+  const view = render(PhotosNeedsLook, { photos, who, ondecided: spy, onreload: reload });
+  return { spy, reload, ...view };
 }
 
 beforeEach(() => {
@@ -179,7 +180,7 @@ describe("Needs a look, deciding", () => {
     const buttons = screen.getAllByRole("button").filter((b) => /^(Pick|Leave|Keep|Remove)/.test(b.getAttribute("aria-label") ?? ""));
     expect(buttons.length).toBe(5);
     for (const b of buttons) expect(b).toBeDisabled();
-    expect(screen.getByRole("status")).toHaveTextContent("Saving…");
+    expect(screen.getByText("Saving…")).toBeInTheDocument();
     done();
     await waitFor(() => { for (const b of buttons) expect(b).toBeEnabled(); });
   });
@@ -194,15 +195,79 @@ describe("Needs a look, deciding", () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
-  it("on a 409 asks for a fresh look: closes the sheet and names the change", async () => {
+  it("on a 409 reloads the list before saying it is up to date, keeps the row, and offers the new candidates in the open sheet", async () => {
     vi.mocked(api).mockRejectedValue(new Refusal("The photo’s trips changed", 409));
-    show([ambiguous]);
+    const NEW = { id: 14, name: "Mesa weekend" };
+    const fresh = photo(21, { candidates: [NEW, REDSTONE] });
+    const view: { rerender?: (p: { photos: ReviewPhoto[] }) => Promise<void> } = {};
+    const made = show([ambiguous], ADA, async () => {}, async () => { await view.rerender?.({ photos: [fresh] }); return true; });
+    view.rerender = made.rerender as never;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^Pick a trip/ }));
+    expect(within(await screen.findByRole("dialog")).getAllByRole("radio")).toHaveLength(2);
+    await user.click(screen.getByRole("button", { name: "Put on Canyon weekend" }));
+    const sheet = await screen.findByRole("dialog");
+    await waitFor(() => expect(within(sheet).getByRole("radio", { name: "Mesa weekend" })).toBeInTheDocument());
+    expect(within(sheet).queryByRole("radio", { name: "Canyon weekend" })).toBeNull();
+    expect(within(sheet).getByRole("alert")).toHaveTextContent("The photo’s trips changed. That photo changed while you were looking. The list is up to date; check it and try again.");
+    expect(within(sheet).getByRole("button", { name: "Put on Mesa weekend" })).toBeEnabled();
+    expect(made.reload).toHaveBeenCalledTimes(1);
+    expect(made.spy).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("closes the sheet and says so when the reload no longer lists the photo", async () => {
+    vi.mocked(api).mockRejectedValue(new Refusal("No such photo", 404));
+    const view: { rerender?: (p: { photos: ReviewPhoto[] }) => Promise<void> } = {};
+    const made = show([ambiguous], ADA, async () => {}, async () => { await view.rerender?.({ photos: [] }); return true; });
+    view.rerender = made.rerender as never;
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^Pick a trip/ }));
     await user.click(await screen.findByRole("button", { name: "Put on Canyon weekend" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByRole("alert")).toHaveTextContent("The photo’s trips changed That photo changed while you were looking.");
-    expect(posted("/api/photos/21")).toHaveLength(1);
+    expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(toast).toHaveBeenCalledWith("No such photo.");
+    expect(made.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("never says the list is up to date when the reload after a 409 fails", async () => {
+    vi.mocked(api).mockRejectedValue(new Refusal("The photo’s trips changed", 409));
+    const made = show([ambiguous], ADA, async () => {}, async () => false);
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("The photo’s trips changed. Couldn’t refresh the list, so it may be out of date.");
+    expect(alert).not.toHaveTextContent("up to date;");
+    expect(made.reload).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeEnabled();
+  });
+
+  it.each([
+    ["Keep on this trip", far()],
+    ["Leave off", ambiguous],
+    ["Remove from this trip", far()],
+  ])("%s reloads the list on a 409 and neither removes the row nor counts the choice as saved", async (action, subject) => {
+    vi.mocked(api).mockRejectedValue(new Refusal("That photo changed", 409));
+    const made = show([subject]);
+    await userEvent.setup().click(screen.getByRole("button", { name: new RegExp(`^${action}`) }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("That photo changed. That photo changed while you were looking. The list is up to date");
+    expect(made.reload).toHaveBeenCalledTimes(1);
+    expect(made.spy).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("reloads on a refused trip (400) and a missing photo (404) but not on a network failure or a server error", async () => {
+    const made = show([ambiguous]);
+    const user = userEvent.setup();
+    const press = () => user.click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    for (const [status, reloads] of [[400, 1], [404, 2], [0, 2], [500, 2]] as const) {
+      vi.mocked(api).mockRejectedValue(new Refusal("Nope", status));
+      await press();
+      await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Nope"));
+      expect(made.reload).toHaveBeenCalledTimes(reloads);
+    }
+    expect(screen.getByRole("alert")).not.toHaveTextContent("up to date");
   });
 
   it("keeps the sheet open with the refusal when the trip is not shared", async () => {
@@ -229,5 +294,20 @@ describe("Needs a look, deciding", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     done();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("moves focus to the heading after a decision leaves other photos, and to the empty line after the last one, announcing it", async () => {
+    const view: { rerender?: (p: { photos: ReviewPhoto[] }) => Promise<void> } = {};
+    const next = { photos: [far()] };
+    const made = show([ambiguous, far()], ADA, async () => { await view.rerender?.({ photos: next.photos }); });
+    view.rerender = made.rerender as never;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    await waitFor(() => expect(screen.getByText("Needs a look").closest("summary")).toHaveFocus());
+    expect(screen.getByRole("status")).toHaveTextContent("Saved. 1 photo still needs a look.");
+    next.photos = [];
+    await user.click(screen.getByRole("button", { name: /^Keep on this trip, the photo/ }));
+    await waitFor(() => expect(screen.getByText("Nothing needs a look.", { selector: "p[tabindex]" })).toHaveFocus());
+    expect(screen.getByRole("status")).toHaveTextContent("Saved. Nothing else needs a look.");
   });
 });

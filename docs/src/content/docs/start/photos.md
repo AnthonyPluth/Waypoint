@@ -97,9 +97,11 @@ The list is in **Settings**, under **Photos**, in the card of the library the ph
 - **Pick a trip** opens a sheet with the trips the photo could belong to; **Put on** that trip files it there. Only trips its person shared photos on are listed.
 - **Leave off** (a photo that fits two trips) keeps it off every trip it could belong to.
 - **Keep on this trip** (a far photo) accepts it, so it counts in the trip's figures.
-- **Remove from this trip** (a far photo) takes it off the trip for everyone; it can be put back from the trip's page.
+- **Remove from this trip** (a far photo) takes it off the trip for everyone.
 
-The list shows three photos at a time, with **Show more**. When a choice is saved the photo leaves the list and the counts update. If Waypoint can't refresh the list afterwards it says the list may be out of date and offers **Try again**; if the photo changed while you were looking, it says so and you choose again.
+There is no Undo here: a choice is reversed by picking again, and a photo removed from a trip is put back with **Put back** on that trip's page once the removal controls there ship.
+
+The list shows three photos at a time, with **Show more**. When a choice is saved the photo leaves the list and the counts update. If Waypoint can't refresh the list afterwards it says the list may be out of date and offers **Try again**; if a choice is refused because the photo or its trips changed, Waypoint reloads the list first, then says so, and you choose again from what it now shows.
 
 ## Who sees what
 

@@ -28,9 +28,9 @@
 </script>
 
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { toast } from "svelte-sonner";
-  import { act } from "$lib/act";
+  import { act, errMsg } from "$lib/act";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Sheet } from "$lib/components/ui/sheet";
@@ -39,51 +39,84 @@
   import { thumbnailUrl } from "$lib/photos";
   import ImageOff from "@lucide/svelte/icons/image-off";
 
-  let { photos, who, ondecided }: { photos: ReviewPhoto[]; who: Who; ondecided: (id: number) => Promise<unknown> } = $props();
+  let { photos, who, ondecided, onreload }: { photos: ReviewPhoto[]; who: Who; ondecided: (id: number) => Promise<unknown>; onreload: () => Promise<boolean> } = $props();
 
-  type Failure = { message: string; stale: boolean };
+  type Failure = { message: string };
 
   let busy = $state<number | null>(null);
   let notes = $state<Record<number, string | undefined>>({});
   let showAll = $state(false);
   let broken = $state<Set<number>>(new Set());
   let summary = $state<HTMLElement | null>(null);
+  let emptyLine = $state<HTMLElement | null>(null);
+  let announce = $state("");
 
-  let picking = $state<ReviewPhoto | null>(null);
+  let pickingId = $state<number | null>(null);
   let sheetOpen = $state(false);
-  let chosen = $state<number | null>(null);
+  let wanted = $state<number | null>(null);
   let sheetProblem = $state("");
 
   const shown = $derived(showAll ? photos : photos.slice(0, SHOWN));
   const rest = $derived(photos.length - shown.length);
+  const picking = $derived(pickingId === null ? null : (photos.find((p) => p.id === pickingId) ?? null));
   const choices = $derived(picking ? choicesOf(picking) : []);
+  const chosen = $derived(choices.some((c) => c.id === wanted) ? wanted : (choices[0]?.id ?? null));
   const chosenName = $derived(choices.find((c) => c.id === chosen)?.name ?? "");
 
   const note = (id: number, text: string | undefined) => { notes = { ...notes, [id]: text }; };
 
   const CHANGED = "That photo changed while you were looking. The list is up to date; check it and try again.";
+  const sentence = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}.`);
+  const UNSURE = "Couldn’t refresh the list, so it may be out of date.";
+
+  $effect(() => {
+    void photos;
+    untrack(() => {
+      notes = Object.fromEntries(Object.entries(notes).filter(([, text]) => !text?.endsWith(UNSURE)));
+      if (sheetProblem.endsWith(UNSURE)) sheetProblem = "";
+    });
+  });
+
+  $effect(() => {
+    if (sheetOpen && picking === null && busy === null) sheetOpen = false;
+  });
 
   async function settle(p: ReviewPhoto, send: () => Promise<unknown>, said: string, failed: string): Promise<Failure | null> {
     note(p.id, undefined);
     let failure: Failure | null = null;
     await act(async () => {
-      await send();
+      try {
+        await send();
+      } catch (err) {
+        const status = (err as { status?: unknown } | null)?.status;
+        if (status !== 400 && status !== 404 && status !== 409) throw err;
+        const reason = errMsg(err) || failed;
+        const fresh = await onreload();
+        failure = { message: [sentence(reason), fresh ? (isStale(err) ? CHANGED : "") : UNSURE].filter(Boolean).join(" ") };
+        return;
+      }
       toast.success(said);
       await ondecided(p.id);
     }, {
       busy: (on) => (busy = on ? p.id : null),
-      onError: (message, err) => {
-        const stale = isStale(err);
-        failure = { message: stale ? `${message || failed} ${CHANGED}` : message || failed, stale };
-      },
+      onError: (message) => { failure = { message: message || failed }; },
     });
     return failure;
   }
 
   async function settled(p: ReviewPhoto, failure: Failure | null) {
-    if (failure) { note(p.id, failure.message); return; }
+    if (failure) {
+      await tick();
+      if (photos.some((x) => x.id === p.id)) note(p.id, failure.message);
+      else toast(failure.message);
+      return;
+    }
     await tick();
-    summary?.focus();
+    const count = photos.length;
+    announce = count ? `Saved. ${plural(count, "photo", "photos")} still ${count === 1 ? "needs" : "need"} a look.` : "Saved. Nothing else needs a look.";
+    const target = () => (count ? summary : emptyLine);
+    target()?.focus();
+    setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) target()?.focus(); }, 50);
   }
 
   const post = (p: ReviewPhoto, body: { trip_id?: number; excluded?: boolean }) =>
@@ -108,8 +141,8 @@
 
   function openPick(p: ReviewPhoto) {
     note(p.id, undefined);
-    picking = p;
-    chosen = choicesOf(p)[0]?.id ?? null;
+    pickingId = p.id;
+    wanted = choicesOf(p)[0]?.id ?? null;
     sheetProblem = "";
     sheetOpen = true;
   }
@@ -118,11 +151,13 @@
     const p = picking;
     const trip = chosen;
     if (!p || trip === null) return;
+    const name = chosenName;
     sheetProblem = "";
-    const failure = await settle(p, () => post(p, { trip_id: trip }), `Put on ${chosenName}.`, "Couldn’t put it on that trip");
+    const failure = await settle(p, () => post(p, { trip_id: trip }), `Put on ${name}.`, "Couldn’t put it on that trip");
     if (!failure) { sheetOpen = false; await settled(p, null); return; }
-    if (failure.stale) { sheetOpen = false; note(p.id, failure.message); return; }
-    sheetProblem = failure.message;
+    await tick();
+    if (photos.some((x) => x.id === p.id)) sheetProblem = failure.message;
+    else { sheetOpen = false; toast(failure.message); }
   }
 
   const label = (p: ReviewPhoto) => stampOf(p);
@@ -176,8 +211,9 @@
       {/if}
     </details>
   {:else}
-    <p class="text-sm text-muted-foreground">Nothing needs a look.</p>
+    <p bind:this={emptyLine} tabindex="-1" class="text-sm text-muted-foreground outline-none">Nothing needs a look.</p>
   {/if}
+  {#if announce}<p class="sr-only" role="status">{announce}</p>{/if}
 </div>
 
 <Sheet bind:open={() => sheetOpen, (v) => { if (busy === null || v) sheetOpen = v; }} title="Pick a trip for this photo" description="Waypoint won’t move it again by itself.">
@@ -194,7 +230,7 @@
         <legend class="eyebrow mb-2">Trips it could belong to</legend>
         {#each choices as c (c.id)}
           <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-3 has-[:checked]:border-ring has-[:checked]:bg-primary/10">
-            <input class="mt-0.5 size-[18px] shrink-0 accent-primary" type="radio" name="needs-a-look-trip" value={c.id} checked={chosen === c.id} disabled={busy !== null} onchange={() => (chosen = c.id)} />
+            <input class="mt-0.5 size-[18px] shrink-0 accent-primary" type="radio" name="needs-a-look-trip" value={c.id} checked={chosen === c.id} disabled={busy !== null} onchange={() => (wanted = c.id)} />
             <span class="font-semibold">{c.name}</span>
           </label>
         {/each}

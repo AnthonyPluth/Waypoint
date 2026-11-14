@@ -89,17 +89,27 @@
   let reviewProblem = $state(false);
   let reviewing = $state(false);
   let reviewLatest = 0;
+  let reviewRun: Promise<boolean> = Promise.resolve(true);
 
-  async function loadReview() {
+  function loadReview(): Promise<boolean> {
+    const run = readReview();
+    reviewRun = run;
+    return run;
+  }
+
+  async function readReview(): Promise<boolean> {
     const mine = ++reviewLatest;
-    if (!list?.sources.some((s) => s.mine)) { review = null; reviewProblem = false; return; }
+    if (!list?.sources.some((s) => s.mine)) { review = null; reviewProblem = false; return true; }
     reviewing = true;
     try {
       const found = await apiCall<"GET /api/photos/review">("/api/photos/review", { keep: true });
-      if (mine !== reviewLatest) return;
+      if (mine !== reviewLatest) return reviewRun;
       review = found.photos; reviewProblem = false;
+      return true;
     } catch {
-      if (mine === reviewLatest) reviewProblem = true;
+      if (mine !== reviewLatest) return reviewRun;
+      reviewProblem = true;
+      return false;
     } finally {
       if (mine === reviewLatest) reviewing = false;
     }
@@ -369,7 +379,7 @@
               </form>
             {/if}
             {#if review !== null && lookAt.get(s.person_id) === s.id}
-              <PhotosNeedsLook photos={lookFor(s.person_id)} who={whoIs(s.person_id, me, people)} ondecided={decided} />
+              <PhotosNeedsLook photos={lookFor(s.person_id)} who={whoIs(s.person_id, me, people)} ondecided={decided} onreload={loadReview} />
             {/if}
             {#if notice}
               <p id={`photo-notice-${s.id}`} class="text-sm" role="alert">{#if notice.chip}<StatusChip chip={notice.chip} class="mr-2 align-middle" />{/if}<span>{notice.text}</span></p>
