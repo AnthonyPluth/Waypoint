@@ -369,8 +369,8 @@ async function openPage(page, base, name) {
   await page.locator(opened.open).first().click();
   for (const ready of opened.ready) await page.locator(ready).first().waitFor({ timeout: 30000 });
   await page.locator(opened.still).first().press("End");
-  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
-  await page.waitForFunction(() => [...document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); }), undefined, { timeout: 10000 });
+  await page.evaluate("document.activeElement?.blur?.()");
+  await page.waitForFunction("[...document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); })", undefined, { timeout: 10000 });
   await page.waitForLoadState("networkidle");
 }
 
