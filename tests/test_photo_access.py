@@ -143,6 +143,21 @@ class ScopeTests(AccessCase):
         self.assertEqual(self.sharing("ben")["state"], "declined")
         self.assertEqual(self.sharing("ana")["state"], "none")
 
+    def test_an_unshared_trip_asks_with_the_live_count_to_its_person_only_and_shows_no_photo(self):
+        self.in_library(1)
+        self.in_library(2)
+        with no_leaks(self, ASSET, URL, KEY, "immich-user-1"):
+            asked = self.sharing("ben")
+            stranger = self.call("cy", "GET", f"/api/trips/{self.trip}/photo-sharing")
+        self.assertEqual((asked["state"], asked["count"], asked["scope"], asked["removed_count"]), ("ask", 2, None, 0))
+        self.assertEqual(stranger, (404, NO_TRIP))
+        self.assertNoPhotos("ben")
+        self.assertNoPhotos("ana")
+
+    def test_an_unshared_trip_with_nothing_in_the_library_answers_none(self):
+        got = self.sharing("ben")
+        self.assertEqual((got["state"], got["count"]), ("none", 0))
+
     def test_the_trips_booker_who_is_not_on_it_has_no_special_access(self):
         booked = self.book("ana", {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, travelers=[{"person_id": self.person["ben"]}])
         trip = booked["trip_id"]
