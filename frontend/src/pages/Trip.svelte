@@ -4,7 +4,7 @@
   import { tick } from "svelte";
   import { apiCall } from "$lib/contract";
   import { emailNews } from "$lib/email-news";
-  import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
+  import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip, TripPhotos as PhotoReply } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -44,6 +44,8 @@
   import { toast } from "svelte-sonner";
 
   const staticDemo = import.meta.env.MODE === "demo";
+  let tripPhotos = $state<PhotoReply | null>(null);
+  let gallery = $state<{ showCluster: (cluster: number) => Promise<void> } | null>(null);
 
   let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
 
@@ -315,8 +317,8 @@
     {/if}
   </div>
 
-  <RouteReplay trip={t} {now} />
-  <TripPhotos trip={t} {people} {now} />
+  <RouteReplay trip={t} {now} photos={tripPhotos} onshow={(cluster) => void gallery?.showCluster(cluster)} />
+  <TripPhotos bind:this={gallery} onloaded={(found) => (tripPhotos = found)} trip={t} {people} {now} />
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

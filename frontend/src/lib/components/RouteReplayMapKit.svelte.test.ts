@@ -6,7 +6,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
 
 import { api } from "$lib/api";
-import type { TripPlaces } from "$lib/api-types";
+import type { PhotoCluster, TripPhoto, TripPhotos, TripPlaces } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { forgetMapkit } from "$lib/mapkit";
 import { stopsOf } from "$lib/route-replay";
@@ -15,6 +15,7 @@ import { clearRouteCache } from "$lib/driving-routes";
 import { segment, state, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 import RouteReplayMap from "./RouteReplayMap.svelte";
+import MapKitClusters from "../../test/MapKitClusters.svelte";
 
 const places: TripPlaces = {
   home: null,
@@ -258,5 +259,75 @@ describe("RouteReplayMap on MapKit", () => {
     view.unmount();
     expect(fake.last().destroyed).toBe(true);
     expect(maps.watching()).toBe(0);
+  });
+});
+
+const cluster: PhotoCluster = { latitude: 37.8, longitude: -122.4, count: 2, first: "2025-12-07T10:00", last: "2025-12-07T12:00", cover: 1, inferred: false };
+const shot = (id: number): TripPhoto => ({ id, person_id: 1, trip_id: 1, kind: "image", taken_local: "2025-12-07T10:00", zone: "America/Los_Angeles", latitude: 37.8, longitude: -122.4, location_source: "exif", segment_id: null, match: "place", distance_km: 2, cluster: 0, removed_at: null });
+const photos: TripPhotos = { photos: [shot(1), shot(2)], clusters: [cluster], counts: { total: 2, located: 2, inferred: 0, far: 0 }, people: [] };
+const during = Date.parse("2025-12-08T12:00:00Z");
+
+describe("photo pins and Apple's map", () => {
+  it("draws the pins over Apple's map for a route replay, and asks Apple for no more than one map", async () => {
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after, photos });
+    await loadScript();
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(await screen.findByRole("button", { name: /^2 photos/ })).toBeTruthy();
+    expect(container.querySelectorAll("[data-pin]")).toHaveLength(1);
+    expect(fake.maps).toHaveLength(1);
+  });
+
+  it("does not rebuild Apple's map when the clusters are read again at the same places, and rebuilds it when they move", async () => {
+    render(MapKitClusters, { maps: fakeMaps(), stops, roads: places.roads, boundaries: places.boundaries });
+    await waitFor(() => expect(fake.maps).toHaveLength(1));
+    await fireEvent.click(screen.getByRole("button", { name: "same" }));
+    expect(fake.maps).toHaveLength(1);
+    expect(fake.maps[0].destroyed).toBe(false);
+    await fireEvent.click(screen.getByRole("button", { name: "moved" }));
+    await waitFor(() => expect(fake.maps).toHaveLength(2));
+    expect(fake.maps[0].destroyed).toBe(true);
+  });
+
+  it("never draws a map with no route on Apple's, even with a handle left from the previous trip", async () => {
+    const view = render(RouteReplay, { trip: trip(flights), now: after, photos });
+    await loadScript();
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+    const maps = fake.maps.length;
+    const loads = scripts.length;
+    vi.mocked(api).mockClear();
+    await view.rerender({ trip: trip([], { id: 2 }), now: during, photos });
+    expect(await screen.findByRole("region", { name: "Trip photo map" })).toBeTruthy();
+    expect(view.container.querySelector("[data-mapkit]")).toBeNull();
+    expect(svg(view.container)).toBeTruthy();
+    expect(view.container.querySelectorAll("[data-pin]")).toHaveLength(1);
+    expect(fake.maps).toHaveLength(maps);
+    expect(fake.maps.every((m) => m.destroyed)).toBe(true);
+    expect(scripts).toHaveLength(loads);
+    expect(vi.mocked(api).mock.calls.map((c) => c[0])).not.toContain("/api/mapkit/token");
+  });
+
+  it("goes back to Apple's map when the next trip has a route again", async () => {
+    const view = render(RouteReplay, { trip: trip(flights), now: after, photos });
+    await loadScript();
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+    await view.rerender({ trip: trip([], { id: 2 }), now: during, photos });
+    expect(view.container.querySelector("[data-mapkit]")).toBeNull();
+    await view.rerender({ trip: trip(flights, { id: 3 }), now: after, photos });
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+  });
+
+  it("drops Apple's map when an edit leaves the same trip with fewer than two stops", async () => {
+    const view = render(RouteReplay, { trip: trip(flights), now: after, photos });
+    await loadScript();
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+    await view.rerender({ trip: trip([]), now: after, photos });
+    expect(await screen.findByRole("region", { name: "Trip photo map" })).toBeTruthy();
+    expect(view.container.querySelector("[data-mapkit]")).toBeNull();
+    expect(fake.maps.every((m) => m.destroyed)).toBe(true);
+  });
+
+  it("does not use a handle it is given for a map with no route", () => {
+    const { container } = render(RouteReplayMap, { stops: [], year: 2025, maps: fakeMaps(), infos: [] });
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
   });
 });

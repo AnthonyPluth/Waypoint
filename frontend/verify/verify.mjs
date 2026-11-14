@@ -19,7 +19,7 @@ export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"];
 export const OWN_PAGES = ["oauth-approve"];
 export const SIGNED_PAGES = ["trip"];
-export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["section[aria-label='Route replay'] [data-testid='replay-map']", "[data-testid='photo-strip'] img", "[data-testid='trip-summary']"], still: "input[aria-label='Position along the route']" } };
+export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["section[aria-label='Route replay'] [data-testid='replay-map']", "[data-testid='photo-strip'] img", "[data-testid='trip-summary']", "[data-testid='photo-pins'] button"], still: "input[aria-label='Position along the route']" } };
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -411,7 +411,7 @@ async function openPage(page, base, name) {
   for (const ready of opened.ready) await page.locator(ready).first().waitFor({ timeout: 30000 });
   await page.locator(opened.still).first().press("End");
   await page.evaluate("document.activeElement?.blur?.()");
-  await page.waitForFunction("[...document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); })", undefined, { timeout: 10000 });
+  await page.waitForFunction(() => [...globalThis.document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= globalThis.innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); }), undefined, { timeout: 10000 });
   await page.waitForLoadState("networkidle");
 }
 

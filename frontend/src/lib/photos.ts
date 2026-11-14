@@ -1,4 +1,5 @@
 import type { Person, PhotoCluster, Segment, Trip, TripPhoto } from "./api-types";
+import { datesOf } from "./route-replay";
 import { clock, daysBetween, headline } from "./trips";
 
 export type PhotoDay = { day: string; photos: TripPhoto[] };
@@ -84,3 +85,61 @@ export function daysFor(days: PhotoDay[], from: number, size = PAGE_SIZE): numbe
   }
   return to;
 }
+
+export type ClusterInfo = { index: number; cluster: PhotoCluster; place: string; far: number; farKm: number | null; first: TripPhoto | null };
+
+const noun = (n: number): string => `${n} ${n === 1 ? "photo" : "photos"}`;
+
+export function clusterInfos(photos: TripPhoto[], clusters: PhotoCluster[], segments: Map<number, Segment>): ClusterInfo[] {
+  const members = new Map<number, TripPhoto[]>();
+  for (const p of photos) {
+    if (p.cluster === null) continue;
+    const list = members.get(p.cluster);
+    if (list) list.push(p);
+    else members.set(p.cluster, [p]);
+  }
+  return clusters.map((cluster, index) => {
+    const list = (members.get(index) ?? []).slice().sort((a, b) => a.taken_local.localeCompare(b.taken_local) || a.id - b.id);
+    const tally = new Map<string, number>();
+    for (const p of list) {
+      if (isFar(p)) continue;
+      const place = placeOf(p, p.segment_id === null ? undefined : segments.get(p.segment_id));
+      if (place) tally.set(place, (tally.get(place) ?? 0) + 1);
+    }
+    const place = [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+    const far = list.filter(isFar);
+    const km = far.map((p) => p.distance_km).filter((d): d is number => d !== null);
+    return { index, cluster, place, far: far.length, farKm: km.length ? Math.min(...km) : null, first: list[0] ?? null };
+  });
+}
+
+export const clusterAway = (info: ClusterInfo): boolean => info.far > 0 && info.far >= info.cluster.count;
+
+export function clusterTitle(info: ClusterInfo): string {
+  const { cluster, place } = info;
+  let what = noun(cluster.count);
+  if (clusterAway(info)) what += `, ${kilometres(info.farKm)} from every booking`;
+  else {
+    if (cluster.inferred) what += " placed from the itinerary";
+    if (place) what += ` near ${place}`;
+    if (info.far > 0) what += `, ${info.far} of them ${kilometres(info.farKm)} from every booking`;
+  }
+  return what;
+}
+
+export const clusterName = (info: ClusterInfo, year: number): string =>
+  [clusterTitle(info), datesOf(info.cluster.first, info.cluster.last, year)].filter(Boolean).join(", ");
+
+export function clusterCaption(info: ClusterInfo, year: number): string {
+  const { cluster, place } = info;
+  const dates = datesOf(cluster.first, cluster.last, year, true);
+  const where = clusterAway(info) ? `${kilometres(info.farKm)} from every booking` : place ? `${cluster.inferred ? "from the itinerary, " : ""}near ${place}` : cluster.inferred ? "placed from the itinerary" : "";
+  return [dates, where].filter(Boolean).join(" · ");
+}
+
+export const clusterCount = (info: ClusterInfo): string => noun(info.cluster.count);
+
+export const firstOfCluster = (photos: TripPhoto[], index: number): TripPhoto | null =>
+  photos.filter((p) => p.cluster === index).sort((a, b) => a.taken_local.localeCompare(b.taken_local) || a.id - b.id)[0] ?? null;
+
+export const unlocated = (photos: TripPhoto[]): number => photos.filter((p) => p.cluster === null).length;
