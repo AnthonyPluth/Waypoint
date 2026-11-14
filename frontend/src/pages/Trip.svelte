@@ -51,6 +51,7 @@
 
   let trip = $state<Trip | null>(null);
   let loads = $state(0);
+  let photoChanges = $state(0);
   const replace = (next: Trip) => { trip = next; loads++; };
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
@@ -295,7 +296,7 @@
       {#key id}
         <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { replace(next); onchanged?.(); }} />
       {/key}
-      {#if !editingTrip}<TripSummary tripId={t.id} revision={String(loads)} />{/if}
+      {#if !editingTrip}<TripSummary tripId={t.id} revision={`${loads}.${photoChanges}`} />{/if}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
@@ -318,7 +319,7 @@
   </div>
 
   <RouteReplay trip={t} {now} photos={tripPhotos} onshow={(cluster) => void gallery?.showCluster(cluster)} />
-  <TripPhotos bind:this={gallery} onloaded={(found) => (tripPhotos = found)} trip={t} {people} {now} />
+  <TripPhotos bind:this={gallery} onloaded={(found) => (tripPhotos = found)} onchanged={() => photoChanges++} trip={t} {people} {now} />
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

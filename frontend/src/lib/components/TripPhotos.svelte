@@ -5,16 +5,23 @@
   import { apiCall } from "$lib/contract";
   import { Button } from "$lib/components/ui/button";
   import PhotoViewer from "$lib/components/PhotoViewer.svelte";
+  import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
+  import { actingPersons, PersonSharing } from "$lib/trip-sharing.svelte";
   import { byDay, dayCaption, daysFor, firstOfCluster, isFar, isInferred, localDay, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
   import { clock, dayIn, dayLabel, viewerZone } from "$lib/trips";
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Play from "@lucide/svelte/icons/play";
 
-  let { trip, people, now, onloaded }: { trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void } = $props();
+  let { trip, people, now, onloaded, onchanged }: { trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
   let loaded = $state<Loaded>({ state: "loading" });
   let sources = $state<PhotoSource[] | null>(null);
+  let acting = $state<PersonSharing[]>([]);
+  let actingProblem = $state(false);
+  let staleView = $state(false);
+  let refreshing = $state(false);
+  let checking = $state(false);
   let expanded = $state(false);
   let shownDays = $state(0);
   let announce = $state("");
@@ -43,35 +50,99 @@
     if (sources.length === 0) return started ? "connect" : null;
     return waiting ? "waiting" : "nothing";
   });
-  const shows = $derived(loaded.state === "error" || total > 0 || empty !== null);
+  const asking = $derived(acting.some((a) => a.mode === "prompt" || a.mode === "reminder"));
+  const sharingShown = $derived(actingProblem || acting.some((a) => a.visible));
+  const shows = $derived(loaded.state === "error" || total > 0 || empty !== null || sharingShown);
   const waitingName = $derived(waiting ? personName(people, waiting.person_id) : "");
   const seeAll = $derived(`See all ${total} ${total === 1 ? "photo" : "photos"}`);
 
   let latest = 0;
-  async function load(id: number) {
+  async function load(id: number, soft = false) {
     const mine = ++latest;
-    loaded = { state: "loading" };
-    onloaded?.(null);
-    sources = null;
-    expanded = false;
-    shownDays = 0;
-    broken = new Set();
+    refreshing = soft;
+    if (!soft) {
+      loaded = { state: "loading" };
+      onloaded?.(null);
+      sources = null;
+      expanded = false;
+      shownDays = 0;
+      broken = new Set();
+    }
     try {
-      const found = await apiCall<"GET /api/trips/{id}/photos">(`/api/trips/${id}/photos`);
-      const listed = found.photos.length === 0 ? (await apiCall<"GET /api/photo-sources">("/api/photo-sources")).sources : [];
+      const found = await (soft ? apiCall<"GET /api/trips/{id}/photos">(`/api/trips/${id}/photos`, { keep: true }) : apiCall<"GET /api/trips/{id}/photos">(`/api/trips/${id}/photos`));
+      const listed = found.photos.length === 0 ? (await apiCall<"GET /api/photo-sources">("/api/photo-sources", soft ? { keep: true } : undefined)).sources : [];
       if (mine !== latest) return;
       sources = listed;
       loaded = { state: "ready", found };
+      staleView = false;
       onloaded?.(found);
+      if (soft) {
+        broken = new Set();
+        if (found.photos.length === 0) { expanded = false; shownDays = 0; }
+      }
     } catch {
-      if (mine === latest) loaded = { state: "error" };
+      if (mine !== latest) return;
+      if (soft && loaded.state === "ready") staleView = true; else loaded = { state: "error" };
+    } finally {
+      if (mine === latest) refreshing = false;
     }
   }
 
+  async function changed() {
+    onchanged?.();
+    await load(trip.id, true);
+  }
+
+  let setups = 0;
+  async function sync(id: number, me: number | null) {
+    const mine = ++setups;
+    checking = true;
+    try {
+      const ids = await actingPersons(trip, people, me);
+      if (mine !== setups) return;
+      actingProblem = ids === null;
+      const wanted = ids ?? (acting.length ? acting.map((a) => a.personId) : me === null ? [] : [me]);
+      for (const a of acting) if (!wanted.includes(a.personId)) a.dispose();
+      const next = wanted.map((who) => {
+        const kept = acting.find((a) => a.personId === who);
+        if (kept) { kept.relabel(me, people); return kept; }
+        return new PersonSharing(id, who, me, people, { changed });
+      });
+      acting = next;
+      await Promise.all(next.map((a) => a.load()));
+    } finally {
+      if (mine === setups) checking = false;
+    }
+  }
+
+  const changeKey = $derived(JSON.stringify([trip.id, trip.start_date, trip.end_date, [...trip.people].sort(), trip.segments.map((s) => [s.id, s.status, s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.details.address, s.details.state, s.itinerary]), people.map((p) => [p.id, p.member, p.first_name, p.display_name])]));
+  let seen: { id: number; key: string } | null = null;
+
   $effect(() => {
     const id = tripId;
+    const me = app.state?.person_id ?? null;
     if (!signedIn) return;
     untrack(() => void load(id));
+    untrack(() => void sync(id, me));
+    return () => untrack(() => {
+      setups++;
+      checking = false;
+      for (const a of acting) a.dispose();
+      acting = [];
+    });
+  });
+
+  $effect(() => {
+    const key = changeKey;
+    const id = tripId;
+    const me = app.state?.person_id ?? null;
+    const before = seen;
+    seen = { id, key };
+    if (!signedIn || before === null || before.id !== id || before.key === key) return;
+    untrack(() => {
+      void load(id, true);
+      void sync(id, me);
+    });
   });
 
   const ownerOf = (p: TripPhoto) => personName(people, p.person_id);
@@ -147,6 +218,23 @@
       {/if}
     </div>
 
+    {#if actingProblem}
+      <div class="flex flex-wrap items-center gap-3" role="alert">
+        <p class="text-muted-foreground">Couldn’t check which libraries you manage on this trip, so some sharing choices may be missing.</p>
+        <Button variant="outline" size="sm" disabled={checking} onclick={() => void sync(trip.id, app.state?.person_id ?? null)}>Try again</Button>
+      </div>
+    {/if}
+    {#if staleView}
+      <div class="flex flex-wrap items-center gap-3" role="alert">
+        <p class="text-muted-foreground">Couldn’t refresh the photos on this trip, so what shows may be out of date.</p>
+        <Button variant="outline" size="sm" disabled={refreshing} onclick={() => void load(trip.id, true)}>Try again</Button>
+      </div>
+    {/if}
+    {#each acting as a (a.personId)}
+      <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      <TripPhotoSharing sharing={a} tripName={trip.name} part="prompt" />
+    {/each}
+
     {#if loaded.state === "error"}
       <div class="flex flex-wrap items-center gap-3" role="status">
         <p class="text-muted-foreground">Couldn’t load the photos on this trip.</p>
@@ -160,8 +248,8 @@
     {:else if empty === "waiting"}
       <p class="text-muted-foreground">{waitingName ? `${waitingName}’s library` : "Your library"} is connected. The first sync finds your photos; then you choose whether, and with whom, to share them on each trip.</p>
     {:else if empty === "nothing"}
-      <p class="text-muted-foreground">No photos on this trip yet.</p>
-    {:else}
+      {#if !asking}<p class="text-muted-foreground">No photos on this trip yet.</p>{/if}
+    {:else if total > 0}
       <div id="trip-photos-gallery" bind:this={gallery}>
         {#if !expanded}
           <div class="flex gap-2 overflow-x-auto pb-1" data-testid="photo-strip">
@@ -199,8 +287,17 @@
         <p class="text-caption text-muted-foreground">{brokenOwners.map((n) => `${n}’s`).join(" and ")} photos can’t be loaded right now. They show again once Waypoint can reach their Immich.</p>
       {/if}
     {/if}
+    {#each acting as a (a.personId)}
+      <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
+    {/each}
+    {#each acting as a (a.personId)}
+      <TripPhotoSharing sharing={a} tripName={trip.name} part="card" />
+    {/each}
     <p class="sr-only" role="status">{announce}</p>
   </section>
+  {#each acting as a (a.personId)}
+    <TripPhotoSharing sharing={a} tripName={trip.name} part="dialog" />
+  {/each}
   <PhotoViewer bind:open={viewing} bind:index={at} {photos} {people} {segments} returnTo={() => opener} />
 {/if}
 

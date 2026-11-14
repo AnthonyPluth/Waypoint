@@ -1736,6 +1736,28 @@ describe("Trip summary", () => {
     expect(screen.getByTestId("trip-summary")).not.toHaveTextContent("Spain");
   });
 
+  it("asks for the numbers again, and for the photos, after the person shares their photos on the trip", async () => {
+    app.state = state({ person_id: 1 });
+    let asked = true;
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const sharing = (extra: object) => ({ state: "none", scope: null, count: 0, removed_count: 0, removed: [], window: { start: "2026-11-20T00:00:00+00:00", end: "2026-11-28T00:00:00+00:00" }, changed: null, audience: [1], sources: [], count_token: "a".repeat(32), ...extra });
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (String(path).includes("/photo-sharing")) return (opts?.method === "POST" ? (asked = false, sharing({ state: "shared", scope: "only_me", count: 4 })) : sharing(asked ? { state: "ask", count: 4 } : { state: "shared", scope: "only_me", count: 4 })) as never;
+      if (String(path).endsWith("/photos")) return { photos: [], clusters: [], counts: { total: 0, located: 0, inferred: 0, far: 0 }, people: [] } as never;
+      if (path === "/api/photo-sources") return { sources: [], permissions: [] } as never;
+      return answer(path, opts) as never;
+    });
+    render(TripPage);
+    await screen.findByTestId("trip-summary");
+    const summaries = () => vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary").length;
+    const photoLoads = () => vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/photos").length;
+    const before = [summaries(), photoLoads()];
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Share on this trip" }));
+    await waitFor(() => expect(summaries()).toBe(before[0] + 1));
+    expect(photoLoads()).toBe(before[1] + 1);
+    expect(await screen.findByRole("region", { name: "Your photos on this trip" })).toBeInTheDocument();
+  });
+
   it("drops the line when the numbers can’t be read again after an edit", async () => {
     render(TripPage);
     await screen.findByTestId("trip-summary");

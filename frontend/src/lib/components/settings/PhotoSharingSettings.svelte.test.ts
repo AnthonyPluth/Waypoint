@@ -11,7 +11,8 @@ import type { Person, PhotoGrantPerson, PhotoGrantTrip, PhotoSharing, PhotoSourc
 import { app } from "$lib/app.svelte";
 import { toast } from "svelte-sonner";
 import { state } from "../../../test/fixtures";
-import PhotoSharingSettings, { COULDNT_CHECK, NOTHING_YET, photosOf, tripLine, unsharedOf } from "./PhotoSharingSettings.svelte";
+import { COULDNT_CHECK, photosOf, unsharedOf } from "$lib/photo-sharing";
+import PhotoSharingSettings, { NOTHING_YET, tripLine } from "./PhotoSharingSettings.svelte";
 
 const user = userEvent.setup({ pointerEventsCheck: 0 });
 
