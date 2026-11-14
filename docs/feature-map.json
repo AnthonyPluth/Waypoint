@@ -302,7 +302,9 @@
       "method": "GET",
       "path": "/api/trips/{id}/summary",
       "handler": "waypoint/server/api/trips.py:api_trip_summary",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/TripSummary.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_access.py",
@@ -1011,6 +1013,7 @@
       "path": "/api/distance-unit",
       "handler": "waypoint/server/api/stats.py:api_distance_unit",
       "web": [
+        "frontend/src/lib/components/TripSummary.svelte",
         "frontend/src/lib/components/settings/DistanceSection.svelte"
       ],
       "tests": [
