@@ -9,7 +9,7 @@ from tests.test_mail_ai import ScanAiCase
 from tests.test_mail_scan import NOW
 from waypoint import tls
 from waypoint.domain import trips
-from waypoint.domain.mail import nothing_new, scan
+from waypoint.domain.mail import nothing_new, review, scan
 from waypoint.storage import db, stored_mail
 from waypoint.storage.models import ReviewItem, Segment, StoredMessage
 
@@ -27,6 +27,10 @@ EARLIER = "Sat, 10 Oct 2026 09:30:00 -0400"
 LATER = "Wed, 14 Oct 2026 09:30:00 -0400"
 SAME_DAY = "Mon, 12 Oct 2026 09:30:00 -0400"
 VERDICT = {"bookings": [], "not_a_booking": "promotion"}
+CHECK_IN = f"{REMINDER} Online check-in is open."
+CHANGED_TRIP_SUBJECTS = ("Your flight and hotel have been cancelled", "Schedule change for your flight and hotel", "Refund for your flight and hotel",
+                        "Your flight and hotel are delayed")
+CHANGED_SUBJECTS = ("Your flight has been cancelled", "Schedule change for your flight", "Refund for your flight", "Your flight is delayed")
 
 
 AGENT = "Agent Travel <trips@agent-travel.example>"
@@ -170,6 +174,32 @@ class MustStayInReviewTests(NothingNewCase):
                     conn.execute(ReviewItem.__table__.delete())
                 self.stays(line, SAME, name=f"c-{what}")
 
+    def test_a_change_stated_only_in_the_subject_keeps_an_identical_body_in_review(self):
+        for n, subject in enumerate(CHANGED_SUBJECTS):
+            with self.subTest(subject=subject):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.stays(CHECK_IN, SAME, name=f"subj-{n}", subject=subject)
+
+    def test_the_parsers_revision_signal_alone_keeps_it_in_review(self):
+        with mock.patch.object(scan.extract, "guard", return_value=("", True)):
+            self.stays(CHECK_IN, SAME, name="revises")
+
+    def test_a_harmless_subject_still_dismisses(self):
+        self.read_mail(CHECK_IN, SAME, subject="Your upcoming flight: online check-in is open")
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+
+    def test_a_named_passenger_without_a_seat_who_is_not_on_the_booking_keeps_it_in_review(self):
+        for n, who in enumerate(("Mia Rose Doe", "Alex Stranger", "Jane Doe and Alex Stranger")):
+            with self.subTest(who=who):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.stays(f"{CHECK_IN}\nPassenger: {who}", SAME, name=f"pax-{n}")
+
+    def test_a_named_passenger_already_on_the_booking_still_dismisses(self):
+        self.read_mail(f"{CHECK_IN}\nPassenger: Jane Doe", SAME)
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+
     def test_a_flight_nobody_can_see_is_not_known(self):
         self.add_flight(self.sam, "EX 777", "SM7777")
         self.stays("Your flight EX 777 from JFK to LHR departs on 20 November.", {**SAME, "flight_number": "EX 777"})
@@ -283,6 +313,22 @@ class OlderCopyTests(NothingNewCase):
                 self.assertEqual(self.counted(), (0, 0))
                 self.assertNotEqual(self.scanned()[f"o-{what}"], "unreadable")
 
+    def filed_directly(self, subject: str, name: str):
+        earlier = {**FULL, "start_local": "2026-11-20T18:00"}
+        with db.session() as conn:
+            review.add(conn, self.mailbox, name, "agent-travel.example", "2026-10-10", "no_markup", NOW)
+            return scan._file_ai(conn, self.mailbox, name, [earlier], None, None, NOW, signals=nothing_new.signals(OLD_TEXT, subject), dismiss_known=True)
+
+    def test_an_older_message_with_a_change_only_in_the_subject_is_not_dismissed_as_a_copy(self):
+        for n, subject in enumerate(CHANGED_SUBJECTS):
+            with self.subTest(subject=subject):
+                self.assertIsNone(self.filed_directly(subject, f"os-{n}").known)
+        self.assertEqual(self.filed_directly("Your upcoming flight", "os-ok").known, "older_copy")
+
+    def test_an_older_message_naming_a_passenger_who_is_not_on_the_booking_is_not_dismissed_as_a_copy(self):
+        self.read_mail(f"{OLD_TEXT}\nPassenger: Mia Rose Doe", {**FULL, "start_local": "2026-11-20T18:00"}, name="op", date=EARLIER, sender=AGENT)
+        self.assertEqual(self.counted(), (0, 0))
+
     def test_a_newer_message_with_a_different_time_is_not_dismissed(self):
         self.read_mail(OLD_TEXT, {**FULL, "start_local": "2026-11-20T21:30"}, date=LATER, sender=AGENT)
         self.assertEqual(self.counted(), (0, 0))
@@ -295,8 +341,22 @@ class OlderCopyTests(NothingNewCase):
 
 
 class NotTravelTests(NothingNewCase):
-    def plain(self, body: str, reply: dict, name: str):
-        return self.read_mail(body, reply, name=name, subject="Your trip: save on flights and hotels")
+    def plain(self, body: str, reply: dict, name: str, subject: str = "Your trip: save on flights and hotels"):
+        return self.read_mail(body, reply, name=name, subject=subject)
+
+    def test_a_verdict_on_an_email_whose_subject_states_a_change_stays(self):
+        for n, subject in enumerate(CHANGED_TRIP_SUBJECTS):
+            for category in ("promotion", "receipt"):
+                with self.subTest(subject=subject, category=category):
+                    with db.session() as conn:
+                        conn.execute(ReviewItem.__table__.delete())
+                    self.plain("Thank you for being a customer.", {"bookings": [], "not_a_booking": category}, f"vs-{n}-{category}", subject)
+                    self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+
+    def test_the_revision_signal_alone_keeps_a_verdict_in_review(self):
+        with mock.patch.object(scan.extract, "guard", return_value=("", True)):
+            self.plain("Thank you for being a customer.", VERDICT, "rv")
+        self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
 
     def test_marketing_a_receipt_and_a_notice_with_no_travel_details_are_dismissed_by_the_existing_count(self):
         for category in ("promotion", "statement", "newsletter", "receipt", "notification"):
@@ -390,6 +450,13 @@ class SignalTests(unittest.TestCase):
         self.assertTrue(nothing_new.signals("Leaves JFK (JFK)").travel)
         self.assertTrue(nothing_new.signals("Flight EX 101").travel)
         self.assertEqual(nothing_new.signals("Save big this week on everything"), nothing_new.Signals(False, False))
+        self.assertTrue(nothing_new.signals("Hello", "Your flight has been cancelled").change)
+        self.assertTrue(nothing_new.signals("Hello", "", True).change)
+
+    def test_named_passengers_are_picked_out_of_the_text(self):
+        self.assertEqual(nothing_new.signals("Passenger: Jane Doe 21C\nTraveller Mia Rose Doe and Alex Stranger").passengers,
+                         ("Jane Doe", "Mia Rose Doe", "Alex Stranger"))
+        self.assertEqual(nothing_new.signals("No names here").passengers, ())
 
     def test_the_summary_keeps_its_counts_through_storage_and_old_summaries_read_as_zero(self):
         found = scan.Summary(3, 3, 0, 0, 0, False, dismissed=1, dismissed_known=2, dismissed_older=1)

@@ -23,14 +23,21 @@ TRAVEL_WORDS = re.compile(
 TRAVEL_CODES = re.compile(r"\([A-Z]{3}\)|\b[A-Z][A-Z0-9] ?\d{2,4}\b")
 
 
+PASSENGER = re.compile(r"(?i)\b(?:passengers?|travell?ers?|guests?)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
+JOINED = re.compile(r"(?i)\s+(?:and|&)\s+")
+
+
 @dataclass(frozen=True)
 class Signals:
     change: bool
     travel: bool
+    passengers: tuple[str, ...] = ()
 
 
-def signals(text: str) -> Signals:
-    return Signals(change=bool(CHANGE.search(text)), travel=bool(TRAVEL_WORDS.search(text) or TRAVEL_CODES.search(text)))
+def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
+    whole = f"{subject}\n{text}"
+    named = tuple(dict.fromkeys(n for m in PASSENGER.finditer(whole) for part in JOINED.split(m[1]) if (n := " ".join(part.split()))))
+    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)), passengers=named)
 
 
 def _day(local: str | None) -> str:
@@ -112,14 +119,22 @@ def adds_nothing(conn: db.Connection, seg: Segment, said: ai.Suggestion) -> bool
     return _held_by(conn, seg, said, stored)
 
 
-def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None) -> Reason | None:
+def _names_held(conn: db.Connection, seg: Segment, passengers: tuple[str, ...]) -> bool:
+    if not passengers:
+        return True
+    held = {trips._who(h) for h in trips.effective_travelers(conn, seg)}
+    return all(trips._who(t) in held for t in ingest.travelers(conn, tuple(Passenger(n) for n in passengers)))
+
+
+def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
+           passengers: tuple[str, ...] = ()) -> Reason | None:
     if fields is not None:
         decision = newer.decide(conn, viewer, fields, received, False)
         if decision is not None and decision.action == "older":
             same = _same_reservations(conn, viewer, fields)
-            if [s.id for s in same] == [decision.segment_id]:
+            if [s.id for s in same] == [decision.segment_id] and _names_held(conn, same[0], passengers):
                 return "older_copy"
     found = _matches(conn, viewer, said, fields)
-    if len(found) == 1 and found[0].status == "confirmed" and adds_nothing(conn, found[0], said):
+    if len(found) == 1 and found[0].status == "confirmed" and adds_nothing(conn, found[0], said) and _names_held(conn, found[0], passengers):
         return "already_known"
     return None

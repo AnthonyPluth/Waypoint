@@ -387,7 +387,7 @@ def suggest_now(owner: str, item_id: int, now: float) -> str | None:
         kept = None if mine else stored_mail.get(conn, mailbox_id, message_id)
         token = None if mine or kept is not None else gmail.access_token(conn, mailbox_id, time.time())
     if kept is not None:
-        return _ask(mailbox_id, message_id, kept["text"], now)
+        return _ask(mailbox_id, message_id, kept["text"], now, kept["subject"] or "")
     if token is not None:
         return _suggest(mailbox_id, message_id, gmail.fetch(token, message_id), now)
     return _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
@@ -402,11 +402,11 @@ class Read(NamedTuple):
     signals: nothing_new.Signals | None = None
 
 
-def _read(cfg: ai.Config, text: str, timeout: float | None = None) -> Read:
+def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str = "", revises: bool = False) -> Read:
     try:
         reading = ai.suggest(cfg, text, timeout)
         return Read(reading.bookings, reading.error, False, reading.not_a_booking, max(reading.parking, _parking_in(reading.bookings)),
-                    nothing_new.signals(text))
+                    nothing_new.signals(text, subject, revises))
     except ai.AiError as e:
         return Read([], str(e), str(e) != ai.NO_BOOKING and not e.retried)
     except Exception as e:
@@ -416,16 +416,17 @@ def _read(cfg: ai.Config, text: str, timeout: float | None = None) -> Read:
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> str | None:
     content = keep_message(mailbox_id, message_id, raw, [], now)
-    return _ask(mailbox_id, message_id, content["text"], now)
+    subject, revises = extract.guard(raw)
+    return _ask(mailbox_id, message_id, content["text"], now, subject, revises)
 
 
-def _ask(mailbox_id: int, message_id: str, text: str, now: float) -> str | None:
+def _ask(mailbox_id: int, message_id: str, text: str, now: float, subject: str = "", revises: bool = False) -> str | None:
     with db.session() as conn:
         cfg = ai.mail_config(conn)
         asking = not review.is_match(conn, mailbox_id, message_id)
     if cfg is None or not asking:
         return None
-    read = _read(cfg, text)
+    read = _read(cfg, text, None, subject, revises)
     with db.session() as conn:
         filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.not_a_booking, read.parking,
                          signals=read.signals)
@@ -503,7 +504,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         _record(conn, mailbox_id, message_id, UNREADABLE, now)
         return Filed(cleared=1, dismissed=1)
     if dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change:
-        reasons = [nothing_new.assess(conn, viewer, s, _ai_fields(conn, s), row["received"]) for s in suggestions]
+        reasons = [nothing_new.assess(conn, viewer, s, _ai_fields(conn, s), row["received"], signals.passengers) for s in suggestions]
         if all(reasons):
             review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
             _record(conn, mailbox_id, message_id, UNREADABLE, now)
@@ -600,7 +601,8 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         if left <= 0:
             return asked, made, cleared, dismissed
         asked += 1
-        read = _read(cfg, extract.plain_text(raw), left)
+        subject, revises = extract.guard(raw)
+        read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
             filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(), read.not_a_booking,
                              read.parking, signals=read.signals, dismiss_known=True)

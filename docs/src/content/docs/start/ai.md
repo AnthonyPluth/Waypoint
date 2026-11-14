@@ -42,7 +42,7 @@ When the AI finds no booking in a message and judges it plainly not about a book
 - **Ask AI** takes the item off the list and says why, for example “Dismissed: a promotion, not a booking.”
 - A scan counts these in the mailbox’s last-scan line in Settings (“AI dismissed 3 emails as not bookings”), never with a subject, sender or text.
 - Only that one item is dismissed, not others that Review groups with it. The stored copy of the email is deleted, as for any dismissal, and the scan remembers the message so it isn’t queued again.
-- The model proposes and Waypoint decides: even with the verdict, an email whose text has a time of day, a confirmation or reservation label, an airport code in brackets, a flight number, a passenger, check-in or check-out, a departure or arrival, a pick-up or drop-off, or any word about a cancellation, change, refund, delay, gate, terminal or seat stays in Review.
+- The model proposes and Waypoint decides: even with the verdict, an email whose text has a time of day, a confirmation or reservation label, an airport code in brackets, a flight number, a passenger, check-in or check-out, a departure or arrival, a pick-up or drop-off, or any word about a cancellation, change, refund, delay, gate, terminal or seat, in the text or the subject, stays in Review.
 - Only an answer with no bookings at all and that verdict dismisses anything. “No booking found” without the verdict leaves the item in Review as before, and so does an error, a timeout, an answer Waypoint can’t read or a result with a booking in it. The model is told to leave the verdict out for a confirmation, a cancellation, a change, a reminder or anything about a trip, and whenever it is unsure.
 
 An AI assistant connected over [MCP](/Waypoint/start/mcp/) never dismisses this way: it still asks you before every change.
@@ -55,7 +55,8 @@ An email is dismissed this way only when all of these hold:
 
 - Every booking the model found matches exactly one booking you can see, that is still confirmed. A flight matches on its flight number and its date and at least one airport; any other booking matches on its confirmation code and its dates. A match that is unsure, a booking nobody you share it with can see, or two bookings that both fit leaves the email in Review.
 - Every field the email states is already saved on the booking, the same: times, airports, flight number, confirmation, company, cabin, address, phone, price, and each traveller on their own seat. A different or new field, a new traveller or a new price keeps it in Review.
-- The email’s text has no word about a cancellation, change, refund, delay, gate, terminal, seat or boarding.
+- Neither the email’s text nor its subject has a word about a cancellation, change, refund, delay, gate, terminal, seat or boarding, and the reader that looks for changes in mail found none. The subject is checked by Waypoint only and is not sent to the model.
+- Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat. A name Waypoint can’t place on the booking keeps it in Review.
 - The model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
 
 A message dated before the newest email already kept for the booking is dismissed as an older copy, by the same rule as when a newer email replaces an older one ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)), whatever times it states.
