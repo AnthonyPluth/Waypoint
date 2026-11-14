@@ -48,7 +48,7 @@ describe("SideNav", () => {
     const chip = screen.getByTestId("side-user");
     expect(links[links.length - 1]).toBe(chip);
     expect(chip.getAttribute("href")).toBe("#settings");
-    expect(chip.getAttribute("aria-label")).toBe("Signed in as Demo Person");
+    expect(screen.getByRole("link", { name: "Signed in as Demo Person" })).toBe(chip);
     expect(chip.textContent).toContain("Signed in");
     expect(chip.textContent).toContain("DP");
   });

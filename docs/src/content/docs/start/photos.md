@@ -59,6 +59,12 @@ Only you can share, remove or stop sharing your own photos. A person without a s
 
 A trip page shows the photos shared on it that you may see, in the order they were taken, each with the wall-clock time where it was taken (the time zone comes with the photo when Immich knows it, otherwise from the booking the photo is nearest to) and the booking it is nearest to. A photo with no location of its own is placed from the itinerary (the stay or rental under way when it was taken) and marked as such. A photo taken far from every booking of its trip is still shown, with a flag, until its person accepts, moves or removes it.
 
+The **Photos** section sits between the route map and the bookings, once you are signed in (photos are off in local mode). It opens as a strip of the trip's first photos, with a last tile that says how many more there are; that tile or **See all** opens the gallery in place, grouped by the local day each photo was taken, each day headed with its date, the day of the trip, the places of its bookings and how many photos it has. **Show more days** adds the next days (they also load as you scroll), and **Show fewer** goes back to the strip. A photo far from every booking has an amber **Far** tag, a photo placed from the itinerary a hollow ring, and a video a play mark.
+
+Tap a photo to open the viewer: the photo or the video's still (with **Play video**), the time where it was taken (never converted to your own zone), where it was taken and where that came from, whose library it is from, and **Open original**, which opens the original through Waypoint in a new tab. Move between photos with **Previous photo** and **Next photo**, the arrow keys or a sideways swipe; **Close**, Escape or a swipe down leaves it, back on the photo you opened. A photo that can't be loaded says so, with **Retry**.
+
+With no library connected, a trip that has started points you to **Connect a library in Settings**; while your library has not synced yet the section says so, and a trip with no photos says **No photos on this trip yet.**
+
 For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
 
 ## Needs a look

@@ -347,6 +347,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Check-in`, `Pick-up`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
 
+#### `trip-photos`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Denver`, `See all`, `km from every booking`.
+- **Expects to see:** `Trips`, `13`, `Day 1`, `Far from the trip’s bookings`, `12 of 13`.
+- **Drive it:** `tools/control flow trip-photos`; or `poetry run python run.py verify --flow trip-photos`.
+
 #### `trip-route-replay-backtrack`
 
 - **Starts at:** `#trips`.
@@ -453,6 +461,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `London`, `Add address`, `Time zone`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow zone-search-trip`; or `poetry run python run.py verify --flow zone-search-trip`.
+
+## trip (`trip`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** not in the navigation (it keeps Trips lit); URL `#trip`; control `tools/control goto trip`.
+- **Drive it:** `tools/control goto trip`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"`.
 
 ## Stats (`stats`)
 

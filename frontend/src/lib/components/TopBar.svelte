@@ -13,8 +13,8 @@
       <Logo />Waypoint
     </a>
     {#if who}
-      <a href="#settings" title={who} aria-label={`Signed in as ${who}`}
-        class="flex size-9 phone:size-11 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-elevation-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">{initials(who)}</a>
+      <a href="#settings" title={who}
+        class="flex size-9 phone:size-11 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-elevation-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"><span aria-hidden="true">{initials(who)}</span><span class="sr-only">Signed in as {who}</span></a>
     {/if}
   </div>
 </header>

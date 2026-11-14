@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, OPENED_PAGES, pageBase, SIGNED_PAGES, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -113,7 +113,15 @@ describe("flowProblems", () => {
     expect(flowProblems(ok)).toEqual([]);
   });
 
-  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"]));
+  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"]));
+
+  it("opens the trip page on the signed-in server, from the trips list", () => {
+    expect(SIGNED_PAGES).toEqual(["trip"]);
+    expect(OPENED_PAGES.trip.from).toBe("trips");
+    expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trip")).toBe("http://b");
+    expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trips")).toBe("http://a");
+    expect(() => pageBase({ base: "http://a" }, "trip")).toThrow("page trip needs the signed-in demo server");
+  });
 });
 
 describe("screenshotFile", () => {

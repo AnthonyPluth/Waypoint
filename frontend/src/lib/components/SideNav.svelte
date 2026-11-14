@@ -17,13 +17,14 @@
     {#each NAV as item (item.page)}<NavLink {item} current={current === item.page} />{/each}
   </nav>
   {#if who}
-    <a href="#settings" title={who} aria-label={`Signed in as ${who}`} data-testid="side-user"
+    <a href="#settings" title={who} data-testid="side-user"
       class="mt-auto flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 transition-colors outline-none hover:bg-sidebar-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50">
       <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground" aria-hidden="true">{initials(who)}</span>
       <span class="flex min-w-0 flex-col" aria-hidden="true">
         <span class="truncate text-sm font-medium text-sidebar-foreground">{who}</span>
         <span class="text-xs text-muted-foreground">Signed in</span>
       </span>
+      <span class="sr-only">Signed in as {who}</span>
     </a>
   {/if}
 </aside>

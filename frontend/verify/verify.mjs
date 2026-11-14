@@ -16,8 +16,10 @@ export const contextOptions = (viewport, { reducedMotion = "no-preference", phon
 export const prepareContext = (ctx, now) => ctx.clock.setFixedTime(now);
 export const SETTLE_MS = 300;
 export const FROZEN_NOW = "2026-06-15T12:00:00Z";
-export const PAGES = ["upcoming", "trips", "stats", "people", "review", "settings", "design", "oauth-approve"];
+export const PAGES = ["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"];
 export const OWN_PAGES = ["oauth-approve"];
+export const SIGNED_PAGES = ["trip"];
+export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["section[aria-label='Route replay'] [data-testid='replay-map']", "[data-testid='photo-strip'] img"], still: "input[aria-label='Position along the route']" } };
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -354,6 +356,24 @@ export function baseFor(env, flow) {
   return env.signedBase;
 }
 
+export function pageBase(env, name) {
+  if (!SIGNED_PAGES.includes(name)) return env.base;
+  if (!env.signedBase) throw new Error(`page ${name} needs the signed-in demo server, which this run didn't start (make verify starts it for this page)`);
+  return env.signedBase;
+}
+
+async function openPage(page, base, name) {
+  const opened = OPENED_PAGES[name];
+  await page.goto(`${base}/#${opened ? opened.from : name}`, { waitUntil: "networkidle" });
+  if (!opened) return;
+  await page.locator(opened.open).first().click();
+  for (const ready of opened.ready) await page.locator(ready).first().waitFor({ timeout: 30000 });
+  await page.locator(opened.still).first().press("End");
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+  await page.waitForFunction(() => [...document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); }), undefined, { timeout: 10000 });
+  await page.waitForLoadState("networkidle");
+}
+
 export function runVisit(env, v) {
   const { approveUrl } = env;
   if (v.kind === "flow") {
@@ -377,7 +397,7 @@ export function runVisit(env, v) {
   }
   if (v.kind === "reduced") {
     return visit(env, `reduced motion ${v.name}`, v.viewport, async (page) => {
-      await page.goto(`${env.base}/#${v.name}`, { waitUntil: "networkidle" });
+      await openPage(page, pageBase(env, v.name), v.name);
       const moving = await animationsRunning(page);
       if (moving.length) throw new Error(`animations still run under prefers-reduced-motion: ${moving.slice(0, 5).join(", ")}`);
     }, { audit: false, reducedMotion: "reduce" });
@@ -388,10 +408,12 @@ export function runVisit(env, v) {
       if (!approveUrl) throw new Error("no approval page: seeding the demo assistants failed");
       await page.goto(approveUrl, { waitUntil: "networkidle" });
       await page.locator("button[value=allow]").waitFor({ timeout: 10000 });
+    } else if (SIGNED_PAGES.includes(v.name)) {
+      await openPage(page, localBase(pageBase(env, v.name)), v.name);
     } else {
       await setUpOffline(page, base);
       await page.goto("about:blank");
-      await page.goto(`${localBase(base)}/#${v.name}`, { waitUntil: "networkidle" });
+      await openPage(page, localBase(base), v.name);
     }
     await shot(v.name, env.images, true);
   });
@@ -452,6 +474,10 @@ async function main() {
       catch (e) { startup.push({ worker, reason: `seeding the demo assistants: ${String(e.message).split("\n")[0]}` }); }
       try { await warmMaps(browser, base); }
       catch (e) { startup.push({ worker, reason: `warming the map data: ${String(e.message).split("\n")[0]}` }); }
+      if (signedBase && worker === 0) {
+        try { await warmMaps(browser, signedBase); }
+        catch (e) { startup.push({ worker, reason: `warming the map data on the signed-in server: ${String(e.message).split("\n")[0]}` }); }
+      }
       if (mapkitBase && worker === 0) {
         try { await warmMaps(browser, mapkitBase); }
         catch (e) { startup.push({ worker, reason: `warming the map data on the MapKit server: ${String(e.message).split("\n")[0]}` }); }

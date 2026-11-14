@@ -36,13 +36,13 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/trips/{id}/merge` | `trips.py:api_trip_merge` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/split` | `trips.py:api_trip_split` | - | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/destination/suggest` | `trips.py:api_trip_destination_suggest` | `lib/components/TripDetails.svelte` | `test_api_contract.py`, `test_trip_destination.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `GET /api/trips/{id}/photos` | `photos.py:api_trip_photos` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/trips/{id}/photos` | `photos.py:api_trip_photos` | `lib/components/TripPhotos.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/photos/review` | `photos.py:api_photo_review` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_verify_identity.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photos/{id}` | `photos.py:api_photo_decide` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/photos/{id}/thumbnail` | `photos.py:api_photo_thumbnail` | - | `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/photos/{id}/preview` | `photos.py:api_photo_preview` | - | `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
 | `GET /api/photos/{id}/original` | `photos.py:api_photo_original` | - | `test_photo_access.py`, `test_photo_proxy.py` | [start/photos](/Waypoint/start/photos/) |
-| `GET /api/photo-sources` | `photos.py:api_photo_sources` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
+| `GET /api/photo-sources` | `photos.py:api_photo_sources` | `lib/components/TripPhotos.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources` | `photos.py:api_photo_source_add` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/test` | `photos.py:api_photo_source_test_new` | - | `test_api_contract.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sources/{id}` | `photos.py:api_photo_source_edit` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_sources.py` | [start/photos](/Waypoint/start/photos/) |
