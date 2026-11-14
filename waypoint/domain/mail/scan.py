@@ -503,8 +503,9 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
         _record(conn, mailbox_id, message_id, UNREADABLE, now)
         return Filed(cleared=1, dismissed=1)
-    if dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change:
-        reasons = [nothing_new.assess(conn, viewer, s, _ai_fields(conn, s), row["received"], signals.passengers) for s in suggestions]
+    if (dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change
+            and nothing_new.covers(signals, suggestions)):
+        reasons = [nothing_new.assess(conn, viewer, s, _ai_fields(conn, s), row["received"], signals) for s in suggestions]
         if all(reasons):
             review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
             _record(conn, mailbox_id, message_id, UNREADABLE, now)

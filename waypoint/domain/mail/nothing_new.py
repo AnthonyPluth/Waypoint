@@ -8,7 +8,7 @@ from ...storage import db
 from ...storage.models import Segment
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai, ingest, newer
+from . import ai, ingest, newer, references
 from .booking import Passenger
 
 Reason = Literal["already_known", "older_copy"]
@@ -23,6 +23,12 @@ TRAVEL_WORDS = re.compile(
 TRAVEL_CODES = re.compile(r"\([A-Z]{3}\)|\b[A-Z][A-Z0-9] ?\d{2,4}\b")
 
 
+UNCOMPARED = re.compile(
+    r"(?i)\bticket\b|\bfrequent flyer\b|\bloyalty\b|\bmember(?:ship)?\b|\bmiles\b|\bknown traveler\b|\bktn\b|\bbag\w*|\bluggage\b|\bmeals?\b|\blounge\b|"
+    r"\bitinerary\b|\bport of call\b|\blayover\b|\bstopover\b|\bconnection\b|\bmanage\b|https?://|\bwww\.|\btotal\b|\bamount\b|\bpaid\b|\bcharged?\b|\bfare\b|\bprice\b|"
+    r"[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d|\d\s?(?:USD|EUR|GBP|CAD|AUD)\b|\bnotes?\b|\binstructions?\b")
+FLIGHT_TOKEN = re.compile(r"\b([A-Z]{2}|[A-Z]\d|\d[A-Z]) ?(\d{1,4})\b")
+MONTHS = frozenset({"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"})
 PASSENGER = re.compile(r"(?i)\b(?:passengers?|travell?ers?|guests?)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
 JOINED = re.compile(r"(?i)\s+(?:and|&)\s+")
 
@@ -32,12 +38,17 @@ class Signals:
     change: bool
     travel: bool
     passengers: tuple[str, ...] = ()
+    uncompared: bool = False
+    flights: frozenset[str] = frozenset()
+    codes: frozenset[str] = frozenset()
 
 
 def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     whole = f"{subject}\n{text}"
     named = tuple(dict.fromkeys(n for m in PASSENGER.finditer(whole) for part in JOINED.split(m[1]) if (n := " ".join(part.split()))))
-    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)), passengers=named)
+    flights = frozenset(f"{m[1]}{m[2]}" for m in FLIGHT_TOKEN.finditer(whole) if m[1] not in MONTHS)
+    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)), passengers=named,
+                   uncompared=bool(UNCOMPARED.search(whole)), flights=flights, codes=references.labelled(whole))
 
 
 def _day(local: str | None) -> str:
@@ -79,28 +90,28 @@ def _matches(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: t
     return [s for s in _same_reservations(conn, viewer, fields) if _day(s.start_local) == _day(fields.get("start_local"))]
 
 
-def _held_by(conn: db.Connection, seg: Segment, said: ai.Suggestion, stored: dict[str, str]) -> bool:
+def _held_by(conn: db.Connection, seg: Segment, said: ai.Suggestion, stored: dict[str, str], seats: bool = True) -> bool:
     held = trips.effective_travelers(conn, seg)
     wanted = said.get("travelers") or []
     named = ingest.travelers(conn, tuple(Passenger(t["name"]) for t in wanted))
     for want, listed in zip(named, wanted, strict=True):
         mine = next((h for h in held if trips._who(h) == trips._who(want)), None)
         seat = (mine.get("seat") if mine is not None else None) or (stored.get("seat") if len(held) == 1 else None)
-        if mine is None or (listed["seat"] and (seat or "").upper() != listed["seat"].upper()):
+        if mine is None or (seats and listed["seat"] and (seat or "").upper() != listed["seat"].upper()):
             return False
     return True
 
 
-def adds_nothing(conn: db.Connection, seg: Segment, said: ai.Suggestion) -> bool:
+def adds_nothing(conn: db.Connection, seg: Segment, said: ai.Suggestion, superseded: bool = False) -> bool:
     stored = trips.decode_details(seg.details)
     times = ((said.get("start_local"), seg.start_local), (said.get("end_local"), seg.end_local))
     zones = ((said.get("start_zone"), seg.start_zone), (said.get("end_zone"), seg.end_zone))
     places = ((said.get("origin"), seg.origin), (said.get("destination"), seg.destination))
-    if any(told and _minute(told) != _minute(held) for told, held in times):
+    if not superseded and any(told and _minute(told) != _minute(held) for told, held in times):
         return False
-    if any(told and told != held for told, held in zones):
+    if not superseded and any(told and told != held for told, held in zones):
         return False
-    if any(told and trips._text_key(told) != trips._text_key(held) for told, held in places):
+    if not superseded and any(told and trips._text_key(told) != trips._text_key(held) for told, held in places):
         return False
     if said.get("confirmation") and not (seg.confirmation and trips._code_key(said["confirmation"]) == trips._code_key(seg.confirmation)):
         return False
@@ -116,7 +127,7 @@ def adds_nothing(conn: db.Connection, seg: Segment, said: ai.Suggestion) -> bool
         return False
     if said.get("price_minor") is not None and (seg.price_minor != said["price_minor"] or seg.price_currency != said.get("price_currency")):
         return False
-    return _held_by(conn, seg, said, stored)
+    return _held_by(conn, seg, said, stored, not superseded)
 
 
 def _names_held(conn: db.Connection, seg: Segment, passengers: tuple[str, ...]) -> bool:
@@ -126,15 +137,26 @@ def _names_held(conn: db.Connection, seg: Segment, passengers: tuple[str, ...]) 
     return all(trips._who(t) in held for t in ingest.travelers(conn, tuple(Passenger(n) for n in passengers)))
 
 
+def covers(sign: Signals, suggestions: list[ai.Suggestion]) -> bool:
+    told = {k for s in suggestions if (k := trips.flight_key(s.get("flight_number"))) is not None}
+    return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told
+
+
 def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
-           passengers: tuple[str, ...] = ()) -> Reason | None:
+           sign: Signals) -> Reason | None:
     if fields is not None:
         decision = newer.decide(conn, viewer, fields, received, False)
         if decision is not None and decision.action == "older":
             same = _same_reservations(conn, viewer, fields)
-            if [s.id for s in same] == [decision.segment_id] and _names_held(conn, same[0], passengers):
+            if [s.id for s in same] == [decision.segment_id] and _fully_held(conn, same[0], said, sign, True):
                 return "older_copy"
     found = _matches(conn, viewer, said, fields)
-    if len(found) == 1 and found[0].status == "confirmed" and adds_nothing(conn, found[0], said) and _names_held(conn, found[0], passengers):
+    if len(found) == 1 and found[0].status == "confirmed" and _fully_held(conn, found[0], said, sign, False):
         return "already_known"
     return None
+
+
+def _fully_held(conn: db.Connection, seg: Segment, said: ai.Suggestion, sign: Signals, superseded: bool) -> bool:
+    mine = {references.normal(c) for c in (said.get("confirmation"), seg.confirmation) if c}
+    return (not sign.uncompared and {references.normal(c) for c in sign.codes} <= mine and adds_nothing(conn, seg, said, superseded)
+            and _names_held(conn, seg, sign.passengers))

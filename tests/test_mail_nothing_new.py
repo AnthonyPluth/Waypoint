@@ -75,6 +75,12 @@ class NothingNewCase(ScanAiCase):
                   "end_local": "2026-11-21T07:10", "end_zone": "Europe/London", "details": {"flight_number": number}, **changes}
         return self.read(lambda conn: trips.add_segment(conn, viewer, fields))
 
+    def assess(self, said, received=None, convert=False, sign=nothing_new.Signals(False, False)):
+        def run(conn):
+            fields = scan._ai_fields(conn, said) if convert else None
+            return nothing_new.assess(conn, self.jane, said, fields, received, sign)
+        return self.read(run)
+
     def edit_known(self, **changes):
         self.read(lambda conn: trips.edit_segment(conn, self.jane, self.known["id"], changes))
 
@@ -386,12 +392,6 @@ class NotTravelTests(NothingNewCase):
 
 
 class ComparisonTests(NothingNewCase):
-    def assess(self, said, received=None, convert=False):
-        def run(conn):
-            fields = scan._ai_fields(conn, said) if convert else None
-            return nothing_new.assess(conn, self.jane, said, fields, received)
-        return self.read(run)
-
     def test_every_field_the_email_states_must_already_be_held(self):
         self.assertEqual(self.assess(SAME), "already_known")
         differing = {"confirmation": "ZZ9Y8X", "address": "1 Quay Road", "phone": "+44 117 555 0100", "room": "4401", "ship": "Example Star",
@@ -440,6 +440,73 @@ class ComparisonTests(NothingNewCase):
         self.assertEqual(self.assess(FULL, received="2026-10-10", convert=True), "already_known")
         self.assertIsNone(self.assess({**FULL, "start_local": "2026-11-20T21:30"}, received="2026-10-14", convert=True))
         self.assertIsNone(self.assess({**FULL, "start_local": "2026-11-20T21:30"}, received=None, convert=True))
+
+
+class OlderCopyComparisonTests(NothingNewCase):
+    EARLIER_TIMES = {**FULL, "start_local": "2026-11-20T18:00", "end_local": "2026-11-21T06:10"}
+
+    def older(self, **more):
+        return self.assess({**self.EARLIER_TIMES, **more}, received="2026-10-10", convert=True)
+
+    def test_an_older_copy_that_adds_nothing_but_superseded_times_is_dismissed(self):
+        self.assertEqual(self.older(), "older_copy")
+        self.assertEqual(self.older(start_zone="America/New_York", end_zone="Europe/London", cabin="Economy"), "older_copy")
+
+    def test_an_older_copy_with_another_seat_for_a_known_traveller_is_still_a_copy(self):
+        self.assertEqual(self.older(travelers=[{"name": "Jane Doe", "seat": "30A"}]), "older_copy")
+
+    def test_an_older_copy_that_states_anything_the_booking_lacks_is_kept(self):
+        extras = {"price": {"price_minor": 12000, "price_currency": "USD"}, "cabin": {"cabin": "Business"}, "company": {"provider": "Other Air"},
+                  "traveller": {"travelers": [{"name": "Mia Rose Doe", "seat": "14B"}]}, "address": {"address": "1 Quay Road"},
+                  "phone": {"phone": "+44 117 555 0100"}, "confirmation": {"confirmation": "ZZ9Y8X"}, "number": {"flight_number": "EX 102"}}
+        for what, more in extras.items():
+            with self.subTest(what=what):
+                self.assertIsNone(self.older(**more))
+
+    def test_an_older_copy_with_a_total_the_booking_already_holds_is_dismissed(self):
+        self.read(lambda conn: trips.edit_segment(conn, self.jane, self.known["id"], {"price": {"amount_minor": 12000, "currency": "USD"}}))
+        self.assertEqual(self.older(price_minor=12000, price_currency="USD"), "older_copy")
+        self.assertIsNone(self.older(price_minor=13000, price_currency="USD"))
+
+    def test_an_older_confirmation_with_a_total_is_filed_by_the_merge_path_and_the_cost_is_saved(self):
+        self.read_mail(f"{OLD_TEXT} Total USD 120.00", {**self.EARLIER_TIMES, "total": "120.00", "currency": "USD"}, date=EARLIER, sender=AGENT)
+        self.assertEqual(self.counted(), (0, 0))
+        self.assertNotEqual(self.scanned()["reminder"], "unreadable")
+        self.assertEqual(self.segments()[0]["price"], {"amount_minor": 12000, "currency": "USD", "source": "email"})
+
+    def test_names_codes_flights_and_unextracted_details_the_comparison_cannot_see_keep_an_email(self):
+        sign = nothing_new.signals
+        self.assertIsNone(self.assess(SAME, sign=sign("Passenger: Alex Stranger")))
+        self.assertIsNone(self.assess(SAME, sign=sign("Confirmation code ZZ9Y8X")))
+        self.assertEqual(self.assess(SAME, sign=sign("Confirmation code QX7M2K")), "already_known")
+        self.assertIsNone(self.assess(SAME, sign=sign("Your ticket is 0161234567890")))
+
+
+class UnextractedDetailTests(NothingNewCase):
+    def test_details_the_model_never_extracts_keep_an_identical_reminder_in_review(self):
+        lines = {"ticket": "Ticket number 0161234567890.", "loyalty": "Frequent flyer number ZZ12345.", "baggage": "Baggage: 2 checked bags.",
+                 "link": "Manage it at https://example-air.example/trip/abc.", "total": "Total paid USD 120.00.", "meal": "Your meal choice is vegetarian.",
+                 "itinerary": "See your itinerary for connections."}
+        for what, line in lines.items():
+            with self.subTest(what=what):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN}\n{line}", SAME, name=f"u-{what}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_a_second_flight_in_the_text_the_model_did_not_return_keeps_it(self):
+        result = self.read_mail(f"{CHECK_IN} Return flight EX 102 from LHR to JFK departs on 27 November.", SAME, name="return")
+        self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_a_confirmation_code_that_is_not_the_matched_bookings_keeps_it(self):
+        self.read_mail(f"{CHECK_IN} Confirmation code: ZZ9Y8X", SAME, name="code")
+        self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+
+    def test_covers_compares_the_flight_numbers_in_the_text_with_those_returned(self):
+        both = [SAME, {**SAME, "flight_number": "EX 102"}]
+        self.assertTrue(nothing_new.covers(nothing_new.signals("Flight EX 101 and EX 102 on 20 NOV"), both))
+        self.assertFalse(nothing_new.covers(nothing_new.signals("Flight EX 101 and EX 102"), [SAME]))
+        self.assertTrue(nothing_new.covers(nothing_new.signals("Nothing here"), [SAME]))
 
 
 class SignalTests(unittest.TestCase):

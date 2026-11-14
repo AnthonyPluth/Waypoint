@@ -57,9 +57,10 @@ An email is dismissed this way only when all of these hold:
 - Every field the email states is already saved on the booking, the same: times, airports, flight number, confirmation, company, cabin, address, phone, price, and each traveller on their own seat. A different or new field, a new traveller or a new price keeps it in Review.
 - Neither the email’s text nor its subject has a word about a cancellation, change, refund, delay, gate, terminal, seat or boarding, and the reader that looks for changes in mail found none. The subject is checked by Waypoint only and is not sent to the model.
 - Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat. A name Waypoint can’t place on the booking keeps it in Review.
+- The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price or total, link, itinerary or note, no flight number the model didn’t return, and no confirmation code other than the booking’s own. Any of these keeps it in Review, because dismissing deletes the only stored copy.
 - The model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
 
-A message dated before the newest email already kept for the booking is dismissed as an older copy, by the same rule as when a newer email replaces an older one ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)), whatever times it states.
+A message dated before the newest email already kept for the booking is dismissed as an older copy, by the same rule as when a newer email replaces an older one ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)), whatever times, airports and seats it states. Everything else it states (a total, a company, a cabin, an address, a traveller) must already be on the booking, or it stays in Review.
 
 The mailbox’s last-scan line in Settings counts these with the reason, “already known” or “older than a saved copy” (“AI dismissed 3 emails as nothing new (2 already known, 1 older than a saved copy)”), and the log carries the same counts. Never a subject, sender or text.
 
