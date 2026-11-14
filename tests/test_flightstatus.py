@@ -3,6 +3,7 @@ import os
 import threading
 import unittest
 import urllib.error
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -46,6 +47,36 @@ def status(name: str, origin: str | None = None) -> service.Status:
 
 
 FLIGHT = flightstatus.Flight("EX101", "2026-11-20", "JFK", DEPARTS, ARRIVES)
+ON_TIME = status("on_time")
+DEPARTED = status("departed")
+LANDED = status("landed")
+
+
+def delayed(hours: int = 0, minutes: int = 0) -> service.Status:
+    by = timedelta(hours=hours, minutes=minutes)
+    return replace(ON_TIME, state="delayed", dep_estimated=(datetime(2026, 11, 20, 19, 0) + by).isoformat(timespec="minutes"),
+                   arr_estimated=(datetime(2026, 11, 21, 7, 10) + by).isoformat(timespec="minutes"))
+
+
+def late_by(body, hours: int):
+    flight = json.loads(json.dumps(body))[0]
+    flight["status"] = "Delayed"
+    flight["departure"]["revisedTime"] = {"utc": "2026-01-01 00:00Z", "local": f"2026-11-20 {19 + hours}:00-05:00"}
+    flight["arrival"]["revisedTime"] = {"utc": "2026-01-01 00:00Z", "local": f"2026-11-21 {7 + hours:02d}:10+00:00"}
+    return [flight]
+
+
+def fly(answer) -> list[datetime]:
+    calls: list[datetime] = []
+    seen: service.Status | None = None
+    now = EARLY
+    while now < ARRIVES + timedelta(hours=40):
+        state = seen.state if seen else None
+        if flightstatus.due(FLIGHT, now, calls[-1] if calls else None, state, seen=seen):
+            calls.append(now)
+            seen = answer(now)
+        now += timedelta(minutes=1)
+    return calls
 
 
 class FakeService(HTTPServer):
@@ -247,20 +278,56 @@ class ScheduleTests(unittest.TestCase):
         last = at["24h"] + timedelta(minutes=3)
         for now, want in ((at["24h"] + timedelta(hours=5), False), (at["3h"] - timedelta(minutes=1), False), (at["3h"], True)):
             self.assertEqual(flightstatus.due(FLIGHT, now, last, "scheduled"), want, now)
-        for early, name in (("24h", "3h"), ("3h", "1h"), ("1h", "20m"), ("20m", "arrival")):
-            self.assertFalse(flightstatus.due(FLIGHT, at[name] - timedelta(seconds=1), at[early], "scheduled"), name)
-            self.assertTrue(flightstatus.due(FLIGHT, at[name], at[early], "scheduled"), name)
-            self.assertFalse(flightstatus.due(FLIGHT, at[name] + timedelta(minutes=1), at[name], "scheduled"), name)
+        for early, name, state in (("24h", "3h", "scheduled"), ("3h", "1h", "scheduled"), ("1h", "20m", "scheduled"),
+                                   ("20m", "arrival", "departed")):
+            self.assertFalse(flightstatus.due(FLIGHT, at[name] - timedelta(seconds=1), at[early], state), name)
+            self.assertTrue(flightstatus.due(FLIGHT, at[name], at[early], state), name)
+            self.assertFalse(flightstatus.due(FLIGHT, at[name] + timedelta(minutes=1), at[name], state), name)
 
-    def test_a_flight_costs_at_most_five_calls_however_often_the_scheduler_asks(self):
-        last: datetime | None = None
-        calls = []
-        now = EARLY
-        while now < ARRIVES + timedelta(hours=10):
-            if flightstatus.due(FLIGHT, now, last, "scheduled"):
-                calls.append(now)
-                last = now
-            now += timedelta(minutes=1)
+    def test_an_on_time_flight_costs_six_calls_however_often_the_scheduler_asks(self):
+        calls = fly(lambda now: ON_TIME if now < DEPARTS else DEPARTED if now < ARRIVES else LANDED)
+        self.assertEqual(calls, [*[t for t, _ in flightstatus.checkpoints(FLIGHT)][:4], DEPARTS, ARRIVES])
+
+    def test_a_flight_past_its_booked_departure_and_not_departed_is_rechecked_every_15_minutes_until_it_leaves(self):
+        leaves = DEPARTS + timedelta(minutes=70)
+        calls = fly(lambda now: ON_TIME if now < leaves else DEPARTED if now < ARRIVES else LANDED)
+        self.assertEqual(calls[4:], [*(DEPARTS + timedelta(minutes=m) for m in (0, 15, 30, 45, 60, 75)), ARRIVES])
+
+    def test_after_two_hours_late_the_rechecks_slow_to_hourly_and_stop_six_hours_after_the_arrival(self):
+        calls = fly(lambda now: ON_TIME)
+        late = [t - DEPARTS for t in calls[4:]]
+        self.assertEqual(late[:8], [timedelta(minutes=m) for m in range(0, 106, 15)])
+        self.assertEqual(late[8:10], [timedelta(hours=2, minutes=45), timedelta(hours=3, minutes=45)])
+        self.assertLessEqual(calls[-1], ARRIVES + flightstatus.LATE)
+        self.assertEqual(len(calls), 29)
+
+    def test_a_delay_announced_after_the_last_checkpoint_is_picked_up_and_rechecked_as_the_new_time_nears(self):
+        told = DEPARTS - timedelta(minutes=10)
+        late = delayed(hours=3)
+        calls = fly(lambda now: ON_TIME if now < told else late if now < DEPARTS + timedelta(hours=3)
+                    else replace(DEPARTED, dep_actual="2026-11-20T22:02", arr_estimated="2026-11-21T10:10") if now < ARRIVES + timedelta(hours=3) else LANDED)
+        self.assertEqual(calls[4:], [DEPARTS, DEPARTS + timedelta(hours=2), DEPARTS + timedelta(hours=2, minutes=40),
+                                     DEPARTS + timedelta(hours=3), ARRIVES + timedelta(hours=3)])
+
+    def test_a_known_delay_moves_the_checks_to_the_new_time(self):
+        late = delayed(hours=2)
+        names = {n: t for t, n in flightstatus.checkpoints(FLIGHT, late)}
+        self.assertEqual((names["1h late"], names["20m late"], names["arrival"]),
+                         (DEPARTS + timedelta(hours=1), DEPARTS + timedelta(hours=1, minutes=40), ARRIVES + timedelta(hours=2)))
+        self.assertEqual([n for _, n in flightstatus.checkpoints(FLIGHT, delayed(minutes=10))], ["24h", "3h", "1h", "20m", "arrival"])
+        self.assertEqual(flightstatus.expected(FLIGHT, delayed(hours=40)),
+                         (DEPARTS + flightstatus.MOST_LATE, ARRIVES + flightstatus.MOST_LATE))
+        self.assertEqual(flightstatus.expected(FLIGHT, replace(late, dep_zone="Not/AZone")), (DEPARTS, ARRIVES + timedelta(hours=2)))
+        self.assertTrue(flightstatus.due(FLIGHT, ARRIVES + flightstatus.LATE + timedelta(hours=1), None, "delayed", seen=late))
+
+    def test_a_flight_not_landed_by_its_arrival_is_rechecked_until_it_lands(self):
+        lands = ARRIVES + timedelta(minutes=40)
+        calls = fly(lambda now: ON_TIME if now < DEPARTS else DEPARTED if now < lands else LANDED)
+        self.assertEqual(calls[5:], [ARRIVES, ARRIVES + timedelta(minutes=15), ARRIVES + timedelta(minutes=30),
+                                     ARRIVES + timedelta(minutes=45)])
+
+    def test_with_nothing_held_only_the_checkpoints_are_made(self):
+        calls = fly(lambda now: None)
         self.assertEqual(calls, [t for t, _ in flightstatus.checkpoints(FLIGHT)])
 
     def test_after_downtime_only_the_latest_missed_check_is_made(self):
@@ -284,6 +351,9 @@ class ScheduleTests(unittest.TestCase):
         self.assertTrue(flightstatus.due(FLIGHT, at["1h"], at["24h"], "scheduled", reduced=True))
         for name in ("20m", "arrival"):
             self.assertFalse(flightstatus.due(FLIGHT, at[name], at["1h"], "scheduled", reduced=True), name)
+        late = delayed(hours=2)
+        for now in (DEPARTS + timedelta(hours=1), DEPARTS + timedelta(hours=2, minutes=30), ARRIVES + timedelta(hours=3)):
+            self.assertFalse(flightstatus.due(FLIGHT, now, at["1h"], "delayed", reduced=True, seen=late), now)
 
     def test_the_limit_comes_from_the_environment(self):
         for given, want in (("50", 50), (" 12 ", 12), ("", 400), ("abc", 400), ("0", 400), ("-3", 400), ("2.5", 400)):
@@ -409,14 +479,49 @@ class CheckTests(Household):
         self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h"))["statuses"], [])
         self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
 
+    def fly(self, answer, until: datetime = ARRIVES + timedelta(hours=8)) -> list[datetime]:
+        calls: list[datetime] = []
+        now = EARLY
+        while now < until:
+            self.fake.answer = (200, answer(now))
+            if flightstatus.run_due(self.c, now):
+                calls.append(now)
+            now += timedelta(minutes=5)
+        return calls
+
     def test_every_check_from_a_day_out_to_the_arrival_is_made_and_no_more(self):
         self.book(self.jane)
-        now = EARLY
-        while now < ARRIVES + timedelta(hours=8):
-            flightstatus.run_due(self.c, now)
-            now += timedelta(minutes=5)
-        self.assertEqual(len(self.fake.calls), 5)
-        self.assertEqual(self.used(ARRIVES), 5)
+        calls = self.fly(lambda now: fixture("on_time") if now < DEPARTS else fixture("departed") if now < ARRIVES else fixture("landed"))
+        self.assertEqual(calls, [*[t for t, _ in flightstatus.checkpoints(FLIGHT)][:4], DEPARTS, ARRIVES])
+        self.assertEqual(self.used(ARRIVES), 6)
+        self.assertEqual(self.stored(), [("EX101", "landed")])
+
+    def test_a_flight_past_its_booked_departure_is_rechecked_until_it_departs(self):
+        seg = self.book(self.jane)
+        leaves = DEPARTS + timedelta(minutes=50)
+        calls = self.fly(lambda now: fixture("on_time") if now < leaves else fixture("departed"), until=ARRIVES)
+        self.assertEqual(calls[4:], [DEPARTS + timedelta(minutes=m) for m in (0, 15, 30, 45, 60)])
+        shown = flightstatus.overview(self.c, self.jane, ARRIVES - timedelta(minutes=5))["statuses"]
+        self.assertEqual([(s["segment_id"], s["state"]) for s in shown], [(seg["id"], "departed")])
+
+    def test_a_delay_announced_after_the_last_checkpoint_shows_without_a_refresh(self):
+        seg = self.book(self.jane)
+        late = late_by(fixture("on_time"), hours=3)
+        told = DEPARTS - timedelta(minutes=10)
+        calls = self.fly(lambda now: fixture("on_time") if now < told else late, until=DEPARTS + timedelta(hours=2, minutes=50))
+        self.assertEqual(calls[4:], [DEPARTS, DEPARTS + timedelta(hours=2), DEPARTS + timedelta(hours=2, minutes=40)])
+        for now in (DEPARTS + timedelta(hours=2, minutes=45), DEPARTS + timedelta(hours=5)):
+            (s,) = flightstatus.overview(self.c, self.jane, now)["statuses"]
+            self.assertEqual((s["segment_id"], s["state"], s["delay_minutes"], s["dep_estimated"]),
+                             (seg["id"], "delayed", 180, "2026-11-20T22:00"), now)
+        self.assertEqual(self.stored(), [])
+
+    def test_from_90_percent_a_late_flight_gets_only_the_one_hour_check(self):
+        self.book(self.jane)
+        self.set_used(360)
+        late = late_by(fixture("on_time"), hours=3)
+        calls = self.fly(lambda now: late)
+        self.assertEqual(calls, [self.when("1h")])
 
     def test_a_landed_flight_is_left_alone(self):
         self.book(self.jane)
@@ -469,16 +574,19 @@ class CheckTests(Household):
                 shown = flightstatus.overview(self.c, self.jane, ARRIVES + timedelta(days=3650))["statuses"]
                 self.assertEqual([s["state"] for s in shown], [name])
 
-    def test_a_delay_is_shown_while_fresh_then_is_gone_and_a_restart_forgets_it(self):
+    def test_a_delay_is_shown_until_a_newer_answer_and_a_restart_forgets_it(self):
         seg = self.book(self.jane)
         self.assertEqual(flightstatus.run_due(self.c, self.when("3h")), 1)
-        for minutes, shown in ((0, 1), (14, 1), (15, 0), (60, 0)):
+        for minutes in (0, 14, 15, 60, 119):
             got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=minutes)))["statuses"]
-            self.assertEqual(len(got), shown, minutes)
-        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=1)))["statuses"]
-        self.assertEqual((got[0]["segment_id"], got[0]["state"], got[0]["delay_minutes"]), (seg["id"], "delayed", 50))
+            self.assertEqual([(s["segment_id"], s["state"], s["delay_minutes"]) for s in got], [(seg["id"], "delayed", 50)], minutes)
+        self.fake.answer = (200, fixture("on_time"))
+        self.assertEqual(flightstatus.run_due(self.c, self.when("1h")), 1)
+        got = flightstatus.overview(self.c, self.jane, self.when("1h", timedelta(minutes=1)))["statuses"]
+        self.assertEqual([s["state"] for s in got], ["scheduled"])
+        self.assertEqual(flightstatus.overview(self.c, self.jane, ARRIVES + flightstatus.LATE + timedelta(minutes=1))["statuses"], [])
         flightstatus.drop_held()
-        self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=1)))["statuses"], [])
+        self.assertEqual(flightstatus.overview(self.c, self.jane, self.when("1h", timedelta(minutes=1)))["statuses"], [])
         self.assertEqual(self.stored(), [])
 
     def test_a_restart_forgets_the_status_but_not_which_checks_were_made(self):
@@ -691,15 +799,14 @@ class RefreshTests(Household):
         self.assertEqual((got["paused"]["reason"] if got["paused"] else None, got["statuses"]), ("rate", []))
         self.assertEqual(len(self.fake.calls), 1)
 
-    def test_refresh_after_a_failure_shows_nothing_once_the_held_answer_is_stale_and_stores_nothing(self):
+    def test_refresh_after_a_failure_keeps_showing_the_held_answer_and_stores_nothing(self):
         self.refresh(self.when("3h"))
         self.fake.answer = (500, {})
         with self.assertRaises(service.Unavailable):
             self.refresh(self.when("3h", timedelta(minutes=20)))
-        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=10)))
-        self.assertEqual([s["state"] for s in got["statuses"]], ["delayed"])
-        got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=20)))
-        self.assertEqual(got["statuses"], [])
+        for minutes in (10, 20):
+            got = flightstatus.overview(self.c, self.jane, self.when("3h", timedelta(minutes=minutes)))
+            self.assertEqual([(s["state"], s["fetched_at"]) for s in got["statuses"]], [("delayed", self.when("3h").isoformat())])
         self.assertEqual(self.stored(), [])
 
 

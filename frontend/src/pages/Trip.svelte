@@ -19,7 +19,7 @@
   import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
-  import { loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { loadFlightStatus, watchFlightStatus } from "$lib/flightstatus.svelte";
   import { isSavedCopy } from "$lib/offline";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
@@ -112,6 +112,7 @@
     const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
+  $effect(() => watchFlightStatus(() => trip?.segments ?? []));
 
   const id = $derived(tripId === null ? route.sub : String(tripId));
 
