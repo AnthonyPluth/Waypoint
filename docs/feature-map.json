@@ -519,7 +519,6 @@
       "handler": "waypoint/server/api/photos.py:api_photo_sources",
       "web": [
         "frontend/src/lib/components/TripPhotos.svelte",
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
         "frontend/src/lib/components/settings/PhotosSection.svelte"
       ],
       "tests": [

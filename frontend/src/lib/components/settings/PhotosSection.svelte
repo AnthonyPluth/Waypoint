@@ -54,6 +54,8 @@
   import { toast } from "svelte-sonner";
   import { onDestroy, onMount, tick } from "svelte";
 
+  let { onchange = () => {} }: { onchange?: () => void } = $props();
+
   let list = $state<PhotoSources | null>(null);
   let people = $state<Person[]>([]);
   let problem = $state("");
@@ -146,6 +148,7 @@
     await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: snapshot ? { paused, snapshot } : { paused }, failed: paused ? "Couldn’t pause it" : "Couldn’t resume it" });
     toast.success(paused ? "Paused" : "Resumed");
     await load();
+    onchange();
   }, { busy: (on) => (pausing = on ? s.id : null), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
 
   let rekeying = $state<number | null>(null);
@@ -169,6 +172,7 @@
       newKey = ""; rekeying = null;
       toast.success("Key changed");
       await load();
+      onchange();
     }, { busy: (on) => (savingKey = on), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
   };
 
@@ -189,6 +193,7 @@
       await apiCall<"DELETE /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "DELETE", failed: "Couldn’t remove it" });
       toast.success(`${libraryOf(s)} removed`);
       await load();
+      onchange();
     });
   }
 
@@ -259,6 +264,7 @@
       connecting = false;
       toast.success("Library connected");
       await load();
+      onchange();
     }, { busy: (on) => (saving = on), onError: (message, err) => { tested = null; result = outcome(err, message); } });
   };
 

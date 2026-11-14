@@ -622,6 +622,12 @@ export interface PhotoCounts {
   far: number;
 }
 
+export interface PhotoEligibleTrip {
+  trip_id: number;
+  window: PhotoWindow;
+  audience: number[];
+}
+
 export interface PhotoExclusionsBody {
   photo_ids: number[];
 }
@@ -630,6 +636,8 @@ export interface PhotoGrantPerson {
   person_id: number;
   prefs: PhotoPrefs;
   count_token: string;
+  sources: PhotoSourceVersion[];
+  eligible: PhotoEligibleTrip[];
   trips: PhotoGrantTrip[];
 }
 

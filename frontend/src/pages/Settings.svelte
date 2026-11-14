@@ -33,6 +33,7 @@
   const s = $derived(app.state);
   const user = $derived(s?.user);
   let signingOut = $state(false);
+  let librariesChanged = $state(0);
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
   onMount(() => {
@@ -145,9 +146,9 @@
 
     <AiSection />
   {:else if group.id === "photos"}
-    <PhotosSection />
+    <PhotosSection onchange={() => (librariesChanged += 1)} />
 
-    <PhotoSharingSettings />
+    <PhotoSharingSettings refresh={librariesChanged} />
   {:else if group.id === "travel"}
     <HomeSection />
 

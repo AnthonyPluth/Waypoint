@@ -6679,6 +6679,29 @@
         ],
         "additionalProperties": false
       },
+      "PhotoEligibleTrip": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "window": {
+            "$ref": "#/components/schemas/PhotoWindow"
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "trip_id",
+          "window",
+          "audience"
+        ],
+        "additionalProperties": false
+      },
       "PhotoExclusionsBody": {
         "type": "object",
         "properties": {
@@ -6706,6 +6729,18 @@
           "count_token": {
             "type": "string"
           },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoSourceVersion"
+            }
+          },
+          "eligible": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoEligibleTrip"
+            }
+          },
           "trips": {
             "type": "array",
             "items": {
@@ -6717,6 +6752,8 @@
           "person_id",
           "prefs",
           "count_token",
+          "sources",
+          "eligible",
           "trips"
         ],
         "additionalProperties": false

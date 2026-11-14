@@ -3,6 +3,7 @@
 
   export const COULDNT_CHECK = "Couldn’t check your libraries";
   export const SHOWN_AT_FIRST = 3;
+  export const OUT_OF_DATE = "Couldn’t refresh your sharing, so what shows may be out of date.";
   export const NOTHING_YET = "No trips with your photos yet.";
 
   type Scope = "only_me" | "trip";
@@ -27,7 +28,7 @@
 
 <script lang="ts">
   import { act, actGet, errMsg } from "$lib/act";
-  import type { Person, PhotoGrants, PhotoPrefs, PhotoSharingBody, PhotoWindow } from "$lib/api-types";
+  import type { Person, PhotoGrants, PhotoPrefs, PhotoSharingBody } from "$lib/api-types";
   import { app } from "$lib/app.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { Button } from "$lib/components/ui/button";
@@ -37,6 +38,8 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
+  let { refresh = 0 }: { refresh?: number } = $props();
+
   let grants = $state<PhotoGrants | null>(null);
   let people = $state<Person[]>([]);
   let problem = $state("");
@@ -45,6 +48,7 @@
   let expanded = $state(false);
   let saving = $state(false);
   let draft = $state<{ scope: Record<number, Scope>; all: Record<number, boolean> }>({ scope: {}, all: {} });
+  let ticket = 0;
 
   const me = $derived(app.state?.person_id ?? null);
   const current = $derived(grants?.people.find((p) => p.person_id === whose) ?? grants?.people.find((p) => p.person_id === me) ?? grants?.people[0] ?? null);
@@ -59,22 +63,40 @@
   const shares = $derived(mine ? "you share" : `${first} shares`);
   const only = $derived(mine ? "Only me" : `Only ${first}`);
   const stewarded = $derived(current !== null && !mine && personOf(current.person_id)?.member === false);
+  const outOfDate = $derived(grants !== null && problem !== "");
+  const locked = $derived(saving || outOfDate);
 
   async function load(keep = false): Promise<boolean> {
+    ticket += 1;
+    const mineTicket = ticket;
+    const options = keep ? { keep: true } : undefined;
     try {
-      const [found, everyone] = await Promise.all([
-        apiCall<"GET /api/photo-grants">("/api/photo-grants", keep ? { keep: true } : undefined),
-        people.length ? Promise.resolve({ people }) : apiCall<"GET /api/people">("/api/people", keep ? { keep: true } : undefined),
-      ]);
+      const [found, everyone] = await Promise.all([apiCall<"GET /api/photo-grants">("/api/photo-grants", options), apiCall<"GET /api/people">("/api/people", options)]);
+      if (mineTicket !== ticket) return true;
       grants = found; people = everyone.people; problem = ""; off = false;
       return true;
     } catch (err) {
+      if (mineTicket !== ticket) return false;
       problem = errMsg(err);
       off = (err as { status?: unknown } | null)?.status === 404;
       return false;
     }
   }
   onMount(() => { void load(); });
+
+  let seenRefresh: number | null = null;
+  $effect(() => {
+    const now = refresh;
+    const before = seenRefresh;
+    seenRefresh = now;
+    if (before !== null && before !== now) void load(true);
+  });
+
+  async function holding<T>(fn: () => Promise<T>): Promise<T> {
+    saving = true;
+    try { return await fn(); }
+    finally { saving = false; }
+  }
 
   const stale = (err: unknown) => (err as { status?: unknown } | null)?.status === 409;
 
@@ -97,7 +119,7 @@
 
   type Asking =
     | { kind: "later"; person: PhotoGrantPerson }
-    | { kind: "all"; person: PhotoGrantPerson; trips: PhotoGrantTrip[]; photos: number | null; windows: Record<string, PhotoWindow>; audiences: Record<string, number[]>; note: string }
+    | { kind: "all"; person: PhotoGrantPerson; photos: number | null; note: string }
     | { kind: "widen"; person: PhotoGrantPerson; trip: PhotoGrantTrip; sharing: PhotoSharing; note: string }
     | { kind: "stop"; person: PhotoGrantPerson; trip: PhotoGrantTrip };
   let asking = $state<Asking | null>(null);
@@ -106,35 +128,15 @@
   const ask = (next: Asking) => { asking = next; dialog = true; };
   $effect(() => { if (!dialog) draft = { scope: {}, all: {} }; });
 
-  function windowsOf(trips: PhotoGrantTrip[], states: PhotoSharing[]) {
-    const kept = trips.map((t, i) => ({ t, s: states[i] })).filter((x) => x.s.window);
-    return {
-      windows: Object.fromEntries(kept.map((x) => [String(x.t.trip_id), x.s.window!])),
-      audiences: Object.fromEntries(kept.map((x) => [String(x.t.trip_id), x.s.audience])),
-    };
-  }
-
   const stateOf = (p: PhotoGrantPerson, tripId: number) =>
     apiCall<"GET /api/trips/{id}/photo-sharing">(`/api/trips/${tripId}/photo-sharing?person_id=${p.person_id}`, { keep: true });
 
-  const sourcesOf = async (p: PhotoGrantPerson) =>
-    (await apiCall<"GET /api/photo-sources">("/api/photo-sources", { keep: true })).sources
-      .filter((s) => s.person_id === p.person_id).map((s) => ({ id: s.id, status: s.status })).sort((a, b) => a.id - b.id);
-
-  async function gatherAll(p: PhotoGrantPerson, note: string): Promise<Asking> {
-    const trips = unsharedOf(p);
-    const states = await Promise.all(trips.map((t) => stateOf(p, t.trip_id)));
-    return { kind: "all", person: p, trips, photos: photosOf(trips), ...windowsOf(trips, states), note };
-  }
+  const allOf = (p: PhotoGrantPerson, note: string): Asking => ({ kind: "all", person: p, photos: photosOf(unsharedOf(p)), note });
 
   const switchAll = async (p: PhotoGrantPerson, on: boolean, e: Event) => {
     opener = e.currentTarget as HTMLElement;
     draft.all[p.person_id] = on;
-    if (on && p.prefs.default_scope === "trip") {
-      const shown = await actGet(() => gatherAll(p, ""), { busy: (busy) => (saving = busy) });
-      if (shown) ask(shown); else delete draft.all[p.person_id];
-      return;
-    }
+    if (on && p.prefs.default_scope === "trip") { ask(allOf(p, "")); return; }
     await act(async () => {
       patchPrefs(p.person_id, await apiCall<"POST /api/photo-sharing-prefs/{id}">(`/api/photo-sharing-prefs/${p.person_id}`, { method: "POST", body: { share_all: on }, failed: on ? "Couldn’t turn it on" : "Couldn’t turn it off" }));
       toast.success("Saved");
@@ -143,65 +145,68 @@
     delete draft.all[p.person_id];
   };
 
-  async function confirmAll() {
+  const confirmAll = () => holding(async () => {
     const a = asking;
     if (a?.kind !== "all" || a.photos === null) return false;
     const p = a.person;
     try {
-      const sources = await sourcesOf(p);
       patchPrefs(p.person_id, await apiCall<"POST /api/photo-sharing-prefs/{id}">(`/api/photo-sharing-prefs/${p.person_id}`, {
         method: "POST", failed: "Couldn’t turn it on",
-        body: { share_all: true, windows: a.windows, audiences: a.audiences, sources, count_token: p.count_token },
+        body: {
+          share_all: true, sources: p.sources, count_token: p.count_token,
+          windows: Object.fromEntries(p.eligible.map((t) => [String(t.trip_id), t.window])), audiences: Object.fromEntries(p.eligible.map((t) => [String(t.trip_id), t.audience])),
+        },
       }));
     } catch (err) {
       if (!stale(err)) { toast.error(errMsg(err)); return false; }
       const note = errMsg(err);
       if (await load(true)) {
         const fresh = grants?.people.find((x) => x.person_id === p.person_id);
-        if (fresh) asking = await gatherAll(fresh, note);
+        if (fresh) asking = allOf(fresh, note);
       }
       return false;
     }
     toast.success("Saved");
     await load(true);
     return true;
-  }
+  });
 
-  async function confirmLater() {
+  const confirmLater = () => holding(async () => {
     const a = asking;
     if (a?.kind !== "later") return false;
     return saveDefault(a.person, "trip");
-  }
+  });
 
   const datesOf = (t: PhotoGrantTrip) => (t.start_date ?? t.end_date ? rangeLabel((t.start_date ?? t.end_date)!, t.end_date ?? t.start_date!) : "No dates");
 
-  const bodyOf = (p: PhotoGrantPerson, s: PhotoSharing, scope: Scope, sources: PhotoSharing["sources"]): PhotoSharingBody => ({
-    person_id: p.person_id, scope, window: s.window ?? undefined, audience: s.audience, sources, count_token: s.count_token,
+  const bodyOf = (p: PhotoGrantPerson, s: PhotoSharing, scope: Scope): PhotoSharingBody => ({
+    person_id: p.person_id, scope, window: s.window ?? undefined, audience: s.audience, sources: s.sources, count_token: s.count_token,
     ...(s.changed !== null && { expected_changed: s.changed }),
   });
 
   async function widen(p: PhotoGrantPerson, t: PhotoGrantTrip, note = "") {
-    const sharing = await actGet(() => stateOf(p, t.trip_id));
+    const sharing = await actGet(() => stateOf(p, t.trip_id), { busy: (on) => (saving = on) });
     if (!sharing) return;
     if (note) asking = { kind: "widen", person: p, trip: t, sharing, note };
     else ask({ kind: "widen", person: p, trip: t, sharing, note });
   }
 
-  async function confirmWiden() {
+  const confirmWiden = () => holding(async () => {
     const a = asking;
     if (a?.kind !== "widen" || a.sharing.count === null) return false;
     try {
-      const sources = await sourcesOf(a.person);
-      await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${a.trip.trip_id}/photo-sharing`, { method: "POST", body: bodyOf(a.person, a.sharing, "trip", sources), failed: "Couldn’t share it" });
+      await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${a.trip.trip_id}/photo-sharing`, { method: "POST", body: bodyOf(a.person, a.sharing, "trip"), failed: "Couldn’t share it" });
     } catch (err) {
       if (!stale(err)) { toast.error(errMsg(err)); return false; }
-      await widen(a.person, a.trip, errMsg(err));
+      const note = errMsg(err);
+      const fresh = await actGet(() => stateOf(a.person, a.trip.trip_id));
+      if (fresh) asking = { kind: "widen", person: a.person, trip: a.trip, sharing: fresh, note };
       return false;
     }
     toast.success(`Shared with everyone on ${a.trip.name}`);
     await load(true);
     return true;
-  }
+  });
 
   const narrow = (p: PhotoGrantPerson, t: PhotoGrantTrip) => act(async () => {
     const reply = await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { person_id: p.person_id, scope: "only_me" }, failed: "Couldn’t change it" });
@@ -211,10 +216,9 @@
 
   const undo = (p: PhotoGrantPerson, t: PhotoGrantTrip, changed: number | null) => act(async () => {
     const fresh = await stateOf(p, t.trip_id);
-    const sources = await sourcesOf(p);
-    await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { ...bodyOf(p, fresh, "trip", sources), ...(changed !== null && { expected_changed: changed }) }, failed: "Couldn’t undo it" });
+    await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { ...bodyOf(p, fresh, "trip"), ...(changed !== null && { expected_changed: changed }) }, failed: "Couldn’t undo it" });
     await load(true);
-  });
+  }, { busy: (on) => (saving = on) });
 
   const changeScope = (p: PhotoGrantPerson, t: PhotoGrantTrip, e: Event & { currentTarget: HTMLSelectElement }) => {
     const next = e.currentTarget.value as Scope;
@@ -225,14 +229,14 @@
 
   const askStop = (p: PhotoGrantPerson, t: PhotoGrantTrip, e: MouseEvent) => { opener = e.currentTarget as HTMLElement; ask({ kind: "stop", person: p, trip: t }); };
 
-  async function confirmStop() {
+  const confirmStop = () => holding(async () => {
     const a = asking;
     if (a?.kind !== "stop") return false;
     return act(async () => {
       await apiCall<"DELETE /api/trips/{id}/photo-sharing">(`/api/trips/${a.trip.trip_id}/photo-sharing?person_id=${a.person.person_id}`, { method: "DELETE", failed: "Couldn’t stop sharing" });
       await load(true);
     });
-  }
+  });
 
   type Prompt = { trip: number; sharing: PhotoSharing; scope: Scope; note: string };
   let prompt = $state<Prompt | null>(null);
@@ -243,22 +247,22 @@
     if (sharing) prompt = { trip: t.trip_id, sharing, scope: p.prefs.default_scope, note: "" };
   }
 
-  async function sharePrompt(p: PhotoGrantPerson, t: PhotoGrantTrip) {
+  const sharePrompt = (p: PhotoGrantPerson, t: PhotoGrantTrip) => holding(async () => {
     const open = prompt;
     if (!open) return;
     try {
-      const sources = open.scope === "trip" ? await sourcesOf(p) : open.sharing.sources;
-      await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: bodyOf(p, open.sharing, open.scope, sources), failed: "Couldn’t share it" });
+      await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: bodyOf(p, open.sharing, open.scope), failed: "Couldn’t share it" });
     } catch (err) {
       if (!stale(err)) { toast.error(errMsg(err)); return; }
+      const note = errMsg(err);
       const sharing = await actGet(() => stateOf(p, t.trip_id));
-      if (sharing) prompt = { ...open, sharing, note: errMsg(err) };
+      if (sharing) prompt = { ...open, sharing, note };
       return;
     }
     toast.success(`Shared with ${sharedWith(open.scope)}. Change it any time under Your photos on this trip.`);
     prompt = null;
     await load(true);
-  }
+  });
 
   const notNow = (p: PhotoGrantPerson, t: PhotoGrantTrip) => act(async () => {
     await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { person_id: p.person_id, declined: true }, failed: "Couldn’t save it" });
@@ -268,8 +272,8 @@
 
   const title = (a: Asking | null): string => {
     if (!a) return "";
-    if (a.kind === "later" || (a.kind === "all" && !a.trips.length)) return `Show ${own} photos on trips ${joins} later to everyone on them?`;
-    if (a.kind === "all") return a.photos === null ? `Show ${own} photos to everyone on ${plural(a.trips.length, "trip", "trips")}?` : `Show ${own} ${plural(a.photos, "photo", "photos")} to everyone on ${plural(a.trips.length, "trip", "trips")}?`;
+    if (a.kind === "later" || (a.kind === "all" && !a.person.eligible.length)) return `Show ${own} photos on trips ${joins} later to everyone on them?`;
+    if (a.kind === "all") return a.photos === null ? `Show ${own} photos to everyone on ${plural(a.person.eligible.length, "trip", "trips")}?` : `Show ${own} ${plural(a.photos, "photo", "photos")} to everyone on ${plural(a.person.eligible.length, "trip", "trips")}?`;
     if (a.kind === "widen") return a.sharing.count === null ? `Show ${own} photos to everyone on this trip?` : `Show ${own} ${plural(a.sharing.count, "photo", "photos")} to everyone on this trip?`;
     return `Stop sharing ${own} photos on this trip?`;
   };
@@ -280,6 +284,12 @@
   {@const trips = expanded ? p.trips : p.trips.slice(0, SHOWN_AT_FIRST)}
   <section aria-labelledby="photo-sharing-title" class="space-y-2.5">
     <h2 id="photo-sharing-title" class="eyebrow px-1">Photo sharing</h2>
+    {#if outOfDate}
+      <div class="flex flex-wrap items-center gap-2 px-1" role="alert">
+        <p class="text-sm text-signal-ink">{OUT_OF_DATE} {problem}</p>
+        <Button variant="outline" size="sm" onclick={() => load(true)}>Try again</Button>
+      </div>
+    {/if}
     {#if grants.people.length > 1}
       <div class="flex flex-wrap gap-2" role="group" aria-label="Whose sharing">
         {#each grants.people as g (g.person_id)}
@@ -290,7 +300,7 @@
     {/if}
     <div class="rows">
       <div class="space-y-4 p-4">
-        <fieldset class="space-y-2" disabled={saving}>
+        <fieldset class="space-y-2" disabled={locked}>
           <legend class="mb-1.5 font-medium">Who sees the photos {shares}</legend>
           {#each [{ value: "only_me", name: only, hint: `Used when ${shares} on a trip. Each trip can be changed on its own.` }, { value: "trip", name: "Everyone on the trip", hint: `The other people on each trip see ${own} photos there.` }] as choice (choice.value)}
             <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm has-[:checked]:border-ring">
@@ -301,7 +311,7 @@
           {/each}
         </fieldset>
         <label class="flex items-start gap-3 text-sm">
-          <input type="checkbox" class="mt-1" checked={draft.all[p.person_id] ?? p.prefs.share_all} disabled={saving}
+          <input type="checkbox" class="mt-1" checked={draft.all[p.person_id] ?? p.prefs.share_all} disabled={locked}
             onchange={(e) => switchAll(p, e.currentTarget.checked, e)} />
           <span>
             <span class="font-medium">{mine ? "Share on all my trips" : `Share on all of ${first}’s trips`}</span>
@@ -326,14 +336,14 @@
               <div class="flex flex-wrap items-center gap-2">
                 {#if t.state === "shared"}
                   <select class="border-input bg-secondary h-9 rounded-xl border px-3 text-base outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
-                    aria-label={`Who sees ${own} photos on ${t.name}`} value={t.scope ?? "only_me"} disabled={saving} onchange={(e) => changeScope(p, t, e)}>
+                    aria-label={`Who sees ${own} photos on ${t.name}`} value={t.scope ?? "only_me"} disabled={locked} onchange={(e) => changeScope(p, t, e)}>
                     <option value="only_me">Only me</option>
                     <option value="trip">Everyone on this trip</option>
                   </select>
-                  <Button variant="outline" size="sm" class="text-status-bad-ink" aria-label={`Stop sharing on ${t.name}`} onclick={(e: MouseEvent) => askStop(p, t, e)}>Stop sharing</Button>
+                  <Button variant="outline" size="sm" class="text-status-bad-ink" aria-label={`Stop sharing on ${t.name}`} disabled={locked} onclick={(e: MouseEvent) => askStop(p, t, e)}>Stop sharing</Button>
                 {:else}
                   <StatusChip chip={{ label: "Not shared", tone: "quiet" }} />
-                  <Button variant="outline" size="sm" aria-label={`Share on ${t.name}`} aria-expanded={prompt?.trip === t.trip_id} onclick={() => openPrompt(p, t)}>Share…</Button>
+                  <Button variant="outline" size="sm" aria-label={`Share on ${t.name}`} aria-expanded={prompt?.trip === t.trip_id} disabled={locked} onclick={() => openPrompt(p, t)}>Share…</Button>
                 {/if}
               </div>
             </div>
@@ -343,7 +353,7 @@
                 <p id={`photo-prompt-${t.trip_id}`} class="font-medium">{open.sharing.count === null ? COULDNT_CHECK : `${mine ? "You have" : `${first} has`} ${plural(open.sharing.count, "photo", "photos")} from this trip`}</p>
                 <p class="text-sm text-muted-foreground">Only {subject} see{mine ? "" : "s"} this. Nothing from {own} library is on the trip until {shares} it.</p>
                 {#if open.note}<p class="text-sm text-signal-ink" role="alert">{open.note}</p>{/if}
-                <fieldset class="space-y-2">
+                <fieldset class="space-y-2" disabled={locked}>
                   <legend class="mb-1 text-sm font-medium">Who can see them</legend>
                   <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm has-[:checked]:border-ring">
                     <input type="radio" name={`prompt-scope-${t.trip_id}`} class="mt-1" checked={open.scope === "only_me"} onchange={() => (prompt = { ...open, scope: "only_me" })} />
@@ -355,8 +365,8 @@
                   </label>
                 </fieldset>
                 <div class="flex flex-wrap gap-2">
-                  <Button size="sm" disabled={saving || (open.scope === "trip" && open.sharing.count === null)} onclick={() => sharePrompt(p, t)}>Share on this trip</Button>
-                  <Button variant="outline" size="sm" disabled={saving} onclick={() => notNow(p, t)}>Not now</Button>
+                  <Button size="sm" disabled={locked || (open.scope === "trip" && open.sharing.count === null)} onclick={() => sharePrompt(p, t)}>Share on this trip</Button>
+                  <Button variant="outline" size="sm" disabled={locked} onclick={() => notNow(p, t)}>Not now</Button>
                 </div>
               </div>
             {/if}

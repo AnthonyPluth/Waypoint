@@ -227,6 +227,32 @@ describe("Settings photos", () => {
     expect(await screen.findByRole("checkbox", { name: /Share on all my trips/ })).toBeInTheDocument();
   });
 
+  it("shows a child whose first library was just connected under Whose sharing, without reopening the page", async () => {
+    let connected = false;
+    const grant = (person_id: number) => ({ person_id, prefs: { default_scope: "only_me", share_all: false }, count_token: "a".repeat(32), sources: [], eligible: [], trips: [] });
+    const people = [{ id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] }, { id: 3, display_name: "June Doe", first_name: "June", legal_name: null, aliases: [], member: false, links: [] }];
+    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) => {
+      if (path === "/api/photo-sources" && opts?.method === "POST") { connected = true; return { id: 9 } as never; }
+      if (path === "/api/photo-sources/test") return { name: "June", same_account: null } as never;
+      if (path === "/api/photo-sources") return { sources: [], permissions: ["asset.read"] } as never;
+      if (path === "/api/photo-grants") return { people: connected ? [grant(1), grant(3)] : [grant(1)] } as never;
+      if (path === "/api/people") return { people } as never;
+      return {} as never;
+    });
+    const user = userEvent.setup();
+    render(Settings);
+    await screen.findByRole("checkbox", { name: /Share on all my trips/ });
+    expect(screen.queryByRole("group", { name: "Whose sharing" })).toBeNull();
+    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.selectOptions(screen.getByLabelText("Whose library"), "3");
+    await user.type(screen.getByLabelText("Immich address"), "https://immich.brook.example");
+    await user.type(screen.getByLabelText("API key"), "madeUpKeyNumberOne0123456789abcdefghij");
+    await user.click(screen.getByRole("button", { name: "Test" }));
+    await user.click(await screen.findByRole("button", { name: "Save" }).then(async (b) => { await waitFor(() => expect(b).toBeEnabled()); return b; }));
+    const switcher = await screen.findByRole("group", { name: "Whose sharing" });
+    expect(within(switcher).getByRole("button", { name: "June Doe" })).toBeInTheDocument();
+  });
+
   it("leaves Photo sharing out of the other groups", () => {
     route.sub = "travel";
     vi.mocked(api).mockImplementation(async () => ({}) as never);
