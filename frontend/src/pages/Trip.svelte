@@ -48,6 +48,7 @@
   let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
 
   let trip = $state<Trip | null>(null);
+  let loads = $state(0);
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
@@ -127,7 +128,7 @@
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
       if (mine !== latest) return;
-      trip = t; people = p.people; loyalty = l.loyalty;
+      trip = t; people = p.people; loyalty = l.loyalty; loads++;
       void loadFlightStatus();
       void afterOnlineLoad(t);
     } catch (err) {
@@ -291,7 +292,7 @@
       {#key id}
         <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
       {/key}
-      {#if !editingTrip}<TripSummary tripId={t.id} revision={t.segments.map((s) => `${s.id}:${s.status}:${s.start_local}:${s.end_local}`).join()} />{/if}
+      {#if !editingTrip}<TripSummary tripId={t.id} revision={String(loads)} />{/if}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}

@@ -1695,4 +1695,37 @@ describe("Trip summary", () => {
     await waitFor(() => expect(vi.mocked(api).mock.calls.some(([p]) => p === "/api/trips/1/summary")).toBe(true));
     expect(screen.queryByTestId("trip-summary")).toBeNull();
   });
+
+  const saveTerminal = async () => {
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    await u.clear(screen.getByLabelText("Terminal"));
+    await u.type(screen.getByLabelText("Terminal"), "7");
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
+  };
+
+  it("asks for the numbers again after an edit that changes no date or status, keeping the line until the new answer arrives", async () => {
+    summary = { ...summary, states: [], countries: ["Spain"] };
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("Spain");
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(1);
+    let release: (v: TripSummaryT) => void = () => {};
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (String(path).endsWith("/summary") ? new Promise((r) => { release = r as never; }) : answer(path, opts)) as never);
+    await saveTerminal();
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(2));
+    expect(screen.getByTestId("trip-summary")).toHaveTextContent("Spain");
+    release({ ...summary, countries: ["Portugal"] });
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("Portugal"));
+    expect(screen.getByTestId("trip-summary")).not.toHaveTextContent("Spain");
+  });
+
+  it("drops the line when the numbers can’t be read again after an edit", async () => {
+    render(TripPage);
+    await screen.findByTestId("trip-summary");
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => { if (String(path).endsWith("/summary")) throw new Error("down"); return answer(path, opts) as never; });
+    await saveTerminal();
+    await waitFor(() => expect(screen.queryByTestId("trip-summary")).toBeNull());
+  });
 });
