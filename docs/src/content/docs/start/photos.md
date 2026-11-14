@@ -62,7 +62,7 @@ The first time you open a trip whose dates your library has photos from, the **P
 
 Once you have shared, the section ends with **Your photos on this trip**: how many photos of yours are on it, who sees them (**Only me** or **Everyone on this trip**), a way to change it and **Stop sharing on this trip**. Choosing **Only me** saves at once, with **Undo** in the message that confirms it; choosing **Everyone on this trip** asks “Show your 169 photos to everyone on this trip?” first, and **Stop sharing on this trip** asks once and says plainly that your photos leave the trip right away, for everyone. A person without a sign-in whom you manage has the same card, named for them (“June’s photos on this trip”), on the trips they are on. A trip you have no photos on shows none of this.
 
-Each change reloads the trip’s photos, map pins and summary, and editing the trip’s dates or people reloads your sharing choices for it, so a card that must ask again does. If the page can’t reload something after a change that went through, it says so, with **Try again**, and holds the controls that depend on it until it can show the current state.
+Each change reloads the trip’s photos, map pins and summary, and so does editing the trip’s dates or people, or a booking’s times, zones, status (a cancellation too), kind, places (an address too) or itinerary, so a card that must ask again does. If the page can’t reload something after a change that went through, it says so, with **Try again**, and holds the controls that depend on it until it can show the current state.
 
 ### Photo sharing in Settings
 

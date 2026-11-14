@@ -662,13 +662,21 @@ describe("When the trip is edited on the page", () => {
     await askedAgain({ ...road, segments: [{ ...stay, status: "cancelled" }] });
   });
 
-  it("does not ask again for a seat, a confirmation code or a note, which move no window", async () => {
+  it("asks again when a booking’s address, or a visit’s state, changes where it is placed", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, details: { ...stay.details, address: "2 Elm Road, 80302" } }] });
+  });
+
+  it("asks again when a booking’s state changes", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, details: { ...stay.details, state: "UT" } }] });
+  });
+
+  it("does not ask again for a seat, a confirmation code, a phone number or a note, which move no window", async () => {
     current = shared();
     const view = mount();
     await card();
     const getsBefore = sharingGets();
     const photoLoads = calls("GET", "/api/trips/7/photos").length;
-    const edited = { ...road, notes: "Pack layers", segments: [{ ...stay, confirmation: "ZZ9999", details: { ...stay.details, address: "2 Elm Road" }, travelers: [{ id: 9, person_id: 1, name: "Ada Brook", seat: "12C" }] }] };
+    const edited = { ...road, notes: "Pack layers", segments: [{ ...stay, confirmation: "ZZ9999", details: { ...stay.details, phone: "+1 555 0100" }, travelers: [{ id: 9, person_id: 1, name: "Ada Brook", seat: "12C" }] }] };
     await view.rerender({ trip: edited, people: [ada], now: after });
     await Promise.resolve();
     expect(sharingGets()).toBe(getsBefore);
