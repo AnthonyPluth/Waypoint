@@ -697,3 +697,172 @@ describe("Settings → Photos, Needs a look", () => {
     expect(screen.queryByRole("list", { name: "Photos that need a look" })).toBeNull();
   });
 });
+
+describe("Settings → Photos, when sharing changes in Photo sharing", () => {
+  const reviews = () => vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photos/review").length;
+
+  it("reloads the list and the card’s counts, so a trip that was just unshared is no longer offered", async () => {
+    let photos = [look(21)];
+    let count = 1904;
+    const changed = vi.fn();
+    serve([], (path) => {
+      if (path === "/api/photo-sources") return { sources: [source({ photos: count })], permissions: PERMISSIONS };
+      if (path === "/api/photos/review") return { photos };
+    });
+    const { rerender } = render(PhotosSection, { onchange: changed, sharing: 0 });
+    const user = userEvent.setup();
+    await screen.findByText("1 photo");
+    photos = [look(21, 1, { candidates: [{ id: 12, name: "Redstone weekend" }] })];
+    count = 1700;
+    await rerender({ onchange: changed, sharing: 1 });
+    await waitFor(() => expect(screen.getByText(/· 1,700 photos on 12 trips$/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Could belong to Redstone weekend.")).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: /^Pick a trip/ }));
+    const sheet = await screen.findByRole("dialog");
+    expect(within(sheet).queryByRole("radio", { name: "Canyon weekend" })).toBeNull();
+    expect(within(sheet).getByRole("radio", { name: "Redstone weekend" })).toBeInTheDocument();
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("offers a trip that was just shared, without a page reload", async () => {
+    let photos = [look(21, 1, { candidates: [{ id: 12, name: "Redstone weekend" }] })];
+    serve([source()], (path) => { if (path === "/api/photos/review") return { photos }; });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    await screen.findByText("Could belong to Redstone weekend.");
+    photos = [look(21)];
+    await rerender({ sharing: 1 });
+    expect(await screen.findByText("Fits two trips: Canyon weekend and Redstone weekend.")).toBeInTheDocument();
+  });
+
+  it("drops a row that no longer needs a look, and says nothing needs a look when it was the last", async () => {
+    let photos = [look(21)];
+    serve([source()], (path) => { if (path === "/api/photos/review") return { photos }; });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    await screen.findByText("1 photo");
+    photos = [];
+    await rerender({ sharing: 1 });
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+  });
+
+  it("holds the actions on the list while the reload is under way, and gives them back when it has answered", async () => {
+    let release: (v: unknown) => void = () => {};
+    let n = 0;
+    serve([source()], (path) => {
+      if (path !== "/api/photos/review") return;
+      n += 1;
+      if (n === 2) return new Promise((resolve) => (release = resolve));
+      return { photos: [look(21)] };
+    });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    await screen.findByText("1 photo");
+    expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeEnabled();
+    await rerender({ sharing: 1 });
+    await waitFor(() => expect(n).toBe(2));
+    expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Pick a trip/ })).toBeDisabled();
+    release({ photos: [look(21)] });
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeEnabled());
+  });
+
+  it("never lets a late reload after one sharing change overwrite the one after the next", async () => {
+    let n = 0;
+    let release: (v: unknown) => void = () => {};
+    serve([source()], (path) => {
+      if (path !== "/api/photos/review") return;
+      n += 1;
+      if (n === 1) return { photos: [look(21), look(22)] };
+      if (n === 2) return new Promise((resolve) => (release = resolve));
+      return { photos: [look(21)] };
+    });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    await screen.findByText("2 photos");
+    await rerender({ sharing: 1 });
+    await waitFor(() => expect(n).toBe(2));
+    await rerender({ sharing: 2 });
+    expect(await screen.findByText("1 photo")).toBeInTheDocument();
+    release({ photos: [look(21), look(22)] });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(screen.getByText("1 photo")).toBeInTheDocument();
+    expect(screen.queryByText("2 photos")).toBeNull();
+    expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeEnabled();
+  });
+
+  it("says the list may be out of date when the reload fails, keeps the actions held only while it runs, and Try again reloads", async () => {
+    let fail = false;
+    let photos = [look(21)];
+    serve([source()], (path) => {
+      if (path !== "/api/photos/review") return;
+      if (fail) throw new Refusal("Can’t reach Waypoint.", 0);
+      return { photos };
+    });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    const user = userEvent.setup();
+    await screen.findByText("1 photo");
+    fail = true;
+    await rerender({ sharing: 1 });
+    expect(await screen.findByText("Couldn’t refresh which photos need a look, so that list may be out of date.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Leave off, the photo/ })).toBeEnabled());
+    expect(screen.queryByText(/list is up to date/i)).toBeNull();
+    fail = false;
+    photos = [];
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(screen.queryByText(/may be out of date/)).toBeNull();
+  });
+
+  it("says the list may be out of date inside an open Pick a trip sheet when the reload fails, and Try again there reloads", async () => {
+    let fail = false;
+    let photos = [look(21)];
+    serve([source()], (path) => {
+      if (path !== "/api/photos/review") return;
+      if (fail) throw new Refusal("Can’t reach Waypoint.", 0);
+      return { photos };
+    });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Pick a trip/ }));
+    const sheet = await screen.findByRole("dialog");
+    fail = true;
+    await rerender({ sharing: 1 });
+    expect(await within(sheet).findByText("Couldn’t refresh the list, so it may be out of date.")).toBeInTheDocument();
+    fail = false;
+    photos = [look(21, 1, { candidates: [{ id: 12, name: "Redstone weekend" }, { id: 14, name: "Mesa weekend" }] })];
+    await user.click(within(sheet).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(within(sheet).getByRole("radio", { name: "Mesa weekend" })).toBeInTheDocument());
+    expect(within(sheet).queryByText(/may be out of date/)).toBeNull();
+    expect(within(sheet).queryByRole("radio", { name: "Canyon weekend" })).toBeNull();
+  });
+
+  it("closes the sheet when the photo no longer needs a look after the reload", async () => {
+    let photos = [look(21)];
+    serve([source()], (path) => { if (path === "/api/photos/review") return { photos }; });
+    const { rerender } = render(PhotosSection, { sharing: 0 });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Pick a trip/ }));
+    await screen.findByRole("dialog");
+    photos = [];
+    await rerender({ sharing: 1 });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+  });
+
+  it("tells the page when a sync finishes, so Photo sharing’s counts load again, and does not loop on a sharing change", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let synced = "2026-11-06T11:12:00+00:00";
+    const changed = vi.fn();
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ last_sync: synced })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/sync" && opts?.method === "POST") return { started: true };
+    });
+    const { rerender } = render(PhotosSection, { onchange: changed, sharing: 0 });
+    await userEvent.click(await screen.findByRole("button", { name: "Sync now, Ada Brook’s library" }));
+    expect(changed).not.toHaveBeenCalled();
+    synced = "2026-11-06T12:12:00+00:00";
+    await flush(() => vi.advanceTimersByTimeAsync(5000));
+    await waitFor(() => expect(changed).toHaveBeenCalledTimes(1));
+    const before = reviews();
+    await rerender({ onchange: changed, sharing: 1 });
+    await waitFor(() => expect(reviews()).toBeGreaterThan(before));
+    expect(changed).toHaveBeenCalledTimes(1);
+  });
+});
