@@ -40,7 +40,9 @@ MONTH_DAY = re.compile(rf"(?<![^\W\d_])({when.WORD})\.?\s+(\d{{1,2}})(?:st|nd|rd
 ISO_DAY = re.compile(r"(?<!\d)\d{4}-(\d\d)-(\d\d)(?!\d)")
 NUMERIC_DAY = re.compile(r"(?<![\d/.])(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?(?![\d/]|\.\d)")
 JP_DAY = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+SEAT_TOKEN = re.compile(r"(?i)(?<![A-Za-z0-9])(\d{1,2}[A-K])(?![A-Za-z0-9])")
 Day = tuple[int, int]
+Clock = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,22 @@ class Signals:
     flights: frozenset[str] = frozenset()
     codes: frozenset[str] = frozenset()
     days: frozenset[frozenset[Day]] = frozenset()
+    seats: frozenset[str] = frozenset()
+    clocks: frozenset[Clock] = frozenset()
+
+
+def _clocks(whole: str) -> frozenset[Clock]:
+    found: set[Clock] = set()
+    for m in when.CLOCK.finditer(whole):
+        hour, minute, half = int(m[1]), int(m[2]), (m[3] or "").lower()
+        if half == "p" and hour < 12:
+            hour += 12
+        elif half == "a" and hour == 12:
+            hour = 0
+        found.add((hour, minute))
+    found.update((int(m[1]), int(m[2])) for m in when.FRENCH_CLOCK.finditer(whole))
+    found.update((int(m[1]), int(m[2] or 0)) for m in when.JP_CLOCK.finditer(whole))
+    return frozenset(found)
 
 
 def _real(month: int, day: int) -> bool:
@@ -83,7 +101,8 @@ def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     timed = any(c.search(whole) for c in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK))
     return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(timed or LABELS.search(whole) or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
                    passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights,
-                   codes=references.labelled(whole), days=_days(whole))
+                   codes=references.labelled(whole), days=_days(whole),
+                   seats=frozenset(m[1].upper() for m in SEAT_TOKEN.finditer(whole)), clocks=_clocks(whole))
 
 
 def _day(local: str | None) -> str:
@@ -207,7 +226,26 @@ def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: tri
     return None
 
 
+def _seats_held(conn: db.Connection, seg: Segment, said: ai.Suggestion, sign: Signals, superseded: bool) -> bool:
+    held = {(t.get("seat") or "").upper() for t in trips.effective_travelers(conn, seg)} | {(trips.decode_details(seg.details).get("seat") or "").upper()}
+    if superseded:
+        held |= {(t.get("seat") or "").upper() for t in said.get("travelers") or []}
+    return sign.seats <= held - {""}
+
+
+def _clock_of(local: str | None) -> Clock | None:
+    found = re.fullmatch(r"\d{4}-\d\d-\d\dT(\d\d):(\d\d)", (local or "")[:16])
+    return (int(found[1]), int(found[2])) if found else None
+
+
+def _clocks_held(seg: Segment, said: ai.Suggestion, sign: Signals, superseded: bool) -> bool:
+    held = {_clock_of(seg.start_local), _clock_of(seg.end_local)}
+    if superseded:
+        held |= {_clock_of(said.get("start_local")), _clock_of(said.get("end_local"))}
+    return sign.clocks <= {c for c in held if c is not None}
+
+
 def _fully_held(conn: db.Connection, seg: Segment, said: ai.Suggestion, sign: Signals, superseded: bool) -> bool:
     mine = {references.normal(c) for c in (said.get("confirmation"), seg.confirmation) if c}
     return (not sign.uncompared and {references.normal(c) for c in sign.codes} <= mine and adds_nothing(conn, seg, said, superseded)
-            and _names_held(conn, seg, sign.passengers))
+            and _names_held(conn, seg, sign.passengers) and _seats_held(conn, seg, said, sign, superseded) and _clocks_held(seg, said, sign, superseded))

@@ -64,6 +64,7 @@ For both, also:
 
 - Neither the email’s text nor its subject has a word about a cancellation, change, refund, delay, gate, terminal, seat or boarding, and the reader that looks for changes in mail found none. The subject is checked by Waypoint only and is not sent to the model.
 - Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat.
+- Every seat (such as 22A) and every time of day the text prints, in any layout, is one the booking already holds (for an older copy, also one the reading itself returned). A check-in deadline or a seat the booking doesn’t have keeps the email.
 - The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price, total or rate, room, suite, bed, breakfast or vehicle, link, itinerary or note, no flight number the model didn’t return (however it is written: `EX102`, `EX 102`, `EX-102`, in lower case or after a “Flight” label), no day other than the days the model returned (a second date for the same flight number keeps it), and no confirmation code other than the booking’s own. Times, totals and passenger labels are recognised in the same formats Waypoint’s own readers accept, in any currency it knows. Any of these keeps the email, because dismissing deletes the only stored copy.
 - The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
 

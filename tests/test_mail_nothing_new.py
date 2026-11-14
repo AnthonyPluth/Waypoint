@@ -521,6 +521,14 @@ class OlderCopyComparisonTests(NothingNewCase):
     def older_signed(self, text: str):
         return self.assess(self.EARLIER_TIMES, received="2026-10-10", convert=True, sign=nothing_new.signals(text))
 
+    def test_an_older_copy_may_print_only_its_own_or_the_booking_s_seats_and_times(self):
+        self.assertEqual(self.older_signed("Departs 18:00, lands 06:10"), "older_copy")
+        self.assertIsNone(self.older_signed("Departs 18:00, check-in closes 17:15"))
+        self.assertIsNone(self.older_signed("Jane Doe 30A"))
+        self.assertEqual(self.assess({**self.EARLIER_TIMES, "travelers": [{"name": "Jane Doe", "seat": "30A"}]}, received="2026-10-10", convert=True,
+                                     sign=nothing_new.signals("Jane Doe 30A")), "older_copy")
+        self.assertEqual(self.older_signed("Jane Doe 21C"), "older_copy")
+
     def test_an_older_copy_with_a_total_the_booking_already_holds_is_dismissed(self):
         self.read(lambda conn: trips.edit_segment(conn, self.jane, self.known["id"], {"price": {"amount_minor": 12000, "currency": "USD"}}))
         self.assertEqual(self.older(price_minor=12000, price_currency="USD"), "older_copy")
@@ -597,6 +605,31 @@ class UnextractedDetailTests(NothingNewCase):
         self.assertFalse(nothing_new.covers(nothing_new.signals("EX 101 on 20 November and 27 November"), [SAME]))
         self.assertTrue(nothing_new.covers(nothing_new.signals("EX 101 on 20/11"), [SAME]))
         self.assertTrue(nothing_new.covers(nothing_new.signals("EX 101 on 11/20/2026"), [SAME]))
+
+
+    def test_a_printed_seat_the_booking_does_not_hold_keeps_it_in_any_layout(self):
+        for n, line in enumerate(("Passenger: Jane Doe 22A", "Jane Doe | 22A", "Jane Doe — 22a", "Row 22, 22A")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN}\n{line}", SAME, name=f"seat-{n}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_a_printed_seat_the_booking_holds_still_dismisses(self):
+        self.read_mail(f"{CHECK_IN}\nPassenger: Jane Doe 21C", SAME)
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+
+    def test_a_time_of_day_the_booking_does_not_hold_keeps_it(self):
+        for n, line in enumerate(("Check-in closes at 17:30.", "Check-in closes 5:30 pm.", "Check-in closes 17h30.")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN} {line}", SAME, name=f"clock-{n}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_the_booking_s_own_times_may_be_printed(self):
+        self.read_mail(f"{CHECK_IN} Departs 7:00 pm, lands 07:10.", SAME)
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
 
 
 class SignalTests(unittest.TestCase):
