@@ -87,6 +87,7 @@
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
         "frontend/src/lib/components/settings/ImportSection.svelte",
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
         "frontend/src/lib/components/settings/PhotosSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
@@ -302,7 +303,9 @@
       "method": "GET",
       "path": "/api/trips/{id}/summary",
       "handler": "waypoint/server/api/trips.py:api_trip_summary",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/TripSummary.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_access.py",
@@ -642,7 +645,9 @@
       "method": "GET",
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -658,7 +663,9 @@
       "method": "POST",
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing_set",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -675,7 +682,9 @@
       "method": "DELETE",
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing_stop",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -722,7 +731,9 @@
       "method": "GET",
       "path": "/api/photo-grants",
       "handler": "waypoint/server/api/photos.py:api_photo_grants",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -738,7 +749,9 @@
       "method": "POST",
       "path": "/api/photo-sharing-prefs/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_prefs_set",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -1011,6 +1024,7 @@
       "path": "/api/distance-unit",
       "handler": "waypoint/server/api/stats.py:api_distance_unit",
       "web": [
+        "frontend/src/lib/components/TripSummary.svelte",
         "frontend/src/lib/components/settings/DistanceSection.svelte"
       ],
       "tests": [

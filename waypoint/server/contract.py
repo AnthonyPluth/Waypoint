@@ -707,10 +707,18 @@ class PhotoGrantTrip(TypedDict):
     removed_count: int
 
 
+class PhotoEligibleTrip(TypedDict):
+    trip_id: int
+    window: PhotoWindow
+    audience: list[int]
+
+
 class PhotoGrantPerson(TypedDict):
     person_id: int
     prefs: PhotoPrefs
     count_token: str
+    sources: list[PhotoSourceVersion]
+    eligible: list[PhotoEligibleTrip]
     trips: list[PhotoGrantTrip]
 
 

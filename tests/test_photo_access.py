@@ -176,8 +176,12 @@ class ScopeTests(AccessCase):
         self.assertEqual(self.call("ana", "POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [mine]}), (404, NO_PHOTO))
         self.assertEqual(self.call("ana", "POST", f"/api/photos/{mine}", {"trip_id": trip}), (404, NO_PHOTO))
         self.assertEqual(self.seen_by("ben", trip), [mine])
-        self.assertEqual([{k: v for k, v in p.items() if k != "count_token"} for p in self.ok("ana", "GET", "/api/photo-grants")["people"]],
+        grants = self.ok("ana", "GET", "/api/photo-grants")["people"]
+        self.assertEqual([{k: v for k, v in p.items() if k not in ("count_token", "eligible", "sources")} for p in grants],
                          [{"person_id": self.person["ana"], "prefs": {"default_scope": "only_me", "share_all": False}, "trips": []}])
+        self.assertEqual([t["trip_id"] for t in grants[0]["eligible"]], [self.trip])
+        self.assertEqual(grants[0]["eligible"][0]["audience"], sorted([self.person["ana"], self.person["ben"]]))
+        self.assertNotIn(trip, [t["trip_id"] for t in grants[0]["eligible"]])
 
     def test_trip_scope_reaches_the_trips_people_alone_not_a_confirmation_recipient(self):
         self.share("ben")

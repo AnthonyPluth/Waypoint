@@ -8,7 +8,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { LoyaltyEntry, Person, Trip as TripT } from "$lib/api-types";
+import type { LoyaltyEntry, Person, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
 import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
@@ -28,13 +28,18 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
 let held: TripT;
+let summary: TripSummaryT;
 let loyalty: LoyaltyEntry[];
+
+const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).endsWith("/summary") ? summary : undefined);
 
 function serve() {
   vi.mocked(api).mockImplementation(async (path, opts) => {
     if (path.endsWith("/reveal")) return { number: "DEMO1234567" };
     if (path === "/api/people") return { people: [jane, sam] };
     if (path === "/api/loyalty") return { loyalty, programs: {} };
+    if (path === "/api/distance-unit") return { distance_unit: "mi" };
+    if (path.endsWith("/summary")) return summary;
     if (path.startsWith("/api/segments/") && opts?.method === "DELETE") { held = { ...held, segments: held.segments.filter((s) => s.id !== 2) }; return { ok: true }; }
     if (path.startsWith("/api/segments/") && opts?.method === "POST") return flight;
     return held;
@@ -44,6 +49,7 @@ function serve() {
 beforeEach(() => {
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
+  summary = { days: 7, nights: 6, distance_km: 5570.2, flight_km: 5570.2, road_km: 0, road_estimated: false, states: [], countries: ["United Kingdom", "United States"], photos: { total: 0, inferred: 0 }, kinds: { flight: 1, hotel: 1, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
   loyalty = [membership(), membership({ id: 12, kind: "hotel", program: "Marriott Bonvoy", masked: "••••8899" })];
   route.page = "trip"; route.sub = "1"; route.query = ""; location.hash = "#trip/1";
   serve();
@@ -598,6 +604,7 @@ describe("Trip", () => {
     vi.mocked(api).mockImplementation(async (path) => {
       if (path === "/api/trips/1") return slow;
       if (path === "/api/trips/2") return trip([flight], { id: 2, name: "Trip to Auckland" });
+      if (numbers(path)) return numbers(path) as never;
       return path === "/api/people" ? { people: [jane, sam] } : { loyalty, programs: {} };
     });
     render(TripPage);
@@ -680,7 +687,7 @@ describe("Trip", () => {
     expect(screen.getByLabelText("Name")).toHaveValue("Trip to London");
     await u.clear(screen.getByLabelText("Name"));
     await u.type(screen.getByLabelText("Name"), "  Lisbon in spring ");
-    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: (opts.body as { name: string }).name } : held) as never);
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: (opts.body as { name: string }).name } : (numbers(path) ?? held)) as never);
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { name: "Lisbon in spring" } }));
     expect(await screen.findByRole("heading", { name: "Lisbon in spring" })).toBeInTheDocument();
@@ -704,7 +711,7 @@ describe("Trip", () => {
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST"
-      ? { ...held, destination: "Colorado & Texas", destination_manual: true } : held) as never);
+      ? { ...held, destination: "Colorado & Texas", destination_manual: true } : (numbers(path) ?? held)) as never);
     await u.type(screen.getByLabelText("Destination"), "Colorado & Texas");
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { destination: "Colorado & Texas" } }));
@@ -720,7 +727,7 @@ describe("Trip", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Enter a name for the trip");
     expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
     await u.type(screen.getByLabelText("Name"), "Nope");
-    vi.mocked(api).mockImplementation(async (_p, opts) => { if (opts?.method === "POST") throw new Error("The name is too long"); return held; });
+    vi.mocked(api).mockImplementation(async (path, opts) => { if (opts?.method === "POST") throw new Error("The name is too long"); return numbers(path) ?? held; });
     await u.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("The name is too long");
     expect(screen.getByLabelText("Name")).toHaveValue("Nope");
@@ -749,7 +756,7 @@ describe("Trip", () => {
     await u.type(screen.getByLabelText("Seat of Jane Doe"), "12A");
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
-      return held;
+      return numbers(path) ?? held;
     });
     await u.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
@@ -1397,7 +1404,7 @@ describe("Trip on a phone", () => {
     await u.type(within(sheet).getByLabelText("Seat of Jane Doe"), "12A");
     vi.mocked(api).mockImplementation(async (path, opts) => {
       if (opts?.method === "POST") throw new Error("Someone on this isn’t in People");
-      return held;
+      return numbers(path) ?? held;
     });
     await u.click(within(sheet).getByRole("button", { name: "Save changes" }));
     expect(await within(sheet).findByRole("alert")).toHaveTextContent("Someone on this isn’t in People");
@@ -1455,7 +1462,7 @@ describe("beside a list of trips", () => {
     await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
     await u.clear(screen.getByLabelText("Name"));
     await u.type(screen.getByLabelText("Name"), "Lisbon");
-    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: "Lisbon" } : held) as never);
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1" && opts?.method === "POST" ? { ...held, name: "Lisbon" } : (numbers(path) ?? held)) as never);
     await u.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
     expect(onchanged).toHaveBeenCalledWith();
@@ -1586,7 +1593,7 @@ describe("on its own page", () => {
     render(TripPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
-    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : (numbers(path) ?? held)) as never);
     await u.click(screen.getByRole("button", { name: "Save changes" }));
     await waitFor(() => expect(location.hash).toBe("#trip/7"));
   });
@@ -1667,5 +1674,112 @@ describe("Trip photos", () => {
     await screen.findByRole("list", { name: "Bookings" });
     expect(vi.mocked(api).mock.calls.some(([p]) => String(p).endsWith("/photos"))).toBe(false);
     expect(screen.queryByRole("region", { name: /^Photos/ })).toBeNull();
+  });
+});
+
+describe("Trip summary", () => {
+  it("shows the trip’s numbers in one line under its dates, asking once for the trip and once for the household’s unit", async () => {
+    summary = { ...summary, states: [], countries: ["United Kingdom"], photos: { total: 9, inferred: 2 } };
+    render(TripPage);
+    const line = await screen.findByTestId("trip-summary");
+    expect(line).toHaveAttribute("aria-label", "Trip summary");
+    expect(line).toHaveTextContent("7 days");
+    expect(line).toHaveTextContent("6 nights");
+    expect(line).toHaveTextContent("3,461 mi");
+    expect(line).toHaveTextContent("United Kingdom");
+    expect(line).toHaveTextContent("9 photos (2 placed from the itinerary)");
+    const bookings = screen.getByRole("list", { name: "Bookings" });
+    expect(line.compareDocumentPosition(bookings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1 }).compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(1);
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/distance-unit")).toHaveLength(1);
+  });
+
+  it("shows no line for a trip with nothing to count", async () => {
+    summary = { ...summary, days: 0, nights: 0, distance_km: 0, countries: [] };
+    render(TripPage);
+    await screen.findByRole("list", { name: "Bookings" });
+    await waitFor(() => expect(vi.mocked(api).mock.calls.some(([p]) => p === "/api/trips/1/summary")).toBe(true));
+    expect(screen.queryByTestId("trip-summary")).toBeNull();
+  });
+
+  it("shows no line, and the page still works, when the numbers can’t be read", async () => {
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => { if (String(path).endsWith("/summary")) throw new Error("down"); return answer(path, opts) as never; });
+    render(TripPage);
+    await screen.findByRole("list", { name: "Bookings" });
+    await waitFor(() => expect(vi.mocked(api).mock.calls.some(([p]) => p === "/api/trips/1/summary")).toBe(true));
+    expect(screen.queryByTestId("trip-summary")).toBeNull();
+  });
+
+  const saveTerminal = async () => {
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit JFK → LHR" }));
+    await u.clear(screen.getByLabelText("Terminal"));
+    await u.type(screen.getByLabelText("Terminal"), "7");
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
+  };
+
+  it("asks for the numbers again after an edit that changes no date or status, keeping the line until the new answer arrives", async () => {
+    summary = { ...summary, states: [], countries: ["Spain"] };
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("Spain");
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(1);
+    let release: (v: TripSummaryT) => void = () => {};
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (String(path).endsWith("/summary") ? new Promise((r) => { release = r as never; }) : answer(path, opts)) as never);
+    await saveTerminal();
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(2));
+    expect(screen.getByTestId("trip-summary")).toHaveTextContent("Spain");
+    release({ ...summary, countries: ["Portugal"] });
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("Portugal"));
+    expect(screen.getByTestId("trip-summary")).not.toHaveTextContent("Spain");
+  });
+
+  it("drops the line when the numbers can’t be read again after an edit", async () => {
+    render(TripPage);
+    await screen.findByTestId("trip-summary");
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => { if (String(path).endsWith("/summary")) throw new Error("down"); return answer(path, opts) as never; });
+    await saveTerminal();
+    await waitFor(() => expect(screen.queryByTestId("trip-summary")).toBeNull());
+  });
+
+  it("asks for the numbers again after another trip is merged in, which replaces the trip without a reload", async () => {
+    summary = { ...summary, days: 7, nights: 6 };
+    const march = trip([segment({ id: 9, start_local: "2026-03-01T10:00", end_local: "2026-03-01T12:00" })], { id: 7, name: "Spring trip" });
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/trips" && !opts) return { trips: [held, march] } as never;
+      if (path === "/api/trips/1/merge") { summary = { ...summary, days: 40, nights: 39 }; return { ...held, segments: [...held.segments, ...march.segments] } as never; }
+      return answer(path, opts) as never;
+    });
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("7 days");
+    const u = userEvent.setup();
+    await tripOptions(u, "Merge another trip");
+    const dialog = await screen.findByRole("dialog");
+    const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
+    await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
+    await u.selectOptions(choose, "7");
+    await u.click(within(dialog).getByRole("button", { name: "Merge" }));
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("40 days"));
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(2);
+  });
+
+  it("asks for the numbers again after the trip’s own form saves a new copy of the trip", async () => {
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/trips/1" && opts?.method === "POST") { summary = { ...summary, days: 8 }; return { ...held, name: "Lisbon" } as never; }
+      return answer(path, opts) as never;
+    });
+    render(TripPage);
+    expect(await screen.findByTestId("trip-summary")).toHaveTextContent("7 days");
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
+    await u.clear(screen.getByLabelText("Name"));
+    await u.type(screen.getByLabelText("Name"), "Lisbon");
+    await u.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByTestId("trip-summary")).toHaveTextContent("8 days"));
   });
 });

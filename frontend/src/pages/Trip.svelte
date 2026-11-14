@@ -35,6 +35,7 @@
   import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import TripPhotos from "$lib/components/TripPhotos.svelte";
+  import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
@@ -49,6 +50,8 @@
   let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
 
   let trip = $state<Trip | null>(null);
+  let loads = $state(0);
+  const replace = (next: Trip) => { trip = next; loads++; };
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
@@ -128,7 +131,7 @@
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
       if (mine !== latest) return;
-      trip = t; people = p.people; loyalty = l.loyalty;
+      replace(t); people = p.people; loyalty = l.loyalty;
       void loadFlightStatus();
       void afterOnlineLoad(t);
     } catch (err) {
@@ -199,7 +202,7 @@
     if (!trip || !mergeWith) return;
     const body = { merge: Number(mergeWith), ...(confirm ? { confirm: true } : {}) };
     try {
-      trip = await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body });
+      replace(await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body }));
     } catch (e) {
       const said = e as { status?: number; data?: { see_booking?: unknown; see_trip?: unknown } };
       if (said.status === 409 && Array.isArray(said.data?.see_booking)) {
@@ -290,8 +293,9 @@
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       {#key id}
-        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
+        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { replace(next); onchanged?.(); }} />
       {/key}
+      {#if !editingTrip}<TripSummary tripId={t.id} revision={String(loads)} />{/if}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}

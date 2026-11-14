@@ -23,8 +23,12 @@ const auckland = trip([segment({ id: 2, trip_id: 2, origin: "JFK", destination: 
   travelers: [{ id: 3, person_id: 2, name: "Sam Doe", seat: null }] })], { id: 2, name: "Trip to Auckland" });
 const orlando = trip([segment({ id: 3, trip_id: 3, start_local: "2026-08-25T08:00", end_local: "2026-08-30T20:00", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] })], { id: 3, name: "Trip to Orlando" });
 
+const nothingToCount = { days: 0, nights: 0, distance_km: 0, flight_km: 0, road_km: 0, road_estimated: false, states: [], countries: [], photos: { total: 0, inferred: 0 }, kinds: { flight: 0, hotel: 0, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
+const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).endsWith("/summary") ? nothingToCount : undefined);
+
 function serve(trips = [london, auckland, orlando]) {
   vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (numbers(path)) return numbers(path) as never;
     if (path === "/api/segments" && opts?.method === "POST") return segment({ id: 9, trip_id: 5 });
     if (path === "/api/people") return { people: [jane, sam] };
     return { trips };
@@ -139,6 +143,7 @@ describe("Trips", () => {
 
   it("keeps what was typed and says why when a save fails", async () => {
     vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/segments" && opts?.method === "POST") throw new Error("This ends before it starts");
       return path === "/api/people" ? { people: [jane] } : { trips: [london] };
     });
@@ -200,6 +205,7 @@ describe("two panes", () => {
   function serveTrips() {
     const all = [london, auckland, orlando];
     vi.mocked(api).mockImplementation(async (path) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/people") return { people: [jane, sam] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
       const one = /^\/api\/trips\/(\d+)$/.exec(path);
@@ -321,6 +327,7 @@ describe("changing a trip in the pane", () => {
   function serveStateful() {
     store = [trip([...london.segments, second], { id: 1, name: "Trip to London" }), auckland, orlando];
     vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/people") return { people: [jane, sam] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
       const one = /^\/api\/trips\/(\d+)$/.exec(path);
@@ -435,6 +442,7 @@ describe("overlapping loads", () => {
     let holdNext = false;
     let latestName = "Trip to London";
     vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/people") return { people: [jane, sam] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
       const one = /^\/api\/trips\/(\d+)$/.exec(path);
@@ -644,6 +652,7 @@ describe("on a phone", () => {
   it("adds a trip from a name alone and opens its page", async () => {
     app.state = state({ person_id: 1 });
     vi.mocked(api).mockImplementation(async (path, opts) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/trips" && opts?.method === "POST") return trip([], { id: 8, name: "Lisbon" });
       return path === "/api/people" ? { people: [jane, sam] } : { trips: [london] };
     });
@@ -865,6 +874,7 @@ describe("trip cards on a phone and in two panes", () => {
   it("uses the compact row in two panes and keeps the picked trip current with a highlighted border", async () => {
     panes.two = true;
     vi.mocked(api).mockImplementation(async (path) => {
+    if (numbers(path)) return numbers(path) as never;
       if (path === "/api/people") return { people: [jane, sam] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
       const one = /^\/api\/trips\/(\d+)$/.exec(path);
