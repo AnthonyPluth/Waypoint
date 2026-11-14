@@ -13,7 +13,8 @@ from .. import oidc
 from ..storage import db, photo_sources, secretbox
 from ..storage import settings_keys as sk
 from ..storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, Segment, SegmentRecipient, Trip, TripPerson, User
-from . import people, photoqueue, photos, trippeople, trips, visibility
+from . import people, photomatch, photoqueue, photos, trippeople, trips, visibility
+from .stats import distance_km
 from .visibility import Viewer
 
 if TYPE_CHECKING:
@@ -238,14 +239,63 @@ def lock_trips_of(conn: db.Connection, *person_ids: int) -> list[int]:
     return lock_trips(conn, {t for person_id in person_ids for t in _reachable(conn, person_id)})
 
 
-def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], now: float | None = None) -> None:
+def home_now(conn: db.Connection) -> photomatch.HomeIn | None:
+    return photos.home_in(conn)
+
+
+def home_widened(was: photomatch.HomeIn | None, now: photomatch.HomeIn | None) -> bool:
+    radius = photomatch.HOME[was.precision] if was is not None else None
+    if was is None or radius is None:
+        return False
+    reach = photomatch.HOME[now.precision] if now is not None else None
+    if now is None or reach is None:
+        return True
+    return distance_km((was.latitude, was.longitude), (now.latitude, now.longitude)) + radius > reach
+
+
+def _trip_grants(conn: db.Connection) -> list[PhotoGrant]:
+    q = select(PhotoGrant).where(PhotoGrant.revoked.is_(None), PhotoGrant.scope == photos.TRIP).order_by(PhotoGrant.person_id, PhotoGrant.trip_id)
+    return list(conn.orm.scalars(q.execution_options(populate_existing=True)).all())
+
+
+def _lock_trip_grant_holders(conn: db.Connection) -> list[int]:
+    for person in sorted({g.person_id for g in _trip_grants(conn)}):
+        people.lock(conn, person)
+    return sorted({g.trip_id for g in _trip_grants(conn)})
+
+
+def _place_uncovered(conn: db.Connection, person_id: int, at_home: photomatch.HomeIn | None) -> None:
+    windows = photos.candidate_windows(conn, person_id)
+    q = select(Photo).join(PhotoSource, PhotoSource.id == Photo.source_id) \
+        .where(PhotoSource.person_id == person_id, Photo.trip_id.is_(None), Photo.match == photos.HOME).order_by(Photo.id)
+    for row in conn.orm.scalars(q).all():
+        photos.re_place(conn, row, person_id, windows, home=at_home)
+
+
+def _narrow_trip_grants(conn: db.Connection, held: Sequence[int], at_home: photomatch.HomeIn | None, now: float) -> None:
+    lock_grants_for(conn, held)
+    conn.orm.expire_all()
+    holders = sorted({g.person_id for g in _trip_grants(conn)})
+    for trip_id in held:
+        _ask_again(conn, trip_id, now)
+    for person in holders:
+        _place_uncovered(conn, person, at_home)
+
+
+def home_changed(conn: db.Connection, dated: Iterable[int], before: Mapping[int, Before], was: photomatch.HomeIn | None, now: float | None = None) -> None:
+    stamp = time.time() if now is None else now
+    at_home = home_now(conn)
+    widened = home_widened(was, at_home)
+    holding = _lock_trip_grant_holders(conn) if widened else []
     known = list(dated)
-    lock_trips(conn, known)
+    held = lock_trips(conn, [*holding, *known])
+    if widened:
+        _narrow_trip_grants(conn, [t for t in held if t in holding], at_home, stamp)
     fresh = [trip_id for trip_id in dated_trips(conn) if trip_id not in before]
     if fresh:
         aboard = trippeople.of(conn, fresh)
         before = {**before, **{trip_id: Before(None, frozenset(aboard[trip_id]), ()) for trip_id in fresh}}
-    trips_changed(conn, [*known, *fresh], before, now)
+    trips_changed(conn, [*known, *fresh], before, stamp)
 
 
 def dated_trips(conn: db.Connection) -> list[int]:
@@ -287,6 +337,9 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
           window: Mapping[str, str] | None = None, expected_changed: float | None = None,
           sources: Sequence[Mapping[str, object]] | None = None, audience: Sequence[object] | None = None, strict: bool = False,
           token: str | None = None) -> Sharing | None:
+    if viewer.household or not photos.acts_for(conn, viewer, person_id):
+        return None
+    lock_home(conn)
     acting = _acting(conn, viewer, person_id, trip_id)
     if acting is None or scope not in photos.SCOPES:
         return None
@@ -462,6 +515,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     by = photos.viewer_sub(conn, viewer)
     if by is None or (default_scope is not None and default_scope not in photos.SCOPES):
         return None
+    lock_home(conn)
     if not people.lock(conn, person_id) or not photos.acts_for(conn, viewer, person_id):
         return None
     stamp = time.time() if now is None else now
@@ -539,6 +593,9 @@ def _gone(conn: db.Connection, trip_id: int) -> list[int]:
 
 
 def reconcile(conn: db.Connection, trip_id: int, now: float | None = None) -> int:
+    if lock_trips(conn, [trip_id]) != [trip_id]:
+        return 0
+    lock_grants_for(conn, [trip_id])
     stamp = time.time() if now is None else now
     ended = [(p, trip_id) for p in _gone(conn, trip_id)]
     for person, trip in ended:
