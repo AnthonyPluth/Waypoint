@@ -290,6 +290,124 @@ class DecisionTests(SyncCase):
         self.assertEqual((self.rows(), self.syncs(), got.deleted), ({}, {}, 2))
 
 
+class PlacementStampTests(SyncCase):
+    def one(self, taken):
+        self.lib.items = [asset(1, taken, gps=SOHO)]
+        self.sync()
+        return self.rows()[self.lib.items[0]["id"]]
+
+    def bump(self):
+        self.lib.items = [{**a, "updatedAt": "2026-07-01T13:00:00.000Z"} for a in self.lib.items]
+
+    def stamp(self, photo_id):
+        self.c.orm.expire_all()
+        row = self.c.orm.get(Photo, photo_id)
+        return row.decided_by, row.trip_id, row.decided_at
+
+    def undo(self, photo_id, trip, stamp):
+        return photos.undo(self.c, self.jane, photo_id, trip, stamp, None)
+
+    def test_a_sync_between_a_pick_and_its_undo_leaves_the_undo_working(self):
+        row = self.one("2026-06-04T12:00:00Z")
+        self.assertEqual(row.trip_id, self.b)
+        picked = photos.decide(self.c, self.jane, row.id, self.a, None)
+        assert picked is not None
+        stamp = picked["decided_at"]
+        self.assertIsInstance(stamp, float)
+        self.c.commit()
+        self.bump()
+        self.sync(NOW + timedelta(hours=6))
+        self.assertEqual(self.stamp(row.id), ("owner", self.a, stamp))
+        self.assertIsNotNone(self.undo(row.id, self.a, stamp))
+        self.assertEqual(self.stamp(row.id), ("auto", self.b, None))
+
+    def test_a_full_relist_of_unchanged_assets_leaves_the_undo_of_a_keep_working(self):
+        row = self.one("2026-06-02T12:00:00Z")
+        kept = photos.decide(self.c, self.jane, row.id, self.a, None)
+        assert kept is not None
+        stamp = kept["decided_at"]
+        self.c.commit()
+        self.sync(NOW + timedelta(days=8), full=True)
+        self.sync(NOW + timedelta(days=16), full=True)
+        self.assertEqual(self.stamp(row.id), ("owner", self.a, stamp))
+        self.assertIsNotNone(self.undo(row.id, self.a, stamp))
+        self.assertEqual(self.stamp(row.id), ("auto", self.a, None))
+
+    def test_a_sync_that_takes_the_choice_away_refuses_the_old_undo_and_writes_nothing(self):
+        row = self.one("2026-06-04T12:00:00Z")
+        picked = photos.decide(self.c, self.jane, row.id, self.a, None)
+        assert picked is not None
+        stamp = picked["decided_at"]
+        self.c.execute(update(PhotoGrant).where(PhotoGrant.trip_id == self.a).values(revoked=9.0))
+        self.c.commit()
+        self.bump()
+        self.sync(NOW + timedelta(hours=6))
+        before = self.stamp(row.id)
+        self.assertEqual(before, ("auto", self.b, None))
+        with self.assertRaises(photos.Changed):
+            self.undo(row.id, self.a, stamp)
+        self.assertEqual(self.stamp(row.id), before)
+
+    def test_a_second_explicit_pick_gets_a_new_stamp_that_a_sync_then_keeps_and_the_old_undo_is_refused(self):
+        row = self.one("2026-06-04T12:00:00Z")
+        first = photos.decide(self.c, self.jane, row.id, self.a, None)
+        second = photos.decide(self.c, self.jane, row.id, self.a, None)
+        assert first is not None and second is not None
+        self.assertGreater(second["decided_at"], first["decided_at"])
+        self.c.commit()
+        self.bump()
+        self.sync(NOW + timedelta(hours=6))
+        self.assertEqual(self.stamp(row.id), ("owner", self.a, second["decided_at"]))
+        with self.assertRaises(photos.Changed):
+            self.undo(row.id, self.a, first["decided_at"])
+        self.assertEqual(self.stamp(row.id), ("owner", self.a, second["decided_at"]))
+        self.assertIsNotNone(self.undo(row.id, self.a, second["decided_at"]))
+
+    def test_a_row_without_a_stamp_stays_unstamped_through_a_sync(self):
+        row = self.one("2026-06-02T12:00:00Z")
+        self.c.execute(update(Photo).where(Photo.id == row.id).values(decided_by=photos.OWNER, decided_at=None))
+        self.c.commit()
+        self.bump()
+        self.sync(NOW + timedelta(hours=6))
+        self.sync(NOW + timedelta(days=8), full=True)
+        self.assertEqual(self.stamp(row.id), ("owner", self.a, None))
+
+    def test_twin_rows_of_one_asset_keep_one_stamp_through_a_sync_of_either_library(self):
+        second = photo_sources.save(self.c, self.jid, "u-jane", self.lib.url.replace("127.0.0.1", "localhost"), OWNER, KEY, None, 1.0)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-04T12:00:00Z", gps=SOHO)]
+        self.sync()
+        photosync.run(self.c, second, immich, NOW)
+        self.c.orm.expire_all()
+        both = list(self.c.orm.scalars(select(Photo).order_by(Photo.id)).all())
+        self.assertEqual(len(both), 2)
+        picked = photos.decide(self.c, self.jane, both[0].id, self.a, None)
+        assert picked is not None
+        stamp = picked["decided_at"]
+        self.c.commit()
+        self.bump()
+        photosync.run(self.c, second, immich, NOW + timedelta(hours=6))
+        self.assertEqual([self.stamp(p.id) for p in both], [("owner", self.a, stamp)] * 2)
+        self.sync(NOW + timedelta(hours=7))
+        self.assertEqual([self.stamp(p.id) for p in both], [("owner", self.a, stamp)] * 2)
+        self.assertIsNotNone(self.undo(both[0].id, self.a, stamp))
+        self.assertEqual([self.stamp(p.id) for p in both], [("auto", self.b, None)] * 2)
+
+    def test_copying_an_unstamped_placement_to_a_twin_leaves_the_twin_unstamped(self):
+        second = photo_sources.save(self.c, self.jid, "u-jane", self.lib.url.replace("127.0.0.1", "localhost"), OWNER, KEY, None, 1.0)
+        self.c.commit()
+        self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO)]
+        self.sync()
+        photosync.run(self.c, second, immich, NOW)
+        self.c.orm.expire_all()
+        first, twin = self.c.orm.scalars(select(Photo).order_by(Photo.id)).all()
+        self.c.execute(update(Photo).where(Photo.id == first.id).values(decided_by=photos.OWNER, decided_at=None))
+        self.c.commit()
+        self.c.orm.expire_all()
+        photos.copy_placement(self.c, self.c.orm.get(Photo, first.id), self.jid)
+        self.assertEqual((self.stamp(first.id), self.stamp(twin.id)), (("owner", self.a, None), ("owner", self.a, None)))
+
+
 class RelistTests(SyncCase):
     def test_a_weekly_re_list_deletes_rows_immich_no_longer_returns(self):
         self.lib.items = [asset(1, "2026-06-02T12:00:00Z", gps=SOHO), asset(2, "2026-06-04T12:00:00Z", gps=SOHO)]
