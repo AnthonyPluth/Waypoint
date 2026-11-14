@@ -1,0 +1,27 @@
+{
+  "name": "photos-sharing",
+  "page": "settings",
+  "signed_in": true,
+  "steps": [
+    { "goto": "#settings/photos" },
+    { "wait_for": "[data-testid=photo-grant]" },
+    { "screenshot": "list" },
+    { "click": "role=button[name='Share on Trip to Paris (Apr 2024)']" },
+    { "expect_text": { "selector": "[role=group][aria-labelledby^=photo-prompt-]", "text": "Only you see this. Nothing from your library is on the trip until you share it." } },
+    { "screenshot": "prompt" },
+    { "click": "role=button[name='Share on Trip to Paris (Apr 2024)']" },
+    { "click": "role=button[name='Show 6 more trips with your photos']" },
+    { "click": "role=button[name='Stop sharing on Trip to Denver (Feb 2026)']" },
+    { "expect_text": { "selector": "[role=dialog]", "text": "right away, for everyone: the gallery, the map, the replay and the trip’s counts." } },
+    { "screenshot": "stop" },
+    { "click": "[role=dialog] >> role=button[name='Keep sharing']" },
+    { "click": "label:has-text('Everyone on the trip')" },
+    { "wait_for": "label:has-text('Everyone on the trip') input:checked" },
+    { "click": "label:has-text('Share on all my trips')" },
+    { "expect_text": { "selector": "[role=dialog]", "text": "This applies to every trip you’re on now and to trips you join later." } },
+    { "screenshot": "share-all" },
+    { "click": "[role=dialog] >> role=button[name='Cancel']" },
+    { "click": "fieldset >> nth=0 >> label:has-text('Only me')" },
+    { "wait_for": "fieldset >> nth=0 >> label:has-text('Only me') input:checked" }
+  ]
+}

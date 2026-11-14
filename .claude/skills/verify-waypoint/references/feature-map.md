@@ -769,6 +769,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Fakes (the demo server can't):** `fake_immich`.
 - **Drive it:** `tools/control flow photos-connect`; or `poetry run python run.py verify --flow photos-connect`.
 
+#### `photos-sharing`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Touches:** `Everyone on the trip`, `Share on all my trips`, `Only me`.
+- **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `This applies to every trip you’re on now and to trips you join later.`.
+- **Drive it:** `tools/control flow photos-sharing`; or `poetry run python run.py verify --flow photos-sharing`.
+
 #### `review-at-a-glance`
 
 - **Starts at:** `#settings`; goes to: `#settings/mail`.
