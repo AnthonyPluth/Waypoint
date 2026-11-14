@@ -140,6 +140,18 @@ def _served(conn, photo_id) -> tuple[Viewer, photoproxy.Served]:
 
 def _rendition(conn, photo_id, size: photos.Rendition) -> Response:
     _, found = _served(conn, photo_id)
+    return _picture(conn, found, size)
+
+
+def api_photo_removed_thumbnail(conn, _q, _b, trip_id, photo_id) -> Response:
+    who = _viewer(conn)
+    found = photoproxy.find_removed(conn, who, row_id(trip_id, NO_IMAGE), row_id(photo_id, NO_IMAGE))
+    if found is None:
+        raise ApiError(NO_IMAGE, 404)
+    return _picture(conn, found, "thumbnail")
+
+
+def _picture(conn, found: photoproxy.Served, size: photos.Rendition) -> Response:
     tag = photoproxy.etag(found, size)
     if request_header("If-None-Match") == tag:
         return Response(b"", "image/png", cache=RENDITION_CACHE, etag=tag, csp=IMAGE_CSP)

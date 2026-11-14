@@ -73,7 +73,14 @@ _lock = threading.Lock()
 
 
 def find(conn: db.Connection, viewer: Viewer, photo_id: int) -> Served | None:
-    found = photos.served(conn, viewer, photo_id)
+    return _serving(conn, photos.served(conn, viewer, photo_id))
+
+
+def find_removed(conn: db.Connection, viewer: Viewer, trip_id: int, photo_id: int) -> Served | None:
+    return _serving(conn, next(((p, person) for p, person in photos.removed(conn, viewer, trip_id) if p.id == photo_id), None))
+
+
+def _serving(conn: db.Connection, found: photos.Found | None) -> Served | None:
     if found is None:
         return None
     photo = found[0]

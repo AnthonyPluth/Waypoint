@@ -1,8 +1,8 @@
 import { toast } from "svelte-sonner";
 import { actGet, errMsg } from "./act";
-import type { Person, PhotoGrantPerson, PhotoSharing, Trip } from "./api-types";
+import type { Person, PhotoGrantPerson, PhotoSharing, Trip, TripPhoto } from "./api-types";
 import { apiCall } from "./contract";
-import { isStale, narrowedToast, photosOf, photosTitle, sharedWith, shareAllBody, shareBody, stateOf, unsharedOf, whoIs, type Scope, type Who } from "./photo-sharing";
+import { isStale, narrowedToast, photosOf, photosTitle, removedToast, sharedWith, shareAllBody, shareBody, stateOf, unsharedOf, whoIs, type Scope, type Who } from "./photo-sharing";
 
 export const OUT_OF_DATE_HERE = "Couldn’t refresh your photo sharing for this trip, so what shows may be out of date.";
 export const NOT_LOADED_HERE = "Couldn’t load your photo sharing for this trip.";
@@ -14,7 +14,7 @@ export type Asking =
   | { kind: "all"; person: PhotoGrantPerson; photos: number | null; note: string }
   | { kind: "stop" };
 
-type Hooks = { changed: () => Promise<unknown> };
+type Hooks = { changed: () => Promise<unknown>; dropped?: (ids: number[]) => void };
 
 const statusOf = (err: unknown): unknown => (err as { status?: unknown } | null)?.status;
 
@@ -43,17 +43,21 @@ export class PersonSharing {
   reopened = $state(false);
   asking = $state<Asking | null>(null);
   dialog = $state(false);
+  removedOpen = $state(false);
   opener: HTMLElement | null = null;
   private ticket = 0;
+  private freed: (() => void)[] = [];
+  private undos: Promise<void> = Promise.resolve();
   private gone = false;
   who = $state<Who>(whoIs(-1, null, []));
 
-  constructor(readonly tripId: number, readonly personId: number, me: number | null, people: Person[], private hooks: Hooks) {
+  constructor(readonly tripId: number, readonly personId: number, me: number | null, people: Person[], private hooks: Hooks, public tripName = "this trip") {
     this.relabel(me, people);
   }
 
-  relabel(me: number | null, people: Person[]): void {
+  relabel(me: number | null, people: Person[], tripName = this.tripName): void {
     this.who = whoIs(this.personId, me, people);
+    this.tripName = tripName;
   }
 
   readonly mode = $derived.by((): Mode => {
@@ -95,7 +99,22 @@ export class PersonSharing {
   private async hold<T>(fn: () => Promise<T>): Promise<T> {
     this.busy = true;
     try { return await fn(); }
-    finally { this.busy = false; }
+    finally {
+      this.busy = false;
+      for (const wake of this.freed.splice(0)) wake();
+    }
+  }
+
+  private async free(): Promise<void> {
+    while (this.busy) await new Promise<void>((wake) => this.freed.push(wake));
+  }
+
+  private settle(reply: PhotoSharing, mine: number): void {
+    if (mine !== this.ticket || this.gone) return;
+    this.sharing = reply;
+    this.problem = "";
+    this.off = false;
+    if (reply.removed_count === 0) this.removedOpen = false;
   }
 
   private async afterChange(): Promise<boolean> {
@@ -271,6 +290,69 @@ export class PersonSharing {
       return false;
     }
     await this.afterChange();
+    return true;
+  });
+
+  remove = (ids: number[]): Promise<boolean> => this.hold(() => this.removeNow(ids));
+
+  private async removeNow(ids: number[]): Promise<boolean> {
+    const mine = ++this.ticket;
+    let reply: PhotoSharing;
+    try {
+      reply = await apiCall<"POST /api/trips/{id}/photo-exclusions">(`/api/trips/${this.tripId}/photo-exclusions`, { method: "POST", body: { photo_ids: ids }, failed: "Couldn’t remove it" });
+    } catch (err) {
+      toast.error(errMsg(err));
+      if (statusOf(err) === 404 && !this.gone) await this.afterChange();
+      return false;
+    }
+    this.settle(reply, mine);
+    if (!this.gone) this.hooks.dropped?.(ids);
+    const stamps = new Map(reply.removed.map((p) => [p.id, p.removed_at]));
+    toast(removedToast(this.who, ids.length, this.tripName), { action: { label: "Undo", onClick: () => { void this.undoRemoval(ids.map((id) => ({ id, created: stamps.get(id) ?? null }))); } } });
+    if (!this.gone) await this.afterChange();
+    return true;
+  }
+
+  private undoRemoval = (removed: { id: number; created: number | null }[]): Promise<void> => {
+    const run = this.undos.then(() => this.undoNow(removed));
+    this.undos = run.catch(() => undefined);
+    return run;
+  };
+
+  private async undoNow(removed: { id: number; created: number | null }[]): Promise<void> {
+    await this.free();
+    await this.hold(async () => {
+      let done = 0;
+      for (const { id, created } of removed) {
+        try {
+          await this.putBackRequest(id, created);
+          done++;
+        } catch (err) {
+          toast.error(isStale(err) ? errMsg(err) : `${errMsg(err)}${removed.length > 1 ? ` ${done} of ${removed.length} are back.` : ""}`);
+          break;
+        }
+      }
+      if (!this.gone) await this.afterChange();
+    });
+  }
+
+  private putBackRequest(id: number, created: number | null): Promise<PhotoSharing> {
+    const stamp = created === null ? "" : `?created=${encodeURIComponent(String(created))}`;
+    return apiCall<"DELETE /api/trips/{id}/photo-exclusions/{id}">(`/api/trips/${this.tripId}/photo-exclusions/${id}${stamp}`, { method: "DELETE", failed: "Couldn’t put it back" });
+  }
+
+  putBack = (photo: TripPhoto): Promise<boolean> => this.hold(async () => {
+    const mine = ++this.ticket;
+    let reply: PhotoSharing;
+    try {
+      reply = await this.putBackRequest(photo.id, photo.removed_at);
+    } catch (err) {
+      toast.error(errMsg(err));
+      if ((isStale(err) || statusOf(err) === 404) && !this.gone) await this.afterChange();
+      return false;
+    }
+    this.settle(reply, mine);
+    if (!this.gone) await this.afterChange();
     return true;
   });
 }
