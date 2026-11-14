@@ -448,7 +448,9 @@
       "method": "GET",
       "path": "/api/photos/review",
       "handler": "waypoint/server/api/photos.py:api_photo_review",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -464,7 +466,9 @@
       "method": "POST",
       "path": "/api/photos/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_decide",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosNeedsLook.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -702,7 +706,9 @@
       "method": "POST",
       "path": "/api/trips/{id}/photo-exclusions",
       "handler": "waypoint/server/api/photos.py:api_photo_exclude",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosNeedsLook.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",

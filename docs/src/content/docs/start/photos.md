@@ -92,6 +92,15 @@ For the map, the photos are grouped into clusters: photos taken within a few kil
 
 A photo Waypoint could not settle waits under **Needs a look** for the person whose library it came from: one taken during two overlapping trips they shared that distance could not tell apart, or one taken far from every booking of the trip it matched. Each is listed with the trips it could belong to, which are only trips its person shared and did not remove it from. The person picks the trip, accepts the match as it is, removes it from its trip, or leaves an unsettled photo off every trip it could belong to; a photo they have placed by hand keeps that trip through every later sync. A photo can only be moved to a trip its person is on and has shared their photos on.
 
+The list is in **Settings**, under **Photos**, in the card of the library the photos came from, headed **Needs a look** with how many there are. Only that library's person sees it; for a library whose person does not sign in, the member who manages it sees it and decides for them. Each photo shows its thumbnail, when it was taken and why it is there: "Fits two trips: …", or "On this trip, but taken 612 km from every booking" with an amber **Far** tag.
+
+- **Pick a trip** opens a sheet with the trips the photo could belong to; **Put on** that trip files it there. Only trips its person shared photos on are listed.
+- **Leave off** (a photo that fits two trips) keeps it off every trip it could belong to.
+- **Keep on this trip** (a far photo) accepts it, so it counts in the trip's figures.
+- **Remove from this trip** (a far photo) takes it off the trip for everyone; it can be put back from the trip's page.
+
+The list shows three photos at a time, with **Show more**. When a choice is saved the photo leaves the list and the counts update. If Waypoint can't refresh the list afterwards it says the list may be out of date and offers **Try again**; if the photo changed while you were looking, it says so and you choose again.
+
 ## Who sees what
 
 A trip you cannot see answers as if it did not exist, and so does a photo you may not see. Seeing a trip is not enough to see a photo on it: the photo’s person must have shared their photos on that trip with everyone and you must be one of the trip’s people, or you must be that person (or share for them), and the photo must not have been removed from the trip. The same photo reached through two of a person’s libraries is one photo. Two people on the same trip can therefore see different photos, different counts and different places, and neither is told of the difference. Photos are off without sign-in (local mode), and assistants connected over MCP never reach photos, grants or removals.

@@ -39,7 +39,7 @@
 
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
-  import type { Person, PhotoSources } from "$lib/api-types";
+  import type { Person, PhotoSources, ReviewPhoto } from "$lib/api-types";
   import { app } from "$lib/app.svelte";
   import { avatarTone } from "$lib/avatar";
   import StatusChip from "$lib/components/StatusChip.svelte";
@@ -49,6 +49,8 @@
   import { apiCall } from "$lib/contract";
   import { draftGuard } from "$lib/drafts.svelte";
   import { initials } from "$lib/nav";
+  import { whoIs } from "$lib/photo-sharing";
+  import PhotosNeedsLook from "./PhotosNeedsLook.svelte";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import { toast } from "svelte-sonner";
@@ -66,19 +68,61 @@
   const nameOf = (id: number) => personOf(id)?.display_name ?? "Someone";
   const libraryOf = (s: PhotoSource) => `${nameOf(s.person_id)}’s library`;
 
+  let latest = 0;
   async function load() {
+    const mine = ++latest;
     try {
       const [found, everyone] = await Promise.all([
         apiCall<"GET /api/photo-sources">("/api/photo-sources"),
         people.length ? Promise.resolve({ people }) : apiCall<"GET /api/people">("/api/people"),
       ]);
+      if (mine !== latest) return;
       list = found; people = everyone.people; problem = ""; off = false;
     } catch (err) {
+      if (mine !== latest) return;
       problem = errMsg(err);
       off = (err as { status?: unknown } | null)?.status === 404;
     }
   }
-  onMount(load);
+
+  let review = $state<ReviewPhoto[] | null>(null);
+  let reviewProblem = $state(false);
+  let reviewing = $state(false);
+  let reviewLatest = 0;
+
+  async function loadReview() {
+    const mine = ++reviewLatest;
+    if (!list?.sources.some((s) => s.mine)) { review = null; reviewProblem = false; return; }
+    reviewing = true;
+    try {
+      const found = await apiCall<"GET /api/photos/review">("/api/photos/review", { keep: true });
+      if (mine !== reviewLatest) return;
+      review = found.photos; reviewProblem = false;
+    } catch {
+      if (mine === reviewLatest) reviewProblem = true;
+    } finally {
+      if (mine === reviewLatest) reviewing = false;
+    }
+  }
+
+  async function refresh() {
+    await load();
+    await loadReview();
+  }
+  onMount(refresh);
+
+  async function decided(id: number) {
+    if (review) review = review.filter((p) => p.id !== id);
+    await refresh();
+    onchange();
+  }
+
+  const lookAt = $derived.by(() => {
+    const first = new Map<number, number>();
+    for (const s of list?.sources ?? []) if (s.mine && !first.has(s.person_id)) first.set(s.person_id, s.id);
+    return first;
+  });
+  const lookFor = (personId: number) => (review ?? []).filter((p) => p.person_id === personId);
 
   const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
   const synced = (stamp: string) => new Date(stamp).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
@@ -121,6 +165,7 @@
         clearInterval(timer);
         watching.delete(timer);
         syncing = syncing.filter((id) => id !== s.id);
+        void loadReview();
       }
     }, SYNC_POLL_MS);
     watching.add(timer);
@@ -147,7 +192,7 @@
     }
     await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: snapshot ? { paused, snapshot } : { paused }, failed: paused ? "Couldn’t pause it" : "Couldn’t resume it" });
     toast.success(paused ? "Paused" : "Resumed");
-    await load();
+    await refresh();
     onchange();
   }, { busy: (on) => (pausing = on ? s.id : null), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
 
@@ -171,7 +216,7 @@
       await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: { key: newKey }, failed: "Couldn’t change the key" });
       newKey = ""; rekeying = null;
       toast.success("Key changed");
-      await load();
+      await refresh();
       onchange();
     }, { busy: (on) => (savingKey = on), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
   };
@@ -192,7 +237,7 @@
     return act(async () => {
       await apiCall<"DELETE /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "DELETE", failed: "Couldn’t remove it" });
       toast.success(`${libraryOf(s)} removed`);
-      await load();
+      await refresh();
       onchange();
     });
   }
@@ -263,7 +308,7 @@
       clearForm();
       connecting = false;
       toast.success("Library connected");
-      await load();
+      await refresh();
       onchange();
     }, { busy: (on) => (saving = on), onError: (message, err) => { tested = null; result = outcome(err, message); } });
   };
@@ -276,7 +321,7 @@
   <p class="px-1 text-sm text-muted-foreground">Waypoint shows each person’s photos from their Immich library on the trips they were on.</p>
   <div class="rows">
     {#if problem}
-      <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p>{#if !off}<Button variant="outline" onclick={load}>Try again</Button>{/if}</div>
+      <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p>{#if !off}<Button variant="outline" onclick={refresh}>Try again</Button>{/if}</div>
     {:else if !list}
       <div class="row"><p class="text-sm text-muted-foreground">Loading…</p></div>
     {:else}
@@ -323,12 +368,18 @@
                 </div>
               </form>
             {/if}
+            {#if review !== null && lookAt.get(s.person_id) === s.id}
+              <PhotosNeedsLook photos={lookFor(s.person_id)} who={whoIs(s.person_id, me, people)} ondecided={decided} />
+            {/if}
             {#if notice}
               <p id={`photo-notice-${s.id}`} class="text-sm" role="alert">{#if notice.chip}<StatusChip chip={notice.chip} class="mr-2 align-middle" />{/if}<span>{notice.text}</span></p>
             {/if}
           {/if}
         </div>
       {/each}
+      {#if reviewProblem}
+        <div class="row"><p class="text-sm text-signal-ink" role="alert">Couldn’t refresh which photos need a look, so that list may be out of date.</p><Button variant="outline" size="sm" disabled={reviewing} onclick={loadReview}>Try again</Button></div>
+      {/if}
       <div class="row">
         <h3 id="photo-connect-title" class="font-medium">Connect an Immich library</h3>
         <Button size="sm" aria-expanded={connecting} aria-controls={connecting ? "photo-connect" : undefined} onclick={toggleConnect}>{connecting ? "Cancel" : "Connect"}</Button>

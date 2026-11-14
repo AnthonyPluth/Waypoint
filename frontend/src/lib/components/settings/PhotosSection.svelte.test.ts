@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act as flush, render, screen, waitFor, within } from "@testing-library/svelte";
+import { act as flush, cleanup, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import type { Person, PhotoSource } from "$lib/api-types";
+import type { Person, PhotoSource, ReviewPhoto } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { toast } from "svelte-sonner";
 import { state } from "../../../test/fixtures";
@@ -39,6 +39,7 @@ function serve(sources: PhotoSource[], more: Reply = () => undefined) {
     if (answered !== undefined) return answered as never;
     if (path === "/api/photo-sources") return { sources, permissions: PERMISSIONS } as never;
     if (path === "/api/people") return { people: PEOPLE } as never;
+    if (path === "/api/photos/review") return { photos: [] } as never;
     return {} as never;
   });
 }
@@ -455,5 +456,131 @@ describe("Settings → Photos helpers", () => {
   it("keeps Waypoint's own connection problems apart from Immich's", () => {
     expect(outcome(new Refusal("Can’t reach Waypoint.", 0), "Can’t reach Waypoint.")).toEqual({ text: "Can’t reach Waypoint." });
     expect(outcome(new Error("odd"), "odd")).toEqual({ text: "odd" });
+  });
+});
+
+const look = (id: number, person_id = 1, extra: Partial<ReviewPhoto> = {}): ReviewPhoto => ({
+  id, person_id, trip_id: null, kind: "image", taken_local: "2026-09-13T17:40:00", zone: null, latitude: null, longitude: null, location_source: null, segment_id: null,
+  match: "ambiguous", distance_km: null, cluster: null, removed_at: null, candidates: [{ id: 11, name: "Canyon weekend" }, { id: 12, name: "Redstone weekend" }], ...extra,
+});
+
+describe("Settings → Photos, Needs a look", () => {
+  it("lists a person’s photos in their own card only, once, and asks for nothing when there is no library", async () => {
+    serve([source(), theirs, source({ id: 9, person_id: 3 }), source({ id: 10, person_id: 1, url: "https://second.brook.example" })], (path) => {
+      if (path === "/api/photos/review") return { photos: [look(21), look(22, 3)] };
+    });
+    render(PhotosSection);
+    const cards = await screen.findAllByTestId("photo-source");
+    await waitFor(() => expect(within(cards[0]).getByTestId("needs-a-look")).toBeInTheDocument());
+    expect(within(cards[0]).getByText("1 photo")).toBeInTheDocument();
+    expect(within(cards[1]).queryByTestId("needs-a-look")).toBeNull();
+    expect(within(cards[2]).getByText("Only you see this list, because you manage June’s library.")).toBeInTheDocument();
+    expect(within(cards[3]).queryByTestId("needs-a-look")).toBeNull();
+    expect(screen.getAllByRole("list", { name: "Photos that need a look" })).toHaveLength(2);
+  });
+
+  it("renders nothing and never asks for the list when the viewer has no library of their own", async () => {
+    serve([theirs]);
+    render(PhotosSection);
+    await screen.findByTestId("photo-source");
+    expect(screen.queryByTestId("needs-a-look")).toBeNull();
+    expect(vi.mocked(api).mock.calls.some(([p]) => p === "/api/photos/review")).toBe(false);
+    cleanup();
+    serve([]);
+    render(PhotosSection);
+    await screen.findByText("No Immich library connected yet.");
+    expect(screen.queryByTestId("needs-a-look")).toBeNull();
+    expect(vi.mocked(api).mock.calls.some(([p]) => p === "/api/photos/review")).toBe(false);
+  });
+
+  it("Pick sends the trip, drops the row, and refreshes the list and the card’s counts", async () => {
+    let pending = [look(21), look(22)];
+    let photos = 1904;
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ photos })], permissions: PERMISSIONS };
+      if (path === "/api/photos/review") return { photos: pending };
+      if (path === "/api/photos/21" && opts?.method === "POST") { pending = [look(22)]; photos = 1905; return {}; }
+    });
+    const changed = vi.fn();
+    render(PhotosSection, { onchange: changed });
+    const user = userEvent.setup();
+    await screen.findByText("2 photos");
+    await user.click(screen.getAllByRole("button", { name: /^Pick a trip/ })[0]);
+    await user.click(await screen.findByRole("button", { name: "Put on Canyon weekend" }));
+    await waitFor(() => expect(screen.getByText("1 photo")).toBeInTheDocument());
+    expect(calls("POST", "/api/photos/21")[0][1]).toMatchObject({ body: { trip_id: 11 } });
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    expect(screen.getByText(/· 1,905 photos on 12 trips$/)).toBeInTheDocument();
+    expect(changed).toHaveBeenCalled();
+  });
+
+  it("Leave off removes the row the same way", async () => {
+    let pending = [look(21)];
+    serve([source()], (path, opts) => {
+      if (path === "/api/photos/review") return { photos: pending };
+      if (path === "/api/photos/21" && opts?.method === "POST") { pending = []; return {}; }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: /^Leave off, the photo/ }));
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(calls("POST", "/api/photos/21")[0][1]).toMatchObject({ body: { excluded: true } });
+  });
+
+  it("says the list may be out of date when the reload fails after a change, drops the decided row, and Try again reloads", async () => {
+    let fail = false;
+    serve([source()], (path, opts) => {
+      if (path === "/api/photos/review") { if (fail) throw new Refusal("Can’t reach Waypoint.", 0); return { photos: [look(21), look(22)] }; }
+      if (path === "/api/photos/21" && opts?.method === "POST") { fail = true; return {}; }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup();
+    await screen.findByText("2 photos");
+    await user.click(screen.getAllByRole("button", { name: /^Leave off, the photo/ })[0]);
+    const alert = await screen.findByText("Couldn’t refresh which photos need a look, so that list may be out of date.");
+    expect(alert).toBeInTheDocument();
+    expect(screen.getByText("1 photo")).toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.queryByText(/may be out of date/)).toBeNull());
+    expect(screen.getByText("2 photos")).toBeInTheDocument();
+  });
+
+  it("says so when the list can’t be loaded the first time", async () => {
+    serve([source()], (path) => { if (path === "/api/photos/review") throw new Refusal("Can’t reach Waypoint.", 0); });
+    render(PhotosSection);
+    expect(await screen.findByText(/may be out of date/)).toBeInTheDocument();
+    expect(screen.queryByTestId("needs-a-look")).toBeNull();
+  });
+
+  it("never lets a late reply to an older list replace a newer one", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let synced = "2026-11-06T11:12:00+00:00";
+    let calls_ = 0;
+    let release: (v: unknown) => void = () => {};
+    let pending = [look(21), look(22)];
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ last_sync: synced })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/sync" && opts?.method === "POST") return { started: true };
+      if (path === "/api/photos/21" && opts?.method === "POST") return {};
+      if (path === "/api/photos/review") {
+        calls_ += 1;
+        if (calls_ === 1) return { photos: pending };
+        if (calls_ === 2) return new Promise((resolve) => (release = resolve));
+        return { photos: [] };
+      }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await screen.findByText("2 photos");
+    await user.click(screen.getAllByRole("button", { name: /^Leave off, the photo/ })[0]);
+    await waitFor(() => expect(calls_).toBe(2));
+    await user.click(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" }));
+    synced = "2026-11-06T12:12:00+00:00";
+    await flush(() => vi.advanceTimersByTimeAsync(5000));
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+    release({ photos: pending });
+    await flush(() => vi.advanceTimersByTimeAsync(50));
+    expect(screen.getByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(screen.queryByText("2 photos")).toBeNull();
   });
 });
