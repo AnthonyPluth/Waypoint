@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
-vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
+vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), dismiss: vi.fn() }) }));
 
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
@@ -15,6 +15,7 @@ import { viewport } from "$lib/phone.svelte";
 import { toast } from "svelte-sonner";
 import ReviewPage, { providerFrom, REASONS } from "./Review.svelte";
 
+const DISMISS_MS = 6000;
 const settled = () => waitFor(() => { expect(screen.queryByRole("dialog")).toBeNull(); expect(document.body.style.pointerEvents).not.toBe("none"); });
 
 const item = (extra: Partial<ReviewItem> = {}): ReviewItem => ({
@@ -76,8 +77,8 @@ function serve(failOn?: string) {
   });
 }
 
-afterEach(() => { setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; dismissedOnAsk = {}; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+afterEach(() => { vi.useRealTimers(); setQuery(""); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); vi.mocked(toast.dismiss).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; dismissedOnAsk = {}; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -138,22 +139,99 @@ describe("Review", () => {
     expect(calls).toContainEqual(["/api/review/4/preview", undefined, undefined]);
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await settled();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Dismiss" }));
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
   });
 
-  it("dismisses an item", async () => {
+  const undoOf = () => (vi.mocked(toast.success).mock.calls.at(-1)![1] as unknown as { duration: number; action: { label: string; onClick: () => void } });
+  const deletes = () => calls.filter(([, method]) => method === "DELETE");
+
+  it("dismisses an item at once, with no question, and sends the request when the Undo window ends", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
-    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/deletes its stored copy of this email/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/can’t be undone/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Dismiss" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Dismissed");
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    expect(toast.success).toHaveBeenCalledWith("Dismissed", expect.objectContaining({ duration: DISMISS_MS, action: expect.objectContaining({ label: "Undo" }) }));
+    await vi.advanceTimersByTimeAsync(DISMISS_MS - 1000);
+    expect(deletes()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1000);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("puts the item back on Undo and never sends the request", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    undoOf().action.onClick();
+    expect(await screen.findByTestId("review-item")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(DISMISS_MS * 2);
+    expect(deletes()).toEqual([]);
+    expect(screen.getByTestId("review-item")).toBeInTheDocument();
+  });
+
+  it("sends the request at once when the person leaves the page", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const view = render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    expect(deletes()).toEqual([]);
+    view.unmount();
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    await vi.advanceTimersByTimeAsync(DISMISS_MS * 2);
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("sends the request when the page is hidden for good", async () => {
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    window.dispatchEvent(new Event("pagehide"));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+  });
+
+  it("brings the item back with the error when the delayed request fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    serve("/api/review/1");
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Refused."));
+    expect(await screen.findByTestId("review-item")).toBeInTheDocument();
+  });
+
+  it("gives each of two dismissals in a row its own Undo window", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(screen.getAllByTestId("review-item")).toHaveLength(1));
+    const first = undoOf();
+    await vi.advanceTimersByTimeAsync(2000);
+    await userEvent.click(screen.getByRole("button", { name: /^Dismiss: / }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    const second = undoOf();
+    expect(second).not.toBe(first);
+    await vi.advanceTimersByTimeAsync(DISMISS_MS - 2000);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(deletes()).toHaveLength(1);
+    second.action.onClick();
+    expect(await screen.findByTestId("review-item")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("moves focus to the next item after a dismissal", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    render(ReviewPage);
+    const menus = await screen.findAllByTestId("action-menu");
+    const next = within(menus[1]!).getByText("More").closest("summary") as HTMLElement;
+    await userEvent.click(within(menus[0]!).getByText("More"));
+    await userEvent.click(within(menus[0]!).getByRole("button", { name: /^Dismiss/ }));
+    await waitFor(() => expect(next).toHaveFocus());
   });
 
   it("shows items about one reservation as one row with a count, the newest first, and the others behind a disclosure", async () => {
@@ -180,17 +258,19 @@ describe("Review", () => {
     expect(screen.queryByTestId("same-reservation")).toBeNull();
   });
 
-  it("dismisses the whole group from its row and says how many went", async () => {
+  it("dismisses the whole group from its row, says how many went and sends one request after the Undo window", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
       { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
       { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Dismiss all: 3 emails about “Online check-in is open”" }));
-    expect(within(await screen.findByRole("dialog")).getByText(/all 3 emails about this reservation/)).toBeInTheDocument();
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss all" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails", expect.objectContaining({ action: expect.objectContaining({ label: "Undo" }) }));
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    expect(deletes()).toEqual([]);
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
   });
 
   it("adds a legacy generic suggestion without a sender-trust prompt", async () => {
@@ -1924,7 +2004,7 @@ describe("Review as a queue of decisions", () => {
     expect(menu).not.toHaveAttribute("open");
   });
 
-  it("closes the menu when an action in it is chosen, and returns focus to it when the question is cancelled", async () => {
+  it("closes the menu when an action in it is chosen", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
     const menu = await screen.findByTestId("action-menu");
@@ -1932,11 +2012,7 @@ describe("Review as a queue of decisions", () => {
     await u.click(summary);
     await u.click(within(menu).getByRole("button", { name: /^Dismiss/ }));
     expect(menu).not.toHaveAttribute("open");
-    const dialog = await screen.findByRole("dialog");
-    await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(summary).toHaveFocus());
-    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("keeps the warning about where the text goes beside the button that sends it", async () => {

@@ -586,13 +586,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Review`, `Show the email`.
 - **Drive it:** `tools/control flow review-collapse-email`; or `poetry run python run.py verify --flow review-collapse-email`.
 
-#### `review-dismiss-confirm`
+#### `review-dismiss-undo`
 
 - **Starts at:** `#review`.
 - **Widths:** phone, desktop.
-- **Touches:** `Dismiss`.
-- **Expects to see:** `can’t be undone`.
-- **Drive it:** `tools/control flow review-dismiss-confirm`; or `poetry run python run.py verify --flow review-dismiss-confirm`.
+- **Touches:** `Dismiss`, `Undo`.
+- **Expects to see:** `Undo`.
+- **Drive it:** `tools/control flow review-dismiss-undo`; or `poetry run python run.py verify --flow review-dismiss-undo`.
 
 #### `review-held-match`
 
