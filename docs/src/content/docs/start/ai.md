@@ -53,6 +53,8 @@ When the AI reads a message automatically during a scan, Waypoint attaches it to
 
 A complete reading of a booking you already have is never dismissed this way. It is filed as before: the email is kept with that booking and the item leaves Review, so nothing in it is lost and its date still counts when a later email is compared with it ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)).
 
+The order of the emails decides, never the model. When the reading is of an email dated before the newest one kept for that booking (even one that says the booking changed), it never overwrites what the booking holds: the booking’s times, airports and details stay as they are. If everything it states is already on the booking, it is attached and leaves Review. If it says anything different (another time, a total the booking lacks, a traveller who isn’t on it), it stays in Review as a suggestion for you to check, and nothing is changed until you decide. The same holds for a booking that was cancelled, and an email with no date can add details the booking lacks but never replaces a time. A newer email, or one dated the same day as the newest, still updates the booking as before.
+
 **Already known.** A flight reading the model couldn’t complete (a reminder or a check-in notice without the confirmation code, say), which would otherwise wait in Review, is attached only when all of these hold:
 
 - It matches exactly one flight in the household on its flight number, its date and at least one airport, that flight is one you can see, and it is still confirmed. Two flights that both fit, or one that fits and that you can’t see, leaves the email in Review.

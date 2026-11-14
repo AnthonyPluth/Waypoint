@@ -358,7 +358,7 @@ class OlderCopyTests(NothingNewCase):
             with self.subTest(what=what):
                 self.read_mail(line, {**FULL, "start_local": "2026-11-20T18:00"}, name=f"o-{what}", date=EARLIER, sender=AGENT)
                 self.assertEqual(self.counted(), (0, 0))
-                self.assertNotEqual(self.scanned()[f"o-{what}"], "unreadable")
+                self.assertEqual(self.segments()[0]["start_local"], "2026-11-20T19:00")
 
     def filed_directly(self, subject: str, name: str):
         earlier = {**FULL, "start_local": "2026-11-20T18:00"}
@@ -564,11 +564,10 @@ class OlderCopyComparisonTests(NothingNewCase):
         self.assertEqual(self.older(price_minor=12000, price_currency="USD"), "older_copy")
         self.assertIsNone(self.older(price_minor=13000, price_currency="USD"))
 
-    def test_an_older_confirmation_with_a_total_is_filed_by_the_merge_path_and_the_cost_is_saved(self):
+    def test_an_older_confirmation_with_a_total_waits_in_review_and_changes_nothing_on_the_booking(self):
         self.read_mail(f"{OLD_TEXT} Total USD 120.00", {**self.EARLIER_TIMES, "total": "120.00", "currency": "USD"}, date=EARLIER, sender=AGENT)
-        self.assertEqual(self.counted(), (0, 0))
-        self.assertNotEqual(self.scanned()["reminder"], "unreadable")
-        self.assertEqual(self.segments()[0]["price"], {"amount_minor": 12000, "currency": "USD", "source": "email"})
+        self.assertEqual((self.counted(), len(self.kept())), ((0, 0), 1))
+        self.assertEqual((self.segments()[0]["price"], self.segments()[0]["start_local"]), (None, "2026-11-20T19:00"))
 
     def test_names_codes_flights_and_unextracted_details_the_comparison_cannot_see_keep_an_email(self):
         sign = nothing_new.signals
