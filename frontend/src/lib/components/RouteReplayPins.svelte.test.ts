@@ -214,6 +214,29 @@ describe("photo pins on the route map", () => {
     });
   });
 
+  describe("beside the stop markers", () => {
+    const sized = (width: number, height: number) => {
+      Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => width });
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => height });
+    };
+    afterEach(() => { delete (HTMLElement.prototype as { clientWidth?: unknown }).clientWidth; delete (HTMLElement.prototype as { clientHeight?: unknown }).clientHeight; });
+
+    it("moves a pin off the stop it would cover, keeps it at least 24 px wide and keeps every pin off the others", () => {
+      sized(960, 520);
+      const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, infos });
+      const marks = [...container.querySelectorAll<SVGGElement>("[data-testid='stops'] [data-stop]")].map((g) => (g.getAttribute("transform") ?? "").match(/translate\(([-\d.]+) ([-\d.]+)\)/)!.slice(1).map(Number));
+      expect(marks).toHaveLength(3);
+      const at = (p: HTMLElement) => [(parseFloat(p.style.left) * 960) / 100, (parseFloat(p.style.top) * 520) / 100];
+      for (const p of pins(container)) {
+        const [x, y] = at(p);
+        expect(parseFloat(p.style.width)).toBeGreaterThanOrEqual(24);
+        for (const [mx, my] of marks) expect(Math.hypot(x - mx, y - my)).toBeGreaterThanOrEqual(Number(p.dataset.size) / 2 + 8.5);
+      }
+      const spots = pins(container).map(at);
+      for (let i = 0; i < spots.length; i++) for (let j = i + 1; j < spots.length; j++) expect(Math.max(Math.abs(spots[i][0] - spots[j][0]), Math.abs(spots[i][1] - spots[j][1]))).toBeGreaterThanOrEqual(23.5);
+    });
+  });
+
   describe("with no route to replay", () => {
     it("shows the photo pins alone, with no controls, stops list or route key, and says how many photos have no place", () => {
       const { container } = render(RouteReplayMap, { stops: [], year: 2025, infos, unlocated: 5 });

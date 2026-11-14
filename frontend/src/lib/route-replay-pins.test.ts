@@ -2,7 +2,7 @@ import { geoEqualEarth } from "d3-geo";
 import { describe, expect, it } from "vitest";
 import type { PhotoCluster, TripPlaces } from "$lib/api-types";
 import { segment, trip } from "../test/fixtures";
-import { MIN_SPAN_DEGREES, pinFraction, pinLit, pinSize, pinsOf, positions, routeProjection, spreadPins, stopPosition, stopsOf } from "./route-replay";
+import { MIN_SPAN_DEGREES, pinFraction, pinLit, pinSize, pinsOf, positions, routeProjection, spreadPins, STOP_CLEARANCE, stopPosition, stopsOf } from "./route-replay";
 
 const places: TripPlaces = {
   home: null,
@@ -200,5 +200,35 @@ describe("spreadPins", () => {
 
   it("is empty for no pins", () => {
     expect(spreadPins([])).toEqual([]);
+  });
+});
+
+describe("spreadPins around stop markers", () => {
+  const far = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it("moves a pin that sits on a stop until its edge clears the marker", () => {
+    const [pin] = spreadPins([{ x: 100, y: 100, reach: 12, clear: 12 }], undefined, [{ x: 100, y: 100 }]);
+    expect(far(pin, { x: 100, y: 100 })).toBeGreaterThanOrEqual(12 + STOP_CLEARANCE - 0.01);
+    expect(pin.x).toBeGreaterThan(100);
+    expect(pin.y).toBeLessThan(100);
+  });
+
+  it("pushes a pin straight away from a stop it overlaps, and leaves one with room alone", () => {
+    const [near, clear] = spreadPins([{ x: 110, y: 100, reach: 12, clear: 12 }, { x: 300, y: 300, reach: 12, clear: 12 }], undefined, [{ x: 100, y: 100 }]);
+    expect(near.y).toBeCloseTo(100, 6);
+    expect(near.x).toBeCloseTo(121, 6);
+    expect([clear.x, clear.y]).toEqual([300, 300]);
+  });
+
+  it("keeps pins off every stop and off each other together", () => {
+    const stops = [{ x: 100, y: 100 }, { x: 110, y: 104 }];
+    const out = spreadPins([{ x: 100, y: 100, reach: 12, clear: 12 }, { x: 104, y: 102, reach: 12, clear: 12 }, { x: 108, y: 99, reach: 14, clear: 14 }], undefined, stops);
+    for (const p of out) for (const s of stops) expect(far(p, s)).toBeGreaterThanOrEqual(p.clear! + STOP_CLEARANCE - 0.5);
+    for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) expect(Math.max(Math.abs(out[i].x - out[j].x), Math.abs(out[i].y - out[j].y))).toBeGreaterThanOrEqual(out[i].reach + out[j].reach - 0.5);
+  });
+
+  it("does nothing about stops for a pin that doesn't say how big it is", () => {
+    const pins = [{ x: 100, y: 100, reach: 12 }];
+    expect(spreadPins(pins, undefined, [{ x: 100, y: 100 }])).toEqual(pins);
   });
 });

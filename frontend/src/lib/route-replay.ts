@@ -496,8 +496,30 @@ export const pinLit = (cluster: Pick<PhotoCluster, "first">, stops: Pick<Stop, "
 
 export const pinFraction = (pin: Pick<Pin, "x" | "y">, box: Box): { left: number; top: number } => ({ left: ((pin.x - box.x) / box.w) * 100, top: ((pin.y - box.y) / box.h) * 100 });
 
-export function spreadPins<T extends { x: number; y: number; reach: number }>(pins: T[], rounds = 12): T[] {
+export const STOP_CLEARANCE = 9;
+
+export type PinObstacle = { x: number; y: number };
+
+export function spreadPins<T extends { x: number; y: number; reach: number; clear?: number }>(pins: T[], rounds = 12, obstacles: PinObstacle[] = []): T[] {
   const out = pins.map((p) => ({ ...p }));
+  const lift = () => {
+    let moved = false;
+    for (const p of out) {
+      if (p.clear === undefined) continue;
+      for (const o of obstacles) {
+        const need = p.clear + STOP_CLEARANCE;
+        const dx = p.x - o.x, dy = p.y - o.y;
+        const d = Math.hypot(dx, dy);
+        if (d >= need) continue;
+        const angle = d < 0.01 ? -Math.PI / 4 : Math.atan2(dy, dx);
+        p.x = o.x + Math.cos(angle) * need;
+        p.y = o.y + Math.sin(angle) * need;
+        moved = true;
+      }
+    }
+    return moved;
+  };
+  lift();
   for (let round = 0; round < rounds; round++) {
     let moved = false;
     for (let i = 0; i < out.length; i++) {
@@ -517,6 +539,7 @@ export function spreadPins<T extends { x: number; y: number; reach: number }>(pi
         }
       }
     }
+    if (lift()) moved = true;
     if (!moved) break;
   }
   return out;

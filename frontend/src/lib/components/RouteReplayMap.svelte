@@ -104,7 +104,8 @@
   const pins = $derived.by(() => {
     const placed = pinsOf(clusters, pinProjection, away).map((pin) => ({ ...pin, ...pinFraction(pin, pinBox) }));
     if (mapWidth === 0 || mapHeight === 0) return placed;
-    const spread = spreadPins(placed.map((p) => ({ index: p.index, x: (p.left * mapWidth) / 100, y: (p.top * mapHeight) / 100, reach: Math.max(p.size, PIN_TARGET) / 2 })));
+    const marks = positions(stops, pinProjection).map((spot) => pinFraction(spot, pinBox)).map((f) => ({ x: (f.left * mapWidth) / 100, y: (f.top * mapHeight) / 100 }));
+    const spread = spreadPins(placed.map((p) => ({ index: p.index, x: (p.left * mapWidth) / 100, y: (p.top * mapHeight) / 100, reach: Math.max(p.size, PIN_TARGET) / 2, clear: p.size / 2 })), undefined, marks);
     const at = new Map(spread.map((p) => [p.index, p]));
     return placed.map((p) => ({ ...p, left: (at.get(p.index)!.x / mapWidth) * 100, top: (at.get(p.index)!.y / mapHeight) * 100 }));
   });

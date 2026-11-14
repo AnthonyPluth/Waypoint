@@ -543,3 +543,31 @@ describe("driving routes from Apple's directions", () => {
     expect(line.points).toHaveLength(before);
   });
 });
+
+describe("photo places on the MapKit map", () => {
+  const inside = (rect: { x: number; y: number; width: number; height: number }, latitude: number, longitude: number) => {
+    const at = mapPoint(latitude, longitude);
+    return at.x >= rect.x && at.x <= rect.x + rect.width && at.y >= rect.y && at.y <= rect.y + rect.height;
+  };
+
+  it("widens the area Apple is asked for to take in where the photos were taken, and reports the camera", () => {
+    const seen: unknown[] = [];
+    const faraway = { latitude: 61.2, longitude: -149.9 };
+    const { replay } = start({ stops: [denver, saltLake], more: [faraway], onView: (box) => seen.push(box) });
+    replay.update({ progress: 1, playing: false, calm: true });
+    expect(inside(fake.last().rects.at(-1)!, faraway.latitude, faraway.longitude)).toBe(true);
+    expect(seen).toHaveLength(1);
+    fake.reset();
+    const plain = start({ stops: [denver, saltLake] });
+    plain.replay.update({ progress: 1, playing: false, calm: true });
+    expect(inside(fake.last().rects.at(-1)!, faraway.latitude, faraway.longitude)).toBe(false);
+  });
+
+  it("asks for nothing beyond the stops when there are no photo places", () => {
+    const { replay } = start({ stops: [denver, saltLake], more: [] });
+    replay.update({ progress: 1, playing: false, calm: true });
+    const rect = fake.last().rects.at(-1)!;
+    expect(inside(rect, denver.latitude, denver.longitude)).toBe(true);
+    expect(inside(rect, saltLake.latitude, saltLake.longitude)).toBe(true);
+  });
+});
