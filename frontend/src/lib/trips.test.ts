@@ -507,9 +507,24 @@ describe("flightProgress", () => {
     expect(flightProgress(flight, now, live({ state: "departed" }, now))).toBe(0);
     expect(routeProgress(flight, now)).toBe(0.5);
   });
-  it("falls back to the booked arrival when a departed flight has no estimated arrival", () => {
-    const now = estDep + (arr - estDep) / 2;
+  it("keeps the booked duration from the departure when a departed flight has no arrival time", () => {
+    const now = estDep + (arr - dep) / 2;
     expect(flightProgress(flight, now, live({ state: "departed", arr_estimated: null }, now))).toBeCloseTo(0.5, 5);
+  });
+  it("still places a departed or diverted flight when the status has no departure times", () => {
+    const now = dep + (arr - dep) / 2;
+    const bare = { dep_actual: null, dep_estimated: null, dep_scheduled: null, arr_estimated: null };
+    expect(flightProgress(flight, now, live({ state: "departed", ...bare }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "diverted", ...bare }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "departed", ...bare, dep_scheduled: "2026-11-20T19:00" }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "delayed", ...bare }, now))).toBe(0);
+  });
+  it("keeps the booked duration for a flight that leaves after its booked arrival with no arrival time", () => {
+    const short = segment({ start_local: "2026-11-20T10:00", start_zone: NY, end_local: "2026-11-20T11:00", end_zone: NY });
+    const left = at("2026-11-20T13:00", NY), now = left + 30 * 60_000;
+    const status = live({ state: "departed", dep_estimated: null, dep_actual: "2026-11-20T13:00", arr_estimated: null }, now);
+    expect(flightProgress(short, now, status)).toBeCloseTo(0.5, 5);
+    expect(flightProgress(short, left + 3_600_000 * 2, { ...status, fetched_at: new Date(left + 3_600_000 * 2 - 60_000).toISOString() })).toBe(AIRBORNE_MAX);
   });
   it("keeps a departed or diverted flight short of the destination until it lands", () => {
     expect(flightProgress(flight, estArr + 3_600_000, live({ state: "departed" }, estArr + 3_600_000))).toBe(AIRBORNE_MAX);
