@@ -39,7 +39,7 @@
   import { thumbnailUrl } from "$lib/photos";
   import ImageOff from "@lucide/svelte/icons/image-off";
 
-  let { photos, who, ondecided, onreload }: { photos: ReviewPhoto[]; who: Who; ondecided: (id: number) => Promise<unknown>; onreload: () => Promise<boolean> } = $props();
+  let { photos, who, ondecided, onreload, held = false, stale = false }: { photos: ReviewPhoto[]; who: Who; ondecided: (id: number) => Promise<unknown>; onreload: () => Promise<boolean>; held?: boolean; stale?: boolean } = $props();
 
   type Failure = { message: string };
 
@@ -187,15 +187,15 @@
               <p>{aboutOf(p)}</p>
               <div class="flex flex-wrap items-center gap-2">
                 {#if p.match === "far"}
-                  <Button variant="outline" size="sm" disabled={busy !== null} aria-label={`Keep on this trip, the photo from ${label(p)}`} onclick={() => keep(p)}>Keep on this trip</Button>
+                  <Button variant="outline" size="sm" disabled={busy !== null || held} aria-label={`Keep on this trip, the photo from ${label(p)}`} onclick={() => keep(p)}>Keep on this trip</Button>
                 {/if}
                 {#if others.length}
-                  <Button variant="outline" size="sm" disabled={busy !== null} aria-label={`Pick a trip for the photo from ${label(p)}`} onclick={() => openPick(p)}>Pick a trip</Button>
+                  <Button variant="outline" size="sm" disabled={busy !== null || held} aria-label={`Pick a trip for the photo from ${label(p)}`} onclick={() => openPick(p)}>Pick a trip</Button>
                 {/if}
                 {#if p.match === "far"}
-                  <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={`Remove from this trip, the photo from ${label(p)}`} onclick={() => remove(p)}>Remove from this trip</Button>
+                  <Button variant="ghost" size="sm" disabled={busy !== null || held} aria-label={`Remove from this trip, the photo from ${label(p)}`} onclick={() => remove(p)}>Remove from this trip</Button>
                 {:else}
-                  <Button variant="ghost" size="sm" disabled={busy !== null} aria-label={`Leave off, the photo from ${label(p)}`} onclick={() => leaveOff(p)}>Leave off</Button>
+                  <Button variant="ghost" size="sm" disabled={busy !== null || held} aria-label={`Leave off, the photo from ${label(p)}`} onclick={() => leaveOff(p)}>Leave off</Button>
                 {/if}
               </div>
               {#if busy === p.id}<p class="text-sm text-muted-foreground" role="status">Saving…</p>{/if}
@@ -230,16 +230,19 @@
         <legend class="eyebrow mb-2">Trips it could belong to</legend>
         {#each choices as c (c.id)}
           <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-border p-3 has-[:checked]:border-ring has-[:checked]:bg-primary/10">
-            <input class="mt-0.5 size-[18px] shrink-0 accent-primary" type="radio" name="needs-a-look-trip" value={c.id} checked={chosen === c.id} disabled={busy !== null} onchange={() => (wanted = c.id)} />
+            <input class="mt-0.5 size-[18px] shrink-0 accent-primary" type="radio" name="needs-a-look-trip" value={c.id} checked={chosen === c.id} disabled={busy !== null || held} onchange={() => (wanted = c.id)} />
             <span class="font-semibold">{c.name}</span>
           </label>
         {/each}
       </fieldset>
       <p class="text-caption text-muted-foreground">Only trips {who.subject} {who.mine ? "have" : "has"} shared photos on are listed. To use another trip, share {who.own} photos on it first.</p>
       {#if sheetProblem}<p class="text-sm text-signal-ink" role="alert">{sheetProblem}</p>{/if}
+      {#if stale && !sheetProblem}
+        <div class="flex flex-wrap items-center gap-2"><p class="text-sm text-signal-ink" role="alert">{UNSURE}</p><Button variant="outline" size="sm" disabled={held} onclick={() => onreload()}>Try again</Button></div>
+      {/if}
       <div class="flex flex-wrap justify-end gap-2">
         <Button variant="outline" disabled={busy !== null} onclick={() => (sheetOpen = false)}>Cancel</Button>
-        <Button disabled={busy !== null || chosen === null} onclick={put}>{busy !== null ? "Saving…" : `Put on ${chosenName}`}</Button>
+        <Button disabled={busy !== null || held || chosen === null} onclick={put}>{busy !== null ? "Saving…" : `Put on ${chosenName}`}</Button>
       </div>
     </div>
   {/if}

@@ -54,9 +54,9 @@
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import { toast } from "svelte-sonner";
-  import { onDestroy, onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick, untrack } from "svelte";
 
-  let { onchange = () => {} }: { onchange?: () => void } = $props();
+  let { onchange = () => {}, sharing = 0 }: { onchange?: () => void; sharing?: number } = $props();
 
   let list = $state<PhotoSources | null>(null);
   let people = $state<Person[]>([]);
@@ -121,6 +121,19 @@
   }
   onMount(refresh);
 
+  let following = $state(0);
+  let seenSharing: number | null = null;
+  $effect(() => {
+    const now = sharing;
+    const before = seenSharing;
+    seenSharing = now;
+    if (before === null || before === now) return;
+    untrack(() => {
+      following += 1;
+      void refresh().finally(() => { following -= 1; });
+    });
+  });
+
   async function decided(id: number) {
     if (review) review = review.filter((p) => p.id !== id);
     await refresh();
@@ -176,6 +189,7 @@
         watching.delete(timer);
         syncing = syncing.filter((id) => id !== s.id);
         void loadReview();
+        onchange();
       }
     }, SYNC_POLL_MS);
     watching.add(timer);
@@ -379,7 +393,7 @@
               </form>
             {/if}
             {#if review !== null && lookAt.get(s.person_id) === s.id}
-              <PhotosNeedsLook photos={lookFor(s.person_id)} who={whoIs(s.person_id, me, people)} ondecided={decided} onreload={loadReview} />
+              <PhotosNeedsLook photos={lookFor(s.person_id)} who={whoIs(s.person_id, me, people)} ondecided={decided} onreload={loadReview} held={following > 0} stale={reviewProblem} />
             {/if}
             {#if notice}
               <p id={`photo-notice-${s.id}`} class="text-sm" role="alert">{#if notice.chip}<StatusChip chip={notice.chip} class="mr-2 align-middle" />{/if}<span>{notice.text}</span></p>

@@ -314,3 +314,56 @@ describe("Settings data", () => {
     expect(api).toHaveBeenCalledWith("/api/restore", expect.objectContaining({ method: "POST" }));
   });
 });
+
+describe("Settings photos, sharing and Needs a look stay together", () => {
+  beforeEach(() => { route.sub = "photos"; });
+
+  const people = [
+    { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] },
+  ];
+  const sharedTrip = (trip_id: number, name: string) => ({ trip_id, name, start_date: "2025-09-06", end_date: "2025-09-20", state: "shared", scope: "only_me", count: 12, removed_count: 0 });
+  const photo = (candidates: { id: number; name: string }[]) => ({
+    id: 21, person_id: 1, trip_id: null, kind: "image", taken_local: "2026-09-13T17:40:00", zone: null, latitude: null, longitude: null, location_source: null, segment_id: null,
+    match: "ambiguous", distance_km: null, cluster: null, removed_at: null, candidates,
+  });
+  const source = (photos: number) => ({ id: 7, person_id: 1, url: "https://immich.example", label: null, status: "ok", mine: true, last_sync: "2026-11-06T11:12:00+00:00", last_error: null, photos, trips: 2 });
+
+  function serve() {
+    const world = { trips: [sharedTrip(10, "Canyon weekend"), sharedTrip(11, "Redstone weekend")], photos: 30 };
+    vi.mocked(api).mockImplementation(async (path: string, opts?: { method?: string }) => {
+      if (path === "/api/photo-sources") return { sources: [source(world.photos)], permissions: [] } as never;
+      if (path === "/api/people") return { people } as never;
+      if (path === "/api/photos/review") return { photos: [photo(world.trips.map((t) => ({ id: t.trip_id, name: t.name })))] } as never;
+      if (path === "/api/photo-grants") return { people: [{ person_id: 1, prefs: { default_scope: "only_me", share_all: false }, count_token: "a".repeat(32), sources: [{ id: 7, status: "ok" }], eligible: [], trips: world.trips }] } as never;
+      if (path.startsWith("/api/trips/11/photo-sharing") && opts?.method === "DELETE") { world.trips = world.trips.filter((t) => t.trip_id !== 11); world.photos = 18; return {} as never; }
+      return {} as never;
+    });
+    return world;
+  }
+
+  it("stopping sharing on a trip takes it off the Needs a look choices and updates the library’s counts, without a reload", async () => {
+    serve();
+    const user = userEvent.setup();
+    render(Settings);
+    expect(await screen.findByText("Fits two trips: Canyon weekend and Redstone weekend.")).toBeInTheDocument();
+    expect(screen.getByText(/· 30 photos on 2 trips$/)).toBeInTheDocument();
+    await user.click(await screen.findByRole("button", { name: "Stop sharing on Redstone weekend" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    expect(await screen.findByText("Could belong to Canyon weekend.")).toBeInTheDocument();
+    expect(screen.getByText(/· 18 photos on 2 trips$/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Stop sharing on Redstone weekend" })).toBeNull());
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photos/review")).toHaveLength(2);
+  });
+
+  it("a library change still reloads Photo sharing, and neither side reloads the other in a loop", async () => {
+    serve();
+    const user = userEvent.setup();
+    render(Settings);
+    await screen.findByText("Fits two trips: Canyon weekend and Redstone weekend.");
+    await user.click(screen.getByRole("button", { name: "Pause, Jane Doe’s library" }));
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photo-grants")).toHaveLength(2));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photo-grants")).toHaveLength(2);
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photos/review")).toHaveLength(2);
+  });
+});
