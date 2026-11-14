@@ -57,12 +57,12 @@ Nothing from your library is on a trip until you share it there. On each trip yo
 The first time you open a trip whose dates your library has photos from, the **Photos** section starts with a card, **You have 77 photos from this trip**, saying that only you see them and that nothing from your library is on the trip until you share it. Choose **Only me** (chosen to start) or **Everyone on this trip**, then:
 
 - **Share on this trip** shares at that choice. The count and the trip’s details you were shown go with it, so if your photos, your libraries or the trip’s people changed since, Waypoint refuses, shows the new count under a note and waits for you to press **Share on this trip** again. **Everyone on this trip** can’t be shared while the count says “Couldn’t check your libraries”; **Only me** can.
-- **Share on all my trips** shares this trip and every trip you are on now, and turns on the standing setting (below) with the choice made here, so trips you join later are shared the same way without asking. With **Everyone on this trip** chosen it first asks “Show your 319 photos to everyone on 6 trips?”, with the same count-bound confirmation as Settings.
+- **Share on all my trips** shares this trip and every trip you are on now, and turns on the standing setting (below) with the choice made here, so trips you join later are shared the same way without asking. With **Everyone on this trip** chosen it first asks “Show your 319 photos to everyone on 6 trips?”, with the same count-bound confirmation as Settings. If the standing setting is already on, the button only shares this trip, at the choice made here, exactly as **Share on this trip** does, and leaves the setting and its default for later trips as they are (change those in Settings). If Waypoint finds this trip still not shared after turning the setting on, it says so and keeps the card open.
 - **Not now** folds the card into one line, “Your 77 photos from this trip aren’t on it. Only you see this.”, with **Share…**, which opens the card again with a fresh count.
 
 Once you have shared, the section ends with **Your photos on this trip**: how many photos of yours are on it, who sees them (**Only me** or **Everyone on this trip**), a way to change it and **Stop sharing on this trip**. Choosing **Only me** saves at once, with **Undo** in the message that confirms it; choosing **Everyone on this trip** asks “Show your 169 photos to everyone on this trip?” first, and **Stop sharing on this trip** asks once and says plainly that your photos leave the trip right away, for everyone. A person without a sign-in whom you manage has the same card, named for them (“June’s photos on this trip”), on the trips they are on. A trip you have no photos on shows none of this.
 
-Each change reloads the trip’s photos and summary. If the page can’t reload something after a change that went through, it says so, with **Try again**, and holds the controls that depend on it until it can show the current state.
+Each change reloads the trip’s photos, map pins and summary, and editing the trip’s dates or people reloads your sharing choices for it, so a card that must ask again does. If the page can’t reload something after a change that went through, it says so, with **Try again**, and holds the controls that depend on it until it can show the current state.
 
 ### Photo sharing in Settings
 
@@ -86,7 +86,7 @@ Tap a photo to open the viewer: the photo or the video's still (with **Play vide
 
 With no library connected, a trip that has started points you to **Connect a library in Settings**; while your library has not synced yet the section says so, and a trip with no photos says **No photos on this trip yet.**
 
-For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
+For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. The pins are drawn on the trip’s map, and **Show these photos** on a pin’s card opens the gallery at that cluster ([Photo pins on the map](/Waypoint/start/trips/#photo-pins-on-the-map)). A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
 
 ## Needs a look
 

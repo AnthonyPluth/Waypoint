@@ -81,7 +81,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-const mount = (extra: { onchanged?: () => void; people?: Person[]; trip?: typeof road } = {}) => render(TripPhotos, { trip: extra.trip ?? road, people: extra.people ?? [ada], now: after, onchanged: extra.onchanged });
+const mount = (extra: { onchanged?: () => void; onloaded?: (found: Reply | null) => void; people?: Person[]; trip?: typeof road } = {}) => render(TripPhotos, { trip: extra.trip ?? road, people: extra.people ?? [ada], now: after, onchanged: extra.onchanged, onloaded: extra.onloaded });
 const prompt = () => screen.findByRole("group", { name: /from this trip$|^Couldn’t check your libraries$/ });
 const card = () => screen.findByRole("region", { name: /photos on this trip$/ });
 
@@ -485,6 +485,34 @@ describe("Share prompt: Share on all my trips", () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Waypoint is unreachable"));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(within(ask).getByRole("button", { name: "Share on all my trips" })).toBeEnabled();
+  });
+});
+
+describe("The map’s photo pins follow a sharing change", () => {
+  it("hands the page the reloaded photos after sharing, without blanking the pins first", async () => {
+    const loaded = vi.fn();
+    photos = [];
+    mount({ onloaded: loaded });
+    const ask = await prompt();
+    await waitFor(() => expect(loaded).toHaveBeenCalledTimes(2));
+    expect(loaded.mock.calls.map(([found]) => (found === null ? null : found.photos.length))).toEqual([null, 0]);
+    photos = [photo(1), photo(2)];
+    current = shared({ scope: "only_me" });
+    await user.click(within(ask).getByRole("button", { name: "Share on this trip" }));
+    await waitFor(() => expect(loaded).toHaveBeenCalledTimes(3));
+    expect(loaded.mock.calls[2][0]?.photos).toHaveLength(2);
+  });
+
+  it("hands the page the reloaded photos after stopping, so the pins go", async () => {
+    current = shared();
+    const loaded = vi.fn();
+    mount({ onloaded: loaded });
+    await user.click(within(await card()).getByRole("button", { name: "Stop sharing on this trip" }));
+    photos = [];
+    onSharing = (call) => { if (call?.method === "DELETE") { current = sharing({ state: "declined" }); return current; } return undefined; };
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await waitFor(() => expect(loaded.mock.calls.at(-1)?.[0]?.photos).toEqual([]));
+    expect(loaded.mock.calls.slice(1).every(([found]) => found !== null)).toBe(true);
   });
 });
 

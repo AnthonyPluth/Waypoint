@@ -355,6 +355,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Check-in`, `Pick-up`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
 
+#### `trip-photo-pins`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`.
+- **Expects to see:** `Trips`, `5 photos`, `Day 1`.
+- **Drive it:** `tools/control flow trip-photo-pins`; or `poetry run python run.py verify --flow trip-photo-pins`.
+
 #### `trip-photos`
 
 - **Starts at:** `#trips`.
