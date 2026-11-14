@@ -228,6 +228,19 @@ describe("Review", () => {
     expect(deletes()).toHaveLength(2);
   });
 
+  it("lists a new item that reuses the id of one dismissed earlier", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      const reply = await base(path, opts as never);
+      if (opts?.method === "DELETE") held = { ...held, items: [item({ id: 1, subject: "A later email" })] };
+      return reply;
+    }) as never);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    expect(await screen.findByText("A later email")).toBeInTheDocument();
+  });
+
   it("moves focus to the next item after a dismissal", async () => {
     held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
     render(ReviewPage);

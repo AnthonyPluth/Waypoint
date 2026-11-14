@@ -61,6 +61,7 @@
   let loadError = $state("");
 
   let loadSeq = 0;
+  const deleted = new Map<number, number>();
   async function load() {
     const seq = ++loadSeq;
     loadError = "";
@@ -68,6 +69,7 @@
       const [r, p] = await Promise.all([apiCall<"GET /api/review">("/api/review"), apiCall<"GET /api/people">("/api/people")]);
       if (seq !== loadSeq) return;
       review = r; people = p.people;
+      for (const [id, at] of [...deleted]) if (at < seq) { deleted.delete(id); hidden.delete(id); }
     } catch (err) { if (seq !== loadSeq) return; review = null; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
@@ -322,11 +324,12 @@
     hidden.add(i.id);
     const sent = act(async () => {
       await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
+      deleted.set(i.id, loadSeq);
       await settle();
     });
     await tick();
     if (next) menuButtons[next.id]?.focus();
-    if (!(await sent)) hidden.delete(i.id);
+    if (!(await sent) && !deleted.has(i.id)) hidden.delete(i.id);
   };
 
   let ignoring = $state<ReviewItem | null>(null);
