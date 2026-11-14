@@ -326,10 +326,12 @@ describe("Settings → Photos → Photo sharing: one trip", () => {
     expect(sent("POST", "/api/trips/10/photo-sharing")[1]).toMatchObject({ count_token: "e".repeat(32) });
   });
 
-  it("narrows to Only me at once, with an undo that asks for the trip's current count again", async () => {
+  it("narrows to Only me at once, with an undo that sends what the narrowing answered with, not a fresh read", async () => {
     serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })], (path, opts) => {
-      if (path.startsWith("/api/trips/10/photo-sharing") && opts?.method === "POST" && (opts.body as Body | undefined)?.scope === "only_me") return sharing({ state: "shared", scope: "only_me", changed: 99 });
-      if (path.startsWith("/api/trips/10/photo-sharing") && !opts?.method) return sharing({ state: "shared", scope: "only_me", count: 169, changed: 99, count_token: "f".repeat(32) });
+      if (path.startsWith("/api/trips/10/photo-sharing") && opts?.method === "POST" && (opts.body as Body | undefined)?.scope === "only_me") return sharing({ state: "shared", scope: "only_me", changed: 99, count_token: "f".repeat(32) });
+      if (path.startsWith("/api/trips/10/photo-sharing") && !opts?.method) {
+        return sharing({ state: "shared", scope: "only_me", changed: 99, count_token: "9".repeat(32), sources: [{ id: 7, status: "ok" }, { id: 8, status: "ok" }], audience: [1, 2, 3], window: { ...WINDOW, end: "2030-01-01T00:00:00+00:00" } });
+      }
     });
     render(PhotoSharingSettings);
     await user.selectOptions(await screen.findByRole("combobox", { name: "Who sees your photos on Four Corners loop" }), "only_me");
@@ -339,9 +341,41 @@ describe("Settings → Photos → Photo sharing: one trip", () => {
     expect(message).toBe("Now only you see your photos on Four Corners loop.");
     expect(options.action.label).toBe("Undo");
 
+    vi.mocked(api).mockClear();
     options.action.onClick();
-    await waitFor(() => expect(sent("POST", "/api/trips/10/photo-sharing")).toHaveLength(2));
-    expect(sent("POST", "/api/trips/10/photo-sharing")[1]).toMatchObject({ scope: "trip", count_token: "f".repeat(32), expected_changed: 99 });
+    await waitFor(() => expect(sent("POST", "/api/trips/10/photo-sharing")).toHaveLength(1));
+    expect(sent("POST", "/api/trips/10/photo-sharing")[0]).toEqual({
+      person_id: 1, scope: "trip", window: WINDOW, audience: [1, 2], sources: [{ id: 7, status: "ok" }], count_token: "f".repeat(32), expected_changed: 99,
+    });
+    expect(vi.mocked(api).mock.calls.some(([p, o]) => String(p).startsWith("/api/trips/10/photo-sharing") && !(o as Call | undefined)?.method)).toBe(false);
+  });
+
+  it("does not share a library connected between narrowing and Undo: the server refuses and the question comes back with the new count", async () => {
+    let reads = 0;
+    const LATER = [{ id: 7, status: "ok" }, { id: 8, status: "ok" }];
+    serve([grantsOf({ trips: [trip(10, "Four Corners loop", { scope: "trip", count: 169 })] })], (path, opts) => {
+      if (!path.startsWith("/api/trips/10/photo-sharing")) return;
+      const body = opts?.body as Body | undefined;
+      if (opts?.method === "POST" && body?.scope === "only_me") return sharing({ state: "shared", scope: "only_me", changed: 99 });
+      if (opts?.method === "POST") {
+        if (JSON.stringify(body?.sources) !== JSON.stringify(LATER)) throw new Refusal("Your libraries changed. Review them before sharing.", 409);
+        return sharing({ state: "shared", scope: "trip" });
+      }
+      reads += 1;
+      return sharing({ state: "shared", scope: "only_me", count: 190, changed: 99, sources: LATER, count_token: "e".repeat(32) });
+    });
+    render(PhotoSharingSettings);
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Who sees your photos on Four Corners loop" }), "only_me");
+    await waitFor(() => expect(toast).toHaveBeenCalled());
+    const [, options] = vi.mocked(toast).mock.calls[0] as unknown as [string, { action: { onClick: () => void } }];
+    options.action.onClick();
+    const dialog = await screen.findByRole("dialog", { name: "Show your 190 photos to everyone on this trip?" });
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Your libraries changed.");
+    expect(reads).toBe(1);
+    expect(sent("POST", "/api/trips/10/photo-sharing")[1]).toMatchObject({ scope: "trip", sources: [{ id: 7, status: "ok" }] });
+    await user.click(within(dialog).getByRole("button", { name: "Show them" }));
+    await waitFor(() => expect(sent("POST", "/api/trips/10/photo-sharing")).toHaveLength(3));
+    expect(sent("POST", "/api/trips/10/photo-sharing")[2]).toMatchObject({ sources: LATER, count_token: "e".repeat(32), expected_changed: 99 });
   });
 
   it("asks before stopping, says it is immediate for everyone, and keeps the sharing on Keep sharing", async () => {
@@ -607,6 +641,23 @@ describe("Settings → Photos → Photo sharing: a reload that fails after a cha
     await waitFor(() => expect(sent("POST", "/api/photo-sharing-prefs/1")).toEqual([{ share_all: false }]));
     expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/photo-grants")).toHaveLength(1);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("closes the share-all question and says the list is out of date when the refresh after a 409 fails", async () => {
+    let reads = 0;
+    serve([], (path, opts) => {
+      if (path === "/api/photo-grants") { reads += 1; if (reads > 1) throw new Refusal(TOLD, 500); return { people: [grantsOf({ prefs: { default_scope: "trip", share_all: false }, eligible: eligible(12), trips: [trip(12, "Coast and hills", { state: "none", scope: null, count: 10 })] })] }; }
+      if (path === "/api/photo-sharing-prefs/1" && opts?.method === "POST") throw new Refusal(STALE, 409);
+    });
+    render(PhotoSharingSettings);
+    await user.click(await screen.findByRole("checkbox", { name: /Share on all my trips/ }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Show your 10 photos to everyone on 1 trip?" })).getByRole("button", { name: "Show them" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const banner = await screen.findByRole("alert");
+    expect(banner).toHaveTextContent("Couldn’t refresh your sharing, so what shows may be out of date.");
+    expect(banner).toHaveTextContent(TOLD);
+    expect(screen.getByRole("checkbox", { name: /Share on all my trips/ })).toBeDisabled();
+    expect(sent("POST", "/api/photo-sharing-prefs/1")).toHaveLength(1);
   });
 
   it("tells the person when the very first load failed, as before", async () => {

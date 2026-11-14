@@ -160,10 +160,8 @@
     } catch (err) {
       if (!stale(err)) { toast.error(errMsg(err)); return false; }
       const note = errMsg(err);
-      if (await load(true)) {
-        const fresh = grants?.people.find((x) => x.person_id === p.person_id);
-        if (fresh) asking = allOf(fresh, note);
-      }
+      const fresh = (await load(true)) ? grants?.people.find((x) => x.person_id === p.person_id) : undefined;
+      if (fresh) asking = allOf(fresh, note); else dialog = false;
       return false;
     }
     toast.success("Saved");
@@ -187,8 +185,8 @@
   async function widen(p: PhotoGrantPerson, t: PhotoGrantTrip, note = "") {
     const sharing = await actGet(() => stateOf(p, t.trip_id), { busy: (on) => (saving = on) });
     if (!sharing) return;
-    if (note) asking = { kind: "widen", person: p, trip: t, sharing, note };
-    else ask({ kind: "widen", person: p, trip: t, sharing, note });
+    const next: Asking = { kind: "widen", person: p, trip: t, sharing, note };
+    if (dialog) asking = next; else ask(next);
   }
 
   const confirmWiden = () => holding(async () => {
@@ -200,7 +198,7 @@
       if (!stale(err)) { toast.error(errMsg(err)); return false; }
       const note = errMsg(err);
       const fresh = await actGet(() => stateOf(a.person, a.trip.trip_id));
-      if (fresh) asking = { kind: "widen", person: a.person, trip: a.trip, sharing: fresh, note };
+      if (fresh) asking = { kind: "widen", person: a.person, trip: a.trip, sharing: fresh, note }; else dialog = false;
       return false;
     }
     toast.success(`Shared with everyone on ${a.trip.name}`);
@@ -210,15 +208,21 @@
 
   const narrow = (p: PhotoGrantPerson, t: PhotoGrantTrip) => act(async () => {
     const reply = await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { person_id: p.person_id, scope: "only_me" }, failed: "Couldn’t change it" });
-    toast(`Now only ${subject} see${mine ? "" : "s"} ${own} photos on ${t.name}.`, { action: { label: "Undo", onClick: () => { void undo(p, t, reply.changed); } } });
+    toast(`Now only ${subject} see${mine ? "" : "s"} ${own} photos on ${t.name}.`, { action: { label: "Undo", onClick: () => { void undo(p, t, reply); } } });
     await load(true);
   }, { busy: (on) => (saving = on) });
 
-  const undo = (p: PhotoGrantPerson, t: PhotoGrantTrip, changed: number | null) => act(async () => {
-    const fresh = await stateOf(p, t.trip_id);
-    await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { ...bodyOf(p, fresh, "trip"), ...(changed !== null && { expected_changed: changed }) }, failed: "Couldn’t undo it" });
+  const undo = (p: PhotoGrantPerson, t: PhotoGrantTrip, narrowed: PhotoSharing) => holding(async () => {
+    try {
+      await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: bodyOf(p, narrowed, "trip"), failed: "Couldn’t undo it" });
+    } catch (err) {
+      if (!stale(err)) { toast.error(errMsg(err)); return; }
+      opener = null;
+      await widen(p, t, errMsg(err));
+      return;
+    }
     await load(true);
-  }, { busy: (on) => (saving = on) });
+  });
 
   const changeScope = (p: PhotoGrantPerson, t: PhotoGrantTrip, e: Event & { currentTarget: HTMLSelectElement }) => {
     const next = e.currentTarget.value as Scope;
@@ -256,7 +260,7 @@
       if (!stale(err)) { toast.error(errMsg(err)); return; }
       const note = errMsg(err);
       const sharing = await actGet(() => stateOf(p, t.trip_id));
-      if (sharing) prompt = { ...open, sharing, note };
+      prompt = sharing ? { ...open, sharing, note } : null;
       return;
     }
     toast.success(`Shared with ${sharedWith(open.scope)}. Change it any time under Your photos on this trip.`);
