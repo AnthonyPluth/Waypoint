@@ -256,6 +256,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-signed-in`; or `poetry run python run.py verify --flow photos-signed-in`.
 
+#### `photos-trip-sharing`
+
+- **Starts at:** `#trips`; goes to: `#trip/2`, `#trip/7`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `aren’t on it. Only you see this.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `Denver`, `13 photos from your library`, `Everyone on this trip`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-trip-sharing`; or `poetry run python run.py verify --flow photos-trip-sharing`.
+
 #### `seats`
 
 - **Starts at:** `#trips`.

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 
 import { api } from "$lib/api";
-import type { Person, PhotoSource, TripPhoto, TripPhotos as Reply } from "$lib/api-types";
+import type { Person, PhotoSharing, PhotoSource, TripPhoto, TripPhotos as Reply } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { segment, state, trip } from "../../test/fixtures";
 import TripPhotos from "./TripPhotos.svelte";
@@ -26,10 +26,13 @@ const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: {
 const source = (extra: Partial<PhotoSource> = {}): PhotoSource => ({ id: 1, person_id: 1, url: "https://immich.example", label: null, status: "ok", mine: true, last_sync: "2026-03-05T06:00", last_error: null, photos: 0, trips: 0, ...extra });
 const many = (n: number, perDay = 20) => Array.from({ length: n }, (_, i) => photo(i + 1, { taken_local: `2026-03-${String(1 + Math.floor(i / perDay) % 28).padStart(2, "0")}T${String(8 + (i % 12)).padStart(2, "0")}:00` }));
 
+const NO_SHARING: PhotoSharing = { state: "none", scope: null, count: 0, removed_count: 0, removed: [], window: null, changed: null, audience: [1], sources: [], count_token: "a".repeat(32) };
+
 let photos: TripPhoto[];
 let sources: PhotoSource[];
 function serve() {
   vi.mocked(api).mockImplementation(async (path) => {
+    if (String(path).includes("/photo-sharing")) return NO_SHARING;
     if (path === "/api/photo-sources") return { sources, permissions: [] };
     if (String(path).endsWith("/photos")) return reply(photos);
     throw new Error(`unexpected ${path}`);

@@ -1,0 +1,30 @@
+{
+  "name": "photos-trip-sharing",
+  "page": "trips",
+  "signed_in": true,
+  "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
+  "steps": [
+    { "goto": "#trip/2" },
+    { "wait_for": "[role=group][aria-labelledby^=photo-prompt-]" },
+    { "expect_text": { "selector": "[role=group][aria-labelledby^=photo-prompt-]", "text": "Only you see this. Nothing from your library is on the trip until you share it." } },
+    { "screenshot": "prompt" },
+    { "click": "role=button[name='Not now']" },
+    { "wait_for": "[data-testid=photo-reminder]" },
+    { "expect_text": { "selector": "[data-testid=photo-reminder]", "text": "aren’t on it. Only you see this." } },
+    { "screenshot": "reminder" },
+    { "click": "role=button[name='Share your photos on this trip']" },
+    { "wait_for": "[role=group][aria-labelledby^=photo-prompt-]" },
+    { "click": "[role=group][aria-labelledby^=photo-prompt-] >> role=button[name='Share on this trip']" },
+    { "wait_for": "[data-testid=your-photos]" },
+    { "screenshot": "your-photos" },
+    { "click": "[data-testid=your-photos] >> role=button[name='Stop sharing on this trip']" },
+    { "expect_text": { "selector": "[role=dialog]", "text": "right away, for everyone: the gallery, the map, the replay and the trip’s counts." } },
+    { "screenshot": "stop" },
+    { "click": "[role=dialog] >> role=button[name='Keep sharing']" },
+    { "goto": "#trip/7" },
+    { "expect_text": { "selector": "h1", "text": "Denver" } },
+    { "expect_text": { "selector": "[data-testid=your-photos]", "text": "13 photos from your library" } },
+    { "expect_text": { "selector": "[data-testid=your-photos]", "text": "Everyone on this trip" } },
+    { "screenshot": "shared" }
+  ]
+}

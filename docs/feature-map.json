@@ -646,7 +646,7 @@
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing",
       "web": [
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+        "frontend/src/lib/photo-sharing.ts"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -664,7 +664,8 @@
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing_set",
       "web": [
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
+        "frontend/src/lib/trip-sharing.svelte.ts"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -683,7 +684,8 @@
       "path": "/api/trips/{id}/photo-sharing",
       "handler": "waypoint/server/api/photos.py:api_photo_sharing_stop",
       "web": [
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
+        "frontend/src/lib/trip-sharing.svelte.ts"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -732,7 +734,8 @@
       "path": "/api/photo-grants",
       "handler": "waypoint/server/api/photos.py:api_photo_grants",
       "web": [
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
+        "frontend/src/lib/trip-sharing.svelte.ts"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -750,7 +753,8 @@
       "path": "/api/photo-sharing-prefs/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_prefs_set",
       "web": [
-        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte"
+        "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
+        "frontend/src/lib/trip-sharing.svelte.ts"
       ],
       "tests": [
         "tests/test_api_contract.py",
