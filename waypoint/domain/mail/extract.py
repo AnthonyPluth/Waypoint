@@ -783,6 +783,20 @@ SUBJECT_LIMIT = 300
 KEPT_LIMIT = 300_000
 
 
+def guard(message: Mapping[str, Any]) -> tuple[str, bool]:
+    parsed = _parsed(message)
+    subject = ""
+    if parsed is not None:
+        try:
+            subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT]
+        except (ValueError, LookupError, TypeError):
+            subject = ""
+    wrapped = unwrap(_plain(_bodies(message), MAX_PART))
+    if wrapped is not None and wrapped.subject:
+        subject = f"{subject} {wrapped.subject}"
+    return subject, read(message).revises
+
+
 def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Content, list[Image]]:
     parsed = _parsed(message)
     subject: str | None = None
