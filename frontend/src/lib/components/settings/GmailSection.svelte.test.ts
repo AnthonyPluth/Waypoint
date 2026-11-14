@@ -141,10 +141,10 @@ describe("Settings → Gmail", () => {
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("AI asked about 1. AI dismissed 1 email as not a booking.");
   });
 
-  it("counts the emails the AI dismissed as nothing new, with the reason for each", async () => {
+  it("counts the emails the AI attached as nothing new, with the reason for each", async () => {
     serve(list([box({ scan_summary: { found: 30, read: 25, bookings: 2, review: 20, skipped: 5, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 0, ai_asked: 23, dismissed: 1, dismissed_known: 2, dismissed_older: 1 } })]));
     render(GmailSection);
-    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("AI dismissed 1 email as not a booking. AI dismissed 3 emails as nothing new (2 already known, 1 older than a saved copy).");
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("AI dismissed 1 email as not a booking. AI attached 3 emails that add nothing new to their bookings (2 already known, 1 older than a saved copy).");
   });
 
   it("counts the follow-ups attached to bookings, and those with details it did not apply", async () => {

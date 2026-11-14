@@ -109,7 +109,7 @@ def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     flights = frozenset({*(f"{m[1]}{m[2]}".upper() for m in FLIGHT_TOKEN.finditer(whole) if m[1].isupper() or m[1].lower() not in PLAIN_WORDS),
                          *(f"{a}{n}".upper() for a, n in ai.LISTED_FLIGHT.findall(whole))})
     timed = any(c.search(whole) for c in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK))
-    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(timed or LABELS.search(whole) or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
+    return Signals(change=revises or bool(CHANGE.search(whole) or words.CANCEL.search(whole)), travel=bool(timed or LABELS.search(whole) or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
                    passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights,
                    codes=references.labelled(whole), days=_days(whole),
                    seats=frozenset(m[1].upper() for m in SEAT_TOKEN.finditer(whole)), clocks=_clocks(whole))
@@ -220,20 +220,26 @@ def names_nothing(sign: Signals) -> bool:
     return not sign.codes and not sign.flights
 
 
-def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
-           sign: Signals) -> Reason | None:
+def matched(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
+            sign: Signals) -> tuple[Reason, int] | None:
     if fields is not None:
         decision = newer.decide(conn, viewer, fields, received, False)
         if decision is None or decision.action != "older":
             return None
         same = _same_reservations(conn, viewer, fields)
         if [s.id for s in same] == [decision.segment_id] and same[0].status == "confirmed" and _fully_held(conn, same[0], said, sign, True):
-            return "older_copy"
+            return "older_copy", same[0].id
         return None
     found = _flights_like(conn, viewer, said)
     if len(found) == 1 and found[0].status == "confirmed" and _fully_held(conn, found[0], said, sign, False):
-        return "already_known"
+        return "already_known", found[0].id
     return None
+
+
+def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
+           sign: Signals) -> Reason | None:
+    found = matched(conn, viewer, said, fields, received, sign)
+    return found[0] if found else None
 
 
 def _seats_held(conn: db.Connection, seg: Segment, said: ai.Suggestion, sign: Signals, superseded: bool) -> bool:

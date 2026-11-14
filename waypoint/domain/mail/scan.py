@@ -506,11 +506,14 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
         return Filed(cleared=1, dismissed=1)
     if (dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change
             and nothing_new.covers(signals, suggestions)):
-        reasons = [nothing_new.assess(conn, viewer, s, _ai_fields(conn, s), row["received"], signals) for s in suggestions]
-        if all(reasons):
-            review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
-            _record(conn, mailbox_id, message_id, UNREADABLE, now)
-            return Filed(cleared=1, known="older_copy" if all(r == "older_copy" for r in reasons) else "already_known")
+        found = [nothing_new.matched(conn, viewer, s, _ai_fields(conn, s), row["received"], signals) for s in suggestions]
+        if all(found):
+            reasons = [f[0] for f in found if f]
+            kept = list(dict.fromkeys(f[1] for f in found if f))
+            review.dismiss(conn, row["owner_sub"], row["id"], (viewer, kept), only_this=True)
+            conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
+                         .values(outcome=BOOKING, scanned=now, segment_id=kept[0]))
+            return Filed(cleared=1, segments=tuple(kept), known="older_copy" if all(r == "older_copy" for r in reasons) else "already_known")
     pending: list[ai.Suggestion] = []
     touched: list[int] = []
     held: list[ingest.Held] = []
@@ -785,7 +788,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
         remember(mailbox_id, Summary(tally["pending"], read, made, queued, skipped, capped, dropped, tally["found"] - tally["pending"] + handled, tally["found"], not_travel, followups, with_facts, attached,
                                      asked_by_ai, dismissed, known["already_known"], known["older_copy"]))
     monitoring.log(f"{'Read a mailbox’s bookings again' if again else 'Looked back through a mailbox' if backfill else 'Scanned a mailbox'}: {tally['pending']} message(s) found, "
-                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{f'{asked_by_ai} sent to the AI, ' if asked_by_ai else ''}{f'{dismissed} dismissed as not bookings, ' if dismissed else ''}{f'{sum(known.values())} dismissed as nothing new ({known["already_known"]} × already known, {known["older_copy"]} × older copy), ' if known else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
+                   f"{read} read, {made} booking(s) added or changed, {queued} to review, {f'{followups} follow-up(s) attached ({with_facts} with details not applied), ' if followups else ''}{f'{attached} email(s) attached to an existing booking, ' if attached else ''}{f'{asked_by_ai} sent to the AI, ' if asked_by_ai else ''}{f'{dismissed} dismissed as not bookings, ' if dismissed else ''}{f'{sum(known.values())} attached as nothing new ({known["already_known"]} × already known, {known["older_copy"]} × older copy), ' if known else ''}{skipped} skipped ({not_travel} as not travel){', more waiting' if capped else ''}.")
     if why:
         monitoring.log("What stopped messages being read: " + "; ".join(f"{n} × {what}" for what, n in sorted(why.items())) + ".")
     return Result("done", None, read, made, queued, tally["pending"], skipped, capped)

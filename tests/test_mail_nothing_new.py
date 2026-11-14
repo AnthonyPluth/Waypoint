@@ -86,14 +86,23 @@ class NothingNewCase(ScanAiCase):
 
 
 class AlreadyKnownTests(NothingNewCase):
-    def test_a_reminder_that_repeats_the_booking_is_dismissed_and_counted_by_reason(self):
+    def attached(self) -> list[stored_mail.Attached]:
+        return self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))
+
+    def test_a_reminder_that_repeats_the_booking_is_attached_to_it_and_counted_by_reason(self):
         result = self.read_mail(REMINDER, SAME)
         self.assertEqual((result.state, result.review, self.kept()), ("done", 0, []))
         self.assertEqual(self.counted(), (1, 0))
         self.assertEqual(scan.summary(self.mailbox).dismissed, 0)
-        self.assertEqual(self.scanned()["reminder"], "unreadable")
-        self.assertEqual(len(self.stored()), 1)
-        self.assertEqual(len(self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))), 1)
+        self.assertEqual(self.scanned()["reminder"], "booking")
+        self.assertEqual(len(self.stored()), 2)
+        self.assertEqual([a["message_id"] for a in self.attached()], ["msg-flight_jsonld", "reminder"])
+
+    def test_a_later_reminder_that_agrees_with_the_booking_becomes_its_newest_email_without_changing_it(self):
+        before = self.segments()
+        self.read_mail(REMINDER, SAME, date=LATER)
+        self.assertEqual(self.segments(), before)
+        self.assertEqual(max(a["received"] or "" for a in self.attached()), "2026-10-14")
 
     def test_the_trip_is_untouched_by_the_dismissed_reminder(self):
         before = self.segments()
@@ -105,7 +114,7 @@ class AlreadyKnownTests(NothingNewCase):
         real = scan.monitoring.log
         with mock.patch.object(scan.monitoring, "log", side_effect=lambda text, *a, **k: (said.append(text), real(text, *a, **k))[1]):
             self.read_mail(REMINDER, SAME)
-        self.assertTrue(any("1 dismissed as nothing new (1 × already known, 0 × older copy)" in t for t in said))
+        self.assertTrue(any("1 attached as nothing new (1 × already known, 0 × older copy)" in t for t in said))
         self.assertFalse([t for t in said for k in (*CANARIES, "EX 101", "QX7M2K", SUBJECT) if k in t])
 
     def test_the_next_scan_does_not_ask_again(self):
@@ -323,12 +332,25 @@ class MustStayInReviewTests(NothingNewCase):
 
 
 class OlderCopyTests(NothingNewCase):
-    def test_an_older_message_than_the_attached_one_is_dismissed_even_when_its_times_differ(self):
+    def test_an_older_message_is_attached_without_changing_the_booking_or_becoming_its_newest_email(self):
         reply = {**FULL, "start_local": "2026-11-20T18:00"}
         self.read_mail(OLD_TEXT, reply, date=EARLIER, sender=AGENT)
         self.assertEqual((self.kept(), self.counted()), ([], (0, 1)))
-        self.assertEqual(self.segments()[0]["start_local"], "2026-11-20T19:00")
-        self.assertEqual(self.scanned()["reminder"], "unreadable")
+        self.assertEqual((self.segments()[0]["start_local"], self.segments()[0]["status"]), ("2026-11-20T19:00", "confirmed"))
+        self.assertEqual(self.scanned()["reminder"], "booking")
+        held = self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))
+        self.assertEqual(sorted(a["received"] or "" for a in held), ["2026-10-10", "2026-10-12"])
+
+    def test_a_cancellation_or_change_in_another_language_keeps_it_in_review(self):
+        for n, line in enumerate(("Votre vol EX 101 de JFK à LHR est annulé.", "Ihr Flug EX 101 von JFK nach LHR wurde storniert.",
+                                  "EX 101 JFK-LHR のフライトはキャンセルされました。", "Su vuelo EX 101 de JFK a LHR fue anulado.")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.read_mail(line, SAME, name=f"lang-{n}")
+                self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+                self.read_mail(line, {**FULL, "start_local": "2026-11-20T18:00"}, name=f"lang-old-{n}", date=EARLIER, sender=AGENT)
+                self.assertEqual(self.counted(), (0, 0))
 
     def test_an_older_cancellation_or_change_is_never_counted_as_nothing_new(self):
         for what, line in (("cancel", "Flight EX 101 from JFK to LHR, booking QX7M2K, was cancelled."),
@@ -417,6 +439,14 @@ class NotTravelTests(NothingNewCase):
                 with db.session() as conn:
                     conn.execute(ReviewItem.__table__.delete())
                 self.plain("Thank you for being a customer. Save on your next purchase this week.", {"bookings": [], "not_a_booking": category}, f"r-{category}")
+                self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+
+    def test_a_cancellation_in_another_language_wearing_a_verdict_stays(self):
+        for n, line in enumerate(("Ihre Buchung wurde storniert. Sparen Sie diese Woche.", "ご予約はキャンセルされました。今週のセール。")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.plain(line, VERDICT, f"wl-{n}")
                 self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
 
     def test_a_cancellation_or_change_wearing_a_promotion_verdict_stays(self):
