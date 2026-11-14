@@ -10,7 +10,7 @@
   import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
-  import { flightStatus, loadFlightStatus, statusFor } from "$lib/flightstatus.svelte";
+  import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
@@ -66,6 +66,7 @@
     const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
+  followFlightStatus(() => (trips ?? []).flatMap((t) => t.segments), () => app.sessionExpired);
   $effect(() => {
     if (!mail?.mailboxes.some((m) => m.scanning)) return;
     const poll = setInterval(() => { void loadMail(); void refreshState(true); }, 5_000);

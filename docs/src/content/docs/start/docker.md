@@ -44,7 +44,7 @@ Everyone who can sign in belongs to one household: they share settings and loyal
 - Waypoint answers only to addresses that are yours: the host in `WAYPOINT_PUBLIC_URL`, local IPs, `*.local`, plain names like `nas` and Tailscale names. Add others with `WAYPOINT_ALLOWED_HOSTS` ([Configuration](/Waypoint/reference/configuration/#advanced)).
 - Use an `https://` address for `WAYPOINT_PUBLIC_URL`, so session cookies are marked Secure. On an internet address Waypoint requires it.
 
-**Settings** is grouped into cards: Account, Mail & review, Travel preferences, Offline & notifications, Connected assistants, and Backup & import. The rest of these pages name a control by its card.
+**Settings** is grouped into cards: Account, Mail & review, Photos, Travel preferences, Offline & notifications, Connected assistants, and Backup & import. The rest of these pages name a control by its card.
 
 ## Moving your data from another machine
 

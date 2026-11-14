@@ -60,6 +60,21 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
   });
 
+  it("updates a flight’s card from the stored status on its own, without a reload", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 20, 23, 30));
+    let found: unknown = { ...delayed, statuses: [] };
+    const answer = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? found : answer(path, opts)) as never);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    expect(await within(cards[0]).findByRole("button", { name: "Check live status" })).toBeInTheDocument();
+    found = delayed;
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await within(cards[0]).findByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).startsWith("/api/flight-status/"))).toEqual([]);
+  });
+
   it("shows each booking’s brand logo on its card, and none where the server has none", async () => {
     held = trip([{ ...flight, logo: "/api/segments/1/logo" }, stay]);
     render(TripPage);

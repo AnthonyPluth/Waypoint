@@ -118,13 +118,14 @@ describe("Settings index", () => {
     render(Settings);
     expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => [h.textContent, h.closest("a")?.getAttribute("href")])).toEqual([
-      ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+      ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Photos", "#settings/photos"], ["Travel preferences", "#settings/travel"],
       ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"]]);
+    expect(document.getElementById("settings-photos")).toHaveTextContent("Photos");
     expect(screen.queryByText("Signed in as")).toBeNull();
   });
 
   it.each([
-    ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Travel preferences", "#settings/travel"],
+    ["Account", "#settings/account"], ["Mail & review", "#settings/mail"], ["Photos", "#settings/photos"], ["Travel preferences", "#settings/travel"],
     ["Offline & notifications", "#settings/offline"], ["Connected assistants", "#settings/assistants"], ["Backup & import", "#settings/backup"],
   ])("opens %s from one clearly named category link", (task, href) => {
     render(Settings);
@@ -138,7 +139,14 @@ describe("Settings index", () => {
     expect(heading("Gmail")).not.toBeNull();
     expect(heading("AI")).not.toBeNull();
     expect(heading("Account")).toBeNull();
+    expect(heading("Photos")).toBeNull();
     expect(index().getByRole("link", { name: "All settings" })).toHaveAttribute("href", "#settings");
+    view.unmount();
+    view = open("photos");
+    expect(screen.getByRole("heading", { level: 2, name: "Photos" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Photos" })).toBeInTheDocument();
+    expect(index().getByRole("link", { name: "Photos" })).toHaveAttribute("aria-current", "page");
+    expect(heading("Gmail")).toBeNull();
     view.unmount();
     view = open("travel");
     for (const name of ["Home", "Distances"]) expect(heading(name)).not.toBeNull();

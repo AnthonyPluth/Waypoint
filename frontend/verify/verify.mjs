@@ -40,7 +40,11 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
+<<<<<<< HEAD
 const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+=======
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+>>>>>>> origin/main
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -49,6 +53,20 @@ export function lengthenNames(value, suffix) {
   return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, LONG_NAME_KEYS.has(k) && typeof v === "string" ? v + suffix : lengthenNames(v, suffix)]));
 }
 const ARCHIVE_PLACES = [["Lisbon", "TAP Air Portugal"], ["Denver", "United Airlines"], ["Tokyo", "All Nippon Airways"], ["Chicago", "American Airlines"], ["Reykjavik", "Icelandair"], ["Mexico City", "Delta Air Lines"], ["Sydney", "Qantas"], ["Seattle", "Alaska Airlines"], ["Rome", "ITA Airways"], ["Vancouver", "Air Canada"]];
+
+export const IMMICH_REFUSED = "Immich didn’t accept this library’s API key (check it, and the permissions it was given).";
+export const IMMICH_UNREACHABLE = "Couldn’t reach Immich.";
+
+export function fakeImmichTest(mode) {
+  if (mode === "refused") return { status: 400, json: { error: IMMICH_REFUSED } };
+  if (mode === "unreachable") return { status: 502, json: { error: IMMICH_UNREACHABLE } };
+  return { status: 200, json: { name: mode, same_account: null } };
+}
+
+export function fakeImmichSource(body, id) {
+  return { id, person_id: body?.person_id ?? null, url: String(body?.url ?? "").replace(/\/+$/, ""), label: null, status: "ok", mine: true,
+    last_sync: null, last_error: null, photos: 0, trips: 0 };
+}
 
 export function fakeArchive(trips, count) {
   const model = trips.find((t) => t.segments.length) ?? trips[0];
@@ -226,6 +244,21 @@ export async function runStep(page, step, shot, saveDownload) {
     await page.route("**/api/trips/*/merge", async (route) => {
       if (route.request().postDataJSON()?.confirm) return route.continue();
       return route.fulfill({ status: 409, json: { error: "Merging these trips changes who sees what.", see_booking: named(first), see_trip: named(second) } });
+    });
+  } else if ("fake_immich" in step) {
+    const made = [];
+    const answer = fakeImmichTest(step.fake_immich);
+    await page.route(/\/api\/photo-sources\/(\d+\/)?test$/, (route) => route.request().method() === "POST" ? route.fulfill(answer) : route.fallback());
+    await page.route("**/api/photo-sources", async (route) => {
+      if (route.request().method() === "POST") {
+        if (answer.status !== 200) return route.fulfill(answer);
+        const created = fakeImmichSource(route.request().postDataJSON(), 9000 + made.length);
+        made.push(created);
+        return route.fulfill({ json: created });
+      }
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, sources: [...(body.sources ?? []), ...made] } });
     });
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {
