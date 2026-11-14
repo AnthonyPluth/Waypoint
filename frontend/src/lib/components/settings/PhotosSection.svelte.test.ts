@@ -526,6 +526,51 @@ describe("Settings → Photos, Needs a look", () => {
     expect(calls("POST", "/api/photos/21")[0][1]).toMatchObject({ body: { excluded: true } });
   });
 
+  it("Undo on the toast brings the photo back to the list, the card’s counts and Photo sharing", async () => {
+    let pending = [look(21)];
+    let photos = 1904;
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ photos })], permissions: PERMISSIONS };
+      if (path === "/api/photos/review") return { photos: pending };
+      if (path === "/api/photos/21" && opts?.method === "POST") { pending = []; photos = 1905; return { removed_at: 1700000000.5 }; }
+      if (path === "/api/photos/21/undo" && opts?.method === "POST") { pending = [look(21)]; photos = 1904; return {}; }
+    });
+    const changed = vi.fn();
+    render(PhotosSection, { onchange: changed });
+    await screen.findByText("1 photo");
+    await userEvent.click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    expect(await screen.findByText("Nothing needs a look.")).toBeInTheDocument();
+    expect(screen.getByText(/· 1,905 photos on 12 trips$/)).toBeInTheDocument();
+    const toasted = vi.mocked(toast.success).mock.calls.at(-1);
+    expect(toasted?.[0]).toBe("Left off both trips.");
+    const before = changed.mock.calls.length;
+    (toasted?.[1] as unknown as { action: { onClick: () => void } }).action.onClick();
+    expect(await screen.findByText("1 photo")).toBeInTheDocument();
+    expect(calls("POST", "/api/photos/21/undo")[0][1]).toMatchObject({ body: { left_off: 1700000000.5 } });
+    expect(screen.getByText(/· 1,904 photos on 12 trips$/)).toBeInTheDocument();
+    expect(changed.mock.calls.length).toBeGreaterThan(before);
+  });
+
+  it("says the list may be out of date when the reload after an Undo fails, and Try again reloads it", async () => {
+    let fail = false;
+    let pending = [look(21)];
+    serve([source()], (path, opts) => {
+      if (path === "/api/photos/review") { if (fail) throw new Refusal("Can’t reach Waypoint.", 0); return { photos: pending }; }
+      if (path === "/api/photos/21" && opts?.method === "POST") { pending = []; return { removed_at: 1700000000.5 }; }
+      if (path === "/api/photos/21/undo" && opts?.method === "POST") { pending = [look(21)]; fail = true; return {}; }
+    });
+    render(PhotosSection);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Leave off, the photo/ }));
+    await screen.findByText("Nothing needs a look.");
+    (vi.mocked(toast.success).mock.calls.at(-1)?.[1] as unknown as { action: { onClick: () => void } }).action.onClick();
+    await screen.findByText("Couldn’t refresh which photos need a look, so that list may be out of date.");
+    expect(screen.queryByText("1 photo")).toBeNull();
+    fail = false;
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("1 photo")).toBeInTheDocument();
+  });
+
   it("says the list may be out of date when the reload fails after a change, drops the decided row, and Try again reloads", async () => {
     let fail = false;
     serve([source()], (path, opts) => {

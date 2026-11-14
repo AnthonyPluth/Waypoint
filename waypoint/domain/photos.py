@@ -52,6 +52,7 @@ SHARE_FIRST = "Share your photos on that trip first"
 PUT_BACK_FIRST = "Put the photo back on that trip first"
 NOT_UNSETTLED = "Only a photo waiting under Needs a look can be left off"
 NOT_IN_WINDOW = "That trip’s dates don’t cover this photo"
+UNDO_CHANGED = "That photo changed since you chose, so the choice can’t be undone"
 
 
 class OutsideWindow(Exception):
@@ -828,10 +829,54 @@ def decide(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | No
         photo, candidates = fresh
         if any(w.trip_id not in locked for w in candidates):
             raise Changed(CHANGED)
+        stamp = time.time()
         for w in candidates:
-            db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": time.time(), "was_trip_id": None},
+            db.insert_ignore(conn, PhotoExclusion, {"person_id": person, "asset_id": photo.asset_id, "trip_id": w.trip_id, "created": stamp, "was_trip_id": None},
                              key=["person_id", "asset_id", "trip_id"])
+        conn.orm.flush()
+        return {**photo_out(photo, person, {}), "removed_at": stamp}
     conn.orm.flush()
+    return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
+
+
+def _own_row(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
+    persons = persons_of(conn, viewer)
+    return next(iter(_rows(conn, PhotoSource.person_id.in_(persons), Photo.id == photo_id)), None) if persons else None
+
+
+def _held_row(conn: db.Connection, viewer: Viewer, photo_id: int) -> Found | None:
+    found = _own_row(conn, viewer, photo_id)
+    if found is None:
+        return None
+    person = found[1]
+    if not photo_sources.lock_person(conn, person):
+        return None
+    found = _own_row(conn, viewer, photo_id)
+    if found is None or found[1] != person:
+        return None
+    lock_grants(conn, person, sorted(granted_trips(conn, person) | ({found[0].trip_id} if found[0].trip_id is not None else set())))
+    conn.orm.expire_all()
+    found = _own_row(conn, viewer, photo_id)
+    return found if found is not None and found[1] == person else None
+
+
+def undo(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None, left_off: float | None) -> TripPhoto | None:
+    held = _held_row(conn, viewer, photo_id) if not viewer.household else None
+    if held is None:
+        return None
+    photo, person = held
+    if trip_id is not None:
+        if photo.decided_by != OWNER or photo.trip_id != trip_id:
+            raise Changed(UNDO_CHANGED)
+    else:
+        mine = (PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.created == left_off)
+        if not list(conn.execute(select(PhotoExclusion.trip_id).where(*mine)).scalars()):
+            raise Changed(UNDO_CHANGED)
+        conn.execute(delete(PhotoExclusion).where(*mine))
+        conn.orm.expire_all()
+    if not re_place(conn, photo, person):
+        raise Changed(UNDO_CHANGED)
+    copy_placement(conn, photo, person)
     return photo_out(photo, person, _placed(conn, viewer, [photo.trip_id] if photo.trip_id is not None else []))
 
 

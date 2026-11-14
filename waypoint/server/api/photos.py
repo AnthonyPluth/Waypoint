@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Callable
 from typing import Any
@@ -12,13 +13,15 @@ from ...providers import immich
 from .. import jobs
 from ..common import IMAGE_CSP, NO_IMAGE, ApiError, Response, _current, image_response, keep_blank, request_header, row_id
 from ..contract import (Ok, PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, PhotoSource,
-                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSourceResume, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, SyncStarted, TripPhoto,
+                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSourceResume, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, PhotoUndoBody, SyncStarted, TripPhoto,
                         TripPhotos)
 from .trips import NO_TRIP, _run, viewer
 
 NO_PHOTO = "No such photo"
 PHOTOS_OFF = "Photos need sign-in"
 NOTHING_TO_DO = 'Send "trip_id" to put the photo on a trip, or "excluded" to leave it off'
+NOTHING_TO_UNDO = 'Send "trip_id" to take the photo off the trip you put it on, or "left_off" with the stamp the leaving off came with'
+NOT_A_STAMP_OF_LEAVING = 'Send "left_off" as the number the leaving off came with'
 NOTHING_TO_SHARE = 'Send "scope" to share, or "declined" for Not now'
 MAX_ID = 10 ** 18
 MAX_REMOVED = 500
@@ -127,6 +130,22 @@ def api_photo_decide(conn, _q, body: PhotoBody, photo_id) -> TripPhoto:
     try:
         return _run(lambda: photos.decide(conn, who, this, trip, excluded), NO_PHOTO)
     except (photos.OutsideWindow, photos.Changed) as e:
+        raise ApiError(str(e), 409) from None
+
+
+def api_photo_undo(conn, _q, body: PhotoUndoBody, photo_id) -> TripPhoto:
+    who, this = _viewer(conn), row_id(photo_id, NO_PHOTO)
+    if isinstance(body.get("trip_id"), bool):
+        raise ApiError(NOT_A_TRIP)
+    trip = _v.integer(body.get("trip_id"), "trip", 1, MAX_ID)
+    left_off = _stamp(body.get("left_off"), NOT_A_STAMP_OF_LEAVING)
+    if (trip is None) == (left_off is None) or set(body) - {"trip_id", "left_off"}:
+        raise ApiError(NOTHING_TO_UNDO)
+    if left_off is not None and not math.isfinite(left_off):
+        raise ApiError(NOT_A_STAMP_OF_LEAVING)
+    try:
+        return _run(lambda: photos.undo(conn, who, this, trip, left_off), NO_PHOTO)
+    except photos.Changed as e:
         raise ApiError(str(e), 409) from None
 
 

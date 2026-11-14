@@ -2,6 +2,7 @@
   import { kilometres } from "$lib/photos";
   import { clock, dayLabel } from "$lib/trips";
   import type { ReviewPhoto } from "$lib/api-types";
+  import type { Who } from "$lib/photo-sharing";
 
   export const SHOWN = 3;
 
@@ -16,6 +17,18 @@
 
   export const tripOf = (p: ReviewPhoto): string => p.candidates.find((c) => c.id === p.trip_id)?.name ?? "this trip";
 
+  export type Reversal = { kind: "placed"; trip: number } | { kind: "left"; stamp: number } | { kind: "removed"; trip: number; stamp: number };
+
+  export const putText = (who: Who, trip: string): string => (who.mine ? `Put on ${trip}.` : `Put ${who.first}’s photo on ${trip}.`);
+
+  export const keptText = (who: Who, trip: string): string => (who.mine ? `Kept on ${trip}.` : `Kept ${who.first}’s photo on ${trip}.`);
+
+  export const leftText = (who: Who, trips: number): string => (who.mine ? `Left off ${offWhere(trips)}.` : `Left ${who.first}’s photo off ${offWhere(trips)}.`);
+
+  export const removedText = (who: Who, trip: string): string => (who.mine ? `Removed from ${trip}.` : `Removed ${who.first}’s photo from ${trip}.`);
+
+  export const backText = (who: Who): string => (who.mine ? "Back in Needs a look." : `${who.first}’s photo is back in Needs a look.`);
+
   export const choicesOf = (p: ReviewPhoto) => p.candidates.filter((c) => c.id !== p.trip_id);
 
   export function aboutOf(p: ReviewPhoto): string {
@@ -28,28 +41,31 @@
 </script>
 
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { onDestroy, tick, untrack } from "svelte";
   import { toast } from "svelte-sonner";
   import { act, errMsg } from "$lib/act";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { Button } from "$lib/components/ui/button";
   import { Sheet } from "$lib/components/ui/sheet";
+  import type { PhotoSharing, TripPhoto } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
-  import { isStale, plural, type Who } from "$lib/photo-sharing";
+  import { isStale, plural } from "$lib/photo-sharing";
   import { thumbnailUrl } from "$lib/photos";
   import ImageOff from "@lucide/svelte/icons/image-off";
 
   let { photos, who, ondecided, onreload }: { photos: ReviewPhoto[]; who: Who; ondecided: (id: number) => Promise<unknown>; onreload: () => Promise<boolean> } = $props();
 
-  type Failure = { message: string };
+  type Failure = { message: string; retry: boolean };
 
   let busy = $state<number | null>(null);
+  let undoing = $state(false);
   let notes = $state<Record<number, string | undefined>>({});
   let showAll = $state(false);
   let broken = $state<Set<number>>(new Set());
   let summary = $state<HTMLElement | null>(null);
   let emptyLine = $state<HTMLElement | null>(null);
   let announce = $state("");
+  let waiting: (() => void)[] = [];
 
   let pickingId = $state<number | null>(null);
   let sheetOpen = $state(false);
@@ -66,8 +82,10 @@
   const note = (id: number, text: string | undefined) => { notes = { ...notes, [id]: text }; };
 
   const CHANGED = "That photo changed while you were looking. The list is up to date; check it and try again.";
+  const UP_TO_DATE = "The list is up to date; check it before you choose again.";
   const sentence = (text: string): string => (/[.!?]$/.test(text) ? text : `${text}.`);
   const UNSURE = "Couldn’t refresh the list, so it may be out of date.";
+  const UNDONE = "Couldn’t undo that";
 
   $effect(() => {
     void photos;
@@ -81,33 +99,51 @@
     if (sheetOpen && picking === null && busy === null) sheetOpen = false;
   });
 
-  async function settle(p: ReviewPhoto, send: () => Promise<unknown>, said: string, failed: string): Promise<Failure | null> {
-    note(p.id, undefined);
+  const release = () => { for (const wake of waiting.splice(0)) wake(); };
+
+  $effect(() => {
+    if (busy === null) release();
+  });
+
+  onDestroy(release);
+
+  async function idle(): Promise<void> {
+    while (busy !== null) await new Promise<void>((wake) => waiting.push(wake));
+  }
+
+  async function settle<R>(id: number, send: () => Promise<R>, said: string, failed: string, reverse?: (reply: R) => Reversal | null, again = CHANGED): Promise<Failure | null> {
+    note(id, undefined);
     let failure: Failure | null = null;
     await act(async () => {
+      let reply: R;
       try {
-        await send();
+        reply = await send();
       } catch (err) {
         const status = (err as { status?: unknown } | null)?.status;
         if (status !== 400 && status !== 404 && status !== 409) throw err;
         const reason = errMsg(err) || failed;
         const fresh = await onreload();
-        failure = { message: [sentence(reason), fresh ? (isStale(err) ? CHANGED : "") : UNSURE].filter(Boolean).join(" ") };
+        failure = { message: [sentence(reason), fresh ? (isStale(err) ? again : "") : UNSURE].filter(Boolean).join(" "), retry: false };
         return;
       }
-      toast.success(said);
-      await ondecided(p.id);
+      const reversal = reverse?.(reply) ?? null;
+      if (reversal) {
+        let used = false;
+        toast.success(said, { action: { label: "Undo", onClick: () => { if (!used) { used = true; void undo(id, reversal); } } } });
+      } else toast.success(said);
+      await ondecided(id);
     }, {
-      busy: (on) => (busy = on ? p.id : null),
-      onError: (message) => { failure = { message: message || failed }; },
+      busy: (on) => (busy = on ? id : null),
+      onError: (message) => { failure = { message: message || failed, retry: true }; },
     });
     return failure;
   }
 
-  async function settled(p: ReviewPhoto, failure: Failure | null) {
+  async function settled(id: number, failure: Failure | null, again?: () => void) {
     if (failure) {
       await tick();
-      if (photos.some((x) => x.id === p.id)) note(p.id, failure.message);
+      if (photos.some((x) => x.id === id)) note(id, failure.message);
+      else if (failure.retry && again) toast(failure.message, { action: { label: "Try again", onClick: again } });
       else toast(failure.message);
       return;
     }
@@ -122,21 +158,44 @@
   const post = (p: ReviewPhoto, body: { trip_id?: number; excluded?: boolean }) =>
     apiCall<"POST /api/photos/{id}">(`/api/photos/${p.id}`, { method: "POST", body, failed: "Couldn’t save that choice" });
 
+  const placed = (trip: number) => (): Reversal => ({ kind: "placed", trip });
+  const left = (reply: TripPhoto): Reversal | null => (typeof reply.removed_at === "number" ? { kind: "left", stamp: reply.removed_at } : null);
+  const removedFrom = (id: number, trip: number) => (reply: PhotoSharing): Reversal | null => {
+    const stamp = reply.removed?.find((r) => r.id === id)?.removed_at;
+    return typeof stamp === "number" ? { kind: "removed", trip, stamp } : null;
+  };
+
   async function keep(p: ReviewPhoto) {
     const trip = p.trip_id;
     if (trip === null) return;
-    await settled(p, await settle(p, () => post(p, { trip_id: trip }), `Kept on ${tripOf(p)}.`, "Couldn’t keep it"));
+    await settled(p.id, await settle(p.id, () => post(p, { trip_id: trip }), keptText(who, tripOf(p)), "Couldn’t keep it", placed(trip)));
   }
 
   async function leaveOff(p: ReviewPhoto) {
-    await settled(p, await settle(p, () => post(p, { excluded: true }), `Left off ${offWhere(p.candidates.length)}.`, "Couldn’t leave it off"));
+    await settled(p.id, await settle(p.id, () => post(p, { excluded: true }), leftText(who, p.candidates.length), "Couldn’t leave it off", left));
   }
 
   async function remove(p: ReviewPhoto) {
     const trip = p.trip_id;
     if (trip === null) return;
     const send = () => apiCall<"POST /api/trips/{id}/photo-exclusions">(`/api/trips/${trip}/photo-exclusions`, { method: "POST", body: { photo_ids: [p.id] }, failed: "Couldn’t remove it" });
-    await settled(p, await settle(p, send, `Removed from ${tripOf(p)}.`, "Couldn’t remove it"));
+    await settled(p.id, await settle(p.id, send, removedText(who, tripOf(p)), "Couldn’t remove it", removedFrom(p.id, trip)));
+  }
+
+  async function undo(id: number, reversal: Reversal) {
+    await idle();
+    const again = () => { void undo(id, reversal); };
+    const send = (): Promise<unknown> => reversal.kind === "removed"
+      ? apiCall<"DELETE /api/trips/{id}/photo-exclusions/{id}">(`/api/trips/${reversal.trip}/photo-exclusions/${id}?created=${encodeURIComponent(String(reversal.stamp))}`, { method: "DELETE", failed: UNDONE })
+      : apiCall<"POST /api/photos/{id}/undo">(`/api/photos/${id}/undo`, { method: "POST", body: reversal.kind === "placed" ? { trip_id: reversal.trip } : { left_off: reversal.stamp }, failed: UNDONE });
+    undoing = true;
+    try {
+      const failure = await settle(id, send, backText(who), UNDONE, undefined, UP_TO_DATE);
+      if (failure) await settled(id, failure, again);
+      else announce = backText(who);
+    } finally {
+      undoing = false;
+    }
   }
 
   function openPick(p: ReviewPhoto) {
@@ -153,8 +212,8 @@
     if (!p || trip === null) return;
     const name = chosenName;
     sheetProblem = "";
-    const failure = await settle(p, () => post(p, { trip_id: trip }), `Put on ${name}.`, "Couldn’t put it on that trip");
-    if (!failure) { sheetOpen = false; await settled(p, null); return; }
+    const failure = await settle(p.id, () => post(p, { trip_id: trip }), putText(who, name), "Couldn’t put it on that trip", placed(trip));
+    if (!failure) { sheetOpen = false; await settled(p.id, null); return; }
     await tick();
     if (photos.some((x) => x.id === p.id)) sheetProblem = failure.message;
     else { sheetOpen = false; toast(failure.message); }
@@ -213,6 +272,7 @@
   {:else}
     <p bind:this={emptyLine} tabindex="-1" class="text-sm text-muted-foreground outline-none">Nothing needs a look.</p>
   {/if}
+  {#if undoing}<p class="text-sm text-muted-foreground" role="status">Undoing…</p>{/if}
   <p class="sr-only" role="status">{announce}</p>
 </div>
 

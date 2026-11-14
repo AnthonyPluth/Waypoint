@@ -644,6 +644,11 @@ class PhotoBody(TypedDict):
     excluded: NotRequired[bool]
 
 
+class PhotoUndoBody(TypedDict):
+    trip_id: NotRequired[int]
+    left_off: NotRequired[float]
+
+
 class PhotoWindow(TypedDict):
     start: str
     end: str

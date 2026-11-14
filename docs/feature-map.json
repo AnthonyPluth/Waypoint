@@ -480,6 +480,23 @@
       ]
     },
     {
+      "method": "POST",
+      "path": "/api/photos/{id}/undo",
+      "handler": "waypoint/server/api/photos.py:api_photo_undo",
+      "web": [
+        "frontend/src/lib/components/settings/PhotosNeedsLook.svelte"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_access.py",
+        "tests/test_photos_api.py"
+      ],
+      "docs": [
+        "start/photos"
+      ]
+    },
+    {
       "method": "GET",
       "path": "/api/photos/{id}/thumbnail",
       "handler": "waypoint/server/api/photos.py:api_photo_thumbnail",
@@ -724,7 +741,9 @@
       "method": "DELETE",
       "path": "/api/trips/{id}/photo-exclusions/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_put_back",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosNeedsLook.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_access.py",
