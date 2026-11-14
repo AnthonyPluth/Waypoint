@@ -1,7 +1,7 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
   import { app, route } from "$lib/app.svelte";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { apiCall } from "$lib/contract";
   import { emailNews } from "$lib/email-news";
   import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip, TripPhotos as PhotoReply } from "$lib/api-types";
@@ -47,7 +47,7 @@
   let tripPhotos = $state<PhotoReply | null>(null);
   let gallery = $state<{ showCluster: (cluster: number) => Promise<void> } | null>(null);
 
-  let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
+  let { tripId = null, onchanged = null, revision = 0 }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null; revision?: number } = $props();
 
   let trip = $state<Trip | null>(null);
   let loads = $state(0);
@@ -140,6 +140,8 @@
       await offerSavedCopy();
     }
   }
+  let seenRevision = untrack(() => revision);
+  $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
   $effect(() => { void id; form = null; editingTrip = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
