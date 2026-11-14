@@ -10,7 +10,7 @@ export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly data: Record<string, unknown> = {}) { super(message); }
 }
 
-export type Options = { method?: "GET" | "POST" | "DELETE"; body?: unknown; keep?: boolean; background?: boolean; failed?: string };
+export type Options = { method?: "GET" | "POST" | "DELETE"; body?: unknown; keep?: boolean; background?: boolean; keepalive?: boolean; failed?: string };
 
 declare global {
   interface WindowEventMap { "waypoint:signed-out": CustomEvent<{ background: boolean }> }
@@ -37,6 +37,7 @@ export async function api<T = unknown>(path: string, opts: Options = {}): Promis
   if (init.method !== "GET") headers["X-Waypoint"] = "1";
   if (opts.body instanceof Blob) { headers["Content-Type"] = "application/octet-stream"; init.body = opts.body; }
   else if (opts.body !== undefined) { headers["Content-Type"] = "application/json"; init.body = JSON.stringify(opts.body); }
+  if (opts.keepalive) init.keepalive = true;
   const page = init.method === "GET" && !opts.keep ? pageLoads : null;
   if (page) init.signal = page.signal;
   let res: Response;

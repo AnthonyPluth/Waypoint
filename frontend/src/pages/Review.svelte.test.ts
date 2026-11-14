@@ -185,11 +185,37 @@ describe("Review", () => {
     expect(deletes()).toHaveLength(1);
   });
 
-  it("sends the request when the page is hidden for good", async () => {
+  const keptAlive = () => vi.mocked(api).mock.calls.filter(([path, opts]) => path === "/api/review/1" && opts?.method === "DELETE" && opts.keepalive === true);
+
+  it("sends the request, kept alive, when the page is hidden for good", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
     window.dispatchEvent(new Event("pagehide"));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(keptAlive()).toHaveLength(1);
+  });
+
+  it("sends the request, kept alive, when the tab goes to the background, and not again later", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(toast.success).mockReturnValueOnce("gone");
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    const state = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await waitFor(() => expect(keptAlive()).toHaveLength(1));
+    expect(toast.dismiss).toHaveBeenCalledWith("gone");
+    await vi.advanceTimersByTimeAsync(DISMISS_MS * 2);
+    expect(deletes()).toHaveLength(1);
+    state.mockRestore();
+  });
+
+  it("sends the request, kept alive, when the person leaves the page, and a plain one when the window ends", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+    expect(keptAlive()).toHaveLength(0);
   });
 
   it("brings the item back with the error when the delayed request fails", async () => {
@@ -222,6 +248,72 @@ describe("Review", () => {
     expect(await screen.findByTestId("review-item")).toBeInTheDocument();
     await vi.advanceTimersByTimeAsync(DISMISS_MS);
     expect(deletes()).toHaveLength(1);
+  });
+
+  it("keeps a dismissed item off the list when an older reload answers after a newer one", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    const stale = structuredClone(held);
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let reloads = 0;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/review" && reloads++ === 0) { await gate; return stale; }
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await userEvent.click(screen.getByRole("button", { name: /^Dismiss: / }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    await waitFor(() => expect(reloads).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(deletes()).toHaveLength(2));
+    release();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(screen.queryByTestId("review-item")).toBeNull();
+  });
+
+  it("drops the Undo and the request of a dismissed item that ignoring its sender deleted too", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path.endsWith("/ignore")) { calls.push([path, opts?.method, opts?.body]); held = { ...held, items: [] }; return { ok: true, mailbox_id: 5, domain: "example-air.example" }; }
+      return base(path, opts as never);
+    }) as never);
+    vi.mocked(toast.success).mockReturnValueOnce("dismissed-1");
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(screen.getAllByTestId("review-item")).toHaveLength(1));
+    await userEvent.click(screen.getByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(toast.dismiss).toHaveBeenCalledWith("dismissed-1"));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await vi.advanceTimersByTimeAsync(DISMISS_MS * 2);
+    expect(deletes()).toEqual([]);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("keeps the Undo of a dismissed item that holds a booking when its sender is ignored", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    held = { matches: [], items: [item({ id: 1, holds_bookings: true }), item({ id: 2 })], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path.endsWith("/ignore")) { calls.push([path, opts?.method, opts?.body]); held = { ...held, items: held.items.filter((i) => i.holds_bookings) }; return { ok: true, mailbox_id: 5, domain: "example-air.example" }; }
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(screen.getAllByTestId("review-item")).toHaveLength(1));
+    await userEvent.click(screen.getByRole("button", { name: "Not travel: ignore this sender (example-air.example)" }));
+    await userEvent.click((await screen.findByRole("dialog")).querySelector("button[type=submit]")!);
+    await waitFor(() => expect(calls.some(([path]) => path.endsWith("/ignore"))).toBe(true));
+    await vi.advanceTimersByTimeAsync(DISMISS_MS);
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
   });
 
   it("moves focus to the next item after a dismissal", async () => {

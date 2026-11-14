@@ -60,12 +60,15 @@
   let people = $state<Person[]>([]);
   let loadError = $state("");
 
+  let loadSeq = 0;
   async function load() {
+    const seq = ++loadSeq;
     loadError = "";
     try {
       const [r, p] = await Promise.all([apiCall<"GET /api/review">("/api/review"), apiCall<"GET /api/people">("/api/people")]);
+      if (seq !== loadSeq) return;
       review = r; people = p.people;
-    } catch (err) { review = null; loadError = errMsg(err); }
+    } catch (err) { if (seq !== loadSeq) return; review = null; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
 
@@ -317,7 +320,7 @@
   const held = new Map<number, Held>();
   const sendDismiss = async (i: ReviewItem, leaving: boolean) => {
     const ok = await act(async () => {
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE", keepalive: leaving });
       if (leaving) await refreshState().catch(ignoreFailure);
       else await settle();
     });
@@ -361,14 +364,27 @@
     toast.success(`Reading again what was skipped from ${domain}`);
     await settle();
   });
+  const dropIgnored = (i: ReviewItem) => {
+    const gone: number[] = [];
+    for (const [id, h] of [...held]) {
+      if (h.item.address !== i.address || h.item.sender_domain !== i.sender_domain || h.item.holds_bookings) continue;
+      clearTimeout(h.timer);
+      held.delete(id);
+      if (h.toastId !== undefined) toast.dismiss(h.toastId);
+      gone.push(id);
+    }
+    return gone;
+  };
   const ignore = (i: ReviewItem) => act(async () => {
     const r = await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
+    const gone = dropIgnored(i);
     toast.success(`Ignoring ${r.domain}`, {
       description: "You can undo this in Settings → Mail & review → Gmail",
       duration: UNDO_MS,
       action: { label: "Undo", onClick: () => { void undoIgnore(r.mailbox_id, r.domain); } },
     });
     await settle();
+    for (const id of gone) hidden.delete(id);
   });
 
   let chosen = $state<Record<number, string>>({});
@@ -565,6 +581,7 @@
 {/snippet}
 
 <svelte:window onpagehide={flushDismissals} />
+<svelte:document onvisibilitychange={() => { if (document.visibilityState === "hidden") flushDismissals(); }} />
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
