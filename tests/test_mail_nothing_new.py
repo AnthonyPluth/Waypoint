@@ -75,10 +75,10 @@ class NothingNewCase(ScanAiCase):
                   "end_local": "2026-11-21T07:10", "end_zone": "Europe/London", "details": {"flight_number": number}, **changes}
         return self.read(lambda conn: trips.add_segment(conn, viewer, fields))
 
-    def assess(self, said, received=None, convert=False, sign=nothing_new.Signals(False, False)):
+    def assess(self, said, received=None, convert=False, sign=None):
         def run(conn):
             fields = scan._ai_fields(conn, said) if convert else None
-            return nothing_new.assess(conn, self.jane, said, fields, received, sign)
+            return nothing_new.assess(conn, self.jane, said, fields, received, sign or nothing_new.Signals(False, False))
         return self.read(run)
 
     def edit_known(self, **changes):
