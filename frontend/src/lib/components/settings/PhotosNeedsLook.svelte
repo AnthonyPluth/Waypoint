@@ -17,7 +17,7 @@
 
   export const tripOf = (p: ReviewPhoto): string => p.candidates.find((c) => c.id === p.trip_id)?.name ?? "this trip";
 
-  export type Reversal = { kind: "placed"; trip: number } | { kind: "left"; stamp: number } | { kind: "removed"; trip: number; stamp: number };
+  export type Reversal = { kind: "placed"; trip: number; decided: number } | { kind: "left"; stamp: number } | { kind: "removed"; trip: number; stamp: number };
 
   export const putText = (who: Who, trip: string): string => (who.mine ? `Put on ${trip}.` : `Put ${who.first}’s photo on ${trip}.`);
 
@@ -158,7 +158,7 @@
   const post = (p: ReviewPhoto, body: { trip_id?: number; excluded?: boolean }) =>
     apiCall<"POST /api/photos/{id}">(`/api/photos/${p.id}`, { method: "POST", body, failed: "Couldn’t save that choice" });
 
-  const placed = (trip: number) => (): Reversal => ({ kind: "placed", trip });
+  const placed = (trip: number) => (reply: TripPhoto): Reversal | null => (typeof reply.decided_at === "number" ? { kind: "placed", trip, decided: reply.decided_at } : null);
   const left = (reply: TripPhoto): Reversal | null => (typeof reply.removed_at === "number" ? { kind: "left", stamp: reply.removed_at } : null);
   const removedFrom = (id: number, trip: number) => (reply: PhotoSharing): Reversal | null => {
     const stamp = reply.removed?.find((r) => r.id === id)?.removed_at;
@@ -187,7 +187,7 @@
     const again = () => { void undo(id, reversal); };
     const send = (): Promise<unknown> => reversal.kind === "removed"
       ? apiCall<"DELETE /api/trips/{id}/photo-exclusions/{id}">(`/api/trips/${reversal.trip}/photo-exclusions/${id}?created=${encodeURIComponent(String(reversal.stamp))}`, { method: "DELETE", failed: UNDONE })
-      : apiCall<"POST /api/photos/{id}/undo">(`/api/photos/${id}/undo`, { method: "POST", body: reversal.kind === "placed" ? { trip_id: reversal.trip } : { left_off: reversal.stamp }, failed: UNDONE });
+      : apiCall<"POST /api/photos/{id}/undo">(`/api/photos/${id}/undo`, { method: "POST", body: reversal.kind === "placed" ? { trip_id: reversal.trip, decided_at: reversal.decided } : { left_off: reversal.stamp }, failed: UNDONE });
     undoing = true;
     try {
       const failure = await settle(id, send, backText(who), UNDONE, undefined, UP_TO_DATE);

@@ -20,7 +20,8 @@ from .trips import NO_TRIP, _run, viewer
 NO_PHOTO = "No such photo"
 PHOTOS_OFF = "Photos need sign-in"
 NOTHING_TO_DO = 'Send "trip_id" to put the photo on a trip, or "excluded" to leave it off'
-NOTHING_TO_UNDO = 'Send "trip_id" to take the photo off the trip you put it on, or "left_off" with the stamp the leaving off came with'
+NOTHING_TO_UNDO = 'Send "trip_id" with "decided_at", the stamp the placement came with, or "left_off" with the stamp the leaving off came with'
+NOT_A_STAMP_OF_PLACING = 'Send "decided_at" as the number the placement came with'
 NOT_A_STAMP_OF_LEAVING = 'Send "left_off" as the number the leaving off came with'
 NOTHING_TO_SHARE = 'Send "scope" to share, or "declined" for Not now'
 MAX_ID = 10 ** 18
@@ -139,12 +140,13 @@ def api_photo_undo(conn, _q, body: PhotoUndoBody, photo_id) -> TripPhoto:
         raise ApiError(NOT_A_TRIP)
     trip = _v.integer(body.get("trip_id"), "trip", 1, MAX_ID)
     left_off = _stamp(body.get("left_off"), NOT_A_STAMP_OF_LEAVING)
-    if (trip is None) == (left_off is None) or set(body) - {"trip_id", "left_off"}:
+    decided = _stamp(body.get("decided_at"), NOT_A_STAMP_OF_PLACING)
+    if (trip is None) == (left_off is None) or (trip is None) != (decided is None) or set(body) - {"trip_id", "decided_at", "left_off"}:
         raise ApiError(NOTHING_TO_UNDO)
-    if left_off is not None and not math.isfinite(left_off):
-        raise ApiError(NOT_A_STAMP_OF_LEAVING)
+    if any(v is not None and not math.isfinite(v) for v in (left_off, decided)):
+        raise ApiError(NOT_A_STAMP_OF_LEAVING if left_off is not None else NOT_A_STAMP_OF_PLACING)
     try:
-        return _run(lambda: photos.undo(conn, who, this, trip, left_off), NO_PHOTO)
+        return _run(lambda: photos.undo(conn, who, this, trip, decided, left_off), NO_PHOTO)
     except photos.Changed as e:
         raise ApiError(str(e), 409) from None
 

@@ -502,6 +502,27 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("relist_gen", [col[0] for col in shape(self.path)["photo_trip_syncs"]["columns"]])
         self.assertEqual([r[:5] for r in rows_of(self.path, "photo_trip_syncs")], [(1, 1, "a", "b", "c1")])
 
+    def test_0047_adds_the_placement_stamp_to_photos_and_leaves_earlier_rows_without_one(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0046")
+            c.execute(insert(schema.people).values(id=1, display_name="One"))
+            c.execute(insert(schema.photo_sources).values(id=1, person_id=1, owner_sub="sub-x", url="https://photos.example", immich_user_id="u",
+                                                         api_key="enc:v1:x", status="ok", created=1.0))
+            c.execute(sa.table("photos", *(sa.column(n) for n in ("source_id", "asset_id", "asset_updated", "kind", "taken_utc", "taken_local", "match", "decided_by", "seen")))
+                      .insert().values(source_id=1, asset_id="a1", asset_updated="x", kind="image", taken_utc="2026-06-01T00:00:00+00:00", taken_local="2026-06-01T00:00",
+                                       match="place", decided_by="owner", seen=1.0))
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        names = [col[0] for col in shape(self.path)["photos"]["columns"]]
+        self.assertEqual([(r[names.index("decided_by")], r[names.index("decided_at")]) for r in rows_of(self.path, "photos")], [("owner", None)])
+        with db.engine(self.path).begin() as c:
+            c.execute(sa.update(schema.photos).values(decided_at=1700000000.5))
+            command.downgrade(db.alembic_config(c), "0046")
+        after = [col[0] for col in shape(self.path)["photos"]["columns"]]
+        self.assertNotIn("decided_at", after)
+        self.assertEqual([r[after.index("decided_by")] for r in rows_of(self.path, "photos")], ["owner"])
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:

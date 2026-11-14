@@ -769,6 +769,7 @@ export interface PhotoSources {
 
 export interface PhotoUndoBody {
   trip_id?: number;
+  decided_at?: number;
   left_off?: number;
 }
 
@@ -927,6 +928,7 @@ export interface ReviewPhoto {
   distance_km: number | null;
   cluster: number | null;
   removed_at: number | null;
+  decided_at?: number | null;
   candidates: PhotoCandidate[];
 }
 
@@ -1360,6 +1362,7 @@ export interface TripPhoto {
   distance_km: number | null;
   cluster: number | null;
   removed_at: number | null;
+  decided_at?: number | null;
 }
 
 export interface TripPhotoCounts {

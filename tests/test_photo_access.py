@@ -478,10 +478,11 @@ class StewardTests(AccessCase):
     def test_the_steward_undoes_a_choice_for_the_person_they_manage_and_nobody_else_can(self):
         self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.kid, "scope": "only_me"})
         far = self.keep(photo_row(self.sources["kid"], self.trip, "2026-06-03T10:00", where=ROME, match="far", distance=1400.0, segment_id=self.stay["id"]))
-        self.ok("ana", "POST", f"/api/photos/{far}", {"trip_id": self.trip})
+        placed = self.ok("ana", "POST", f"/api/photos/{far}", {"trip_id": self.trip})
+        undoing = {"trip_id": self.trip, "decided_at": placed["decided_at"]}
         self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
-        self.assertEqual(self.call("ben", "POST", f"/api/photos/{far}/undo", {"trip_id": self.trip}), (404, NO_PHOTO))
-        self.assertEqual(self.ok("ana", "POST", f"/api/photos/{far}/undo", {"trip_id": self.trip})["person_id"], self.kid)
+        self.assertEqual(self.call("ben", "POST", f"/api/photos/{far}/undo", undoing), (404, NO_PHOTO))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photos/{far}/undo", undoing)["person_id"], self.kid)
         self.assertEqual([(p["id"], p["person_id"]) for p in self.ok("ana", "GET", "/api/photos/review")["photos"]], [(far, self.kid)])
         self.assertEqual(self.ok("ben", "GET", "/api/photos/review"), {"photos": []})
 
@@ -831,7 +832,7 @@ class LocalModeTests(ServerCase):
         self.assertEqual(status, 200)
         trip = seg["trip_id"]
         calls = [("GET", f"/api/trips/{trip}/photos", None), ("GET", "/api/photos/review", None), ("POST", "/api/photos/1", {"trip_id": trip}),
-                 ("POST", "/api/photos/1/undo", {"trip_id": trip}), ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
+                 ("POST", "/api/photos/1/undo", {"trip_id": trip, "decided_at": 1.0}), ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
                  ("DELETE", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [1]}),
                  ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", "/api/photo-grants", None), ("POST", "/api/photo-sharing-prefs/1", {"share_all": True}),
                  ("GET", "/api/photos/1/thumbnail", None), ("GET", "/api/photos/1/preview", None), ("GET", "/api/photos/1/original", None)]

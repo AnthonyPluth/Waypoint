@@ -7353,6 +7353,9 @@
           "trip_id": {
             "type": "integer"
           },
+          "decided_at": {
+            "type": "number"
+          },
           "left_off": {
             "type": "number"
           }
@@ -8053,6 +8056,12 @@
             ]
           },
           "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "decided_at": {
             "type": [
               "number",
               "null"
@@ -10063,6 +10072,12 @@
             ]
           },
           "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "decided_at": {
             "type": [
               "number",
               "null"

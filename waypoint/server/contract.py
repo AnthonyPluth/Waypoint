@@ -595,6 +595,7 @@ class TripPhoto(TypedDict):
     distance_km: float | None
     cluster: int | None
     removed_at: float | None
+    decided_at: NotRequired[float | None]
 
 
 class PhotoCluster(TypedDict):
@@ -646,6 +647,7 @@ class PhotoBody(TypedDict):
 
 class PhotoUndoBody(TypedDict):
     trip_id: NotRequired[int]
+    decided_at: NotRequired[float]
     left_off: NotRequired[float]
 
 

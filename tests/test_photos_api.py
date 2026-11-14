@@ -68,7 +68,7 @@ def stored(photo_id):
         row = conn.orm.get(Photo, photo_id)
         if row is None:
             return None
-        return {k: getattr(row, k) for k in ("trip_id", "segment_id", "match", "distance_km", "decided_by", "latitude", "longitude", "location_source")}
+        return {k: getattr(row, k) for k in ("trip_id", "segment_id", "match", "distance_km", "decided_by", "decided_at", "latitude", "longitude", "location_source")}
 
 
 class PhotoRoutes(RouteCase):
@@ -381,6 +381,9 @@ class PhotoRoutes(RouteCase):
     def review(self, who="ana"):
         return self.ok(who, "GET", "/api/photos/review")["photos"]
 
+    def at(self, photo, trip):
+        return {"trip_id": trip, "decided_at": stored(photo)["decided_at"] or 1.0}
+
     def undo(self, who, photo, body):
         return self.call(who, "POST", f"/api/photos/{photo}/undo", body)
 
@@ -390,11 +393,11 @@ class PhotoRoutes(RouteCase):
         before = ({**stored(torn), "decided_by": "auto"}, [c["id"] for c in self.review()[0]["candidates"]])
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
         self.assertEqual((self.review(), [p["id"] for p in self.listing("ana", week)["photos"]]), ([], [torn]))
-        got = self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"trip_id": week})
+        got = self.ok("ana", "POST", f"/api/photos/{torn}/undo", self.at(torn, week))
         self.assertEqual((got["id"], got["trip_id"], got["match"]), (torn, None, "ambiguous"))
         self.assertEqual((stored(torn), [c["id"] for c in self.review()[0]["candidates"]]), before)
         self.assertEqual(self.listing("ana", week)["photos"], [])
-        self.assertEqual(self.undo("ana", torn, {"trip_id": week}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(self.undo("ana", torn, self.at(torn, week)), (409, {"error": photos.UNDO_CHANGED}))
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": self.trip})
         self.assertEqual([p["id"] for p in self.listing("ana")["photos"]], [torn])
 
@@ -403,7 +406,7 @@ class PhotoRoutes(RouteCase):
         before = stored(far)
         self.ok("ana", "POST", f"/api/photos/{far}", {"trip_id": self.trip})
         self.assertEqual((self.review(), stored(far)["decided_by"]), ([], "owner"))
-        got = self.ok("ana", "POST", f"/api/photos/{far}/undo", {"trip_id": self.trip})
+        got = self.ok("ana", "POST", f"/api/photos/{far}/undo", self.at(far, self.trip))
         self.assertEqual((got["trip_id"], got["match"]), (self.trip, "far"))
         self.assertEqual(stored(far), {**before, "decided_by": "auto", "segment_id": self.flight["id"], "distance_km": stored(far)["distance_km"]})
         self.assertEqual([(p["id"], p["trip_id"], p["match"]) for p in self.review()], [(far, self.trip, "far")])
@@ -416,10 +419,10 @@ class PhotoRoutes(RouteCase):
         twin = self.photo(second, None, "2026-06-04T12:00", match="ambiguous", where=SOHO, asset="twice-4v8n")
         self.ok("ana", "POST", f"/api/photos/{first}", {"trip_id": week})
         self.assertEqual((stored(twin)["trip_id"], stored(twin)["decided_by"]), (week, "owner"))
-        self.ok("ana", "POST", f"/api/photos/{first}/undo", {"trip_id": week})
+        self.ok("ana", "POST", f"/api/photos/{first}/undo", self.at(first, week))
         self.assertEqual([(stored(i)["trip_id"], stored(i)["match"], stored(i)["decided_by"]) for i in (first, twin)], [(None, "ambiguous", "auto")] * 2)
         self.assertEqual([p["id"] for p in self.review()], [first])
-        self.assertEqual(self.undo("ana", twin, {"trip_id": week}), (404, {"error": "No such photo"}))
+        self.assertEqual(self.undo("ana", twin, self.at(twin, week)), (404, {"error": "No such photo"}))
 
     def test_leaving_off_carries_its_stamp_and_undoing_it_returns_the_photo_to_needs_a_look(self):
         week = self.week()
@@ -448,6 +451,60 @@ class PhotoRoutes(RouteCase):
         self.assertEqual((stored(torn)["trip_id"], stored(torn)["decided_by"], self.review()), (self.trip, "auto", []))
         self.assertEqual([p["id"] for p in self.ok("ana", "GET", f"/api/trips/{week}/photo-sharing")["removed"]], [torn])
 
+    def test_an_undo_bound_to_an_older_placement_cannot_reverse_a_newer_one_on_the_same_trip(self):
+        week = self.week()
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        first = self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
+        self.assertIsInstance(first["decided_at"], float)
+        self.assertEqual(stored(torn)["decided_at"], first["decided_at"])
+        old = {"trip_id": week, "decided_at": first["decided_at"]}
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", old)
+        self.assertEqual(stored(torn)["decided_at"], None)
+        second = self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
+        self.assertGreater(second["decided_at"], first["decided_at"])
+        before = stored(torn)
+        self.assertEqual(self.undo("ana", torn, old), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(stored(torn), before)
+        self.assertEqual((before["trip_id"], before["decided_by"], before["decided_at"]), (week, "owner", second["decided_at"]))
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"trip_id": week, "decided_at": second["decided_at"]})
+        self.assertEqual((stored(torn)["trip_id"], stored(torn)["decided_at"]), (None, None))
+
+    def test_retrying_an_undo_whose_answer_was_lost_cannot_reverse_a_placement_made_since(self):
+        week = self.week()
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        lost = {"trip_id": week, "decided_at": self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})["decided_at"]}
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", lost)
+        self.assertEqual(self.undo("ana", torn, lost), (409, {"error": photos.UNDO_CHANGED}))
+        again = self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
+        before = stored(torn)
+        self.assertEqual(self.undo("ana", torn, lost), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(stored(torn), before)
+        self.assertEqual((before["trip_id"], before["decided_at"]), (week, again["decided_at"]))
+
+    def test_a_placement_stamp_is_shared_with_the_same_asset_in_a_second_library_and_cleared_with_the_choice(self):
+        week = self.week()
+        second = self.keep(PhotoSource(person_id=self.person["ana"], owner_sub="sub-ana", url=URL + "1", immich_user_id="immich-user-1",
+                                       api_key=secretbox.encrypt(KEY) or "", status="ok", created=1.0))
+        first = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO, asset="twice-7c1d")
+        twin = self.photo(second, None, "2026-06-04T12:00", match="ambiguous", where=SOHO, asset="twice-7c1d")
+        got = self.ok("ana", "POST", f"/api/photos/{first}", {"trip_id": week})
+        self.assertEqual((stored(first)["decided_at"], stored(twin)["decided_at"]), (got["decided_at"], got["decided_at"]))
+        self.ok("ana", "POST", f"/api/photos/{first}/undo", {"trip_id": week, "decided_at": got["decided_at"]})
+        self.assertEqual((stored(first)["decided_at"], stored(twin)["decided_at"]), (None, None))
+
+    def test_an_undo_of_a_leaving_off_cannot_reverse_a_later_leaving_off_of_the_same_photo(self):
+        week = self.week()
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        one = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})["removed_at"]
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"left_off": one})
+        two = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})["removed_at"]
+        self.assertGreater(two, one)
+        self.assertEqual(self.undo("ana", torn, {"left_off": one}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual([p["id"] for p in self.ok("ana", "GET", f"/api/trips/{week}/photo-sharing")["removed"]], [torn])
+        self.assertEqual(self.review(), [])
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"left_off": two})
+        self.assertEqual([p["id"] for p in self.review()], [torn])
+
     def test_undoing_an_old_leaving_off_cannot_clobber_a_newer_keep_on_one_of_its_trips(self):
         week = self.week()
         torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
@@ -466,10 +523,10 @@ class PhotoRoutes(RouteCase):
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": self.trip})
         before = stored(torn)
-        self.assertEqual(self.undo("ana", torn, {"trip_id": week}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(self.undo("ana", torn, self.at(torn, week)), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual(stored(torn), before)
-        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"trip_id": self.trip})
-        for body in ({"trip_id": self.trip}, {"trip_id": week}):
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", self.at(torn, self.trip))
+        for body in (self.at(torn, self.trip), self.at(torn, week)):
             self.assertEqual(self.undo("ana", torn, body), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual((stored(torn)["trip_id"], stored(torn)["match"]), (None, "ambiguous"))
         stamp = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})["removed_at"]
@@ -491,13 +548,13 @@ class PhotoRoutes(RouteCase):
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
         gone = {"error": "No such photo"}
         for who in ("ben", "cy"):
-            self.assertEqual(self.undo(who, torn, {"trip_id": week}), (404, gone), who)
+            self.assertEqual(self.undo(who, torn, self.at(torn, week)), (404, gone), who)
         for odd in ("abc", "0", "99999"):
-            self.assertEqual(self.call("ana", "POST", f"/api/photos/{odd}/undo", {"trip_id": week}), (404, gone), odd)
-        self.assertEqual(self.undo("ana", torn, {"trip_id": self.trip}), (409, {"error": photos.UNDO_CHANGED}))
+            self.assertEqual(self.call("ana", "POST", f"/api/photos/{odd}/undo", self.at(torn, week)), (404, gone), odd)
+        self.assertEqual(self.undo("ana", torn, self.at(torn, self.trip)), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual((stored(torn)["trip_id"], stored(torn)["decided_by"]), (week, "owner"))
         mine = self.photo(self.ana, self.trip, "2026-06-02T10:00", where=SOHO)
-        self.assertEqual(self.undo("ana", mine, {"trip_id": self.trip}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(self.undo("ana", mine, self.at(mine, self.trip)), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual(self.undo("ana", mine, {"left_off": 1.0}), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual((stored(mine)["trip_id"], stored(mine)["decided_by"]), (self.trip, None))
         self.assertEqual(self.undo("ben", mine, {"left_off": 1.0}), (404, gone))
@@ -507,11 +564,13 @@ class PhotoRoutes(RouteCase):
         torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
         self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
         nothing = {"error": photos_api.NOTHING_TO_UNDO}
-        for body in ({}, {"trip_id": None}, {"left_off": None}, {"trip_id": week, "left_off": 1.0}, {"trip_id": week, "excluded": True}, {"hidden": True}):
+        for body in ({}, {"trip_id": None}, {"left_off": None}, {"trip_id": week}, {"decided_at": 1.0}, {"left_off": 1.0, "decided_at": 1.0},
+                     {"trip_id": week, "decided_at": 1.0, "left_off": 1.0}, {"trip_id": week, "decided_at": 1.0, "excluded": True}, {"hidden": True}):
             self.assertEqual(self.undo("ana", torn, body), (400, nothing), body)
         for odd in ("abc", True, 1.5, 0, [1]):
             self.assertEqual(self.undo("ana", torn, {"trip_id": odd})[0], 400, odd)
         for odd in ("1", True, [1], {}, "nan"):
+            self.assertEqual(self.undo("ana", torn, {"trip_id": week, "decided_at": odd})[0], 400, odd)
             self.assertEqual(self.undo("ana", torn, {"left_off": odd}), (400, {"error": photos_api.NOT_A_STAMP_OF_LEAVING}), odd)
         status, _ = self.req("POST", f"/api/photos/{torn}/undo", None, self.who["ana"])
         self.assertEqual(status, 400)
@@ -524,7 +583,7 @@ class PhotoRoutes(RouteCase):
         before = stored(torn)
         with db.session() as conn:
             conn.execute(delete(PhotoGrant).where(PhotoGrant.trip_id.in_([week, self.trip])))
-        self.assertEqual(self.undo("ana", torn, {"trip_id": week}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(self.undo("ana", torn, self.at(torn, week)), (409, {"error": photos.UNDO_CHANGED}))
         self.assertEqual(stored(torn), before)
 
     def test_the_undo_replies_never_carry_the_asset_id_the_library_address_or_the_key(self):
@@ -533,7 +592,7 @@ class PhotoRoutes(RouteCase):
         other = self.photo(self.ana, None, "2026-06-04T13:00", match="ambiguous", where=SOHO)
         with no_leaks(self, ASSET, URL, KEY, "immich-user-1"):
             self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
-            replies = [self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"trip_id": week}), self.undo("ana", torn, {"trip_id": week})[1],
+            replies = [self.ok("ana", "POST", f"/api/photos/{torn}/undo", self.at(torn, week)), self.undo("ana", torn, self.at(torn, week))[1],
                        self.undo("ben", torn, {"trip_id": week})[1], self.undo("cy", other, {"left_off": 1.0})[1]]
             stamp = self.ok("ana", "POST", f"/api/photos/{other}", {"excluded": True})["removed_at"]
             replies += [self.ok("ana", "POST", f"/api/photos/{other}/undo", {"left_off": stamp}), self.undo("ana", other, {"left_off": stamp})[1]]
@@ -750,9 +809,9 @@ class PhotoViewers(Household):
         mine = self.photo(self.janes, self.trip, "2026-06-02T10:00", where=SOHO)
         self.assertIsNotNone(photos.decide(self.c, self.jane, mine, self.trip, None))
         for viewer in (Viewer(None), self.household, self.sam):
-            self.assertIsNone(photos.undo(self.c, viewer, mine, self.trip, None))
+            self.assertIsNone(photos.undo(self.c, viewer, mine, self.trip, 1.0, None))
         self.assertEqual(stored_decided(self.c, mine), "owner")
-        self.assertIsNotNone(photos.undo(self.c, self.jane, mine, self.trip, None))
+        self.assertIsNotNone(photos.undo(self.c, self.jane, mine, self.trip, photos_stamp(self.c, mine), None))
         self.assertEqual(stored_decided(self.c, mine), "auto")
 
     def test_a_person_decides_only_their_own_librarys_photos(self):
@@ -770,6 +829,12 @@ class PhotoViewers(Household):
     def test_an_instant_is_read_in_utc_whatever_its_spelling(self):
         for text in ("2026-06-02T09:00:00+00:00", "2026-06-02T09:00:00Z", "2026-06-02T09:00:00", "2026-06-02T10:00:00+01:00"):
             self.assertEqual(photos.instant(text).isoformat(), "2026-06-02T09:00:00+00:00", text)
+
+
+def photos_stamp(conn, photo_id):
+    row = conn.orm.get(Photo, photo_id)
+    assert row is not None
+    return row.decided_at
 
 
 def stored_decided(conn, photo_id):

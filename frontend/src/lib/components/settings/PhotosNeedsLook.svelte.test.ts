@@ -44,10 +44,11 @@ function show(photos: ReviewPhoto[], who = ADA, ondecided: (id: number) => Promi
 }
 
 const STAMP = 1700000000.123456;
+const PLACED = 1700000001.654321;
 
 function replyTo(path: string, o?: unknown): unknown {
   const { method, body } = (o ?? {}) as Call;
-  if (method === "POST" && /^\/api\/photos\/\d+$/.test(path)) return { removed_at: (body as { excluded?: boolean }).excluded ? STAMP : null };
+  if (method === "POST" && /^\/api\/photos\/\d+$/.test(path)) return (body as { excluded?: boolean }).excluded ? { removed_at: STAMP } : { removed_at: null, decided_at: PLACED };
   if (method === "POST" && /photo-exclusions$/.test(path)) return { removed: (body as { photo_ids: number[] }).photo_ids.map((id) => ({ id, removed_at: STAMP })) };
   return {};
 }
@@ -376,7 +377,7 @@ describe("Needs a look, undoing a decision", () => {
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     undoOf()();
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
-    expect(sent("/api/photos/21/undo", "POST")[0][1]).toMatchObject({ body: { trip_id: 12 } });
+    expect(sent("/api/photos/21/undo", "POST")[0][1]).toMatchObject({ body: { trip_id: 12, decided_at: PLACED } });
     expect(spy).toHaveBeenLastCalledWith(21);
     expect(toast.success).toHaveBeenLastCalledWith("Back in Needs a look.");
   });
@@ -387,7 +388,7 @@ describe("Needs a look, undoing a decision", () => {
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
     undoOf()();
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
-    expect(sent("/api/photos/22/undo", "POST")[0][1]).toMatchObject({ body: { trip_id: 13 } });
+    expect(sent("/api/photos/22/undo", "POST")[0][1]).toMatchObject({ body: { trip_id: 13, decided_at: PLACED } });
   });
 
   it("Undo on the Leave off toast sends the stamp the leaving off came back with, and nothing else", async () => {
@@ -410,15 +411,17 @@ describe("Needs a look, undoing a decision", () => {
     expect(toast.success).toHaveBeenLastCalledWith("Back in Needs a look.");
   });
 
-  it("offers no Undo for a removal or a leaving off the reply gives no stamp for", async () => {
+  it("offers no Undo for a placement, a removal or a leaving off the reply gives no stamp for", async () => {
     vi.mocked(api).mockResolvedValue({ removed: [], removed_at: null } as never);
     const { spy } = show([ambiguous, far()]);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    await user.click(screen.getByRole("button", { name: /^Keep on this trip, the photo/ }));
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
-    await user.click(screen.getByRole("button", { name: /^Remove from this trip, the photo/ }));
+    await user.click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
-    expect(vi.mocked(toast.success).mock.calls).toEqual([["Left off both trips."], ["Removed from Four Corners loop."]]);
+    await user.click(screen.getByRole("button", { name: /^Remove from this trip, the photo/ }));
+    await waitFor(() => expect(spy).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(toast.success).mock.calls).toEqual([["Kept on Four Corners loop."], ["Left off both trips."], ["Removed from Four Corners loop."]]);
   });
 
   it("words every toast for the person the photo is for", async () => {
