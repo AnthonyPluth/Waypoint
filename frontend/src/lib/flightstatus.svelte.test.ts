@@ -85,7 +85,7 @@ describe("watching the stored status", () => {
     stop = watchFlightStatus(() => [flight]);
     await vi.advanceTimersByTimeAsync(3 * LIVE_EVERY);
     expect(reads()).toBe(3);
-    expect(vi.mocked(api).mock.calls.every(([path, opts]) => path === "/api/flight-status" && !opts)).toBe(true);
+    expect(vi.mocked(api).mock.calls).toEqual(Array(3).fill(["/api/flight-status", { background: true }]));
   });
 
   it("shows a delay the server found without a reload", async () => {
@@ -125,6 +125,30 @@ describe("watching the stored status", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     window.dispatchEvent(new Event("focus"));
     expect(reads()).toBe(2);
+  });
+
+  it("leaves the page where it is and stops reading when the session has gone", async () => {
+    vi.setSystemTime(DEPARTS);
+    const was = location.href;
+    vi.mocked(api).mockRejectedValue(Object.assign(new Error("Your session expired. Sign in again to keep going."), { status: 401 }));
+    stop = watchFlightStatus(() => [flight]);
+    await vi.advanceTimersByTimeAsync(LIVE_EVERY);
+    expect(reads()).toBe(1);
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/flight-status", { background: true });
+    expect(location.href).toBe(was);
+    await vi.advanceTimersByTimeAsync(5 * LIVE_EVERY);
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(reads()).toBe(1);
+  });
+
+  it("keeps reading after a failure that isn’t the session", async () => {
+    vi.setSystemTime(DEPARTS);
+    vi.mocked(api).mockRejectedValue(Object.assign(new Error("offline"), { status: 0 }));
+    stop = watchFlightStatus(() => [flight]);
+    await vi.advanceTimersByTimeAsync(3 * LIVE_EVERY);
+    expect(reads()).toBe(3);
+    expect(flightStatus.problem).toBe("offline");
   });
 
   it("stops when the page goes, and when live status is off", async () => {

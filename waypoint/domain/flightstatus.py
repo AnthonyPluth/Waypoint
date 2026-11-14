@@ -40,6 +40,7 @@ Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "dive
 _lock = threading.Lock()
 _held_lock = threading.Lock()
 _held: dict[tuple[str, str], tuple[service.Status, datetime, datetime]] = {}
+_failed: set[tuple[str, str]] = set()
 
 
 class NotAFlight(ValueError):
@@ -144,7 +145,7 @@ def checkpoints(flight: Flight, seen: service.Status | None = None) -> list[tupl
 
 
 def due(flight: Flight, now: datetime, last: datetime | None, state: str | None, reduced: bool = False,
-        seen: service.Status | None = None) -> bool:
+        seen: service.Status | None = None, failed: bool = False) -> bool:
     departs, arrives = expected(flight, seen)
     if state in OVER or now > arrives + LATE:
         return False
@@ -152,7 +153,7 @@ def due(flight: Flight, now: datetime, last: datetime | None, state: str | None,
     if passed and (last is None or last < passed[-1]):
         return True
     since = arrives if now >= arrives else departs if now >= departs and not _left(state, seen, now) else None
-    if reduced or seen is None or since is None:
+    if reduced or failed or seen is None or since is None:
         return False
     every = OVERDUE_EVERY if now - since < OVERDUE_FAST_FOR else OVERDUE_SLOW_EVERY
     return last is None or now - last >= every
@@ -266,8 +267,22 @@ def drop_held(number: str | None = None, day: str | None = None) -> None:
     with _held_lock:
         if number is None or day is None:
             _held.clear()
+            _failed.clear()
         else:
             _held.pop((number, day), None)
+
+
+def _note_failure(flight: Flight, failed: bool) -> None:
+    with _held_lock:
+        if failed:
+            _failed.add((flight.number, flight.day))
+        else:
+            _failed.discard((flight.number, flight.day))
+
+
+def _last_failed(flight: Flight) -> bool:
+    with _held_lock:
+        return (flight.number, flight.day) in _failed
 
 
 def _fresh(number: str, day: str, now: datetime) -> tuple[service.Status, datetime] | None:
@@ -323,6 +338,9 @@ def _note_aircraft(conn: db.Connection, flight: Flight, found: service.Status | 
 
 
 def purge(conn: db.Connection, now: datetime) -> None:
+    gone = (now.astimezone().date() - timedelta(days=CHECK_KEEP_DAYS)).isoformat()
+    with _held_lock:
+        _failed.difference_update({key for key in _failed if key[1] <= gone})
     conn.execute(delete(FlightCheck).where(FlightCheck.date <= (now.astimezone().date() - timedelta(days=CHECK_KEEP_DAYS)).isoformat()))
 
 
@@ -331,6 +349,7 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
     try:
         found = service.fetch(flight.number, flight.day, flight.origin)
     except service.FlightStatusError as e:
+        _note_failure(flight, True)
         _touch(conn, flight, now)
         conn.commit()
         if isinstance(e, service.RateLimited):
@@ -338,6 +357,7 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
         elif isinstance(e, service.Refused):
             _pause(conn, now, "key")
         raise
+    _note_failure(flight, False)
     _store(conn, flight, found, now)
     _note_aircraft(conn, flight, found)
     conn.commit()
@@ -355,7 +375,7 @@ def run_due(conn: db.Connection, now: datetime) -> int:
         row = _final(conn, flight.number, flight.day)
         seen = None if row else _fresh(flight.number, flight.day, now)
         state = row.state if row else seen[0].state if seen else None
-        if not due(flight, now, _last_call(conn, flight), state, spent.reduced, seen[0] if seen else None):
+        if not due(flight, now, _last_call(conn, flight), state, spent.reduced, seen[0] if seen else None, _last_failed(flight)):
             continue
         try:
             _check(conn, flight, now)

@@ -516,6 +516,47 @@ class CheckTests(Household):
                              (seg["id"], "delayed", 180, "2026-11-20T22:00"), now)
         self.assertEqual(self.stored(), [])
 
+    def test_an_outage_after_a_good_answer_falls_back_to_the_scheduled_checks_and_keeps_the_answer(self):
+        seg = self.book(self.jane)
+        now = EARLY
+        calls = []
+        while now < ARRIVES + timedelta(hours=8):
+            self.fake.answer = (500, {"message": "down"}) if now >= DEPARTS else (200, fixture("on_time"))
+            before = len(self.fake.calls)
+            _captured(lambda at=now: flightstatus.run_due(self.c, at))
+            if len(self.fake.calls) > before:
+                calls.append(now)
+            now += timedelta(minutes=5)
+        self.assertEqual(calls, [*[t for t, _ in flightstatus.checkpoints(FLIGHT)][:4], DEPARTS, ARRIVES])
+        self.assertEqual(self.used(ARRIVES), 6)
+        shown = flightstatus.overview(self.c, self.jane, ARRIVES + timedelta(hours=1))["statuses"]
+        self.assertEqual([(s["segment_id"], s["state"]) for s in shown], [(seg["id"], "scheduled")])
+
+    def test_after_an_outage_a_good_scheduled_answer_brings_the_rechecks_back(self):
+        self.book(self.jane)
+        def answer(now):
+            if now < DEPARTS:
+                return 200, fixture("on_time")
+            return (500, {"message": "down"}) if now < ARRIVES else (200, fixture("departed"))
+        now = EARLY
+        calls = []
+        while now < ARRIVES + timedelta(minutes=50):
+            self.fake.answer = answer(now)
+            before = len(self.fake.calls)
+            _captured(lambda at=now: flightstatus.run_due(self.c, at))
+            if len(self.fake.calls) > before:
+                calls.append(now)
+            now += timedelta(minutes=5)
+        self.assertEqual(calls[4:], [DEPARTS, ARRIVES, ARRIVES + timedelta(minutes=15), ARRIVES + timedelta(minutes=30),
+                                     ARRIVES + timedelta(minutes=45)])
+
+    def test_a_failure_is_forgotten_with_the_flights_checks(self):
+        flightstatus._note_failure(FLIGHT, True)
+        flightstatus.purge(self.c, DEPARTS + timedelta(days=3))
+        self.assertTrue(flightstatus._last_failed(FLIGHT))
+        flightstatus.purge(self.c, DEPARTS + timedelta(days=8))
+        self.assertFalse(flightstatus._last_failed(FLIGHT))
+
     def test_from_90_percent_a_late_flight_gets_only_the_one_hour_check(self):
         self.book(self.jane)
         self.set_used(360)

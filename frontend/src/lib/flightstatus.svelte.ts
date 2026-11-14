@@ -11,9 +11,15 @@ const AFTER = 6 * 3_600_000;
 const AGAIN_AFTER = 5_000;
 const FINAL = new Set(["landed", "cancelled", "diverted"]);
 
-export async function loadFlightStatus(): Promise<void> {
-  try { flightStatus.list = await apiCall<"GET /api/flight-status">("/api/flight-status"); flightStatus.problem = ""; }
-  catch (err) { flightStatus.problem = errMsg(err); }
+export async function loadFlightStatus(background = false): Promise<boolean> {
+  try {
+    flightStatus.list = await (background ? apiCall<"GET /api/flight-status">("/api/flight-status", { background }) : apiCall<"GET /api/flight-status">("/api/flight-status"));
+    flightStatus.problem = "";
+  } catch (err) {
+    flightStatus.problem = errMsg(err);
+    return (err as { status?: number }).status !== 401;
+  }
+  return true;
 }
 
 export async function refreshFlightStatus(segmentId: number): Promise<void> {
@@ -43,15 +49,16 @@ export function watchFlightStatus(segments: () => Segment[]): () => void {
     if (!force && now - last < AGAIN_AFTER) return;
     if (!segments().some((s) => liveFlight(s, now))) return;
     last = now;
-    void loadFlightStatus();
+    void loadFlightStatus(true).then((signedIn) => { if (!signedIn) stop(); });
   };
   const back = () => reread(false);
   const timer = setInterval(() => reread(true), LIVE_EVERY);
   window.addEventListener("focus", back);
   document.addEventListener("visibilitychange", back);
-  return () => {
+  function stop() {
     clearInterval(timer);
     window.removeEventListener("focus", back);
     document.removeEventListener("visibilitychange", back);
-  };
+  }
+  return stop;
 }
