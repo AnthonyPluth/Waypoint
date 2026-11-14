@@ -568,6 +568,32 @@ describe("Share on all my trips when the standing setting is already on", () => 
     expect(await screen.findByText(/this one still isn’t\. Press Share on this trip/)).toBeInTheDocument();
     expect(screen.getByRole("group", { name: /from this trip$/ })).toBeInTheDocument();
   });
+
+  it("names the managed person in the note when this trip is still not shared", async () => {
+    grantList = [grants(), grants({ person_id: 3 })];
+    onSharing = (_call, path) => (path.includes("person_id=3") ? sharing({ count: 12 }) : sharing({ state: "none", count: 0 }));
+    mount({ people: [ada, june], trip: { ...road, people: [1, 3] } });
+    const ask = await screen.findByRole("group", { name: "June has 12 photos from this trip" });
+    await user.click(within(ask).getByRole("button", { name: "Share on all June’s trips" }));
+    expect(await screen.findByText(/June’s other trips are shared, but this one still isn’t\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Your other trips/)).toBeNull();
+  });
+
+  it("does not claim the trip is still not shared when the reload after the change failed, and offers Try again instead", async () => {
+    mount();
+    const ask = await prompt();
+    let failing = false;
+    const original = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path: string, opts?: Call) => {
+      if (path.includes("/photo-sharing-prefs/")) { failing = true; return original(path, opts as never); }
+      if (failing && path.includes("/photo-sharing?")) throw new Refusal("Waypoint is unreachable", 503);
+      return original(path, opts as never);
+    });
+    await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
+    expect(await screen.findByText(/Couldn’t refresh your photo sharing for this trip, so what shows may be out of date\./)).toBeInTheDocument();
+    expect(screen.queryByText(/still isn’t/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
 });
 
 describe("When the trip is edited on the page", () => {

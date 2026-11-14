@@ -98,8 +98,9 @@ export class PersonSharing {
     finally { this.busy = false; }
   }
 
-  private async afterChange(): Promise<void> {
-    await Promise.all([this.load(), this.hooks.changed()]);
+  private async afterChange(): Promise<boolean> {
+    const [reloaded] = await Promise.all([this.load(), this.hooks.changed()]);
+    return reloaded;
   }
 
   retry = (): Promise<void> => this.hold(async () => { await Promise.all([this.load(), this.hooks.changed()]); });
@@ -134,10 +135,10 @@ export class PersonSharing {
     await this.afterChange();
   }
 
-  private async unlessStillOut(): Promise<void> {
+  private async unlessStillOut(reloaded: boolean): Promise<void> {
     const s = this.sharing;
-    if (!s || s.state === "shared" || s.state === "none") return;
-    this.note = `Your other trips are shared, but this one still isn’t. Press Share on this trip to share it.`;
+    if (!reloaded || !s || s.state === "shared" || s.state === "none") return;
+    this.note = `${this.who.mine ? "Your" : `${this.who.first}’s`} other trips are shared, but this one still isn’t. Press Share on this trip to share it.`;
     if (s.state === "declined") this.reopened = true;
   }
 
@@ -177,8 +178,7 @@ export class PersonSharing {
       }
       this.reopened = false;
       toast.success(`Sharing on all trips, with ${sharedWith("only_me", this.who).replace(" only", "")} only. Change it any time in Settings.`);
-      await this.afterChange();
-      await this.unlessStillOut();
+      await this.unlessStillOut(await this.afterChange());
       return;
     }
     this.askAll(person, "");
@@ -197,8 +197,7 @@ export class PersonSharing {
     }
     this.reopened = false;
     toast.success("Saved");
-    await this.afterChange();
-    await this.unlessStillOut();
+    await this.unlessStillOut(await this.afterChange());
     return true;
   });
 
