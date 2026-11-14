@@ -347,6 +347,29 @@ class RenditionTests(ProxyCase):
         self.missing("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": fresh})
         self.assertEqual(self.immich.calls, [])
 
+    def test_a_removed_photo_has_a_thumbnail_for_its_person_alone_and_only_while_it_stays_removed(self):
+        removed = self.photo("ben")
+        self.immich.routes[f"/api/assets/{self.asset_of(removed)}/thumbnail"] = self.rendition
+        self.exclude("ben", removed)
+        path = f"/api/trips/{self.trip}/photo-exclusions/{removed}/thumbnail"
+        headers, raw = self.image("ben", path)
+        self.assertEqual((raw, headers["Content-Type"], headers["Cache-Control"]), (WEBP, "image/webp", "private, no-cache"))
+        self.assertIn(CSP, headers.get_all("Content-Security-Policy"))
+        self.assertNotIn(HEADER_CANARY, str(headers))
+        self.immich.calls.clear()
+        status, _, body = self.get("ben", path, {"If-None-Match": headers["ETag"]})
+        self.assertEqual((status, body, self.immich.calls), (304, b"", []))
+        for who, target in (("ana", path), ("cy", path), ("ben", f"/api/trips/{self.trip}/photo-exclusions/{self.mine}/thumbnail"),
+                            ("ben", f"/api/trips/{self.trip}/photo-exclusions/987654/thumbnail"), ("ben", f"/api/trips/987654/photo-exclusions/{removed}/thumbnail")):
+            with self.subTest(who=who, path=target):
+                self.missing(who, target)
+        with db.session() as conn:
+            conn.execute(delete(PhotoExclusion))
+        self.missing("ben", path, {"If-None-Match": headers["ETag"]})
+        self.exclude("ben", removed)
+        self.revoke("ben")
+        self.missing("ben", path)
+
     def test_a_photo_id_reused_for_another_asset_with_the_same_revision_never_answers_304(self):
         headers, _ = self.image("ana", f"/api/photos/{self.mine}/thumbnail")
         tag = headers["ETag"]

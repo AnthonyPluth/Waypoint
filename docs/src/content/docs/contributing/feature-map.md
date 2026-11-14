@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-119 routes; 0 have no test yet.
+120 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -53,8 +53,9 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing` | `lib/photo-sharing.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_set` | `lib/components/settings/PhotoSharingSettings.svelte`, `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}/photo-sharing` | `photos.py:api_photo_sharing_stop` | `lib/components/settings/PhotoSharingSettings.svelte`, `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `POST /api/trips/{id}/photo-exclusions` | `photos.py:api_photo_exclude` | - | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `DELETE /api/trips/{id}/photo-exclusions/{id}` | `photos.py:api_photo_put_back` | - | `test_api_contract.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `POST /api/trips/{id}/photo-exclusions` | `photos.py:api_photo_exclude` | `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `DELETE /api/trips/{id}/photo-exclusions/{id}` | `photos.py:api_photo_put_back` | `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/trips/{id}/photo-exclusions/{id}/thumbnail` | `photos.py:api_photo_removed_thumbnail` | - | `test_mcp_routes.py`, `test_photo_proxy.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/photo-grants` | `photos.py:api_photo_grants` | `lib/components/settings/PhotoSharingSettings.svelte`, `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/photo-sharing-prefs/{id}` | `photos.py:api_photo_prefs_set` | `lib/components/settings/PhotoSharingSettings.svelte`, `lib/trip-sharing.svelte.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_photo_sources.py`, `test_photos_api.py` | [start/photos](/Waypoint/start/photos/) |
 | `POST /api/segments` | `trips.py:api_segment_add` | `lib/components/SegmentForm.svelte`, `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mail_scan.py`, `test_mcp_routes.py`, `test_offline.py`, `test_onboarding.py`, `test_photo_access.py`, `test_reminders.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |

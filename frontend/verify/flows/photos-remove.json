@@ -1,0 +1,31 @@
+{
+  "name": "photos-remove",
+  "page": "trips",
+  "signed_in": true,
+  "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
+  "steps": [
+    {"goto": "#trip/7"},
+    {"wait_for": "[data-testid=your-photos]"},
+    {"click": "[data-testid=photo-strip] button[data-photo] >> nth=0"},
+    {"wait_for": "[data-testid='photo-viewer'] img"},
+    {"expect_text": {"selector": "[data-testid='photo-viewer']", "text": "Remove from this trip"}},
+    {"screenshot": "viewer"},
+    {"click": "[data-testid='photo-viewer'] >> role=button[name='Remove from this trip']"},
+    {"expect_text": {"selector": "[data-testid='photo-viewer']", "text": "1 of 12"}},
+    {"click": "[data-testid='photo-viewer'] >> role=button[name='Close']"},
+    {"click": "role=button[name='Select your photos to remove']"},
+    {"wait_for": "[data-testid=photo-selection]"},
+    {"click": "role=checkbox >> nth=0"},
+    {"click": "role=checkbox >> nth=1"},
+    {"expect_text": {"selector": "[data-testid=photo-selection]", "text": "2 selected"}},
+    {"screenshot": "select"},
+    {"click": "[data-testid=photo-selection] >> role=button[name='Remove from this trip']"},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "10 photos from your library"}},
+    {"wait_for": "role=button[name='Select your photos to remove']"},
+    {"click": "role=button[name^='Removed from this trip (']"},
+    {"wait_for": "[data-testid=your-photos] ul img"},
+    {"scroll_to": "[data-testid=your-photos] ul"},
+    {"wait_for": "[data-testid=your-photos] ul li:nth-child(4) img"},
+    {"screenshot": "removed"}
+  ]
+}
