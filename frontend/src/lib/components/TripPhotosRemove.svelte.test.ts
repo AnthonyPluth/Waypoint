@@ -426,6 +426,37 @@ describe("The viewer when the list changes under it", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("asks for the list once, and keeps saying the preview can’t be loaded, while the photo stays listed as a new object", async () => {
+    mount();
+    await photosSection();
+    await user.click(await tile(/^Photo, 9:00 AM/));
+    const dialog = await viewer();
+    onPhotos = () => reply(visible.map((p) => ({ ...p })));
+    const before = calls("GET", "/photos").length;
+    dialog.querySelector("img")!.dispatchEvent(new Event("error"));
+    await waitFor(() => expect(calls("GET", "/photos")).toHaveLength(before + 1));
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAccessibleName("Photo can’t be loaded"));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole("dialog")).toHaveAccessibleName("Photo can’t be loaded");
+    expect(screen.getByText("Can’t load this photo right now")).toBeTruthy();
+    expect(calls("GET", "/photos")).toHaveLength(before + 1);
+  });
+
+  it("keeps a playing video playing when a reload hands back a new object for the same photo", async () => {
+    visible = [shot(1), shot(2, 1, { kind: "video" }), shot(3)];
+    const { rerender } = mount();
+    await photosSection();
+    await user.click(await tile(/^Video, 10:00 AM/));
+    await viewer();
+    await user.click(screen.getByRole("button", { name: "Play video" }));
+    onPhotos = () => reply(visible.map((p) => ({ ...p })));
+    const before = calls("GET", "/photos").length;
+    await rerender({ trip: { ...road, end_date: "2026-03-05" } });
+    await waitFor(() => expect(calls("GET", "/photos")).toHaveLength(before + 1));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.getByRole("dialog").querySelector("video")?.getAttribute("src")).toBe("/api/photos/2/original");
+  });
+
   it("checks the list again when a preview can’t be loaded, and says the photo is gone only if it is", async () => {
     mount();
     await photosSection();

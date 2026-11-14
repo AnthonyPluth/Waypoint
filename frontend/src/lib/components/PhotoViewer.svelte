@@ -34,6 +34,7 @@
   let start: { x: number; y: number } | null = null;
 
   const photo = $derived(photos[index] as TripPhoto | undefined);
+  const photoId = $derived(photos[index]?.id);
   const segment = $derived(photo && photo.segment_id !== null ? segments.get(photo.segment_id) : undefined);
   const place = $derived(photo ? placeOf(photo, segment) : "");
   const owner = $derived(photo ? fullName(people, photo.person_id) : "");
@@ -42,7 +43,7 @@
   const zoneWords = $derived(!photo?.zone ? "" : photo.zone.includes("/") ? `${zoneCity(photo.zone)} time` : photo.zone);
 
   $effect(() => {
-    void photo?.id;
+    void photoId;
     void gone;
     void open;
     playing = false;
