@@ -326,8 +326,7 @@
     });
     await tick();
     if (next) menuButtons[next.id]?.focus();
-    await sent;
-    hidden.delete(i.id);
+    if (!(await sent)) hidden.delete(i.id);
   };
 
   let ignoring = $state<ReviewItem | null>(null);

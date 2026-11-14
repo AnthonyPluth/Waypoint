@@ -201,6 +201,33 @@ describe("Review", () => {
     expect(screen.queryByTestId("review-item")).toBeNull();
   });
 
+  it("keeps a dismissed item off the list when its own reload is thrown away for a newer one", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3 })], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    const gates: (() => void)[] = [];
+    let reloads = 0;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/review") {
+        reloads++;
+        await new Promise<void>((resolve) => { gates.push(resolve); });
+      }
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(reloads).toBe(1));
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(reloads).toBe(2));
+    gates[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getAllByTestId("review-item")).toHaveLength(1);
+    gates[1]!();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getAllByTestId("review-item")).toHaveLength(1);
+    expect(deletes()).toHaveLength(2);
+  });
+
   it("moves focus to the next item after a dismissal", async () => {
     held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
     render(ReviewPage);
