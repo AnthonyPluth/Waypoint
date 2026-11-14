@@ -740,7 +740,8 @@
       "web": [],
       "tests": [
         "tests/test_mcp_routes.py",
-        "tests/test_photo_proxy.py"
+        "tests/test_photo_proxy.py",
+        "tests/test_trips.py"
       ],
       "docs": [
         "start/trips"
