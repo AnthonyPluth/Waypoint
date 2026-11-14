@@ -26,7 +26,8 @@ TRAVEL_CODES = re.compile(r"\([A-Z]{3}\)|\b[A-Z][A-Z0-9] ?\d{2,4}\b")
 UNCOMPARED = re.compile(
     r"(?i)\bticket\b|\bfrequent flyer\b|\bloyalty\b|\bmember(?:ship)?\b|\bmiles\b|\bknown traveler\b|\bktn\b|\bbag\w*|\bluggage\b|\bmeals?\b|\blounge\b|"
     r"\bitinerary\b|\bport of call\b|\blayover\b|\bstopover\b|\bconnection\b|\bmanage\b|https?://|\bwww\.|\btotal\b|\bamount\b|\bpaid\b|\bcharged?\b|\bfare\b|\bprice\b|"
-    r"[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d|\d\s?(?:USD|EUR|GBP|CAD|AUD)\b|\bnotes?\b|\binstructions?\b")
+    r"[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d|\d\s?(?:USD|EUR|GBP|CAD|AUD)\b|\bnotes?\b|\binstructions?\b|"
+    r"\b(?:state)?rooms?\b|\bsuites?\b|\bbeds?\b|\bbreakfast\b|\brates?\b|\bnightly\b|\bvehicle\b|\bcar class\b")
 FLIGHT_TOKEN = re.compile(r"\b([A-Z]{2}|[A-Z]\d|\d[A-Z]) ?(\d{1,4})\b")
 MONTHS = frozenset({"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"})
 PASSENGER = re.compile(r"(?i)\b(?:passengers?|travell?ers?|guests?)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
@@ -82,12 +83,12 @@ def _same_reservations(conn: db.Connection, viewer: Viewer, fields: trips.Segmen
     return [s for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled" and trips.reservation(s, values, details) == "same"]
 
 
-def _matches(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None) -> list[Segment]:
-    if said.get("kind") == "flight":
-        return [s for s in visibility.visible_segments(conn, viewer) if _flight_matches(s, said)]
-    if fields is None:
+def _flights_like(conn: db.Connection, viewer: Viewer, said: ai.Suggestion) -> list[Segment]:
+    if said.get("kind") != "flight":
         return []
-    return [s for s in _same_reservations(conn, viewer, fields) if _day(s.start_local) == _day(fields.get("start_local"))]
+    fits = [s for s in visibility.household_segments(conn, "flight") if _flight_matches(s, said)]
+    seen = {s.id for s in visibility.visible_segments(conn, viewer)}
+    return fits if all(s.id in seen for s in fits) else []
 
 
 def _held_by(conn: db.Connection, seg: Segment, said: ai.Suggestion, stored: dict[str, str], seats: bool = True) -> bool:
@@ -146,11 +147,13 @@ def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: tri
            sign: Signals) -> Reason | None:
     if fields is not None:
         decision = newer.decide(conn, viewer, fields, received, False)
-        if decision is not None and decision.action == "older":
-            same = _same_reservations(conn, viewer, fields)
-            if [s.id for s in same] == [decision.segment_id] and _fully_held(conn, same[0], said, sign, True):
-                return "older_copy"
-    found = _matches(conn, viewer, said, fields)
+        if decision is None or decision.action != "older":
+            return None
+        same = _same_reservations(conn, viewer, fields)
+        if [s.id for s in same] == [decision.segment_id] and same[0].status == "confirmed" and _fully_held(conn, same[0], said, sign, True):
+            return "older_copy"
+        return None
+    found = _flights_like(conn, viewer, said)
     if len(found) == 1 and found[0].status == "confirmed" and _fully_held(conn, found[0], said, sign, False):
         return "already_known"
     return None

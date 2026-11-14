@@ -49,18 +49,23 @@ An AI assistant connected over [MCP](/Waypoint/start/mcp/) never dismisses this 
 
 ## Emails that add nothing new
 
-When the AI reads a message automatically during a scan and the booking it describes is one you can already see, Waypoint dismisses the Review item when nothing in the email is new. The model only reads the email. Waypoint makes the decision by comparing the fields the model found with the saved booking, and never takes the model’s own word that nothing is new. Dismissal is the same as dismissing by hand: the stored copy is deleted and nothing is added to your trips, and there is no Undo.
+When the AI reads a message automatically during a scan, Waypoint dismisses its Review item in two narrow cases where the email adds nothing to a booking you can already see. The model only reads the email. Waypoint makes the decision by comparing the fields the model found with the saved booking, and never takes the model’s own word that nothing is new. Dismissal is the same as dismissing by hand: the stored copy is deleted and nothing is added to your trips, and there is no Undo.
 
-An email is dismissed this way only when all of these hold:
+A complete reading of a booking you already have is never dismissed this way. It is filed as before: the email is kept with that booking and the item leaves Review, so nothing in it is lost and its date still counts when a later email is compared with it ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)).
 
-- Every booking the model found matches exactly one booking you can see, that is still confirmed. A flight matches on its flight number and its date and at least one airport; any other booking matches on its confirmation code and its dates. A match that is unsure, a booking nobody you share it with can see, or two bookings that both fit leaves the email in Review.
-- Every field the email states is already saved on the booking, the same: times, airports, flight number, confirmation, company, cabin, address, phone, price, and each traveller on their own seat. A different or new field, a new traveller or a new price keeps it in Review.
+**Already known.** A flight reading the model couldn’t complete (a reminder or a check-in notice without the confirmation code, say), which would otherwise wait in Review, is dismissed only when all of these hold:
+
+- It matches exactly one flight in the household on its flight number, its date and at least one airport, that flight is one you can see, and it is still confirmed. Two flights that both fit, or one that fits and that you can’t see, leaves the email in Review.
+- Every field the email states is already saved on the booking, the same: times, airports, flight number, company, cabin, price, and each traveller on their own seat.
+
+**Older copy.** A complete reading dated before the newest email already kept for the same reservation, which is still confirmed, is dismissed as an older copy, as Waypoint already does for an older email it reads itself, whatever times, airports and seats it states. Everything else it states (a total, a company, a cabin, an address, a traveller) must already be on the booking, or it is filed as before.
+
+For both, also:
+
 - Neither the email’s text nor its subject has a word about a cancellation, change, refund, delay, gate, terminal, seat or boarding, and the reader that looks for changes in mail found none. The subject is checked by Waypoint only and is not sent to the model.
-- Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat. A name Waypoint can’t place on the booking keeps it in Review.
-- The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price or total, link, itinerary or note, no flight number the model didn’t return, and no confirmation code other than the booking’s own. Any of these keeps it in Review, because dismissing deletes the only stored copy.
-- The model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
-
-A message dated before the newest email already kept for the booking is dismissed as an older copy, by the same rule as when a newer email replaces an older one ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)), whatever times, airports and seats it states. Everything else it states (a total, a company, a cabin, an address, a traveller) must already be on the booking, or it stays in Review.
+- Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat.
+- The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price, total or rate, room, suite, bed, breakfast or vehicle, link, itinerary or note, no flight number the model didn’t return, and no confirmation code other than the booking’s own. Any of these keeps the email, because dismissing deletes the only stored copy.
+- The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
 
 The mailbox’s last-scan line in Settings counts these with the reason, “already known” or “older than a saved copy” (“AI dismissed 3 emails as nothing new (2 already known, 1 older than a saved copy)”), and the log carries the same counts. Never a subject, sender or text.
 

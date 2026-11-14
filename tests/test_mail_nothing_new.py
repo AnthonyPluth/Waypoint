@@ -9,7 +9,7 @@ from tests.test_mail_ai import ScanAiCase
 from tests.test_mail_scan import NOW
 from waypoint import tls
 from waypoint.domain import trips
-from waypoint.domain.mail import nothing_new, review, scan
+from waypoint.domain.mail import newer, nothing_new, review, scan
 from waypoint.storage import db, stored_mail
 from waypoint.storage.models import ReviewItem, Segment, StoredMessage
 
@@ -119,18 +119,33 @@ class AlreadyKnownTests(NothingNewCase):
         self.read_mail(f"{REMINDER}\nJane Doe 21C", reply)
         self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
 
-    def test_a_reminder_the_parser_could_not_use_and_the_known_booking_with_a_confirmation_match_the_same_way(self):
+    def test_a_complete_reading_of_a_known_flight_is_kept_with_the_booking_and_never_dismissed(self):
         self.read_mail(f"{REMINDER}\nBooking QX7M2K", FULL, sender=AGENT)
-        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+        self.assertEqual((self.kept(), self.counted(), self.scanned()["reminder"]), ([], (0, 0), "booking"))
+        self.assertEqual(len(self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))), 2)
 
-    def test_a_hotel_with_the_same_confirmation_and_every_field_the_same_is_dismissed(self):
+    def test_a_newer_identical_email_is_kept_so_a_message_dated_between_them_replaces_nothing(self):
+        self.read_mail(f"{REMINDER}\nBooking QX7M2K", FULL, date=LATER, sender=AGENT)
+        self.assertEqual(self.counted(), (0, 0))
+        between = {"kind": "flight", "status": "confirmed", "provider": "Example Air", "confirmation": "QX7M2K", "origin": "JFK", "destination": "LHR",
+                   "start_local": "2026-11-20T17:00", "start_zone": "America/New_York", "end_local": "2026-11-21T05:10", "end_zone": "Europe/London",
+                   "details": {"flight_number": "EX 101"}}
+        decision = self.read(lambda conn: newer.decide(conn, self.jane, between, "2026-10-13", False))
+        self.assertEqual((decision.action, decision.segment_id), ("older", self.known["id"]))
+
+    def stay(self) -> dict:
         stay = {"kind": "hotel", "provider": "Example Stays", "confirmation": "HT5K9P", "origin": "Harbour Hotel", "start_local": "2026-12-01T15:00",
                 "end_local": "2026-12-04T11:00", "start_zone": "Europe/London", "end_zone": "Europe/London", "status": "confirmed", "details": {}}
-        self.read(lambda conn: trips.add_segment(conn, self.jane, stay))
+        return self.read(lambda conn: trips.add_segment(conn, self.jane, stay))
+
+    def test_a_complete_reading_of_a_known_stay_with_a_room_number_keeps_the_email_with_the_stay(self):
+        held = self.stay()
         reply = {"kind": "hotel", "provider": "Example Stays", "confirmation": "HT5K9P", "origin": "Harbour Hotel",
                  "start_local": "2026-12-01T15:00", "end_local": "2026-12-04T11:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
-        self.read_mail("Your stay at Harbour Hotel starts on 1 December. Example Stays HT5K9P", reply, subject="Your hotel stay: check-in details")
-        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+        self.read_mail("Your stay at Harbour Hotel starts on 1 December. Example Stays HT5K9P. Your room number is 4401.", reply,
+                       subject="Your hotel stay: check-in details")
+        self.assertEqual((self.kept(), self.counted(), self.scanned()["reminder"]), ([], (0, 0), "booking"))
+        self.assertEqual([a["message_id"] for a in self.read(lambda conn: stored_mail.attached(conn, held["id"]))], ["reminder"])
 
 
 class MustStayInReviewTests(NothingNewCase):
@@ -205,6 +220,10 @@ class MustStayInReviewTests(NothingNewCase):
     def test_a_named_passenger_already_on_the_booking_still_dismisses(self):
         self.read_mail(f"{CHECK_IN}\nPassenger: Jane Doe", SAME)
         self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+
+    def test_a_flight_another_household_booking_also_holds_is_not_known_even_when_only_one_is_visible(self):
+        self.add_flight(self.sam, "EX 101", "SM7777")
+        self.stays(REMINDER, SAME)
 
     def test_a_flight_nobody_can_see_is_not_known(self):
         self.add_flight(self.sam, "EX 777", "SM7777")
@@ -326,10 +345,10 @@ class OlderCopyTests(NothingNewCase):
             return scan._file_ai(conn, self.mailbox, name, [earlier], None, None, NOW, signals=nothing_new.signals(OLD_TEXT, subject), dismiss_known=True)
 
     def test_an_older_message_with_a_change_only_in_the_subject_is_not_dismissed_as_a_copy(self):
+        self.assertEqual(self.filed_directly("Your upcoming flight", "os-ok").known, "older_copy")
         for n, subject in enumerate(CHANGED_SUBJECTS):
             with self.subTest(subject=subject):
                 self.assertIsNone(self.filed_directly(subject, f"os-{n}").known)
-        self.assertEqual(self.filed_directly("Your upcoming flight", "os-ok").known, "older_copy")
 
     def test_an_older_message_naming_a_passenger_who_is_not_on_the_booking_is_not_dismissed_as_a_copy(self):
         self.read_mail(f"{OLD_TEXT}\nPassenger: Mia Rose Doe", {**FULL, "start_local": "2026-11-20T18:00"}, name="op", date=EARLIER, sender=AGENT)
@@ -427,7 +446,7 @@ class ComparisonTests(NothingNewCase):
         self.read(lambda conn: trips.add_segment(conn, self.jane, stay))
         said = {"kind": "hotel", "provider": "Example Stays", "confirmation": "HT5K9P", "origin": "Harbour Hotel", "start_local": "2026-12-01T15:00",
                 "end_local": "2026-12-04T11:00", "start_zone": "Europe/London", "end_zone": "Europe/London", "address": "1 Quay Road"}
-        self.assertEqual(self.assess(said, convert=True), "already_known")
+        self.assertIsNone(self.assess(said, convert=True))
         self.assertIsNone(self.assess({**said, "address": "2 Quay Road"}, convert=True))
         self.assertIsNone(self.assess({**said, "confirmation": "ZZ9Y8X"}, convert=True))
         self.assertIsNone(self.assess({k: v for k, v in said.items() if k != "start_zone"}))
@@ -437,7 +456,8 @@ class ComparisonTests(NothingNewCase):
         earlier = {**FULL, "start_local": "2026-11-20T18:00"}
         self.assertEqual(self.assess(earlier, received="2026-10-10", convert=True), "older_copy")
         self.assertIsNone(self.assess(earlier, received="2026-10-12", convert=True))
-        self.assertEqual(self.assess(FULL, received="2026-10-10", convert=True), "already_known")
+        self.assertIsNone(self.assess(FULL, received="2026-10-10", convert=True))
+        self.assertEqual(self.assess(FULL, received="2026-10-10"), "already_known")
         self.assertIsNone(self.assess({**FULL, "start_local": "2026-11-20T21:30"}, received="2026-10-14", convert=True))
         self.assertIsNone(self.assess({**FULL, "start_local": "2026-11-20T21:30"}, received=None, convert=True))
 
@@ -462,6 +482,26 @@ class OlderCopyComparisonTests(NothingNewCase):
         for what, more in extras.items():
             with self.subTest(what=what):
                 self.assertIsNone(self.older(**more))
+
+    def test_an_older_copy_of_a_booking_that_is_not_confirmed_is_kept(self):
+        for status in ("changed", "cancelled"):
+            with self.subTest(status=status):
+                with db.session() as conn:
+                    conn.execute(Segment.__table__.update().values(status=status))
+                self.assertIsNone(self.older())
+        with db.session() as conn:
+            conn.execute(Segment.__table__.update().values(status="confirmed"))
+        self.assertEqual(self.older(), "older_copy")
+
+    def test_an_older_copy_that_mentions_a_room_rate_or_vehicle_is_kept(self):
+        for line in ("Your room number is 4401.", "Deluxe King Room", "Your suite is ready", "Breakfast included", "Nightly rate 150.00",
+                     "Vehicle: compact or similar"):
+            with self.subTest(line=line):
+                self.assertIsNone(self.older_signed(line))
+        self.assertEqual(self.older_signed("See you soon."), "older_copy")
+
+    def older_signed(self, text: str):
+        return self.assess(self.EARLIER_TIMES, received="2026-10-10", convert=True, sign=nothing_new.signals(text))
 
     def test_an_older_copy_with_a_total_the_booking_already_holds_is_dismissed(self):
         self.read(lambda conn: trips.edit_segment(conn, self.jane, self.known["id"], {"price": {"amount_minor": 12000, "currency": "USD"}}))
