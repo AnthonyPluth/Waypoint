@@ -92,32 +92,54 @@
   }
 
   let setups = 0;
-  async function setup(id: number, me: number | null) {
+  async function sync(id: number, me: number | null) {
     const mine = ++setups;
     checking = true;
     try {
       const ids = await actingPersons(trip, people, me);
       if (mine !== setups) return;
       actingProblem = ids === null;
-      const made = (ids ?? (me === null ? [] : [me])).map((who) => new PersonSharing(id, who, me, people, { changed }));
-      acting = made;
-      await Promise.all(made.map((a) => a.load()));
+      const wanted = ids ?? (acting.length ? acting.map((a) => a.personId) : me === null ? [] : [me]);
+      for (const a of acting) if (!wanted.includes(a.personId)) a.dispose();
+      const next = wanted.map((who) => {
+        const kept = acting.find((a) => a.personId === who);
+        if (kept) { kept.relabel(me, people); return kept; }
+        return new PersonSharing(id, who, me, people, { changed });
+      });
+      acting = next;
+      await Promise.all(next.map((a) => a.load()));
     } finally {
       if (mine === setups) checking = false;
     }
   }
+
+  const changeKey = $derived(JSON.stringify([trip.id, trip.start_date, trip.end_date, [...trip.people].sort(), people.map((p) => [p.id, p.member, p.first_name, p.display_name])]));
+  let seen: { id: number; key: string } | null = null;
 
   $effect(() => {
     const id = tripId;
     const me = app.state?.person_id ?? null;
     if (!signedIn) return;
     untrack(() => void load(id));
-    untrack(() => void setup(id, me));
+    untrack(() => void sync(id, me));
     return () => untrack(() => {
       setups++;
       checking = false;
       for (const a of acting) a.dispose();
       acting = [];
+    });
+  });
+
+  $effect(() => {
+    const key = changeKey;
+    const id = tripId;
+    const me = app.state?.person_id ?? null;
+    const before = seen;
+    seen = { id, key };
+    if (!signedIn || before === null || before.id !== id || before.key === key) return;
+    untrack(() => {
+      void load(id, true);
+      void sync(id, me);
     });
   });
 
@@ -182,7 +204,7 @@
     {#if actingProblem}
       <div class="flex flex-wrap items-center gap-3" role="alert">
         <p class="text-muted-foreground">Couldn’t check which libraries you manage on this trip, so some sharing choices may be missing.</p>
-        <Button variant="outline" size="sm" disabled={checking} onclick={() => void setup(trip.id, app.state?.person_id ?? null)}>Try again</Button>
+        <Button variant="outline" size="sm" disabled={checking} onclick={() => void sync(trip.id, app.state?.person_id ?? null)}>Try again</Button>
       </div>
     {/if}
     {#if staleView}

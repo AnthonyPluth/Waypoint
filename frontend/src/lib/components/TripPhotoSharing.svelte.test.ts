@@ -488,6 +488,123 @@ describe("Share prompt: Share on all my trips", () => {
   });
 });
 
+describe("Share on all my trips when the standing setting is already on", () => {
+  const on = () => { grantList = [grants({ prefs: { default_scope: "only_me", share_all: true } })]; };
+
+  it("shares this trip itself, with the snapshot shown, and leaves the standing setting and the default alone", async () => {
+    on();
+    current = sharing({ state: "declined" });
+    mount();
+    await user.click(within(await screen.findByTestId("photo-reminder")).getByRole("button", { name: "Share your photos on this trip" }));
+    const ask = await prompt();
+    current = shared({ scope: "only_me" });
+    await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
+    await card();
+    expect(sent("POST", "/photo-sharing-prefs/1")).toHaveLength(0);
+    expect(sent("POST", "/photo-sharing")).toEqual([{ person_id: 1, scope: "only_me", window: WINDOW, audience: [1, 2], sources: [{ id: 7, status: "ok" }], count_token: "a".repeat(32) }]);
+    expect(toast.success).toHaveBeenCalledWith("Shared with you only. Change it any time under Your photos on this trip.");
+  });
+
+  it("shares this trip with Everyone on this trip without a second question, and does not change the default for later trips", async () => {
+    on();
+    mount();
+    const ask = await prompt();
+    await user.click(within(ask).getByRole("radio", { name: /^Everyone on this trip/ }));
+    current = shared();
+    await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
+    await card();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(sent("POST", "/photo-sharing-prefs/1")).toHaveLength(0);
+    expect(sent("POST", "/photo-sharing")[0]).toMatchObject({ scope: "trip", count_token: "a".repeat(32) });
+  });
+
+  it("re-displays with the fresh count when this trip’s share is refused as out of date", async () => {
+    on();
+    mount();
+    const ask = await prompt();
+    onSharing = (call) => {
+      if (call?.method !== "POST") return undefined;
+      current = sharing({ count: 80, count_token: "d".repeat(32) });
+      throw new Refusal(STALE, 409);
+    };
+    await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
+    const fresh = await screen.findByRole("group", { name: "You have 80 photos from this trip" });
+    expect(within(fresh).getByRole("alert")).toHaveTextContent(STALE);
+  });
+
+  it("says so, and keeps the prompt, when the setting went on elsewhere meanwhile and this trip is still not shared", async () => {
+    mount();
+    const ask = await prompt();
+    await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
+    await waitFor(() => expect(sent("POST", "/photo-sharing-prefs/1")).toHaveLength(1));
+    expect(await screen.findByText(/this one still isn’t\. Press Share on this trip/)).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /from this trip$/ })).toBeInTheDocument();
+  });
+});
+
+describe("When the trip is edited on the page", () => {
+  it("asks again, from fresh sharing, when the dates move and the server wants a new answer", async () => {
+    current = shared();
+    const view = mount();
+    await card();
+    const getsBefore = sharingGets();
+    const photoLoads = calls("GET", "/api/trips/7/photos").length;
+    current = sharing({ state: "ask", count: 90 });
+    await view.rerender({ trip: { ...road, end_date: "2026-03-09" }, people: [ada], now: after });
+    expect(await screen.findByRole("group", { name: "You have 90 photos from this trip" })).toBeInTheDocument();
+    expect(screen.queryByTestId("your-photos")).toBeNull();
+    expect(sharingGets()).toBe(getsBefore + 1);
+    expect(calls("GET", "/api/trips/7/photos").length).toBe(photoLoads + 1);
+  });
+
+  it("asks again when someone joins the trip", async () => {
+    current = shared();
+    const view = mount();
+    await card();
+    current = sharing({ state: "ask", count: 90 });
+    await view.rerender({ trip: { ...road, people: [1, 2, 4] }, people: [ada], now: after });
+    expect(await screen.findByRole("group", { name: "You have 90 photos from this trip" })).toBeInTheDocument();
+  });
+
+  it("gives a child added to the trip the controls, and takes them away when the child leaves", async () => {
+    grantList = [grants(), grants({ person_id: 3 })];
+    onSharing = (_call, path) => (path.includes("person_id=3") ? sharing({ count: 12 }) : sharing({ state: "none", count: 0 }));
+    photos = [];
+    const view = mount({ people: [ada, june] });
+    await screen.findByText("No photos on this trip yet.");
+    expect(screen.queryByRole("group", { name: "June has 12 photos from this trip" })).toBeNull();
+    await view.rerender({ trip: { ...road, people: [1, 3] }, people: [ada, june], now: after });
+    expect(await screen.findByRole("group", { name: "June has 12 photos from this trip" })).toBeInTheDocument();
+    await view.rerender({ trip: { ...road, people: [1] }, people: [ada, june], now: after });
+    await waitFor(() => expect(screen.queryByRole("group", { name: "June has 12 photos from this trip" })).toBeNull());
+  });
+
+  it("does not ask again for a rename or any other edit that moves nothing", async () => {
+    current = shared();
+    const view = mount();
+    await card();
+    const getsBefore = sharingGets();
+    await view.rerender({ trip: { ...road, name: "Renamed" }, people: [ada], now: after });
+    await Promise.resolve();
+    expect(sharingGets()).toBe(getsBefore);
+  });
+
+  it("keeps the controls held while a change is under way, and the newest load wins", async () => {
+    mount();
+    const ask = await prompt();
+    const post = deferred<PhotoSharing>();
+    onSharing = (call) => (call?.method === "POST" ? post.promise : undefined);
+    await user.click(within(ask).getByRole("button", { name: "Share on this trip" }));
+    expect(within(ask).getByRole("button", { name: "Not now" })).toBeDisabled();
+    current = sharing({ count: 91 });
+    await screen.findByRole("group", { name: /from this trip$/ });
+    current = shared({ scope: "only_me" });
+    post.resolve(current);
+    await card();
+    expect(screen.queryByRole("group", { name: /from this trip$/ })).toBeNull();
+  });
+});
+
 describe("Your photos on this trip", () => {
   it("narrows to Only me at once, without asking, with a toast that offers Undo", async () => {
     current = shared();

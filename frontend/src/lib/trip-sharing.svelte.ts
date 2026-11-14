@@ -46,10 +46,14 @@ export class PersonSharing {
   opener: HTMLElement | null = null;
   private ticket = 0;
   private gone = false;
-  readonly who: Who;
+  who = $state<Who>(whoIs(-1, null, []));
 
   constructor(readonly tripId: number, readonly personId: number, me: number | null, people: Person[], private hooks: Hooks) {
-    this.who = whoIs(personId, me, people);
+    this.relabel(me, people);
+  }
+
+  relabel(me: number | null, people: Person[]): void {
+    this.who = whoIs(this.personId, me, people);
   }
 
   readonly mode = $derived.by((): Mode => {
@@ -110,7 +114,9 @@ export class PersonSharing {
     if (ok && this.sharing?.state === "declined") this.reopened = true;
   });
 
-  share = (): Promise<void> => this.hold(async () => {
+  share = (): Promise<void> => this.hold(() => this.grantHere());
+
+  private async grantHere(): Promise<void> {
     const shown = this.sharing;
     const scope = this.scope;
     if (!shown || (scope === "trip" && shown.count === null)) return;
@@ -126,7 +132,14 @@ export class PersonSharing {
     this.reopened = false;
     toast.success(`Shared with ${sharedWith(scope, this.who)}. Change it any time under ${photosTitle(this.who)}.`);
     await this.afterChange();
-  });
+  }
+
+  private async unlessStillOut(): Promise<void> {
+    const s = this.sharing;
+    if (!s || s.state === "shared" || s.state === "none") return;
+    this.note = `Your other trips are shared, but this one still isn’t. Press Share on this trip to share it.`;
+    if (s.state === "declined") this.reopened = true;
+  }
 
   notNow = (): Promise<void> => this.hold(async () => {
     this.note = "";
@@ -152,6 +165,9 @@ export class PersonSharing {
 
   shareAll = (e?: Event): Promise<void> => this.hold(async () => {
     this.opener = (e?.currentTarget as HTMLElement | null | undefined) ?? this.opener;
+    const person = await this.everyone();
+    if (!person) return;
+    if (person.prefs.share_all) { await this.grantHere(); return; }
     if (this.scope === "only_me") {
       try {
         await apiCall<"POST /api/photo-sharing-prefs/{id}">(`/api/photo-sharing-prefs/${this.personId}`, { method: "POST", body: { default_scope: "only_me", share_all: true }, failed: "Couldn’t turn it on" });
@@ -162,10 +178,10 @@ export class PersonSharing {
       this.reopened = false;
       toast.success(`Sharing on all trips, with ${sharedWith("only_me", this.who).replace(" only", "")} only. Change it any time in Settings.`);
       await this.afterChange();
+      await this.unlessStillOut();
       return;
     }
-    const person = await this.everyone();
-    if (person) this.askAll(person, "");
+    this.askAll(person, "");
   });
 
   confirmAll = (): Promise<boolean> => this.hold(async () => {
@@ -182,6 +198,7 @@ export class PersonSharing {
     this.reopened = false;
     toast.success("Saved");
     await this.afterChange();
+    await this.unlessStillOut();
     return true;
   });
 
