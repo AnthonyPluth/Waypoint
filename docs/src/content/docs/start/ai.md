@@ -37,7 +37,7 @@ What is sent and where it goes are exactly as for **Ask AI**. The item in Review
 
 ## Emails that aren’t bookings
 
-When the AI finds no booking in a message and judges it plainly not about a booking at all, Waypoint dismisses the Review item itself, with no step for you. This applies to **Ask AI** and to the automatic reading alike. The model can say so for three kinds of email: a **promotion** (a sale, a discount or another offer), a **loyalty or account statement**, and a **newsletter**. A receipt or an account notice is never dismissed this way: it stays in Review for you.
+When the AI finds no booking in a message and judges it plainly not about a booking at all, Waypoint dismisses the Review item itself, with no step for you. This applies to **Ask AI** and to the automatic reading alike. The model can say so for three kinds of email: a **promotion** (a sale, a discount or another offer), a **loyalty or account statement**, and a **newsletter**. A receipt or an account notice is never dismissed this way, on purpose: the model isn’t asked to name them, an answer that calls an email one is ignored, and the email stays in Review for you as before.
 
 - **Ask AI** takes the item off the list and says why, for example “Dismissed: a promotion, not a booking.”
 - A scan counts these in the mailbox’s last-scan line in Settings (“AI dismissed 3 emails as not bookings”), never with a subject, sender or text.
