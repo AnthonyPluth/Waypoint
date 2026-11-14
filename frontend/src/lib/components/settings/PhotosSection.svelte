@@ -5,6 +5,7 @@
   export const REFUSED_SAID = "Immich didn’t accept this key. Check that you copied all of it, or make a new key in Immich under Account settings › API keys.";
   export const UNREACHABLE_SAID = "Waypoint couldn’t connect to the address. Check the address and port, and that the server is on and reachable from Waypoint, then Test again.";
   export const ALREADY_SAID = "This library is already connected.";
+  export const KEY_LOST = "Waypoint can’t unlock this library’s key any more; enter it again.";
   const IMMICH_REFUSED = ["Immich didn’t accept", "This Immich library isn’t set up"];
   const UNREACHABLE_STATUS = [502, 504];
 
@@ -13,7 +14,7 @@
   export function outcome(err: unknown, message: string): Outcome {
     const status = (err as { status?: unknown } | null)?.status;
     if (typeof status === "number" && UNREACHABLE_STATUS.includes(status)) return { chip: { label: "Can’t reach Immich", tone: "warn" }, text: UNREACHABLE_SAID };
-    if (status === 409) return { text: ALREADY_SAID };
+    if (message.startsWith("That library is already connected")) return { text: ALREADY_SAID };
     if (IMMICH_REFUSED.some((start) => message.startsWith(start))) return { chip: { label: "Key refused", tone: "bad" }, text: REFUSED_SAID };
     if (status === 400 && (message.includes("Immich address") || message.startsWith("Use https://"))) return { field: "url", text: message };
     if (status === 400 && message.includes("API key")) return { field: "key", text: message };
@@ -25,7 +26,8 @@
     if (!s.mine) return { label: "Connected", tone: "quiet" };
     if (syncing) return { label: "Syncing", tone: "info" };
     if (s.status === "off") return { label: "Paused", tone: "quiet" };
-    if (s.status === "refused") return { label: "Key refused", tone: "bad" };
+    if (s.status === "ok" && s.last_error) return { label: "Not up to date", tone: "warn" };
+    if (s.status === "refused") return { label: s.last_error === KEY_LOST ? "Key lost" : "Key refused", tone: "bad" };
     if (s.status === "unreachable") return { label: "Can’t reach Immich", tone: "warn" };
     return s.last_sync ? { label: "Up to date", tone: "ok" } : { label: "Not synced yet", tone: "quiet" };
   }
@@ -50,7 +52,7 @@
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import { toast } from "svelte-sonner";
-  import { onMount, tick } from "svelte";
+  import { onDestroy, onMount, tick } from "svelte";
 
   let list = $state<PhotoSources | null>(null);
   let people = $state<Person[]>([]);
@@ -86,9 +88,11 @@
     if (!s.mine) return [{ text: `${person?.member ? person.display_name : "Another member"} manages this library and what it shares.` }];
     const lines: Line[] = [];
     if (s.person_id !== me && person && !person.member) lines.push({ text: `You manage this library because ${person.display_name} doesn’t sign in.` });
-    if (s.status === "refused") lines.push({ text: "Immich turned the key down. It may have been deleted or lost a permission. Photos already on trips stay; nothing new syncs until you change the key.", problem: true });
+    if (s.status === "refused" && s.last_error === KEY_LOST) lines.push({ text: `${KEY_LOST} Photos already on trips stay; nothing new syncs until you change the key.`, problem: true });
+    else if (s.status === "refused") lines.push({ text: "Immich turned the key down. It may have been deleted or lost a permission. Photos already on trips stay; nothing new syncs until you change the key.", problem: true });
     else if (s.status === "unreachable") lines.push({ text: "Waypoint couldn’t reach Immich. It tries again at the next sync.", problem: true });
     else if (s.status === "off") lines.push({ text: "Paused. Nothing new syncs until you resume it." });
+    if ((s.status === "ok" || s.status === "off") && s.last_error) lines.push({ text: s.last_error, problem: true });
     if (s.status !== "refused") {
       const count = s.photos != null ? `${plural(s.photos, "photo", "photos")} on ${plural(s.trips ?? 0, "trip", "trips")}` : "";
       if (s.last_sync) lines.push({ text: [`Last synced ${synced(s.last_sync)}`, count].filter(Boolean).join(" · ") });
@@ -99,8 +103,10 @@
 
   let syncing = $state<number[]>([]);
   let starting = $state<number | null>(null);
-  const SYNC_POLL_MS = 3000;
-  const SYNC_POLLS = 20;
+  const SYNC_POLL_MS = 5000;
+  const SYNC_POLLS = 120;
+  const watching = new Set<ReturnType<typeof setInterval>>();
+  onDestroy(() => { watching.forEach(clearInterval); watching.clear(); });
 
   function watchSync(s: PhotoSource) {
     syncing = [...syncing, s.id];
@@ -109,11 +115,13 @@
       polls += 1;
       await load();
       const now = list?.sources.find((x) => x.id === s.id);
-      if (!now || polls >= SYNC_POLLS || now.last_sync !== s.last_sync || now.status !== s.status) {
+      if (!now || polls >= SYNC_POLLS || now.last_sync !== s.last_sync || now.status !== s.status || now.last_error !== s.last_error) {
         clearInterval(timer);
+        watching.delete(timer);
         syncing = syncing.filter((id) => id !== s.id);
       }
     }, SYNC_POLL_MS);
+    watching.add(timer);
   }
 
   const syncNow = (s: PhotoSource) => act(async () => {
@@ -227,11 +235,20 @@
     result = null;
   }
 
-  const test = () => act(async () => {
-    result = null;
-    const r = await apiCall<"POST /api/photo-sources/test">("/api/photo-sources/test", { method: "POST", body: { url: url.trim(), key: key.trim() } });
-    tested = { url: url.trim(), key: key.trim(), person: chosen, name: r.name };
-  }, { busy: (on) => (testing = on), onError: (message, err) => { tested = null; result = outcome(err, message); } });
+  const asTyped = () => ({ url: url.trim(), key: key.trim(), person: chosen });
+  const stillTyped = (sent: { url: string; key: string; person: number | null }) => {
+    const now = asTyped();
+    return now.url === sent.url && now.key === sent.key && now.person === sent.person;
+  };
+
+  function test() {
+    const sent = asTyped();
+    return act(async () => {
+      result = null;
+      const r = await apiCall<"POST /api/photo-sources/test">("/api/photo-sources/test", { method: "POST", body: { url: sent.url, key: sent.key } });
+      if (stillTyped(sent)) tested = { ...sent, name: r.name };
+    }, { busy: (on) => (testing = on), onError: (message, err) => { if (!stillTyped(sent)) return; tested = null; result = outcome(err, message); } });
+  }
 
   const save = (event: SubmitEvent) => {
     event.preventDefault();
@@ -275,7 +292,7 @@
           </div>
           {#if s.mine}
             {@const library = libraryOf(s)}
-            {#if syncing.includes(s.id)}<p class="text-sm text-muted-foreground" role="status">Syncing {library}…</p>{/if}
+            {#if syncing.includes(s.id)}<p class="text-sm text-muted-foreground" role="status">Sync started for {library}. This card updates when it finishes.</p>{/if}
             <div class="flex flex-wrap gap-2">
               {#if s.status === "refused"}
                 <Button size="sm" aria-label={`Change key, ${library}`} aria-expanded={rekeying === s.id} onclick={() => openRekey(s)}><KeyRound aria-hidden="true" />Change key</Button>
@@ -342,7 +359,7 @@
             </div>
           </div>
           <div class="space-y-2 rounded-xl bg-surface-2 p-3 text-sm">
-            <p><span class="font-semibold">What Waypoint reads.</span> Photos taken during {forSelf ? "your" : `${chosenPerson?.display_name}’s`} trips and the 12 hours around them. For each one it keeps when and where it was taken, including photos that turn out not to belong to a trip. It never keeps the pictures: they are shown straight from Immich.</p>
+            <p><span class="font-semibold">What Waypoint reads.</span> Photos taken during {forSelf ? "your" : `${chosenPerson?.display_name}’s`} trips and the 12 hours around them. For each one it keeps when and where it was taken, including photos that turn out not to belong to a trip. It never keeps the pictures: they stay in Immich, and Waypoint fetches each one from Immich when it is shown, without storing it.</p>
             <p class="text-muted-foreground">Nothing from this library shows on a trip until it is shared there, and then only to the people chosen.{forSelf ? "" : ` ${chosenPerson?.display_name} doesn’t sign in, so you manage what ${chosenPerson?.display_name}’s library shares.`} The key is stored encrypted and is never shown again.</p>
           </div>
           {#if result && !result.field}

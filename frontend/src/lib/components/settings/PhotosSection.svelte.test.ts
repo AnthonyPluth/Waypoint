@@ -11,7 +11,7 @@ import type { Person, PhotoSource } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { toast } from "svelte-sonner";
 import { state } from "../../../test/fixtures";
-import PhotosSection, { ALREADY_SAID, REFUSED_SAID, UNREACHABLE_SAID, host, outcome, sourceChip } from "./PhotosSection.svelte";
+import PhotosSection, { ALREADY_SAID, KEY_LOST, REFUSED_SAID, UNREACHABLE_SAID, host, outcome, sourceChip } from "./PhotosSection.svelte";
 
 class Refusal extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -86,6 +86,53 @@ describe("Settings → Photos, the source cards", () => {
     expect(within(refused).getByText(/Immich turned the key down/)).toBeInTheDocument();
     expect(within(refused).queryByRole("button", { name: /Sync now/ })).toBeNull();
     expect(within(refused).getByRole("button", { name: "Change key, June Brook’s library" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Some of your library couldn’t be read."],
+    ["Immich says Waypoint has made too many requests; it will try again later."],
+  ])("doesn't call a library up to date while its last sync left a warning: %s", async (warning) => {
+    serve([source({ last_error: warning })]);
+    render(PhotosSection);
+    const card = within(await screen.findByTestId("photo-source"));
+    expect(card.getByText(warning)).toBeInTheDocument();
+    expect(card.getByText("Not up to date")).toHaveAttribute("data-tone", "warn");
+    expect(card.queryByText("Up to date")).toBeNull();
+    expect(card.getByText(/^Last synced /)).toBeInTheDocument();
+  });
+
+  it("blames a key Waypoint can no longer unlock on Waypoint, not on Immich", async () => {
+    serve([source({ status: "refused", last_error: KEY_LOST })]);
+    render(PhotosSection);
+    const card = within(await screen.findByTestId("photo-source"));
+    expect(card.getByText("Key lost")).toHaveAttribute("data-tone", "bad");
+    expect(card.getByText(/^Waypoint can’t unlock this library’s key any more; enter it again\./)).toBeInTheDocument();
+    expect(card.queryByText(/Immich turned the key down/)).toBeNull();
+    expect(card.getByRole("button", { name: "Change key, Ada Brook’s library" })).toBeInTheDocument();
+  });
+
+  it("shows why a resume was refused when the trips changed meanwhile", async () => {
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") return { asks: false, count: 0, grants: [], snapshot: "c".repeat(32) };
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") throw new Refusal("Your trips changed meanwhile; try again", 409);
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Your trips changed meanwhile; try again");
+    expect(alert).not.toHaveTextContent(ALREADY_SAID);
+  });
+
+  it("stops checking on a sync once the section is gone", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    serve([source()], (path) => { if (path === "/api/photo-sources/7/sync") return { started: true }; });
+    const { unmount } = render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Sync now, Ada Brook’s library" }));
+    await screen.findByRole("status");
+    unmount();
+    const before = vi.mocked(api).mock.calls.length;
+    await flush(() => vi.advanceTimersByTimeAsync(30000));
+    expect(vi.mocked(api).mock.calls.length).toBe(before);
   });
 
   it("says when no library is connected, and when photos are off without sign-in", async () => {
@@ -172,11 +219,11 @@ describe("Settings → Photos, the source cards", () => {
     await waitFor(() => expect(sync).toBeDisabled());
     expect(sync).toHaveTextContent("Syncing…");
     release({ started: true });
-    expect(await screen.findByRole("status")).toHaveTextContent("Syncing Ada Brook’s library…");
+    expect(await screen.findByRole("status")).toHaveTextContent("Sync started for Ada Brook’s library. This card updates when it finishes.");
     expect(screen.getByText("Syncing")).toBeInTheDocument();
     expect(sync).toBeDisabled();
     synced = "2026-11-06T12:12:00+00:00";
-    await flush(() => vi.advanceTimersByTimeAsync(3000));
+    await flush(() => vi.advanceTimersByTimeAsync(5000));
     await waitFor(() => expect(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" })).toBeEnabled());
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.getByText("Up to date")).toBeInTheDocument();
@@ -240,6 +287,8 @@ describe("Settings → Photos, connecting a library", () => {
     expect(screen.getByRole("form", { name: "Connect an Immich library" })).toBeInTheDocument();
     for (const p of PERMISSIONS) expect(screen.getByText(p)).toBeInTheDocument();
     expect(screen.getByText(/Photos taken during your trips and the 12 hours around them/)).toBeInTheDocument();
+    expect(screen.getByText(/they stay in Immich, and Waypoint fetches each one from Immich when it is shown, without storing it\./)).toBeInTheDocument();
+    expect(screen.queryByText(/straight from Immich/)).toBeNull();
     expect(screen.getByLabelText("API key")).toHaveAttribute("type", "password");
     const show = screen.getByRole("button", { name: "Show the key" });
     expect(show).toHaveAttribute("aria-pressed", "false");
@@ -288,6 +337,32 @@ describe("Settings → Photos, connecting a library", () => {
     expect(screen.queryByLabelText("API key")).toBeNull();
     expect(document.body.innerHTML).not.toContain(KEY);
     expect(toast.success).toHaveBeenCalledWith("Library connected");
+  });
+
+  it("ignores a Test answer for an address or key that has since changed, so Save stays off", async () => {
+    let answer: (v: unknown) => void = () => {};
+    let refuse: (e: unknown) => void = () => {};
+    let calls = 0;
+    await openForm([], (path) => {
+      if (path !== "/api/photo-sources/test") return undefined;
+      calls += 1;
+      return new Promise((resolve, reject) => { if (calls === 1) answer = resolve; else refuse = reject; });
+    });
+    await fill("https://first.immich.example");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await userEvent.clear(screen.getByLabelText("Immich address"));
+    await userEvent.type(screen.getByLabelText("Immich address"), "https://second.immich.example");
+    answer({ name: "First Account", same_account: null });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Test" })).toBeEnabled());
+    expect(screen.queryByText("Key works")).toBeNull();
+    expect(screen.queryByText(/First Account/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await userEvent.type(screen.getByLabelText("API key"), "x");
+    refuse(new Refusal(IMMICH_REFUSED, 400));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Test" })).toBeEnabled());
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it.each([
