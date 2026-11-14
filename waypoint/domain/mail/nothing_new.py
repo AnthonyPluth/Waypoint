@@ -8,7 +8,7 @@ from ...storage import db
 from ...storage.models import Segment
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai, ingest, newer, price, references, when
+from . import ai, ingest, newer, price, references, when, words
 from .booking import Passenger
 
 Reason = Literal["already_known", "older_copy"]
@@ -20,6 +20,7 @@ CHANGE = re.compile(
 TRAVEL_WORDS = re.compile(
     r"(?i)\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?[ap]\.?m\b|\bconfirmation\b|\breservation (?:number|code|no\b|#)|record locator|\bpnr\b|e-?ticket|ticket number|"
     r"\bitinerary\b|check-?in\b|check-?out\b|\bdepart\w*|\barriv\w*|pick-?up|drop-?off|\bpassengers?\b|\bflight\s*(?:no\.?|number|#)")
+LABELS = re.compile(r"(?i)" + "|".join(re.escape(w) for w in sorted(words.CONFIRMATION, key=len, reverse=True)))
 TRAVEL_CODES = re.compile(r"\([A-Z]{3}\)|\b[A-Z][A-Z0-9] ?\d{2,4}\b")
 
 
@@ -34,6 +35,12 @@ PLAIN_WORDS = frozenset({"am", "an", "as", "at", "be", "by", "do", "go", "he", "
 PASSENGER = re.compile(r"(?i)\b(?:(?:lead\s+)?(?:passengers?|travell?ers?|guests?)(?:\s+names?)?|passagers?|passagiere?|reisende[rn]?|pasajeros?|"
                        r"viajeros?|huéspedes|huésped|搭乗者|旅行者)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
 JOINED = re.compile(r"(?i)\s+(?:and|&)\s+")
+DAY_MONTH = re.compile(rf"(?<!\d)(\d{{1,2}})(?:st|nd|rd|th|er|\.)?\s+(?:de\s+)?({when.WORD})")
+MONTH_DAY = re.compile(rf"(?<![^\W\d_])({when.WORD})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?(?!\d)")
+ISO_DAY = re.compile(r"(?<!\d)\d{4}-(\d\d)-(\d\d)(?!\d)")
+NUMERIC_DAY = re.compile(r"(?<![\d/.])(\d{1,2})[/.](\d{1,2})(?:[/.]\d{2,4})?(?![\d/]|\.\d)")
+JP_DAY = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
+Day = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -44,6 +51,28 @@ class Signals:
     uncompared: bool = False
     flights: frozenset[str] = frozenset()
     codes: frozenset[str] = frozenset()
+    days: frozenset[frozenset[Day]] = frozenset()
+
+
+def _real(month: int, day: int) -> bool:
+    return 1 <= month <= 12 and 1 <= day <= 31
+
+
+def _days(whole: str) -> frozenset[frozenset[Day]]:
+    found: set[frozenset[Day]] = set()
+    for m in DAY_MONTH.finditer(whole):
+        if (month := when.month_number(m[2])) is not None and _real(month, int(m[1])):
+            found.add(frozenset({(month, int(m[1]))}))
+    for m in MONTH_DAY.finditer(whole):
+        if (month := when.month_number(m[1])) is not None and _real(month, int(m[2])):
+            found.add(frozenset({(month, int(m[2]))}))
+    for pattern in (ISO_DAY, JP_DAY):
+        found.update(frozenset({(int(m[1]), int(m[2]))}) for m in pattern.finditer(whole) if _real(int(m[1]), int(m[2])))
+    for m in NUMERIC_DAY.finditer(whole):
+        readings = frozenset((a, b) for a, b in ((int(m[1]), int(m[2])), (int(m[2]), int(m[1]))) if _real(a, b))
+        if readings:
+            found.add(readings)
+    return frozenset(found)
 
 
 def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
@@ -52,9 +81,9 @@ def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     flights = frozenset({*(f"{m[1]}{m[2]}".upper() for m in FLIGHT_TOKEN.finditer(whole) if m[1].isupper() or m[1].lower() not in PLAIN_WORDS),
                          *(f"{a}{n}".upper() for a, n in ai.LISTED_FLIGHT.findall(whole))})
     timed = any(c.search(whole) for c in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK))
-    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(timed or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
+    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(timed or LABELS.search(whole) or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
                    passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights,
-                   codes=references.labelled(whole))
+                   codes=references.labelled(whole), days=_days(whole))
 
 
 def _day(local: str | None) -> str:
@@ -143,9 +172,23 @@ def _names_held(conn: db.Connection, seg: Segment, passengers: tuple[str, ...]) 
     return all(trips._who(t) in held for t in ingest.travelers(conn, tuple(Passenger(n) for n in passengers)))
 
 
+def _told_days(suggestions: list[ai.Suggestion]) -> set[Day]:
+    told: set[Day] = set()
+    for s in suggestions:
+        for local in (s.get("start_local"), s.get("end_local")):
+            if found := ISO_DAY.match(local or ""):
+                told.add((int(found[1]), int(found[2])))
+    return told
+
+
 def covers(sign: Signals, suggestions: list[ai.Suggestion]) -> bool:
     told = {k for s in suggestions if (k := trips.flight_key(s.get("flight_number"))) is not None}
-    return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told
+    days = _told_days(suggestions)
+    return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told and all(readings & days for readings in sign.days)
+
+
+def names_nothing(sign: Signals) -> bool:
+    return not sign.codes and not sign.flights
 
 
 def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,

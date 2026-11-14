@@ -499,7 +499,8 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
     if row is None or viewer is None or row["matches"]:
         return Filed()
     review.raise_parking(conn, mailbox_id, message_id, parking)
-    if not_a_booking and not suggestions and error is None and signals is not None and not signals.change and not signals.travel:
+    if (not_a_booking and not suggestions and error is None and signals is not None and not signals.change and not signals.travel
+            and nothing_new.names_nothing(signals)):
         review.dismiss(conn, row["owner_sub"], row["id"], only_this=True)
         _record(conn, mailbox_id, message_id, UNREADABLE, now)
         return Filed(cleared=1, dismissed=1)

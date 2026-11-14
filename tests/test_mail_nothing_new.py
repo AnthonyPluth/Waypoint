@@ -401,6 +401,16 @@ class NotTravelTests(NothingNewCase):
                     self.plain(line, {"bookings": [], "not_a_booking": category}, f"t-{what}-{category}".replace(" ", "-"))
                     self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
 
+    def test_a_verdict_on_an_email_naming_a_booking_code_or_flight_stays(self):
+        for n, line in enumerate(("Booking reference: ZQ4P8W", "Booking reference: QXMKZB", "Reservation number 88231", "Your PNR is ZZ9Y8X",
+                                  "Thanks for flying ex-102.")):
+            for category in ("receipt", "notification", "promotion"):
+                with self.subTest(line=line, category=category):
+                    with db.session() as conn:
+                        conn.execute(ReviewItem.__table__.delete())
+                    self.plain(f"Thank you for your payment. {line}", {"bookings": [], "not_a_booking": category}, f"code-{n}-{category}")
+                    self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+
     def test_a_cancellation_or_change_wearing_a_promotion_verdict_stays(self):
         for line in ("Your booking was cancelled. Save 10 percent on your next trip.", "Fare change: save on your next trip."):
             with self.subTest(line=line):
@@ -564,6 +574,21 @@ class UnextractedDetailTests(NothingNewCase):
                     conn.execute(ReviewItem.__table__.delete())
                 self.read_mail(f"{CHECK_IN} {line}", SAME, name=f"cur-{n}")
                 self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+
+
+    def test_the_same_flight_listed_on_another_day_keeps_it_when_only_one_day_was_returned(self):
+        for n, other in enumerate(("27 November", "Nov 27", "2026-11-27", "27/11", "11月27日")):
+            with self.subTest(other=other):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN} Flight EX 101 from JFK to LHR also on {other}.", SAME, name=f"day-{n}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_every_day_the_text_names_must_be_a_day_the_reading_returned(self):
+        self.assertTrue(nothing_new.covers(nothing_new.signals("EX 101 on 20 November, landing 21 Nov"), [SAME]))
+        self.assertFalse(nothing_new.covers(nothing_new.signals("EX 101 on 20 November and 27 November"), [SAME]))
+        self.assertTrue(nothing_new.covers(nothing_new.signals("EX 101 on 20/11"), [SAME]))
+        self.assertTrue(nothing_new.covers(nothing_new.signals("EX 101 on 11/20/2026"), [SAME]))
 
 
 class SignalTests(unittest.TestCase):
