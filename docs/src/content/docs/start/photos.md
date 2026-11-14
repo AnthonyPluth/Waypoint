@@ -48,7 +48,7 @@ A library whose key Immich refuses is marked **refused** and is not read again u
 
 ## Sharing your photos on a trip
 
-Nothing from your library is on a trip until you share it there. On each trip you choose who sees the photos you share: **Only me** (the default) or **Everyone on this trip** (the people on the trip; someone who merely booked it or received a confirmation for it is not one of them). You can change that choice at any time, take single photos off a trip (**Remove from this trip**) and put them back, or stop sharing on a trip altogether; each change takes effect at once, for everyone and everywhere a photo appears (the gallery, the map, the replay, the trip’s counts and summary). Photos you remove stay removed through every later sync, even after you stop and share again or connect the library anew, and are listed for you alone under **Removed from this trip** with **Put back**. Stopping sharing takes every photo of yours off the trip for everyone and keeps your removals for when you share again. Nothing changes in Immich.
+Nothing from your library is on a trip until you share it there. On each trip you choose who sees the photos you share: **Only me** (the default) or **Everyone on this trip** (the people on the trip; someone who merely booked it or received a confirmation for it is not one of them). You can change that choice at any time, or stop sharing on a trip altogether; each change takes effect at once, for everyone and everywhere a photo appears (the gallery, the map, the replay, the trip’s counts and summary). Photos you remove stay removed through every later sync, even after you stop and share again or connect the library anew, and are listed for you alone under **Removed from this trip** with **Put back**. Stopping sharing takes every photo of yours off the trip for everyone and keeps your removals for when you share again. Nothing changes in Immich.
 
 **Share on all my trips** is a standing setting in Settings: while it is on, every trip you are on, including ones you join later, is shared with your default choice without asking. Turning it on shares every trip you are on now, including ones you had declined or stopped; a trip you stop while it is on stays stopped. Turning it off changes no trip.
 
@@ -99,7 +99,7 @@ The list is in **Settings**, under **Photos**, in the card of the library the ph
 - **Keep on this trip** (a far photo) accepts it, so it counts in the trip's figures.
 - **Remove from this trip** (a far photo) takes it off the trip for everyone.
 
-A choice made here is final for now: the photo leaves the list, and Settings offers no way to change it or to pick a different trip later. A photo removed from a trip can be put back from that trip's page once Put back ships there.
+A choice made here is final for now: the photo leaves the list, and Settings offers no way to change it or to pick a different trip later. A photo taken off a trip with **Remove from this trip** is not yet shown anywhere to put back: **Put back**, and removing single photos from the trip page itself, arrive with the trip page's removal controls.
 
 The list shows three photos at a time, with **Show more**. When a choice is saved the photo leaves the list and the counts update. If Waypoint can't refresh the list afterwards it says the list may be out of date and offers **Try again**; if a choice is refused because the photo or its trips changed, Waypoint reloads the list first, then says so, and you choose again from what it now shows.
 
