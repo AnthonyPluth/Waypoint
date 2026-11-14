@@ -351,7 +351,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`.
+- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`, `Close`.
 - **Expects to see:** `Trips`, `5 photos`, `Day 1`.
 - **Drive it:** `tools/control flow trip-photo-pins`; or `poetry run python run.py verify --flow trip-photo-pins`.
 
