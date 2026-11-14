@@ -869,6 +869,8 @@ def undo(conn: db.Connection, viewer: Viewer, photo_id: int, trip_id: int | None
         if photo.decided_by != OWNER or photo.trip_id != trip_id:
             raise Changed(UNDO_CHANGED)
     else:
+        if photo.decided_by == OWNER:
+            raise Changed(UNDO_CHANGED)
         mine = (PhotoExclusion.person_id == person, PhotoExclusion.asset_id == photo.asset_id, PhotoExclusion.created == left_off)
         if not list(conn.execute(select(PhotoExclusion.trip_id).where(*mine)).scalars()):
             raise Changed(UNDO_CHANGED)

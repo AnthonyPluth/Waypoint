@@ -448,6 +448,35 @@ class PhotoRoutes(RouteCase):
         self.assertEqual((stored(torn)["trip_id"], stored(torn)["decided_by"], self.review()), (self.trip, "auto", []))
         self.assertEqual([p["id"] for p in self.ok("ana", "GET", f"/api/trips/{week}/photo-sharing")["removed"]], [torn])
 
+    def test_undoing_an_old_leaving_off_cannot_clobber_a_newer_keep_on_one_of_its_trips(self):
+        week = self.week()
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        stamp = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})["removed_at"]
+        self.ok("ana", "DELETE", f"/api/trips/{week}/photo-exclusions/{torn}?created={stamp}")
+        self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
+        before = stored(torn)
+        self.assertEqual((before["trip_id"], before["decided_by"]), (week, "owner"))
+        self.assertEqual(self.undo("ana", torn, {"left_off": stamp}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(stored(torn), before)
+        self.assertEqual([p["id"] for p in self.ok("ana", "GET", f"/api/trips/{self.trip}/photo-sharing")["removed"]], [torn])
+
+    def test_undoing_an_old_pick_cannot_clobber_a_newer_pick_elsewhere_or_run_twice_from_two_sessions(self):
+        week = self.week()
+        torn = self.photo(self.ana, None, "2026-06-04T12:00", match="ambiguous", where=SOHO)
+        self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": week})
+        self.ok("ana", "POST", f"/api/photos/{torn}", {"trip_id": self.trip})
+        before = stored(torn)
+        self.assertEqual(self.undo("ana", torn, {"trip_id": week}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual(stored(torn), before)
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"trip_id": self.trip})
+        for body in ({"trip_id": self.trip}, {"trip_id": week}):
+            self.assertEqual(self.undo("ana", torn, body), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual((stored(torn)["trip_id"], stored(torn)["match"]), (None, "ambiguous"))
+        stamp = self.ok("ana", "POST", f"/api/photos/{torn}", {"excluded": True})["removed_at"]
+        self.ok("ana", "POST", f"/api/photos/{torn}/undo", {"left_off": stamp})
+        self.assertEqual(self.undo("ana", torn, {"left_off": stamp}), (409, {"error": photos.UNDO_CHANGED}))
+        self.assertEqual((stored(torn)["trip_id"], stored(torn)["match"]), (None, "ambiguous"))
+
     def test_undoing_a_removal_with_its_stamp_keeps_a_far_photo_in_needs_a_look(self):
         far = self.photo(self.ana, self.trip, "2026-06-03T10:00", match="far", where=ROME, segment_id=self.stay["id"], distance=1400.0)
         stamp = self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [far]})["removed"][0]["removed_at"]
