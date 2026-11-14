@@ -8,7 +8,7 @@ from ...storage import db
 from ...storage.models import Segment
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai, ingest, newer, references
+from . import ai, ingest, newer, price, references, when
 from .booking import Passenger
 
 Reason = Literal["already_known", "older_copy"]
@@ -28,9 +28,11 @@ UNCOMPARED = re.compile(
     r"\bitinerary\b|\bport of call\b|\blayover\b|\bstopover\b|\bconnection\b|\bmanage\b|https?://|\bwww\.|\btotal\b|\bamount\b|\bpaid\b|\bcharged?\b|\bfare\b|\bprice\b|"
     r"[$€£]\s?\d|\b(?:USD|EUR|GBP|CAD|AUD)\s?\d|\d\s?(?:USD|EUR|GBP|CAD|AUD)\b|\bnotes?\b|\binstructions?\b|"
     r"\b(?:state)?rooms?\b|\bsuites?\b|\bbeds?\b|\bbreakfast\b|\brates?\b|\bnightly\b|\bvehicle\b|\bcar class\b")
-FLIGHT_TOKEN = re.compile(r"\b([A-Z]{2}|[A-Z]\d|\d[A-Z]) ?(\d{1,4})\b")
-MONTHS = frozenset({"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"})
-PASSENGER = re.compile(r"(?i)\b(?:passengers?|travell?ers?|guests?)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
+FLIGHT_TOKEN = re.compile(rf"(?i)(?<![A-Za-z0-9])({ai.FLIGHT_CODE}){ai.FLIGHT_GAP}(\d{{1,4}})(?![A-Za-z0-9])")
+PLAIN_WORDS = frozenset({"am", "an", "as", "at", "be", "by", "do", "go", "he", "if", "in", "is", "it", "me", "my", "no", "of", "on", "or",
+                         "pm", "so", "to", "up", "us", "we"})
+PASSENGER = re.compile(r"(?i)\b(?:(?:lead\s+)?(?:passengers?|travell?ers?|guests?)(?:\s+names?)?|passagers?|passagiere?|reisende[rn]?|pasajeros?|"
+                       r"viajeros?|huéspedes|huésped|搭乗者|旅行者)\b[ \t]*[:#-]?[ \t]*([^\W\d_][^\d\n,;:()]{0,59})")
 JOINED = re.compile(r"(?i)\s+(?:and|&)\s+")
 
 
@@ -47,9 +49,12 @@ class Signals:
 def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     whole = f"{subject}\n{text}"
     named = tuple(dict.fromkeys(n for m in PASSENGER.finditer(whole) for part in JOINED.split(m[1]) if (n := " ".join(part.split()))))
-    flights = frozenset(f"{m[1]}{m[2]}" for m in FLIGHT_TOKEN.finditer(whole) if m[1] not in MONTHS)
-    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)), passengers=named,
-                   uncompared=bool(UNCOMPARED.search(whole)), flights=flights, codes=references.labelled(whole))
+    flights = frozenset({*(f"{m[1]}{m[2]}".upper() for m in FLIGHT_TOKEN.finditer(whole) if m[1].isupper() or m[1].lower() not in PLAIN_WORDS),
+                         *(f"{a}{n}".upper() for a, n in ai.LISTED_FLIGHT.findall(whole))})
+    timed = any(c.search(whole) for c in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK))
+    return Signals(change=revises or bool(CHANGE.search(whole)), travel=bool(timed or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
+                   passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights,
+                   codes=references.labelled(whole))
 
 
 def _day(local: str | None) -> str:

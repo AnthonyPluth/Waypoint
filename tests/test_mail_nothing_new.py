@@ -549,7 +549,47 @@ class UnextractedDetailTests(NothingNewCase):
         self.assertTrue(nothing_new.covers(nothing_new.signals("Nothing here"), [SAME]))
 
 
+    def test_a_leg_the_reading_left_out_keeps_it_however_its_number_is_written(self):
+        for n, leg in enumerate(("EX-102", "ex 102", "ex-102", "EX0102", "Flight No.: ex 102", "| EX102 |")):
+            with self.subTest(leg=leg):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN} Return flight {leg} from LHR to JFK on 27 November.", SAME, name=f"leg-{n}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_a_total_in_any_currency_keeps_an_identical_reminder(self):
+        for n, line in enumerate(("Total JPY 12,000.", "Paid CHF 120.00.", "₹ 5,000 for seats.", "120.00 SEK")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.read_mail(f"{CHECK_IN} {line}", SAME, name=f"cur-{n}")
+                self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+
+
 class SignalTests(unittest.TestCase):
+    def test_every_way_a_flight_number_is_written_is_recognised(self):
+        written = {"EX102": "EX102", "EX 102": "EX102", "EX-102": "EX102", "ex102": "EX102", "ex-102": "EX102", "ex 102": "EX102",
+                   "EX0102": "EX102", "U2 1234": "U21234", "3K 551": "3K551", "| EX102 |": "EX102", "<td>EX102</td>": "EX102",
+                   "Flight: EX-102": "EX102", "Flight No. ex 102": "EX102", "flight number u2 1234": "U21234"}
+        for text, key in written.items():
+            with self.subTest(text=text):
+                self.assertIn(key, {trips.flight_key(f) for f in nothing_new.signals(text).flights})
+        self.assertFalse(nothing_new.covers(nothing_new.signals("EX 101 and EX-102"), [SAME]))
+
+    def test_ordinary_words_before_numbers_and_codes_inside_words_are_not_flights(self):
+        for text in ("Departs on 20 November", "Be there at 7", "It is 30 minutes away", "Ref CANARY-4T8Q", "Room 4401"):
+            with self.subTest(text=text):
+                self.assertEqual(nothing_new.signals(text).flights, frozenset())
+
+    def test_times_and_names_are_seen_in_the_formats_the_readers_accept(self):
+        for text in ("Départ 19h00", "出発 19時30分", "Leaves 7:15pm"):
+            with self.subTest(text=text):
+                self.assertTrue(nothing_new.signals(text).travel)
+        for text, name in (("Passagier: Alex Stranger", "Alex Stranger"), ("Pasajero: Mia Rose Doe", "Mia Rose Doe"),
+                           ("Passagers : Alex Stranger", "Alex Stranger")):
+            with self.subTest(text=text):
+                self.assertIn(name, nothing_new.signals(text).passengers)
+
     def test_change_and_travel_words_are_seen_without_regard_to_case(self):
         self.assertTrue(nothing_new.signals("FLIGHT CANCELLED").change)
         self.assertTrue(nothing_new.signals("Your boarding pass").change)

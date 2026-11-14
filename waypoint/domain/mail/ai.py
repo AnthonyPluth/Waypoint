@@ -236,8 +236,10 @@ TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?")
 FIELDS = ("kind", "provider", "confirmation", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone")
 LIMITS = {"provider": 100, "confirmation": 50, "origin": 100, "destination": 100, "start_zone": 64, "end_zone": 64}
 IATA = re.compile(r"[A-Z]{3}")
-FLIGHT_NUMBER = re.compile(r"[A-Z][A-Z0-9] ?\d{1,4}|\d[A-Z] ?\d{1,4}")
-LISTED_FLIGHT = re.compile(r"(?i)\bflight\s*(?:no\.?|number|#)?\s*:?\s*([A-Z][A-Z0-9]|\d[A-Z])\s?(\d{1,4})\b")
+FLIGHT_CODE = r"[A-Z][A-Z0-9]|\d[A-Z]"
+FLIGHT_GAP = r"[\s-]?"
+FLIGHT_NUMBER = re.compile(rf"(?:{FLIGHT_CODE}) ?\d{{1,4}}")
+LISTED_FLIGHT = re.compile(rf"(?i)\bflight\s*(?:no\.?|number|#)?\s*:?\s*({FLIGHT_CODE})\s?(\d{{1,4}})\b")
 CABIN_LIMIT = 50
 ADDRESS_LIMIT = 200
 ADDRESS_KINDS = ("hotel", "car", "train", "cruise", "parking")
@@ -350,7 +352,7 @@ def _details(kind: str, values: dict[str, str], sent: str) -> Suggestion:
     if kind == "flight":
         number = " ".join(values.get("flight_number", "").upper().split())
         if FLIGHT_NUMBER.fullmatch(number) and re.search(
-                rf"(?<![A-Za-z0-9]){re.escape(number[:2])}[\s-]?{number[2:].strip()}(?!\d)", sent, re.IGNORECASE):
+                rf"(?<![A-Za-z0-9]){re.escape(number[:2])}{FLIGHT_GAP}{number[2:].strip()}(?!\d)", sent, re.IGNORECASE):
             out["flight_number"] = number
         if "cabin" in values and (cabin := _detail(values["cabin"], CABIN_LIMIT, sent)):
             out["cabin"] = cabin
