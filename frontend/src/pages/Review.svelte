@@ -32,7 +32,7 @@
 </script>
 
 <script lang="ts">
-  import { flushSync, onDestroy, tick } from "svelte";
+  import { flushSync, tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import { act, errMsg, ignoreFailure } from "$lib/act";
   import type { Person, Review, ReviewCandidate, ReviewMatch, SegmentBody, WhoIsThis } from "$lib/api-types";
@@ -315,45 +315,20 @@
     heading.focus({ preventScroll: true });
   };
 
-  const DISMISS_MS = 6000;
-  type Held = { item: ReviewItem; timer: ReturnType<typeof setTimeout>; toastId: string | number | undefined };
-  const held = new Map<number, Held>();
-  const sendDismiss = async (i: ReviewItem, leaving: boolean) => {
-    const ok = await act(async () => {
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE", keepalive: leaving });
-      if (leaving) await refreshState().catch(ignoreFailure);
-      else await settle();
-    });
-    if (!ok || !leaving) hidden.delete(i.id);
-  };
-  const commitDismiss = (i: ReviewItem, leaving = false) => {
-    const h = held.get(i.id);
-    if (!h) return;
-    clearTimeout(h.timer);
-    held.delete(i.id);
-    if (h.toastId !== undefined) toast.dismiss(h.toastId);
-    void sendDismiss(i, leaving);
-  };
-  const undoDismiss = (i: ReviewItem) => {
-    const h = held.get(i.id);
-    if (!h) return;
-    clearTimeout(h.timer);
-    held.delete(i.id);
-    hidden.delete(i.id);
-    void tick().then(() => menuButtons[i.id]?.focus());
-  };
   const dismiss = async (i: ReviewItem) => {
     const order = [...suggested, ...missing];
     const at = order.findIndex((x) => x.id === i.id);
     const next = order[at + 1] ?? order[at - 1];
     hidden.add(i.id);
-    const toastId = toast.success(i.count > 1 ? `Dismissed ${i.count} emails` : "Dismissed", { duration: DISMISS_MS, action: { label: "Undo", onClick: () => undoDismiss(i) } });
-    held.set(i.id, { item: i, toastId, timer: setTimeout(() => commitDismiss(i), DISMISS_MS) });
+    const sent = act(async () => {
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
+      await settle();
+    });
     await tick();
     if (next) menuButtons[next.id]?.focus();
+    await sent;
+    hidden.delete(i.id);
   };
-  const flushDismissals = () => { for (const { item: i } of [...held.values()]) commitDismiss(i, true); };
-  onDestroy(flushDismissals);
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
@@ -364,27 +339,14 @@
     toast.success(`Reading again what was skipped from ${domain}`);
     await settle();
   });
-  const dropIgnored = (i: ReviewItem) => {
-    const gone: number[] = [];
-    for (const [id, h] of [...held]) {
-      if (h.item.address !== i.address || h.item.sender_domain !== i.sender_domain || h.item.holds_bookings) continue;
-      clearTimeout(h.timer);
-      held.delete(id);
-      if (h.toastId !== undefined) toast.dismiss(h.toastId);
-      gone.push(id);
-    }
-    return gone;
-  };
   const ignore = (i: ReviewItem) => act(async () => {
     const r = await apiCall<"POST /api/review/{id}/ignore">(`/api/review/${i.id}/ignore`, { method: "POST" });
-    const gone = dropIgnored(i);
     toast.success(`Ignoring ${r.domain}`, {
       description: "You can undo this in Settings → Mail & review → Gmail",
       duration: UNDO_MS,
       action: { label: "Undo", onClick: () => { void undoIgnore(r.mailbox_id, r.domain); } },
     });
     await settle();
-    for (const id of gone) hidden.delete(id);
   });
 
   let chosen = $state<Record<number, string>>({});
@@ -579,9 +541,6 @@
     <li class="row items-stretch" data-testid="preview">{@render messagePeek(item)}</li>
   {/if}
 {/snippet}
-
-<svelte:window onpagehide={flushDismissals} />
-<svelte:document onvisibilitychange={() => { if (document.visibilityState === "hidden") flushDismissals(); }} />
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">

@@ -40,7 +40,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -176,6 +176,18 @@ export async function runStep(page, step, shot, saveDownload) {
     });
   } else if ("fake_ignore" in step) {
     await page.route("**/api/review/*/ignore", (route) => route.fulfill({ json: { ok: true, mailbox_id: 1, domain: step.fake_ignore } }));
+  } else if ("fake_dismiss" in step) {
+    const gone = new Set();
+    await page.route("**/api/review/*", (route) => {
+      if (route.request().method() !== "DELETE") return route.fallback();
+      gone.add(Number(new URL(route.request().url()).pathname.split("/").pop()));
+      return route.fulfill({ json: { ok: true } });
+    });
+    await page.route("**/api/review", async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      await route.fulfill({ response, json: { ...data, items: data.items.filter((i) => !gone.has(i.id)) } });
+    });
   } else if ("fake_destination" in step) {
     await page.route("**/api/state", async (route) => {
       const response = await route.fetch();

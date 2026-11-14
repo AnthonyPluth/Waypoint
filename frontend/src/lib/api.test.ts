@@ -16,14 +16,6 @@ describe("api", () => {
     expect(init.headers).not.toHaveProperty("X-Waypoint");
   });
 
-  it("asks the browser to finish a request that must outlive the page only when told to", async () => {
-    fetchMock.mockReturnValue(reply({ ok: true }));
-    await api("/api/x", { method: "DELETE", keepalive: true });
-    await api("/api/x", { method: "DELETE" });
-    expect(fetchMock.mock.calls[0][1].keepalive).toBe(true);
-    expect(fetchMock.mock.calls[1][1]).not.toHaveProperty("keepalive");
-  });
-
   it("sends state changes with the CSRF header and a JSON body", async () => {
     fetchMock.mockReturnValue(reply({ ok: true }));
     await api("/api/x", { method: "POST", body: { n: 2 } });
