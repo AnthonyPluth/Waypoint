@@ -10,6 +10,10 @@ Hand-edited. `tools/user_feature_map.py` merges these into [feature-map.md](feat
 - The list loads after the heading renders (a Loading indicator first): `wait-settle`, then `snapshot`.
 - A trip's link is `#trip/<id>`; at desktop width the page shows the trip beside the list (the route becomes `#trips?trip=<id>`), so click the link and read the route in the answer.
 
+## trip
+- Without `--signed-in`, the demo runs as the local user, for whom photos are off: the Photos section isn't there at all.
+- The route replay plays on its own; press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
+
 ## review
 - The demo has emails waiting (the Upcoming page links "emails to review"). The flows that ignore a sender or read mail fake the replies (`fake_ignore`, `fake_labels`, `fake_ignored`): the demo mailbox can't reach Google and ignoring a sender must not change the demo data.
 

@@ -16,7 +16,7 @@ export function byDay(photos: TripPhoto[]): PhotoDay[] {
     if (found) found.push(p);
     else days.set(day, [p]);
   }
-  return [...days].map(([day, list]) => ({ day, photos: list }));
+  return [...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, list]) => ({ day, photos: list }));
 }
 
 export const clusterOf = (p: Pick<TripPhoto, "cluster">, clusters: PhotoCluster[]): PhotoCluster | null =>

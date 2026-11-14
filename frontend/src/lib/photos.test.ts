@@ -26,6 +26,12 @@ describe("byDay", () => {
   });
 
   it("is empty for no photos", () => expect(byDay([])).toEqual([]));
+
+  it("puts the days in the order of their local dates after a westward zone change", () => {
+    const lateInNewYork = photo({ id: 1, taken_local: "2026-03-02T00:30", zone: "America/New_York" });
+    const eveningInLosAngeles = photo({ id: 2, taken_local: "2026-03-01T22:30", zone: "America/Los_Angeles" });
+    expect(byDay([lateInNewYork, eveningInLosAngeles]).map((d) => [d.day, d.photos.map((p) => p.id)])).toEqual([["2026-03-01", [2]], ["2026-03-02", [1]]]);
+  });
 });
 
 describe("marks and labels", () => {

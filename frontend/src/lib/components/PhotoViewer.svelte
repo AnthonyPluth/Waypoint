@@ -52,17 +52,29 @@
     index = next;
   }
 
+  const onMedia = (target: EventTarget | null) => target instanceof Element && !!target.closest("video, audio, button, a");
+
   function keys(e: KeyboardEvent) {
+    if (e.target instanceof HTMLMediaElement) return;
     if (e.key === "ArrowRight") { e.preventDefault(); move(1); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); move(-1); }
   }
 
-  function press(e: PointerEvent) { start = { x: e.clientX, y: e.clientY }; }
-  function lift(e: PointerEvent) {
-    if (!start) return;
-    const dx = e.clientX - start.x;
-    const dy = e.clientY - start.y;
+  let last: { x: number; y: number } | null = null;
+  function press(e: PointerEvent) {
+    start = onMedia(e.target) ? null : { x: e.clientX, y: e.clientY };
+    last = start;
+  }
+  function track(e: PointerEvent) { if (start) last = { x: e.clientX, y: e.clientY }; }
+  function lift(e: PointerEvent) { settle({ x: e.clientX, y: e.clientY }); }
+  function cancel() { settle(last); }
+  function settle(end: { x: number; y: number } | null) {
+    const from = start;
     start = null;
+    last = null;
+    if (!from || !end) return;
+    const dx = end.x - from.x;
+    const dy = end.y - from.y;
     if (Math.abs(dx) >= SWIPE && Math.abs(dx) > Math.abs(dy)) move(dx < 0 ? 1 : -1);
     else if (dy >= CLOSE_DISTANCE && dy > Math.abs(dx)) open = false;
   }
@@ -79,6 +91,7 @@
 
   function retry() {
     failed = false;
+    playing = false;
     attempt++;
   }
 </script>
@@ -101,7 +114,7 @@
         </span>
       </div>
       {#if photo}
-        <div class="photo-viewer-stage" onpointerdown={press} onpointerup={lift} onpointercancel={() => (start = null)} role="presentation">
+        <div class="photo-viewer-stage" onpointerdown={press} onpointermove={track} onpointerup={lift} onpointercancel={cancel} role="presentation">
           <Button class="photo-viewer-nav left-4" variant="outline" size="icon" aria-label="Previous photo" disabled={index === 0} onclick={() => move(-1)}><ChevronLeft /></Button>
           {#if failed}
             <div class="flex flex-col items-center gap-2 px-6 text-center text-muted-foreground" role="status">
@@ -115,7 +128,7 @@
               </div>
             </div>
           {:else if playing}
-            <video class="photo-viewer-media" src={originalUrl(photo.id)} controls autoplay playsinline><track kind="captions" /></video>
+            <video class="photo-viewer-media" src={originalUrl(photo.id)} controls autoplay playsinline onerror={() => (failed = true)}><track kind="captions" /></video>
           {:else}
             {#key `${photo.id}-${attempt}`}
               <img class="photo-viewer-media" src={previewUrl(photo.id)} alt={photo.kind === "video" ? "Video still" : "Photo"} draggable="false" onerror={() => (failed = true)} />

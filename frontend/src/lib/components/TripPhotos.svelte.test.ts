@@ -85,7 +85,7 @@ describe("TripPhotos", () => {
     const far = screen.getByRole("button", { name: "Photo, 10:42 AM, Ada’s library, 560 km from every booking" });
     expect(far.textContent).toContain("Far");
     const inferred = screen.getByRole("button", { name: "Photo, 10:42 AM, Marlow Springs, Theo’s library, place from the itinerary" });
-    expect(inferred.querySelector("[data-mark='inferred']")).toBeTruthy();
+    expect(inferred.querySelector("[data-mark='inferred'] span")?.classList.contains("border-map-photo")).toBe(true);
     expect(inferred.textContent).not.toContain("Far");
     const video = screen.getByRole("button", { name: "Video, 10:42 AM, near Marlow Springs, Ada’s library" });
     expect(video.querySelector("[data-mark='video']")).toBeTruthy();
@@ -140,6 +140,40 @@ describe("TripPhotos", () => {
     expect(await screen.findByText("Couldn’t load the photos on this trip.")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByTestId("photo-strip")).toBeTruthy();
+  });
+
+  it("says the photos couldn’t be loaded when the libraries can’t be looked up, rather than asking to connect one", async () => {
+    let failing = true;
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/photo-sources") { if (failing) throw new Error("offline"); return { sources, permissions: [] }; }
+      return reply([]);
+    });
+    render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
+    expect(await screen.findByText("Couldn’t load the photos on this trip.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Connect a library in Settings" })).toBeNull();
+    failing = false;
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("No photos on this trip yet.")).toBeTruthy();
+  });
+
+  it("asks once per trip id, not again when the page hands it a fresh copy of the same trip", async () => {
+    photos = many(2);
+    const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
+    await screen.findByTestId("photo-strip");
+    await view.rerender({ trip: { ...roadTrip, name: "Renamed" }, people: [ada], now: after });
+    await Promise.resolve();
+    expect(screen.getByTestId("photo-strip")).toBeTruthy();
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/7/photos")).toHaveLength(1);
+  });
+
+  it("opens the viewer in the gallery’s order, by local date", async () => {
+    photos = [photo(1, { taken_local: "2026-03-02T00:30", zone: "America/New_York" }), photo(2, { taken_local: "2026-03-01T22:30", zone: "America/Los_Angeles" })];
+    render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
+    await section();
+    const tiles = within(screen.getByTestId("photo-strip")).getAllByRole("button", { name: /^Photo,/ });
+    expect(tiles.map((t) => t.getAttribute("data-photo"))).toEqual(["2", "1"]);
+    await userEvent.click(tiles[0]);
+    expect(await screen.findByRole("dialog", { name: "Photo 1 of 2" })).toBeTruthy();
   });
 
   it("asks for nothing without a sign-in", async () => {

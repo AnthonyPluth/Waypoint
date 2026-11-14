@@ -47,7 +47,7 @@ describe("the dark palette", () => {
     expect(contrast(resolve(series), resolve("card"))).toBeGreaterThanOrEqual(3);
     expect(contrast(resolve(series), resolve("background"))).toBeGreaterThanOrEqual(3);
   });
-  it.each(["map-route", "map-airport", "map-stay", "map-visited"])("draws %s legibly on the sea and the land", (mark) => {
+  it.each(["map-route", "map-airport", "map-stay", "map-visited", "map-photo"])("draws %s legibly on the sea and the land", (mark) => {
     expect(contrast(resolve(mark), resolve("map-sea"))).toBeGreaterThanOrEqual(3);
     expect(contrast(resolve(mark), resolve("map-land"))).toBeGreaterThanOrEqual(3);
   });

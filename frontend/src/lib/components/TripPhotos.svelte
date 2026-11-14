@@ -26,9 +26,10 @@
   let opener: HTMLElement | null = null;
 
   const signedIn = $derived(!!app.state?.user && !app.state.user.local);
-  const photos = $derived(loaded.state === "ready" ? loaded.found.photos : []);
+  const tripId = $derived(trip.id);
+  const days = $derived(byDay(loaded.state === "ready" ? loaded.found.photos : []));
+  const photos = $derived(days.flatMap((d) => d.photos));
   const total = $derived(photos.length);
-  const days = $derived(byDay(photos));
   const shown = $derived(days.slice(0, shownDays));
   const shownCount = $derived(shown.reduce((n, d) => n + d.photos.length, 0));
   const strip = $derived(photos.slice(0, STRIP_SIZE));
@@ -56,19 +57,17 @@
     broken = new Set();
     try {
       const found = await apiCall<"GET /api/trips/{id}/photos">(`/api/trips/${id}/photos`);
+      const listed = found.photos.length === 0 ? (await apiCall<"GET /api/photo-sources">("/api/photo-sources")).sources : [];
       if (mine !== latest) return;
+      sources = listed;
       loaded = { state: "ready", found };
-      if (found.photos.length === 0) {
-        const listed = await apiCall<"GET /api/photo-sources">("/api/photo-sources").catch(() => null);
-        if (mine === latest) sources = listed?.sources ?? [];
-      }
     } catch {
       if (mine === latest) loaded = { state: "error" };
     }
   }
 
   $effect(() => {
-    const id = trip.id;
+    const id = tripId;
     if (!signedIn) return;
     untrack(() => void load(id));
   });
@@ -198,7 +197,7 @@
       <span class="sr-only">{tileLabel(p, p.segment_id === null ? undefined : segments.get(p.segment_id), ownerOf(p))}</span>
       <img class="size-full object-cover" src={thumbnailUrl(p.id)} alt="" loading="lazy" decoding="async" draggable="false" onerror={() => lost(p.id)} />
       {#if isFar(p)}<span class="absolute left-[5px] top-[5px] rounded-full bg-status-warn-soft px-1.5 py-[3px] text-[10px] font-semibold leading-none text-status-warn-ink shadow-[0_0_0_1px_rgb(0_0_0/30%)]" aria-hidden="true">Far</span>{/if}
-      {#if isInferred(p)}<span class="absolute bottom-[5px] left-[5px] rounded-full bg-lightbox/70 p-[3px]" aria-hidden="true" data-mark="inferred"><span class="block size-2.5 rounded-full border-2 border-foreground"></span></span>{/if}
+      {#if isInferred(p)}<span class="absolute bottom-[5px] left-[5px] rounded-full bg-lightbox/70 p-[3px]" aria-hidden="true" data-mark="inferred"><span class="block size-2.5 rounded-full border-2 border-map-photo"></span></span>{/if}
       {#if p.kind === "video"}<span class="absolute bottom-[5px] right-[5px] inline-flex items-center rounded-full bg-lightbox/70 p-1 text-foreground" aria-hidden="true" data-mark="video"><Play class="size-2.5 fill-current" /></span>{/if}
     </button>
   {/if}

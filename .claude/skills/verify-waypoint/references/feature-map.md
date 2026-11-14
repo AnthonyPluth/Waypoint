@@ -465,8 +465,11 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 ## trip (`trip`)
 
 - **What exists:** No docs page of its own.
-- **Reach it:** not in the navigation (it keeps Trips lit); URL `#trip`; control `tools/control goto trip`.
-- **Drive it:** `tools/control goto trip`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"`.
+- **Reach it:** not in the navigation (it keeps Trips lit); URL `#trip/<id>`, opened by clicking an item on `#trips`; it shows its photos only to a signed-in member, so control `tools/control start --signed-in jane`, then `tools/control goto trips` and `click` one.
+- **Drive it:** `tools/control start --signed-in jane`, `tools/control goto trips`, `click` an item, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in frontend/verify/verify.mjs names).
+- **What usually breaks:**
+  - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the Photos section isn't there at all.
+  - The route replay plays on its own; press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
 
 ## Stats (`stats`)
 

@@ -76,6 +76,54 @@ describe("PhotoViewer", () => {
     view.unmount();
   });
 
+  it("still closes on a swipe down when the browser cancels the pointer", async () => {
+    render(PhotoViewer, { open: true, index: 0, photos, people: [ada], segments });
+    await dialog("Photo 1 of 3");
+    const stage = info().querySelector(".photo-viewer-stage")!;
+    await fireEvent.pointerDown(stage, { clientX: 100, clientY: 100 });
+    await fireEvent.pointerMove(stage, { clientX: 104, clientY: 240 });
+    await fireEvent.pointerCancel(stage);
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("forgets a cancelled touch that hadn’t moved, and ignores swipes that start on the video’s controls", async () => {
+    render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    const stage = info().querySelector(".photo-viewer-stage")!;
+    await fireEvent.pointerDown(stage, { clientX: 300, clientY: 200 });
+    await fireEvent.pointerCancel(stage);
+    await fireEvent.pointerUp(stage, { clientX: 100, clientY: 200 });
+    expect(await dialog("Video 2 of 3")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Play video" }));
+    const video = info().querySelector("video")!;
+    await fireEvent.pointerDown(video, { clientX: 300, clientY: 200 });
+    await fireEvent.pointerUp(video, { clientX: 100, clientY: 200 });
+    expect(await dialog("Video 2 of 3")).toBeTruthy();
+  });
+
+  it("leaves the arrow keys to a playing video, so they seek", async () => {
+    render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await userEvent.click(screen.getByRole("button", { name: "Play video" }));
+    const video = info().querySelector("video")!;
+    const key = new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true });
+    video.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(false);
+    expect(await dialog("Video 2 of 3")).toBeTruthy();
+  });
+
+  it("says when a video can’t be played, and Retry goes back to its still", async () => {
+    render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await userEvent.click(screen.getByRole("button", { name: "Play video" }));
+    await fireEvent.error(info().querySelector("video")!);
+    expect(await dialog("Video can’t be loaded")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await dialog("Video 2 of 3")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Play video" })).toBeTruthy();
+    expect(info().querySelector("video")).toBeNull();
+  });
+
   it("closes on Escape and on Close, giving focus back to where it was opened from", async () => {
     const tile = document.createElement("button");
     document.body.append(tile);
