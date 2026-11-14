@@ -87,6 +87,7 @@
       "handler": "waypoint/server/api/people.py:api_people",
       "web": [
         "frontend/src/lib/components/settings/ImportSection.svelte",
+        "frontend/src/lib/components/settings/PhotosSection.svelte",
         "frontend/src/pages/People.svelte",
         "frontend/src/pages/Review.svelte",
         "frontend/src/pages/Stats.svelte",
@@ -516,7 +517,8 @@
       "path": "/api/photo-sources",
       "handler": "waypoint/server/api/photos.py:api_photo_sources",
       "web": [
-        "frontend/src/lib/components/TripPhotos.svelte"
+        "frontend/src/lib/components/TripPhotos.svelte",
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -531,7 +533,9 @@
       "method": "POST",
       "path": "/api/photo-sources",
       "handler": "waypoint/server/api/photos.py:api_photo_source_add",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -545,7 +549,9 @@
       "method": "POST",
       "path": "/api/photo-sources/test",
       "handler": "waypoint/server/api/photos.py:api_photo_source_test_new",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_sources.py"
@@ -558,7 +564,9 @@
       "method": "POST",
       "path": "/api/photo-sources/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_source_edit",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -572,7 +580,9 @@
       "method": "DELETE",
       "path": "/api/photo-sources/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_source_remove",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -600,7 +610,9 @@
       "method": "POST",
       "path": "/api/photo-sources/{id}/sync",
       "handler": "waypoint/server/api/photos.py:api_photo_source_sync",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -615,7 +627,9 @@
       "method": "GET",
       "path": "/api/photo-sources/{id}/resume",
       "handler": "waypoint/server/api/photos.py:api_photo_source_resume",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/settings/PhotosSection.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_sources.py"

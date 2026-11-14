@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, OPENED_PAGES, pageBase, SIGNED_PAGES, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, PAGES, PHONE_AGENT, readFlows, recheck, screenshotFile, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -77,6 +77,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_merge_warning: 3 }] })).toEqual(["step 1: fake_merge_warning takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ clock: "2026-08-31T12:00:00Z" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ clock: 3 }] })).toEqual(["step 1: clock takes a string"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_immich: "Demo Person" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_immich: true }] })).toEqual(["step 1: fake_immich takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
   });
@@ -88,6 +90,14 @@ describe("flowProblems", () => {
     expect(new Set(made.map((t) => t.id)).size).toBe(120);
     expect(made.every((t) => t.id > 7 && t.segments[0].trip_id === t.id)).toBe(true);
     expect(fakeArchive([], 5)).toEqual([]);
+  });
+
+  it("answers an Immich test with a made-up user, a refused key or an unreachable server, and makes the library a save would", () => {
+    expect(fakeImmichTest("Demo Person")).toEqual({ status: 200, json: { name: "Demo Person", same_account: null } });
+    expect(fakeImmichTest("refused")).toMatchObject({ status: 400, json: { error: expect.stringContaining("didn’t accept") } });
+    expect(fakeImmichTest("unreachable")).toMatchObject({ status: 502 });
+    expect(fakeImmichSource({ person_id: 3, url: "https://photos.immich.example/", key: "secret" }, 9000)).toEqual({ id: 9000, person_id: 3, url: "https://photos.immich.example",
+      label: null, status: "ok", mine: true, last_sync: null, last_error: null, photos: 0, trips: 0 });
   });
 
   it("takes a download to click and save, named", () => {

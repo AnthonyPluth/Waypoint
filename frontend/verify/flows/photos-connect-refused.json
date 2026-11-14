@@ -1,0 +1,17 @@
+{
+  "name": "photos-connect-refused",
+  "page": "settings",
+  "signed_in": true,
+  "allow_console": ["the server responded with a status of 400"],
+  "steps": [
+    { "fake_immich": "refused" },
+    { "goto": "#settings/photos" },
+    { "wait_for": "[data-testid=photo-source]" },
+    { "click": "role=button[name='Connect']" },
+    { "fill": { "selector": "#photo-url", "text": "https://photos.immich.example" } },
+    { "fill": { "selector": "#photo-key", "text": "madeUpDemoKeyForTheVerifyFlow0123456789" } },
+    { "click": "role=button[name='Test']" },
+    { "expect_text": { "selector": "#photo-result", "text": "Immich didn’t accept this key." } },
+    { "wait_for": "#photo-key[aria-invalid=true]" }
+  ]
+}
