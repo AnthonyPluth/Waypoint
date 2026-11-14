@@ -35,7 +35,12 @@ def nav_inside(nav: str) -> dict[str, str]:
     return dict(re.findall(r"(\w+): \"([^\"]+)\"", found.group(1))) if found else {}
 
 
-def reach(page: str, labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str]) -> str:
+def reach(page: str, labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str], signed: tuple[str, ...] = ()) -> str:
+    if page in signed and page in inside:
+        lit = labels.get(inside[page], inside[page])
+        return (f"not in the navigation (it keeps {lit} lit); URL `#{page}/<id>`, opened by clicking an item on `#{inside[page]}`; "
+                f"it shows its photos only to a signed-in member, so control `tools/control start --signed-in jane`, then "
+                f"`tools/control goto {inside[page]}` and `click` one")
     if page in own:
         return ("not a route of the app: an assistant's connection request, a page the server serves at /oauth/authorize; make verify opens "
                 "it with a request it seeds first, so `goto` can't")
@@ -146,7 +151,7 @@ def flow_lines(flow: dict, notes: dict[str, list[str]]) -> list[str]:
 
 
 def render(page_names: list[str], labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str],
-           all_flows: list[dict], notes: dict[str, list[str]], root: Path = ROOT) -> str:
+           all_flows: list[dict], notes: dict[str, list[str]], root: Path = ROOT, signed: tuple[str, ...] = ()) -> str:
     lines = [
         "# User feature map",
         "",
@@ -164,8 +169,13 @@ def render(page_names: list[str], labels: dict[str, str], tabs: list[str], more:
     for page in page_names:
         label = labels.get(page, page)
         lines += [f"## {label} (`{page}`)", "", f"- **What exists:** {docs_line(page, root)}",
-                  f"- **Reach it:** {reach(page, labels, tabs, more, inside, own)}."]
-        if page not in own:
+                  f"- **Reach it:** {reach(page, labels, tabs, more, inside, own, signed)}."]
+        if page in signed and page in inside:
+            lines.append(f"- **Drive it:** `tools/control start --signed-in jane`, `tools/control goto {inside[page]}`, `click` an item, "
+                         f"`tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check "
+                         f"`make verify PAGES=\"{page}\"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in "
+                         f"frontend/verify/verify.mjs names).")
+        elif page not in own:
             lines.append(f"- **Drive it:** `tools/control goto {page}`, `tools/control snapshot --text`, then `click`/`type`/`press`; "
                          f"`tools/control viewport phone|desktop`; batch check `make verify PAGES=\"{page}\"`.")
         if notes.get(page):
@@ -190,7 +200,8 @@ def generate(root: Path = ROOT) -> tuple[str, list[str]]:
     notes, problems = gotchas(gotcha_file.read_text() if gotcha_file.exists() else "", names)
     if not page_names:
         problems.append("no PAGES found in frontend/verify/verify.mjs")
-    text = render(page_names, nav_labels(nav), nav_list(nav, "TAB_PAGES"), nav_list(nav, "MORE_PAGES"), nav_inside(nav), own, all_flows, notes, root)
+    signed = tuple(exported_list(verify, "SIGNED_PAGES"))
+    text = render(page_names, nav_labels(nav), nav_list(nav, "TAB_PAGES"), nav_list(nav, "MORE_PAGES"), nav_inside(nav), own, all_flows, notes, root, signed)
     return text, problems
 
 

@@ -427,7 +427,9 @@
       "method": "GET",
       "path": "/api/trips/{id}/photos",
       "handler": "waypoint/server/api/photos.py:api_trip_photos",
-      "web": [],
+      "web": [
+        "frontend/src/lib/components/TripPhotos.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -515,6 +517,7 @@
       "path": "/api/photo-sources",
       "handler": "waypoint/server/api/photos.py:api_photo_sources",
       "web": [
+        "frontend/src/lib/components/TripPhotos.svelte",
         "frontend/src/lib/components/settings/PhotosSection.svelte"
       ],
       "tests": [

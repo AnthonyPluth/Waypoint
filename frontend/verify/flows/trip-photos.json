@@ -1,0 +1,23 @@
+{
+  "name": "trip-photos",
+  "page": "trips",
+  "signed_in": true,
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
+    { "wait_for": "[data-testid='photo-strip'] img" },
+    { "expect_text": { "selector": "#trip-photos-title", "text": "13" } },
+    { "click": "[data-testid='photo-strip'] button:has-text('See all') >> visible=true" },
+    { "wait_for": "section[data-day] h3" },
+    { "expect_text": { "selector": "section[data-day]", "text": "Day 1" } },
+    { "screenshot": "gallery" },
+    { "click": "button[data-photo]:has-text('km from every booking') >> visible=true" },
+    { "wait_for": "[data-testid='photo-viewer'] img" },
+    { "expect_text": { "selector": "[data-testid='photo-viewer']", "text": "Far from the trip’s bookings" } },
+    { "screenshot": "viewer-far" },
+    { "press": { "selector": "[data-testid='photo-viewer']", "key": "ArrowRight" } },
+    { "expect_text": { "selector": "[data-testid='photo-viewer']", "text": "12 of 13" } },
+    { "press": { "selector": "[data-testid='photo-viewer']", "key": "Escape" } },
+    { "wait_for": "section[data-day]" }
+  ]
+}

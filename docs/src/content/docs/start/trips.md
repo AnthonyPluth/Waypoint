@@ -21,7 +21,7 @@ With no trips yet, Upcoming says what to do next: **Connect Gmail**, **Add a boo
 
 ![Trips on a desktop: the list of trips beside the selected trip's timeline of pass cards](../../../assets/screenshots/trips-desktop-hero.png)
 
-A **trip page** is a timeline of pass cards, one per booking, with the trip’s travellers listed once under its title. A flight’s card lists each traveller with their seat; a hotel, rental car or cruise shows a **Loyalty** line with the masked number of each traveller who has one for that chain or line (tap to reveal and copy). A flight shows no frequent-flyer number, since it was used when the flight was booked; the household’s numbers are on [People](/Waypoint/start/people/). Bookings for bundled brands show the brand’s [logo](/Waypoint/start/logos/).
+A **trip page** is a timeline of pass cards, one per booking, with the trip’s travellers listed once under its title. A flight’s card lists each traveller with their seat; a hotel, rental car or cruise shows a **Loyalty** line with the masked number of each traveller who has one for that chain or line (tap to reveal and copy). A flight shows no frequent-flyer number, since it was used when the flight was booked; the household’s numbers are on [People](/Waypoint/start/people/). Bookings for bundled brands show the brand’s [logo](/Waypoint/start/logos/). Between the route map and the bookings, a trip page shows the trip’s [photos](/Waypoint/start/photos/#on-a-trip): a strip that opens into a gallery by day and a viewer.
 
 ## Adding and editing
 

@@ -1630,3 +1630,26 @@ describe("on its own page", () => {
     });
   });
 });
+
+describe("Trip photos", () => {
+  it("shows the trip’s photos above the bookings once signed in, asking for them once per trip", async () => {
+    app.state = state();
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const shot = { id: 5, person_id: 1, trip_id: 1, kind: "image", taken_local: "2026-11-21T16:20", zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null };
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1/photos" ? { photos: [shot], clusters: [], counts: { total: 1, located: 1, inferred: 0, far: 0 }, people: [] } : answer(path, opts)) as never);
+    render(TripPage);
+    const photos = await screen.findByRole("region", { name: /^Photos/ });
+    const bookings = screen.getByRole("list", { name: "Bookings" });
+    expect(photos.compareDocumentPosition(bookings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(photos).getByRole("button", { name: "Photo, 4:20 PM, near Harbour Hotel, Jane’s library" })).toBeTruthy();
+    expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/photos")).toHaveLength(1);
+  });
+
+  it("asks for no photos in local mode", async () => {
+    app.state = state({ user: { name: null, email: null, local: true } });
+    render(TripPage);
+    await screen.findByRole("list", { name: "Bookings" });
+    expect(vi.mocked(api).mock.calls.some(([p]) => String(p).endsWith("/photos"))).toBe(false);
+    expect(screen.queryByRole("region", { name: /^Photos/ })).toBeNull();
+  });
+});
