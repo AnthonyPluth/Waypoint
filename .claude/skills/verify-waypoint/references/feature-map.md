@@ -793,6 +793,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Fakes (the demo server can't):** `fake_immich`.
 - **Drive it:** `tools/control flow photos-connect`; or `poetry run python run.py verify --flow photos-connect`.
 
+#### `photos-needs-a-look`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Touches:** `Pick a trip`, `Cancel`.
+- **Expects to see:** `2 photos`, `from every booking`, `Waypoint won’t move it again by itself.`.
+- **Drive it:** `tools/control flow photos-needs-a-look`; or `poetry run python run.py verify --flow photos-needs-a-look`.
+
 #### `photos-sharing`
 
 - **Starts at:** `#settings`; goes to: `#settings/photos`.

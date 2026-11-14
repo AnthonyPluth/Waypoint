@@ -557,7 +557,7 @@ describe("Settings → Photos, Needs a look", () => {
     let synced = "2026-11-06T11:12:00+00:00";
     let calls_ = 0;
     let release: (v: unknown) => void = () => {};
-    let pending = [look(21), look(22)];
+    const pending = [look(21), look(22)];
     serve([], (path, opts) => {
       if (path === "/api/photo-sources") return { sources: [source({ last_sync: synced })], permissions: PERMISSIONS };
       if (path === "/api/photo-sources/7/sync" && opts?.method === "POST") return { started: true };
