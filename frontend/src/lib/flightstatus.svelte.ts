@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import type { FlightStatus, FlightStatusList, Segment } from "./api-types";
 import { errMsg } from "./act";
 import { apiCall } from "./contract";
@@ -41,7 +42,7 @@ export function liveFlight(s: Segment, now: number): boolean {
   return now >= startAt(s) - AHEAD && now <= Math.max(endAt(s), Number.isNaN(lands) ? 0 : lands) + AFTER;
 }
 
-export function watchFlightStatus(segments: () => Segment[]): () => void {
+export function watchFlightStatus(segments: () => Segment[], now = false): () => void {
   let last = 0;
   const reread = (force: boolean) => {
     const now = Date.now();
@@ -60,5 +61,17 @@ export function watchFlightStatus(segments: () => Segment[]): () => void {
     window.removeEventListener("focus", back);
     document.removeEventListener("visibilitychange", back);
   }
+  if (now) reread(true);
   return stop;
+}
+
+export function followFlightStatus(segments: () => Segment[], expired: () => boolean): void {
+  let was = false;
+  $effect(() => {
+    const gone = expired();
+    const back = was && !gone;
+    was = gone;
+    if (gone) return;
+    return untrack(() => watchFlightStatus(segments, back));
+  });
 }

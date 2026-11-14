@@ -6,7 +6,8 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 import { api } from "$lib/api";
 import type { FlightStatusList } from "$lib/api-types";
 import { segment } from "../test/fixtures";
-import { LIVE_EVERY, flightStatus, liveFlight, loadFlightStatus, refreshFlightStatus, statusFor, watchFlightStatus } from "./flightstatus.svelte";
+import { flushSync } from "svelte";
+import { LIVE_EVERY, flightStatus, followFlightStatus, liveFlight, loadFlightStatus, refreshFlightStatus, statusFor, watchFlightStatus } from "./flightstatus.svelte";
 
 const reply = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: null, statuses: [{ segment_id: 4, state: "landed" }] };
 
@@ -139,6 +140,45 @@ describe("watching the stored status", () => {
     await vi.advanceTimersByTimeAsync(5 * LIVE_EVERY);
     window.dispatchEvent(new Event("focus"));
     document.dispatchEvent(new Event("visibilitychange"));
+    expect(reads()).toBe(1);
+  });
+
+  it("pauses while the session is gone and picks up again, with one read at once, after signing back in", async () => {
+    vi.setSystemTime(DEPARTS);
+    const session = $state({ expired: false });
+    window.addEventListener("waypoint:signed-out", () => { session.expired = true; }, { once: true });
+    vi.mocked(api).mockImplementation(async () => {
+      window.dispatchEvent(new CustomEvent("waypoint:signed-out", { cancelable: true, detail: { background: true } }));
+      throw Object.assign(new Error("Your session expired. Sign in again to keep going."), { status: 401 });
+    });
+    const end = $effect.root(() => followFlightStatus(() => [flight], () => session.expired));
+    stop = end;
+    flushSync();
+    await vi.advanceTimersByTimeAsync(LIVE_EVERY);
+    flushSync();
+    expect(session.expired).toBe(true);
+    expect(reads()).toBe(1);
+    await vi.advanceTimersByTimeAsync(5 * LIVE_EVERY);
+    window.dispatchEvent(new Event("focus"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(reads()).toBe(1);
+    vi.mocked(api).mockResolvedValue(late("delayed"));
+    session.expired = false;
+    flushSync();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(reads()).toBe(2);
+    expect(statusFor(4)?.state).toBe("delayed");
+    await vi.advanceTimersByTimeAsync(LIVE_EVERY);
+    expect(reads()).toBe(3);
+  });
+
+  it("doesn’t read again at once when it starts with the session in place", async () => {
+    vi.setSystemTime(DEPARTS);
+    stop = $effect.root(() => followFlightStatus(() => [flight], () => false));
+    flushSync();
+    await vi.advanceTimersByTimeAsync(LIVE_EVERY - 1);
+    expect(reads()).toBe(0);
+    await vi.advanceTimersByTimeAsync(1);
     expect(reads()).toBe(1);
   });
 
