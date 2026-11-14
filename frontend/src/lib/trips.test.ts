@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { flightEvidence, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -473,6 +473,77 @@ describe("the route progress", () => {
   it("keeps the plane at the origin for a segment with no times", () => {
     expect(routeProgress(segment({ details: { time_unknown: "yes" } }), dep + 3_600_000)).toBe(0);
     expect(routeProgress(segment({ start_local: "soon" }), dep)).toBe(0);
+  });
+});
+
+describe("flightProgress", () => {
+  const flight = segment({ start_local: "2026-11-20T19:00", start_zone: NY, end_local: "2026-11-21T07:10", end_zone: LON });
+  const dep = at("2026-11-20T19:00", NY), arr = at("2026-11-21T07:10", LON);
+  const live = (extra: Partial<FlightStatus> = {}, now = arr): FlightStatus => ({
+    segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR",
+    dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T22:45", dep_actual: null, dep_zone: NY, dep_terminal: null, dep_gate: null,
+    arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T10:55", arr_actual: null, arr_zone: LON, arr_terminal: null, arr_gate: null,
+    delay_minutes: 225, fetched_at: new Date(now - 60_000).toISOString(), ...extra,
+  });
+  const estDep = at("2026-11-20T22:45", NY), estArr = at("2026-11-21T10:55", LON);
+  it("keeps the plane at the origin for a delayed flight not yet confirmed as departed, even after the booked times", () => {
+    expect(flightProgress(flight, arr + 1000, live({}, arr + 1000))).toBe(0);
+    expect(flightProgress(flight, dep + 1000, live({}, dep + 1000))).toBe(0);
+    expect(flightProgress(flight, arr + 1000, live({ dep_estimated: null }, arr + 1000))).toBe(0);
+  });
+  it("keeps the plane at the origin while a delay pushes the departure past now", () => {
+    const now = dep + 3_600_000;
+    expect(flightProgress(flight, now, live({}, now))).toBe(0);
+  });
+  it("places a departed flight between the actual or estimated departure and the estimated arrival", () => {
+    const now = estDep + (estArr - estDep) / 2;
+    expect(flightProgress(flight, now, live({ state: "departed" }, now))).toBeCloseTo(0.5, 5);
+    const actual = at("2026-11-20T23:00", NY);
+    const mid = actual + (estArr - actual) / 4;
+    expect(flightProgress(flight, mid, live({ state: "departed", dep_actual: "2026-11-20T23:00" }, mid))).toBeCloseTo(0.25, 5);
+  });
+  it("moves both ends of the arc when the delay shifts departure and arrival", () => {
+    const now = dep + (arr - dep) / 2;
+    expect(flightProgress(flight, now, live({ state: "departed" }, now))).toBe(0);
+    expect(routeProgress(flight, now)).toBe(0.5);
+  });
+  it("keeps the booked duration from the departure when a departed flight has no arrival time", () => {
+    const now = estDep + (arr - dep) / 2;
+    expect(flightProgress(flight, now, live({ state: "departed", arr_estimated: null }, now))).toBeCloseTo(0.5, 5);
+  });
+  it("still places a departed or diverted flight when the status has no departure times", () => {
+    const now = dep + (arr - dep) / 2;
+    const bare = { dep_actual: null, dep_estimated: null, dep_scheduled: null, arr_estimated: null };
+    expect(flightProgress(flight, now, live({ state: "departed", ...bare }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "diverted", ...bare }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "departed", ...bare, dep_scheduled: "2026-11-20T19:00" }, now))).toBeCloseTo(0.5, 5);
+    expect(flightProgress(flight, now, live({ state: "delayed", ...bare }, now))).toBe(0);
+  });
+  it("keeps the booked duration for a flight that leaves after its booked arrival with no arrival time", () => {
+    const short = segment({ start_local: "2026-11-20T10:00", start_zone: NY, end_local: "2026-11-20T11:00", end_zone: NY });
+    const left = at("2026-11-20T13:00", NY), now = left + 30 * 60_000;
+    const status = live({ state: "departed", dep_estimated: null, dep_actual: "2026-11-20T13:00", arr_estimated: null }, now);
+    expect(flightProgress(short, now, status)).toBeCloseTo(0.5, 5);
+    expect(flightProgress(short, left + 3_600_000 * 2, { ...status, fetched_at: new Date(left + 3_600_000 * 2 - 60_000).toISOString() })).toBe(AIRBORNE_MAX);
+  });
+  it("keeps a departed or diverted flight short of the destination until it lands", () => {
+    expect(flightProgress(flight, estArr + 3_600_000, live({ state: "departed" }, estArr + 3_600_000))).toBe(AIRBORNE_MAX);
+    expect(flightProgress(flight, estArr + 3_600_000, live({ state: "diverted", dep_actual: "2026-11-20T22:50" }, estArr + 3_600_000))).toBe(AIRBORNE_MAX);
+  });
+  it("puts a landed flight at the destination and a cancelled one at the origin", () => {
+    expect(flightProgress(flight, dep - 1000, live({ state: "landed" }, dep - 1000))).toBe(1);
+    expect(flightProgress(flight, arr, live({ state: "cancelled" }))).toBe(0);
+  });
+  it("follows the booked times with no live status, when it is stale, or when offline", () => {
+    const half = dep + (arr - dep) / 2;
+    expect(flightProgress(flight, half)).toBe(0.5);
+    expect(flightProgress(flight, half, null)).toBe(0.5);
+    expect(flightProgress(flight, half, live({ state: "scheduled" }, half))).toBe(0.5);
+    expect(flightProgress(flight, half, live({}, half - 4 * 3_600_000))).toBe(0.5);
+    expect(flightProgress(flight, half, live({}, half), false)).toBe(0.5);
+  });
+  it("keeps the plane at the origin for a flight with no times", () => {
+    expect(flightProgress(segment({ details: { time_unknown: "yes" } }), dep, live({ state: "departed" }, dep))).toBe(0);
   });
 });
 
