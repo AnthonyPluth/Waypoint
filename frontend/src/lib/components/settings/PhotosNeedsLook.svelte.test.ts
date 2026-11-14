@@ -210,6 +210,9 @@ describe("Needs a look, deciding", () => {
     await waitFor(() => expect(within(sheet).getByRole("radio", { name: "Mesa weekend" })).toBeInTheDocument());
     expect(within(sheet).queryByRole("radio", { name: "Canyon weekend" })).toBeNull();
     expect(within(sheet).getByRole("alert")).toHaveTextContent("The photo’s trips changed. That photo changed while you were looking. The list is up to date; check it and try again.");
+    for (const radio of within(sheet).getAllByRole("radio")) expect(radio).not.toBeChecked();
+    expect(within(sheet).getByRole("button", { name: "Put on" })).toBeDisabled();
+    await user.click(within(sheet).getByRole("radio", { name: "Mesa weekend" }));
     expect(within(sheet).getByRole("button", { name: "Put on Mesa weekend" })).toBeEnabled();
     expect(made.reload).toHaveBeenCalledTimes(1);
     expect(made.spy).not.toHaveBeenCalled();
@@ -309,5 +312,30 @@ describe("Needs a look, deciding", () => {
     await user.click(screen.getByRole("button", { name: /^Keep on this trip, the photo/ }));
     await waitFor(() => expect(screen.getByText("Nothing needs a look.", { selector: "p[tabindex]" })).toHaveFocus());
     expect(screen.getByRole("status")).toHaveTextContent("Saved. Nothing else needs a look.");
+  });
+
+  it("leaves no trip chosen and the confirm button off when a refused Pick removed the chosen trip", async () => {
+    vi.mocked(api).mockRejectedValue(new Refusal("The photo’s trips changed", 409));
+    const view: { rerender?: (p: { photos: ReviewPhoto[] }) => Promise<void> } = {};
+    const fresh = photo(21, { candidates: [REDSTONE, { id: 14, name: "Mesa weekend" }] });
+    const made = show([ambiguous], ADA, async () => {}, async () => { await view.rerender?.({ photos: [fresh] }); return true; });
+    view.rerender = made.rerender as never;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^Pick a trip/ }));
+    expect(await screen.findByRole("radio", { name: "Canyon weekend" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Put on Canyon weekend" }));
+    await waitFor(() => expect(screen.getByRole("radio", { name: "Mesa weekend" })).toBeInTheDocument());
+    for (const radio of screen.getAllByRole("radio")) expect(radio).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Put on" })).toBeDisabled();
+    await user.click(screen.getByRole("radio", { name: "Mesa weekend" }));
+    expect(screen.getByRole("button", { name: "Put on Mesa weekend" })).toBeEnabled();
+  });
+
+  it("has its announcement region in the page before the first decision", () => {
+    const { container } = show([ambiguous]);
+    const region = container.querySelector("p.sr-only[role=status]") as HTMLElement;
+    expect(region).not.toBeNull();
+    expect(region.textContent).toBe("");
+    expect(region).toHaveClass("sr-only");
   });
 });

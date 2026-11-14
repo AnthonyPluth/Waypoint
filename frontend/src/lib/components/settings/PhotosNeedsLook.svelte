@@ -60,7 +60,7 @@
   const rest = $derived(photos.length - shown.length);
   const picking = $derived(pickingId === null ? null : (photos.find((p) => p.id === pickingId) ?? null));
   const choices = $derived(picking ? choicesOf(picking) : []);
-  const chosen = $derived(choices.some((c) => c.id === wanted) ? wanted : (choices[0]?.id ?? null));
+  const chosen = $derived(choices.some((c) => c.id === wanted) ? wanted : null);
   const chosenName = $derived(choices.find((c) => c.id === chosen)?.name ?? "");
 
   const note = (id: number, text: string | undefined) => { notes = { ...notes, [id]: text }; };
@@ -213,7 +213,7 @@
   {:else}
     <p bind:this={emptyLine} tabindex="-1" class="text-sm text-muted-foreground outline-none">Nothing needs a look.</p>
   {/if}
-  {#if announce}<p class="sr-only" role="status">{announce}</p>{/if}
+  <p class="sr-only" role="status">{announce}</p>
 </div>
 
 <Sheet bind:open={() => sheetOpen, (v) => { if (busy === null || v) sheetOpen = v; }} title="Pick a trip for this photo" description="Waypoint won’t move it again by itself.">

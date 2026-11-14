@@ -129,7 +129,7 @@ describe("Settings → Photos, the source cards", () => {
     serve([source()], (path) => { if (path === "/api/photo-sources/7/sync") return { started: true }; });
     const { unmount } = render(PhotosSection);
     await userEvent.click(await screen.findByRole("button", { name: "Sync now, Ada Brook’s library" }));
-    await screen.findByRole("status");
+    await screen.findByText(/^Sync started for/);
     unmount();
     const before = vi.mocked(api).mock.calls.length;
     await flush(() => vi.advanceTimersByTimeAsync(30000));
@@ -240,13 +240,13 @@ describe("Settings → Photos, the source cards", () => {
     await waitFor(() => expect(sync).toBeDisabled());
     expect(sync).toHaveTextContent("Syncing…");
     release({ started: true });
-    expect(await screen.findByRole("status")).toHaveTextContent("Sync started for Ada Brook’s library. This card updates when it finishes.");
+    expect(await screen.findByText("Sync started for Ada Brook’s library. This card updates when it finishes.")).toBeInTheDocument();
     expect(screen.getByText("Syncing")).toBeInTheDocument();
     expect(sync).toBeDisabled();
     synced = "2026-11-06T12:12:00+00:00";
     await flush(() => vi.advanceTimersByTimeAsync(5000));
     await waitFor(() => expect(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" })).toBeEnabled());
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByText(/^Sync started for/)).toBeNull();
     expect(screen.getByText("Up to date")).toBeInTheDocument();
   });
 
