@@ -345,6 +345,66 @@ describe("Remove from this trip, in the viewer", () => {
   });
 });
 
+describe("The map’s photo data when the reload after a change fails", () => {
+  const failAfter = (trigger: () => void) => {
+    let failing = false;
+    onPhotos = () => { if (failing) throw new Refusal("Waypoint is unreachable", 503); return undefined; };
+    return () => { failing = true; trigger(); };
+  };
+
+  it("is cleared, not left with the removed photo, when a removal went through and the photos can’t be reloaded", async () => {
+    const onloaded = vi.fn();
+    mount({ onloaded });
+    await photosSection();
+    await user.click(await tile(/^Photo, 9:00 AM/));
+    await viewer();
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(3));
+    onExclude = failAfter(() => undefined) as never;
+    await user.click(removeButton());
+    expect(await screen.findByText("Couldn’t refresh the photos on this trip, so what shows may be out of date.")).toBeTruthy();
+    expect(onloaded.mock.calls.at(-1)?.[0]).toBeNull();
+  });
+
+  it("is cleared when the last photo is removed and the reload fails, so its pin is gone", async () => {
+    visible = [shot(1)];
+    const onloaded = vi.fn();
+    mount({ onloaded });
+    await photosSection();
+    await user.click(await tile(/^Photo, 9:00 AM/));
+    await viewer();
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(1));
+    onExclude = failAfter(() => undefined) as never;
+    await user.click(removeButton());
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]).toBeNull());
+  });
+
+  it("is cleared after a Put back whose reload fails", async () => {
+    gone = [{ ...shot(5), removed_at: 1700000100 }];
+    visible = [shot(1), shot(2)];
+    const onloaded = vi.fn();
+    mount({ onloaded });
+    const mine = await screen.findByTestId("your-photos");
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(2));
+    await user.click(within(mine).getByRole("button", { name: /^Removed from this trip/ }));
+    onPutBack = failAfter(() => undefined) as never;
+    await user.click(within(mine).getByRole("button", { name: /^Put back/ }));
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]).toBeNull());
+  });
+
+  it("keeps the map’s data when a refresh that follows no change fails", async () => {
+    const onloaded = vi.fn();
+    mount({ onloaded });
+    await photosSection();
+    await user.click(await tile(/^Photo, 9:00 AM/));
+    const dialog = await viewer();
+    await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(3));
+    onPhotos = () => { throw new Refusal("Waypoint is unreachable", 503); };
+    dialog.querySelector("img")!.dispatchEvent(new Event("error"));
+    expect(await screen.findByText("Couldn’t refresh the photos on this trip, so what shows may be out of date.")).toBeTruthy();
+    expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(3);
+  });
+});
+
 describe("Undo pressed more than once", () => {
   it("runs a second Undo only after the first, and its reload, are done, even while another change is under way", async () => {
     mount();

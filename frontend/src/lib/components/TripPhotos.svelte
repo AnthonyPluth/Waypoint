@@ -83,6 +83,7 @@
   const seeAll = $derived(`See all ${total} ${total === 1 ? "photo" : "photos"}`);
 
   let latest = 0;
+  let mapStale = false;
   async function load(id: number, soft = false) {
     const mine = ++latest;
     refreshing = soft;
@@ -103,6 +104,7 @@
       sources = listed;
       loaded = { state: "ready", found };
       staleView = false;
+      mapStale = false;
       onloaded?.(found);
       if (soft) {
         broken = new Set();
@@ -110,13 +112,17 @@
       }
     } catch {
       if (mine !== latest) return;
-      if (soft && loaded.state === "ready") staleView = true; else loaded = { state: "error" };
+      if (soft && loaded.state === "ready") {
+        staleView = true;
+        if (mapStale) onloaded?.(null);
+      } else loaded = { state: "error" };
     } finally {
       if (mine === latest) refreshing = false;
     }
   }
 
   async function changed() {
+    mapStale = true;
     onchanged?.();
     await load(trip.id, true);
   }
