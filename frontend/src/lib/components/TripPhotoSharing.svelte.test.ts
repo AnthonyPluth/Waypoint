@@ -633,6 +633,66 @@ describe("When the trip is edited on the page", () => {
     await waitFor(() => expect(screen.queryByRole("group", { name: "June has 12 photos from this trip" })).toBeNull());
   });
 
+  const askedAgain = async (edited: typeof road) => {
+    current = shared();
+    const view = mount();
+    await card();
+    const getsBefore = sharingGets();
+    const photoLoads = calls("GET", "/api/trips/7/photos").length;
+    current = sharing({ state: "ask", count: 90 });
+    await view.rerender({ trip: edited, people: [ada], now: after });
+    expect(await screen.findByRole("group", { name: "You have 90 photos from this trip" })).toBeInTheDocument();
+    expect(sharingGets()).toBe(getsBefore + 1);
+    expect(calls("GET", "/api/trips/7/photos").length).toBe(photoLoads + 1);
+  };
+
+  it("asks again when the first booking starts earlier on the same day", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, start_local: "2026-03-01T09:00" }] });
+  });
+
+  it("asks again when the last booking ends later on the same day", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, end_local: "2026-03-04T23:00" }] });
+  });
+
+  it("asks again when a booking’s zone moves the window within the same day", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, start_zone: "Pacific/Auckland" }] });
+  });
+
+  it("asks again when a booking is cancelled", async () => {
+    await askedAgain({ ...road, segments: [{ ...stay, status: "cancelled" }] });
+  });
+
+  it("does not ask again for a seat, a confirmation code or a note, which move no window", async () => {
+    current = shared();
+    const view = mount();
+    await card();
+    const getsBefore = sharingGets();
+    const photoLoads = calls("GET", "/api/trips/7/photos").length;
+    const edited = { ...road, notes: "Pack layers", segments: [{ ...stay, confirmation: "ZZ9999", details: { ...stay.details, address: "2 Elm Road" }, travelers: [{ id: 9, person_id: 1, name: "Ada Brook", seat: "12C" }] }] };
+    await view.rerender({ trip: edited, people: [ada], now: after });
+    await Promise.resolve();
+    expect(sharingGets()).toBe(getsBefore);
+    expect(calls("GET", "/api/trips/7/photos").length).toBe(photoLoads);
+  });
+
+  it("keeps the controls held and does not clobber a share in flight when a booking time changes", async () => {
+    const view = mount();
+    const ask = await prompt();
+    const post = deferred<PhotoSharing>();
+    onSharing = (call) => (call?.method === "POST" ? post.promise : undefined);
+    await user.click(within(ask).getByRole("button", { name: "Share on this trip" }));
+    const getsBefore = sharingGets();
+    await view.rerender({ trip: { ...road, segments: [{ ...stay, start_local: "2026-03-01T08:00" }] }, people: [ada], now: after });
+    await waitFor(() => expect(sharingGets()).toBe(getsBefore + 1));
+    await user.click(within(ask).getByRole("button", { name: "Not now" }));
+    expect(sent("POST", "/photo-sharing")).toHaveLength(1);
+    expect(within(ask).getByRole("button", { name: "Not now" })).toBeDisabled();
+    current = shared({ scope: "only_me" });
+    post.resolve(current);
+    await card();
+    expect(screen.queryByRole("group", { name: /from this trip$/ })).toBeNull();
+  });
+
   it("does not ask again for a rename or any other edit that moves nothing", async () => {
     current = shared();
     const view = mount();

@@ -115,7 +115,7 @@
     }
   }
 
-  const changeKey = $derived(JSON.stringify([trip.id, trip.start_date, trip.end_date, [...trip.people].sort(), people.map((p) => [p.id, p.member, p.first_name, p.display_name])]));
+  const changeKey = $derived(JSON.stringify([trip.id, trip.start_date, trip.end_date, [...trip.people].sort(), trip.segments.map((s) => [s.id, s.status, s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.itinerary]), people.map((p) => [p.id, p.member, p.first_name, p.display_name])]));
   let seen: { id: number; key: string } | null = null;
 
   $effect(() => {
