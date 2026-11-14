@@ -64,7 +64,7 @@ Tap a photo to open the viewer: the photo or the video's still (with **Play vide
 
 With no library connected, a trip that has started points you to **Connect a library in Settings**; while your library has not synced yet the section says so, and a trip with no photos says **No photos on this trip yet.**
 
-For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
+For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. The pins are drawn on the trip’s map, and **Show these photos** on a pin’s card opens the gallery at that cluster ([Photo pins on the map](/Waypoint/start/trips/#photo-pins-on-the-map)). A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
 
 ## Needs a look
 

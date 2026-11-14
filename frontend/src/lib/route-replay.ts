@@ -1,6 +1,6 @@
 import { geoBounds, geoDistance, geoEqualEarth, type GeoProjection } from "d3-geo";
 import type { Geometry } from "geojson";
-import type { Segment, Trip, TripPlaces } from "./api-types";
+import type { PhotoCluster, Segment, Trip, TripPlaces } from "./api-types";
 import { countryName } from "./stats";
 import { instant, isPast } from "./trips";
 
@@ -173,13 +173,15 @@ export const canReplay = (trip: Trip, today: string, places: TripPlaces | null):
 
 const locale = () => (typeof navigator !== "undefined" && navigator.language) || "en-US";
 
-export function stopDates(stop: Stop, year: number): string {
-  const first = Date.parse(`${stop.from.slice(0, 10)}T00:00:00Z`), last = Date.parse(`${stop.to.slice(0, 10)}T00:00:00Z`);
+export function datesOf(from: string, to: string, year: number, weekday = false): string {
+  const first = Date.parse(`${from.slice(0, 10)}T00:00:00Z`), last = Date.parse(`${to.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(first) || Number.isNaN(last)) return "";
   const sameYear = new Date(first).getUTCFullYear() === year && new Date(last).getUTCFullYear() === year;
-  const format = new Intl.DateTimeFormat(locale(), { timeZone: "UTC", month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
+  const format = new Intl.DateTimeFormat(locale(), { timeZone: "UTC", ...(weekday ? { weekday: "short" } : {}), month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
   return first === last ? format.format(first) : format.formatRange(first, last);
 }
+
+export const stopDates = (stop: Pick<Stop, "from" | "to">, year: number): string => datesOf(stop.from, stop.to, year);
 
 export function stopTitle(stop: Stop): string {
   if (stop.kind === "airport") return `${stop.name} (${stop.code})`;
@@ -190,7 +192,7 @@ export function stopTitle(stop: Stop): string {
 
 export const stopLine = (stop: Stop, year: number): string => `${stopTitle(stop)}, ${stopDates(stop, year)}`;
 
-const lonLat = (s: Point): [number, number] => [s.longitude, s.latitude];
+const lonLat = (s: Pick<Point, "latitude" | "longitude">): [number, number] => [s.longitude, s.latitude];
 
 const km = (at: number[], s: Stop): number => geoDistance([at[1], at[0]], [s.longitude, s.latitude]) * EARTH_KM;
 
@@ -316,9 +318,9 @@ export function moverAt(leg: Leg, t: number): { x: number; y: number; angle: num
   return { x: now.x, y: now.y, angle: (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI };
 }
 
-export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, roads: Roads = NO_ROADS, base: () => GeoProjection = geoEqualEarth): GeoProjection {
+export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, roads: Roads = NO_ROADS, base: () => GeoProjection = geoEqualEarth, more: Pick<Point, "latitude" | "longitude">[] = []): GeoProjection {
   const points = stops.map(lonLat);
-  const geometries: Geometry[] = [{ type: "MultiPoint", coordinates: points }];
+  const geometries: Geometry[] = [{ type: "MultiPoint", coordinates: [...points, ...more.map(lonLat)] }];
   for (let i = 1; i < points.length; i++) {
     const found = roadFor(stops[i - 1], stops[i], roads);
     geometries.push({ type: "LineString", coordinates: found ? [points[i - 1], ...found.points.map(([lat, lon]) => [lon, lat]), points[i]] : [points[i - 1], points[i]] });
@@ -449,4 +451,73 @@ export function cameraAt(stops: Stop[], spots: Spot[], width: number, height: nu
     target = { x: Math.min(width - w, Math.max(0, cx - w / 2)), y: Math.min(height - h, Math.max(0, cy - h / 2)), w, h };
   }
   return { x: full.x + (target.x - full.x) * best, y: full.y + (target.y - full.y) * best, w: width + (target.w - width) * best, h: height + (target.h - height) * best };
+}
+
+export type Pin = { index: number; x: number; y: number; size: number; count: number; inferred: boolean; far: boolean };
+
+export const PIN_MIN = 16;
+export const PIN_MAX = 40;
+export const PIN_DOUBLING = 4;
+export const PIN_TARGET = 24;
+
+export const pinSize = (count: number): number => Math.min(PIN_MAX, Math.round(PIN_MIN + PIN_DOUBLING * Math.log2(Math.max(count, 1))));
+
+export function pinsOf(clusters: PhotoCluster[], projection: GeoProjection, far: ReadonlySet<number> = new Set()): Pin[] {
+  const out: Pin[] = [];
+  clusters.forEach((c, index) => {
+    const at = projection(lonLat(c));
+    if (at) out.push({ index, x: at[0], y: at[1], size: pinSize(c.count), count: c.count, inferred: c.inferred, far: far.has(index) });
+  });
+  return out.sort((a, b) => clusters[a.index].first.localeCompare(clusters[b.index].first) || a.index - b.index);
+}
+
+const wallClock = (local: string): number => Date.parse(`${local.slice(0, 16)}:00Z`);
+
+export function stopPosition(stops: Pick<Stop, "from" | "to">[], local: string): number {
+  if (stops.length === 0) return 0;
+  const at = wallClock(local);
+  if (Number.isNaN(at)) return 0;
+  let position = 0;
+  for (let i = 0; i < stops.length; i++) {
+    const from = wallClock(stops[i].from), to = wallClock(stops[i].to);
+    if (at < from) {
+      if (i === 0) return 0;
+      const left = wallClock(stops[i - 1].to);
+      return left < from ? i - 1 + Math.min(1, Math.max(0, (at - left) / (from - left))) : i;
+    }
+    position = i;
+    if (at <= to) return i;
+  }
+  return position;
+}
+
+export const pinLit = (cluster: Pick<PhotoCluster, "first">, stops: Pick<Stop, "from" | "to">[], progress: number): boolean =>
+  stops.length < 2 || stopPosition(stops, cluster.first) <= progress * (stops.length - 1) + 1e-9;
+
+export const pinFraction = (pin: Pick<Pin, "x" | "y">, box: Box): { left: number; top: number } => ({ left: ((pin.x - box.x) / box.w) * 100, top: ((pin.y - box.y) / box.h) * 100 });
+
+export function spreadPins<T extends { x: number; y: number; reach: number }>(pins: T[], rounds = 12): T[] {
+  const out = pins.map((p) => ({ ...p }));
+  for (let round = 0; round < rounds; round++) {
+    let moved = false;
+    for (let i = 0; i < out.length; i++) {
+      for (let j = i + 1; j < out.length; j++) {
+        const a = out[i], b = out[j];
+        const gap = a.reach + b.reach;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const overX = gap - Math.abs(dx), overY = gap - Math.abs(dy);
+        if (overX <= 0 || overY <= 0) continue;
+        moved = true;
+        if (overX <= overY) {
+          const push = overX / 2 + 0.01, side = dx === 0 ? (i + j) % 2 * 2 - 1 : Math.sign(dx);
+          a.x -= side * push; b.x += side * push;
+        } else {
+          const push = overY / 2 + 0.01, side = dy === 0 ? (i + j) % 2 * 2 - 1 : Math.sign(dy);
+          a.y -= side * push; b.y += side * push;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return out;
 }

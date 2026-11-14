@@ -253,4 +253,43 @@ describe("TripPhotos", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(second));
   });
+
+  describe("linked from the map", () => {
+    const clustered = () => [...many(30, 10), photo(40, { taken_local: "2026-03-02T08:00", cluster: 1 }), photo(41, { taken_local: "2026-03-02T09:00", cluster: 1 }), photo(42, { taken_local: "2026-03-01T05:00", cluster: 0 })];
+
+    it("hands the loaded reply to the page, and takes it back when the trip changes or the request fails", async () => {
+      photos = many(2);
+      const onloaded = vi.fn();
+      const { rerender } = render(TripPhotos, { trip: roadTrip, people: [ada], now: after, onloaded });
+      await section();
+      expect(onloaded).toHaveBeenLastCalledWith(expect.objectContaining({ photos: expect.any(Array) }));
+      vi.mocked(api).mockImplementation(async () => { throw new Error("down"); });
+      onloaded.mockClear();
+      await rerender({ trip: { ...roadTrip, id: 8 } });
+      await waitFor(() => expect(screen.getByText("Couldn’t load the photos on this trip.")).toBeTruthy());
+      expect(onloaded).toHaveBeenCalledExactlyOnceWith(null);
+    });
+
+    it("opens the gallery past the first days, scrolls to a cluster's first photo and focuses it", async () => {
+      photos = clustered();
+      const scroll = vi.fn();
+      Element.prototype.scrollIntoView = scroll;
+      const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
+      await section();
+      await view.component.showCluster(1);
+      expect(screen.getByRole("button", { name: "Show fewer" }).getAttribute("aria-expanded")).toBe("true");
+      await waitFor(() => expect(document.activeElement?.getAttribute("data-photo")).toBe("40"));
+      expect(scroll).toHaveBeenCalled();
+      expect(screen.getByText("Showing 2 photos from the map, from 8:00 AM")).toBeTruthy();
+      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    });
+
+    it("does nothing for a cluster with no photos in the reply", async () => {
+      photos = many(3);
+      const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
+      await section();
+      await view.component.showCluster(9);
+      expect(screen.queryByRole("button", { name: "Show fewer" })).toBeNull();
+    });
+  });
 });

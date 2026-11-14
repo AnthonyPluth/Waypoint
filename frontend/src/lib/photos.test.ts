@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TripPhoto } from "./api-types";
 import { segment } from "../test/fixtures";
-import { byDay, clusterOf, dayCaption, daysFor, FAR_FROM_BOOKINGS, FROM_ITINERARY, isFar, isInferred, kilometres, originalUrl, personName, placeOf, previewUrl, thumbnailUrl, tileLabel, zoneCity } from "./photos";
+import { byDay, clusterAway, clusterCaption, clusterCount, clusterInfos, clusterName, clusterTitle, firstOfCluster, unlocated, clusterOf, dayCaption, daysFor, FAR_FROM_BOOKINGS, FROM_ITINERARY, isFar, isInferred, kilometres, originalUrl, personName, placeOf, previewUrl, thumbnailUrl, tileLabel, zoneCity } from "./photos";
 
 const photo = (extra: Partial<TripPhoto> = {}): TripPhoto => ({
   id: 1, person_id: 1, trip_id: 1, kind: "image", taken_local: "2026-03-01T10:42", zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif",
@@ -101,5 +101,62 @@ describe("day captions and pages", () => {
     expect(daysFor(days, 3)).toBe(4);
     expect(daysFor(days, 0, 2)).toBe(1);
     expect(daysFor(days, 4)).toBe(4);
+  });
+});
+
+describe("clusterInfos and the names built from them", () => {
+  const near = (id: number, cluster: number | null, extra: Partial<TripPhoto> = {}) => photo({ id, cluster, ...extra });
+  const clusters = [
+    { latitude: 39.7, longitude: -105, count: 3, first: "2026-03-01T10:42", last: "2026-03-03T09:00", cover: 1, inferred: false },
+    { latitude: 39.8, longitude: -105.1, count: 2, first: "2026-03-02T10:00", last: "2026-03-02T10:30", cover: 4, inferred: true },
+    { latitude: 35, longitude: -110, count: 2, first: "2026-03-02T08:00", last: "2026-03-02T08:00", cover: 6, inferred: false },
+    { latitude: 36, longitude: -111, count: 3, first: "2026-03-02T09:00", last: "2026-03-02T09:00", cover: 7, inferred: false },
+  ];
+  const photos = [
+    near(1, 0), near(2, 0, { taken_local: "2026-03-03T09:00" }), near(3, 0, { taken_local: "2026-03-01T11:00" }),
+    near(4, 1, { location_source: "inferred", taken_local: "2026-03-02T10:00" }), near(5, 1, { location_source: "inferred", taken_local: "2026-03-02T10:30" }),
+    near(6, 2, { match: "far", distance_km: 612.4, segment_id: null }), near(8, 2, { match: "far", distance_km: 700, segment_id: null }),
+    near(7, 3, { taken_local: "2026-03-02T09:00" }), near(9, 3, { match: "far", distance_km: 530, segment_id: null }), near(10, 3, { match: "far", distance_km: 540, segment_id: null }),
+    near(11, null, { latitude: null, longitude: null }),
+  ];
+  const segments = new Map([[2, stay]]);
+  const infos = clusterInfos(photos, clusters, segments);
+  const said = (text: string) => text.replace(/\s/g, " ");
+
+  it("finds each cluster's place from its photos' bookings, its far photos and the nearest of them", () => {
+    expect(infos.map((i) => [i.place, i.far, i.farKm])).toEqual([["Marlow Springs", 0, null], ["Marlow Springs", 0, null], ["", 2, 612.4], ["Marlow Springs", 2, 530]]);
+    expect(infos[0].first?.id).toBe(1);
+  });
+
+  it("names a pin by its count, place and dates", () => {
+    expect(said(clusterName(infos[0], 2026))).toBe("3 photos near Marlow Springs, Mar 1 – 3");
+  });
+
+  it("says a hollow pin was placed from the itinerary", () => {
+    expect(said(clusterName(infos[1], 2026))).toBe("2 photos placed from the itinerary near Marlow Springs, Mar 2");
+  });
+
+  it("names a pin of only far photos by how far they are, and one of a mix by how many are", () => {
+    expect(clusterAway(infos[2])).toBe(true);
+    expect(said(clusterName(infos[2], 2026))).toBe("2 photos, 612 km from every booking, Mar 2");
+    expect(clusterAway(infos[3])).toBe(false);
+    expect(said(clusterName(infos[3], 2026))).toBe("3 photos near Marlow Springs, 2 of them 530 km from every booking, Mar 2");
+  });
+
+  it("puts the year on dates outside the trip's year", () => {
+    expect(clusterName(infos[0], 2027)).toContain("2026");
+  });
+
+  it("has a callout title without the dates, a caption with weekdays and the place, and a plain count", () => {
+    expect(clusterTitle(infos[0])).toBe("3 photos near Marlow Springs");
+    expect(said(clusterCaption(infos[0], 2026))).toBe("Sun, Mar 1 – Tue, Mar 3 · near Marlow Springs");
+    expect(said(clusterCaption(infos[2], 2026))).toBe("Mon, Mar 2 · 612 km from every booking");
+    expect(clusterCount(infos[0])).toBe("3 photos");
+  });
+
+  it("finds a cluster's first photo by time, and counts the photos with no place", () => {
+    expect(firstOfCluster(photos, 0)?.id).toBe(1);
+    expect(firstOfCluster(photos, 9)).toBeNull();
+    expect(unlocated(photos)).toBe(1);
   });
 });

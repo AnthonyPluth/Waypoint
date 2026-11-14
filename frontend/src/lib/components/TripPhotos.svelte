@@ -5,12 +5,12 @@
   import { apiCall } from "$lib/contract";
   import { Button } from "$lib/components/ui/button";
   import PhotoViewer from "$lib/components/PhotoViewer.svelte";
-  import { byDay, dayCaption, daysFor, isFar, isInferred, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
-  import { dayIn, dayLabel, viewerZone } from "$lib/trips";
+  import { byDay, dayCaption, daysFor, firstOfCluster, isFar, isInferred, localDay, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
+  import { clock, dayIn, dayLabel, viewerZone } from "$lib/trips";
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Play from "@lucide/svelte/icons/play";
 
-  let { trip, people, now }: { trip: Trip; people: Person[]; now: number } = $props();
+  let { trip, people, now, onloaded }: { trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
   let loaded = $state<Loaded>({ state: "loading" });
@@ -51,6 +51,7 @@
   async function load(id: number) {
     const mine = ++latest;
     loaded = { state: "loading" };
+    onloaded?.(null);
     sources = null;
     expanded = false;
     shownDays = 0;
@@ -61,6 +62,7 @@
       if (mine !== latest) return;
       sources = listed;
       loaded = { state: "ready", found };
+      onloaded?.(found);
     } catch {
       if (mine === latest) loaded = { state: "error" };
     }
@@ -84,6 +86,21 @@
     shownDays = daysFor(days, 0);
     announce = `Showing all ${total} ${total === 1 ? "photo" : "photos"} by day`;
     if (fromStrip) { await tick(); focusTile(days[0]?.photos[0]?.id); }
+  }
+
+  export async function showCluster(index: number) {
+    const target = firstOfCluster(photos, index);
+    if (!target) return;
+    const needed = days.findIndex((d) => d.day === localDay(target)) + 1;
+    expanded = true;
+    shownDays = Math.max(shownDays, daysFor(days, 0), needed);
+    const near = photos.filter((p) => p.cluster === index).length;
+    announce = `Showing ${near} ${near === 1 ? "photo" : "photos"} from the map, from ${clock(target.taken_local)}`;
+    await tick();
+    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`);
+    if (!tile) return;
+    tile.scrollIntoView?.({ block: "center", behavior: "auto" });
+    tile.focus({ preventScroll: true });
   }
 
   function close() {

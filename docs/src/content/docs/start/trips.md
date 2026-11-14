@@ -128,6 +128,14 @@ A trip that has ended, with at least two stops Waypoint can place, shows its rou
 
 **Pause**, **Replay**, a speed button (1×, 2×, 4×) and a slider control the replay, and the stops are listed in order beneath the map as a numbered timeline that follows along. With reduced motion turned on in your system nothing animates: the map shows the whole path with every stop labelled. Stops come from the airports and from the point stored with each booking ([Where a booking is on the map](#where-a-booking-is-on-the-map)); a booking Waypoint can’t place is left out rather than guessed.
 
+### Photo pins on the map
+
+When you are signed in and your trip has [photos](/Waypoint/start/photos/) you can see, the map also shows them as pins: one for each cluster of photos taken close together, with the number of photos inside. A pin is filled when any photo in it has a location of its own, and hollow when every photo was placed from the trip’s itinerary. Its size grows with the count, from a small dot to a larger one for dozens of photos. A pin with a photo far from every booking carries an amber dot, and the map is fitted to the stops and the pins together, so a far pin stays on the map. During the replay a pin is dimmed until the replay passes the time of its first photo, then lights up once with a small card at the bottom left that says how many photos and when; with reduced motion every pin is lit from the start.
+
+Each pin is a button named by what it holds, for example “12 photos near Moab, Jun 14 – 16”. Selecting one opens a card with a cover photo, the count, the dates and the place; **Show these photos** opens the gallery on the trip page at that cluster’s first photo, and **Close** (or Escape) puts the card away. The map’s key lists **Photos**, **Photos placed from the itinerary** and **Far from every booking** when a pin of that kind is on the map.
+
+A trip with photos you can see but no route to replay (nothing placeable is booked, or it hasn’t ended) shows a map of just the pins, fitted to them alone, without the replay controls or the stop list, and says how many photos have no location and so aren’t on it. Pins come only from the photos you are allowed to see, so the map never shows that someone else has photos you can’t see; if a person takes photos off the trip, the pins go the next time the page reads them.
+
 ### Apple’s map for the route replay
 
 If you give Waypoint a MapKit JS key from an Apple developer account, the route replay is drawn on Apple’s map (streets and terrain) instead of the bundled outlines. Each drive (a car between two stops, including one that starts or ends at Home) follows the roads of Apple’s driving directions; a flight, a cruise or a train keeps its arc or curve. The stops, the flight arcs, the state lines, the plane, car or boat, the labels, the controls and the stop list are the same as on the bundled map. The Stats map is never drawn by Apple.
