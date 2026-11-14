@@ -32,10 +32,10 @@ STALE_REMOVAL = "The trip changed since that photo was removed. Open the removed
 STALE_SETTING = "Your trips changed. Review them before sharing on all."
 NO_WINDOW = "Give the trip dates or a booking before sharing photos on it"
 STALE_SOURCES = "Your libraries changed. Review them before sharing."
-NEEDS_SNAPSHOT = 'Send the "window", "audience" and "sources" the confirmation showed'
+NEEDS_SNAPSHOT = 'Send the "window", "audience", "sources" and "count_token" the confirmation showed'
 NEEDS_VERSION = 'Send the "expected_changed" the confirmation showed'
 STALE_COUNT = "Your photos or trips changed since they were counted. Review the count before sharing."
-NEEDS_SETTING_SNAPSHOT = 'Send the "windows", "audiences" and "sources" the confirmation showed'
+NEEDS_SETTING_SNAPSHOT = 'Send the "windows", "audiences", "sources" and "count_token" the confirmation showed'
 
 
 class Stale(Exception):
@@ -357,7 +357,7 @@ def grant(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, sco
         return None
     if photos.trip_window(conn, trip.id) is None:
         raise trips.Invalid(NO_WINDOW)
-    if strict and scope == photos.TRIP and (window is None or audience is None or sources is None):
+    if strict and scope == photos.TRIP and (window is None or audience is None or sources is None or token is None):
         raise trips.Invalid(NEEDS_SNAPSHOT)
     if window is not None and not _window_matches(conn, trip.id, window):
         raise Stale(STALE_SHARE)
@@ -531,7 +531,7 @@ def set_prefs(conn: db.Connection, viewer: Viewer, person_id: int, default_scope
     found = conn.orm.get(PhotoSharingPrefs, person_id)
     was_on = found.share_all if found is not None else False
     effective = default_scope if default_scope is not None else found.default_scope if found is not None else photos.ONLY_ME
-    if strict and share_all and not was_on and effective == photos.TRIP and (windows is None or audiences is None or sources is None):
+    if strict and share_all and not was_on and effective == photos.TRIP and (windows is None or audiences is None or sources is None or token is None):
         raise trips.Invalid(NEEDS_SETTING_SNAPSHOT)
     pending = _not_yet_shared(conn, person_id, by) if share_all and not was_on else []
     if windows is not None and any(str(t) not in windows or not _window_matches(conn, t, windows[str(t)]) for t in pending):

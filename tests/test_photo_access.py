@@ -83,7 +83,7 @@ class AccessCase(RouteCase):
         trip = self.trip if trip is None else trip
         query = f"?person_id={person}" if person is not None else ""
         seen = self.ok(who, "GET", f"/api/trips/{trip}/photo-sharing{query}")
-        body = {"scope": scope, "window": seen["window"], "audience": seen["audience"], "sources": seen["sources"]}
+        body = {"scope": scope, "window": seen["window"], "audience": seen["audience"], "sources": seen["sources"], "count_token": seen["count_token"]}
         if person is not None:
             body["person_id"] = person
         if seen["changed"] is not None:
@@ -93,7 +93,9 @@ class AccessCase(RouteCase):
     def setting_snapshots(self, who, trip_ids):
         seen = {str(t): self.ok(who, "GET", f"/api/trips/{t}/photo-sharing") for t in trip_ids}
         sources = next(iter(seen.values()))["sources"] if seen else []
-        return {"windows": {t: s["window"] for t, s in seen.items() if s["window"] is not None}, "audiences": {t: s["audience"] for t, s in seen.items()}, "sources": sources}
+        token = next(g["count_token"] for g in self.ok(who, "GET", "/api/photo-grants")["people"] if g["person_id"] == self.person[who])
+        return {"windows": {t: s["window"] for t, s in seen.items() if s["window"] is not None}, "audiences": {t: s["audience"] for t, s in seen.items()}, "sources": sources,
+                "count_token": token}
 
     def core(self, state):
         return {k: v for k, v in state.items() if k not in ("window", "changed", "audience", "sources", "count_token")}
@@ -330,7 +332,7 @@ class RemovalTests(AccessCase):
         self.ok("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "only_me"})
         state = self.sharing("ben")
         self.assertEqual(sorted(state["window"]), ["end", "start"])
-        shown = {"scope": "trip", "audience": state["audience"], "sources": state["sources"], "expected_changed": state["changed"]}
+        shown = {"scope": "trip", "audience": state["audience"], "sources": state["sources"], "expected_changed": state["changed"], "count_token": state["count_token"]}
         stale = {**shown, "window": {"start": state["window"]["start"], "end": "2030-01-01T00:00:00+00:00"}}
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", stale), (409, {"error": "The trip changed. Review who sees your photos under Your photos on this trip."}))
         self.assertEqual(self.call("ben", "POST", f"/api/trips/{self.trip}/photo-sharing", {**shown, "window": state["window"], "expected_changed": state["changed"] + 1})[0], 409)
