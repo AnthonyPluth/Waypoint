@@ -43,6 +43,11 @@ JP_DAY = re.compile(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日")
 SEAT_TOKEN = re.compile(r"(?i)(?<![A-Za-z0-9])(\d{1,2}[A-K])(?![A-Za-z0-9])")
 Day = tuple[int, int]
 Clock = tuple[int, int]
+HOUR_ONLY = re.compile(r"(?<![\d:.])(\d{1,2})\s?([AaPp])\.?\s?[Mm]\b\.?")
+FRENCH_HOUR = re.compile(r"(?<![\d:])(\d{1,2})\s?h(?![\w])")
+NAMED_HOURS = {"noon": (12, 0), "midday": (12, 0), "midnight": (0, 0), "midi": (12, 0), "minuit": (0, 0), "mittag": (12, 0), "mitternacht": (0, 0),
+               "mediodía": (12, 0), "medianoche": (0, 0), "正午": (12, 0)}
+NAMED_HOUR = re.compile(r"(?i)(?<![^\W\d_])(?:" + "|".join(sorted(NAMED_HOURS, key=len, reverse=True)) + r")(?![^\W\d_])")
 
 
 @dataclass(frozen=True)
@@ -58,17 +63,22 @@ class Signals:
     clocks: frozenset[Clock] = frozenset()
 
 
+def _twelve_hour(hour: int, half: str) -> int:
+    if half == "p" and hour < 12:
+        return hour + 12
+    if half == "a" and hour == 12:
+        return 0
+    return hour
+
+
 def _clocks(whole: str) -> frozenset[Clock]:
     found: set[Clock] = set()
-    for m in when.CLOCK.finditer(whole):
-        hour, minute, half = int(m[1]), int(m[2]), (m[3] or "").lower()
-        if half == "p" and hour < 12:
-            hour += 12
-        elif half == "a" and hour == 12:
-            hour = 0
-        found.add((hour, minute))
+    found.update((_twelve_hour(int(m[1]), (m[3] or "").lower()), int(m[2])) for m in when.CLOCK.finditer(whole))
+    found.update((_twelve_hour(int(m[1]), m[2].lower()), 0) for m in HOUR_ONLY.finditer(whole) if 1 <= int(m[1]) <= 12)
     found.update((int(m[1]), int(m[2])) for m in when.FRENCH_CLOCK.finditer(whole))
+    found.update((int(m[1]), 0) for m in FRENCH_HOUR.finditer(whole) if int(m[1]) < 24)
     found.update((int(m[1]), int(m[2] or 0)) for m in when.JP_CLOCK.finditer(whole))
+    found.update(NAMED_HOURS[m[0].lower()] for m in NAMED_HOUR.finditer(whole))
     return frozenset(found)
 
 

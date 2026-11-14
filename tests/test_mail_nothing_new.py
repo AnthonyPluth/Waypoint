@@ -627,6 +627,22 @@ class UnextractedDetailTests(NothingNewCase):
                 result = self.read_mail(f"{CHECK_IN} {line}", SAME, name=f"clock-{n}")
                 self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
 
+    def test_a_time_written_as_an_hour_alone_that_the_booking_does_not_hold_keeps_it(self):
+        for n, line in enumerate(("Check-in closes at 5 pm.", "Check-in closes 5pm.", "Check-in closes 5 p.m.", "Check-in closes 5PM.",
+                                  "L’enregistrement ferme à 17 h.", "Check-in closes at noon.")):
+            with self.subTest(line=line):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                result = self.read_mail(f"{CHECK_IN} {line}", SAME, name=f"hour-{n}")
+                self.assertEqual((result.state, len(self.kept()), self.counted()), ("done", 1, (0, 0)))
+
+    def test_the_booking_s_own_time_written_as_an_hour_alone_still_dismisses(self):
+        self.read_mail(f"{CHECK_IN} Departs 7 pm.", SAME)
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+        for text in ("Departs 7 p.m.", "Departs 7pm", "Départ 19h", "Departs 19時"):
+            with self.subTest(text=text):
+                self.assertEqual(nothing_new.signals(text).clocks, frozenset({(19, 0)}))
+
     def test_the_booking_s_own_times_may_be_printed(self):
         self.read_mail(f"{CHECK_IN} Departs 7:00 pm, lands 07:10.", SAME)
         self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
