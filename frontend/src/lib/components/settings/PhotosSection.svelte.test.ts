@@ -1,0 +1,364 @@
+// @vitest-environment jsdom
+import { act as flush, render, screen, waitFor, within } from "@testing-library/svelte";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
+vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
+
+import { api } from "$lib/api";
+import type { Person, PhotoSource } from "$lib/api-types";
+import { app } from "$lib/app.svelte";
+import { toast } from "svelte-sonner";
+import { state } from "../../../test/fixtures";
+import PhotosSection, { ALREADY_SAID, REFUSED_SAID, UNREACHABLE_SAID, host, outcome, sourceChip } from "./PhotosSection.svelte";
+
+class Refusal extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
+const PERMISSIONS = ["asset.read", "asset.view", "user.read", "map.read", "asset.download"];
+const IMMICH_REFUSED = "Immich didn’t accept this library’s API key (check it, and the permissions it was given).";
+const KEY = "madeUpKeyNumberOne0123456789abcdefghij";
+
+const person = (id: number, display_name: string, member: boolean): Person => ({ id, display_name, first_name: null, legal_name: null, aliases: [], member, links: [] });
+const PEOPLE = [person(1, "Ada Brook", true), person(2, "Theo Brook", true), person(3, "June Brook", false), person(4, "Rory Brook", false)];
+
+const source = (extra: Partial<PhotoSource> = {}): PhotoSource => ({
+  id: 7, person_id: 1, url: "https://immich.brook.example", label: null, status: "ok", mine: true,
+  last_sync: "2026-11-06T11:12:00+00:00", last_error: null, photos: 1904, trips: 12, ...extra,
+});
+const theirs = source({ id: 8, person_id: 2, mine: false, last_sync: null, last_error: null, photos: null, trips: null });
+
+type Call = { method?: string; body?: unknown };
+type Reply = (path: string, opts?: Call) => unknown;
+
+function serve(sources: PhotoSource[], more: Reply = () => undefined) {
+  vi.mocked(api).mockImplementation(async (path: string, opts?: Call) => {
+    const answered = await more(path, opts);
+    if (answered !== undefined) return answered as never;
+    if (path === "/api/photo-sources") return { sources, permissions: PERMISSIONS } as never;
+    if (path === "/api/people") return { people: PEOPLE } as never;
+    return {} as never;
+  });
+}
+
+const calls = (method: string, path: string) => vi.mocked(api).mock.calls.filter(([p, o]) => p === path && (o as Call | undefined)?.method === method);
+
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast).mockReset(); app.state = state(); });
+afterEach(() => { app.state = null; vi.useRealTimers(); });
+
+describe("Settings → Photos, the source cards", () => {
+  it("shows a card for each library, with actions only on the ones you connected", async () => {
+    serve([source(), theirs, source({ id: 9, person_id: 3, url: "http://nas.brook.example:2283", photos: 640, trips: 4 })]);
+    render(PhotosSection);
+    const cards = await screen.findAllByTestId("photo-source");
+    expect(cards).toHaveLength(3);
+
+    const own = within(cards[0]);
+    expect(own.getByText("Ada Brook")).toBeInTheDocument();
+    expect(own.getByText("immich.brook.example")).toBeInTheDocument();
+    expect(own.getByText(/· 1,904 photos on 12 trips$/)).toBeInTheDocument();
+    expect(own.getByText("Up to date")).toBeInTheDocument();
+    for (const name of ["Sync now, Ada Brook’s library", "Change key, Ada Brook’s library", "Pause, Ada Brook’s library", "Remove Ada Brook’s library"]) {
+      expect(own.getByRole("button", { name })).toBeInTheDocument();
+    }
+
+    const other = within(cards[1]);
+    expect(other.getByText("Theo Brook manages this library and what it shares.")).toBeInTheDocument();
+    expect(other.getByText("Connected")).toBeInTheDocument();
+    expect(other.queryAllByRole("button")).toHaveLength(0);
+    expect(other.queryByText(/photos on/)).toBeNull();
+
+    const stewarded = within(cards[2]);
+    expect(stewarded.getByText("You manage this library because June Brook doesn’t sign in.")).toBeInTheDocument();
+    expect(stewarded.getByText("nas.brook.example:2283")).toBeInTheDocument();
+    expect(stewarded.getByRole("button", { name: "Remove June Brook’s library" })).toBeInTheDocument();
+  });
+
+  it("names a library no one has synced yet, and one whose key Immich refused, with Change key as its one main action", async () => {
+    serve([source({ last_sync: null, photos: 0, trips: 0 }), source({ id: 9, person_id: 3, status: "refused" })]);
+    render(PhotosSection);
+    const [fresh, refused] = await screen.findAllByTestId("photo-source");
+    expect(within(fresh).getByText("Not synced yet.")).toBeInTheDocument();
+    expect(within(fresh).getAllByText("Not synced yet")).toHaveLength(1);
+    expect(within(refused).getByText("Key refused")).toBeInTheDocument();
+    expect(within(refused).getByText(/Immich turned the key down/)).toBeInTheDocument();
+    expect(within(refused).queryByRole("button", { name: /Sync now/ })).toBeNull();
+    expect(within(refused).getByRole("button", { name: "Change key, June Brook’s library" })).toBeInTheDocument();
+  });
+
+  it("says when no library is connected, and when photos are off without sign-in", async () => {
+    serve([]);
+    const { unmount } = render(PhotosSection);
+    expect(await screen.findByText("No Immich library connected yet.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect" })).toHaveAttribute("aria-expanded", "false");
+    unmount();
+
+    vi.mocked(api).mockRejectedValue(new Refusal("Photos are off without sign-in.", 404));
+    render(PhotosSection);
+    expect(await screen.findByText("Photos are off without sign-in.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  it("offers Try again when the list doesn't load", async () => {
+    let fail = true;
+    serve([source()], (path) => { if (path === "/api/photo-sources" && fail) throw new Refusal("Request failed (500)", 500); });
+    render(PhotosSection);
+    expect(await screen.findByText("Request failed (500)")).toBeInTheDocument();
+    fail = false;
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByTestId("photo-source")).toBeInTheDocument();
+  });
+
+  it("asks before removing a library, gives focus back on Cancel, and removes it on Remove", async () => {
+    serve([source()]);
+    render(PhotosSection);
+    const remove = await screen.findByRole("button", { name: "Remove Ada Brook’s library" });
+    await userEvent.click(remove);
+    const dialog = await screen.findByRole("dialog", { name: "Remove Ada Brook’s library?" });
+    expect(dialog).toHaveTextContent("Its 1,904 photos leave every trip. Nothing changes in Immich.");
+    expect(calls("DELETE", "/api/photo-sources/7")).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(remove).toHaveFocus());
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await userEvent.keyboard("{Enter}");
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(calls("DELETE", "/api/photo-sources/7")).toHaveLength(1));
+    expect(toast.success).toHaveBeenCalledWith("Ada Brook’s library removed");
+  });
+
+  it("pauses a library, and resumes it with the snapshot when nothing needs confirming", async () => {
+    let status: PhotoSource["status"] = "ok";
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ status })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/resume") return { asks: false, count: 0, grants: [], snapshot: "a".repeat(32) };
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") { status = (opts.body as { paused: boolean }).paused ? "off" : "ok"; return source({ status }); }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Pause, Ada Brook’s library" }));
+    expect(calls("POST", "/api/photo-sources/7")[0][1]).toMatchObject({ body: { paused: true } });
+    const resume = await screen.findByRole("button", { name: "Resume, Ada Brook’s library" });
+    expect(screen.getByText("Paused")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" })).toBeDisabled();
+    await userEvent.click(resume);
+    await waitFor(() => expect(calls("POST", "/api/photo-sources/7")).toHaveLength(2));
+    expect(calls("POST", "/api/photo-sources/7")[1][1]).toMatchObject({ body: { paused: false, snapshot: "a".repeat(32) } });
+    expect(await screen.findByRole("button", { name: "Pause, Ada Brook’s library" })).toBeInTheDocument();
+  });
+
+  it("leaves a paused library paused when resuming it would need the sharing confirmation", async () => {
+    serve([source({ status: "off" })], (path) => {
+      if (path === "/api/photo-sources/7/resume") return { asks: true, count: 12, grants: [], snapshot: "b".repeat(32) };
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/needs a confirmation/);
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(0);
+  });
+
+  it("turns Sync now off while the sync starts and runs, and on again once the library has synced", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let release: (v: unknown) => void = () => {};
+    let synced = "2026-11-06T11:12:00+00:00";
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources") return { sources: [source({ last_sync: synced })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/sync" && opts?.method === "POST") return new Promise((resolve) => (release = resolve));
+    });
+    render(PhotosSection);
+    const sync = await screen.findByRole("button", { name: "Sync now, Ada Brook’s library" });
+    await userEvent.click(sync);
+    await waitFor(() => expect(sync).toBeDisabled());
+    expect(sync).toHaveTextContent("Syncing…");
+    release({ started: true });
+    expect(await screen.findByRole("status")).toHaveTextContent("Syncing Ada Brook’s library…");
+    expect(screen.getByText("Syncing")).toBeInTheDocument();
+    expect(sync).toBeDisabled();
+    synced = "2026-11-06T12:12:00+00:00";
+    await flush(() => vi.advanceTimersByTimeAsync(3000));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sync now, Ada Brook’s library" })).toBeEnabled());
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByText("Up to date")).toBeInTheDocument();
+  });
+
+  it("says so when a sync doesn't start", async () => {
+    serve([source()], (path) => { if (path === "/api/photo-sources/7/sync") return { started: false }; });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Sync now, Ada Brook’s library" }));
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("This library is already syncing, or has nothing to sync."));
+  });
+
+  it("changes a key in the card, and shows in the card a key for another Immich account", async () => {
+    let refuse = true;
+    serve([source({ id: 9, person_id: 3 })], (path, opts) => {
+      if (path === "/api/photo-sources/9" && opts?.method === "POST") {
+        if (refuse) throw new Refusal("That key belongs to a different Immich account; remove this library and connect it again.", 400);
+        return source({ id: 9, person_id: 3 });
+      }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Change key, June Brook’s library" }));
+    const field = screen.getByLabelText("API key");
+    expect(field).toHaveFocus();
+    expect(field).toHaveAttribute("type", "password");
+    await userEvent.type(field, KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Save key" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Key refused");
+    expect(alert).toHaveTextContent("That key belongs to a different Immich account; remove this library and connect it again.");
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    refuse = false;
+    await userEvent.click(screen.getByRole("button", { name: "Save key" }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Key changed"));
+    expect(calls("POST", "/api/photo-sources/9").at(-1)?.[1]).toMatchObject({ body: { key: KEY } });
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(document.body.innerHTML).not.toContain(KEY);
+  });
+});
+
+describe("Settings → Photos, connecting a library", () => {
+  async function openForm(sources: PhotoSource[] = [], more: Reply = () => undefined) {
+    serve(sources, more);
+    render(PhotosSection);
+    const open = await screen.findByRole("button", { name: "Connect" });
+    await userEvent.click(open);
+    return open;
+  }
+
+  async function fill(url = "https://immich.example", key = KEY) {
+    await userEvent.type(screen.getByLabelText("Immich address"), url);
+    await userEvent.type(screen.getByLabelText("API key"), key);
+  }
+
+  it("opens on its first field, offers yourself and people without a sign-in, and lists the key's permissions", async () => {
+    const open = await openForm([theirs, source({ id: 10, person_id: 4, mine: false, photos: null, trips: null })]);
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    const whose = screen.getByLabelText("Whose library");
+    expect(whose).toHaveFocus();
+    expect(within(whose).getAllByRole("option").map((o) => o.textContent)).toEqual(["Ada Brook (you)", "June Brook"]);
+    expect(screen.getByRole("form", { name: "Connect an Immich library" })).toBeInTheDocument();
+    for (const p of PERMISSIONS) expect(screen.getByText(p)).toBeInTheDocument();
+    expect(screen.getByText(/Photos taken during your trips and the 12 hours around them/)).toBeInTheDocument();
+    expect(screen.getByLabelText("API key")).toHaveAttribute("type", "password");
+    const show = screen.getByRole("button", { name: "Show the key" });
+    expect(show).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(show);
+    expect(screen.getByLabelText("API key")).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Test" })).toBeDisabled();
+
+    await userEvent.selectOptions(whose, "3");
+    expect(screen.getByText(/Photos taken during June Brook’s trips/)).toBeInTheDocument();
+    expect(screen.getByText(/June Brook doesn’t sign in, so you manage what June Brook’s library shares/)).toBeInTheDocument();
+    expect(screen.getByText(/signed in as June Brook, and tick/)).toBeInTheDocument();
+    await userEvent.click(open);
+    expect(screen.queryByLabelText("Whose library")).toBeNull();
+  });
+
+  it("tests the key, turns Save on only for what was tested, and saves without leaving the key on the page", async () => {
+    let saved = false;
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources/test") return { name: "Demo Person", same_account: null };
+      if (path === "/api/photo-sources" && opts?.method === "POST") { saved = true; return source({ id: 11, url: "https://immich.example" }); }
+      if (path === "/api/photo-sources" && saved) return { sources: [source({ id: 11, url: "https://immich.example", last_sync: null })], permissions: PERMISSIONS };
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await fill();
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    const works = await screen.findByRole("status");
+    expect(works).toHaveTextContent("Key works");
+    expect(works).toHaveTextContent("It belongs to the Immich user Demo Person.");
+    expect(calls("POST", "/api/photo-sources/test")[0][1]).toMatchObject({ body: { url: "https://immich.example", key: KEY } });
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save).toBeEnabled();
+
+    await userEvent.type(screen.getByLabelText("Immich address"), "x");
+    expect(save).toBeDisabled();
+    expect(screen.queryByText("Key works")).toBeNull();
+    await userEvent.type(screen.getByLabelText("Immich address"), "{Backspace}");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await screen.findByText("Key works");
+
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls("POST", "/api/photo-sources")).toHaveLength(1));
+    expect(calls("POST", "/api/photo-sources")[0][1]).toMatchObject({ body: { person_id: 1, url: "https://immich.example", key: KEY } });
+    expect(await screen.findByTestId("photo-source")).toHaveTextContent("immich.example");
+    expect(screen.queryByLabelText("API key")).toBeNull();
+    expect(document.body.innerHTML).not.toContain(KEY);
+    expect(toast.success).toHaveBeenCalledWith("Library connected");
+  });
+
+  it.each([
+    [new Refusal(IMMICH_REFUSED, 400), "Key refused", REFUSED_SAID],
+    [new Refusal("Couldn’t reach Immich.", 502), "Can’t reach Immich", UNREACHABLE_SAID],
+  ])("says plainly when Test fails, keeps Save off, and clears the line on an edit", async (error, chip, said) => {
+    await openForm([], (path) => { if (path === "/api/photo-sources/test") throw error; });
+    await fill();
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(chip);
+    expect(alert).toHaveTextContent(said);
+    expect(screen.getByLabelText("API key").getAttribute("aria-describedby")).toContain("photo-result");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("API key"), "z");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the API's validation message on the field it is about", async () => {
+    await openForm([], (path) => {
+      if (path === "/api/photo-sources/test") throw new Refusal("The Immich address must be a web address, such as https://immich.local:2283, with no path or sign-in in it", 400);
+    });
+    await fill("immich");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The Immich address must be a web address");
+    expect(screen.getByLabelText("Immich address")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("API key")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("shows a key the API turns down on the key field, and a library already connected under the fields", async () => {
+    let reply: Refusal = new Refusal("Enter the API key as Immich shows it", 400);
+    await openForm([], (path) => { if (path === "/api/photo-sources/test") throw reply; });
+    await fill("https://immich.example", "short");
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter the API key as Immich shows it");
+    expect(screen.getByLabelText("API key")).toHaveAttribute("aria-invalid", "true");
+
+    reply = new Refusal("That library is already connected for this person.", 409);
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(ALREADY_SAID));
+  });
+
+  it("keeps the form open with the reason when Save is refused", async () => {
+    await openForm([], (path, opts) => {
+      if (path === "/api/photo-sources/test") return { name: "Demo Person", same_account: null };
+      if (path === "/api/photo-sources" && opts?.method === "POST") throw new Refusal("This person’s library is managed by another member; ask them to connect it.", 403);
+    });
+    await fill();
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("managed by another member");
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+});
+
+describe("Settings → Photos helpers", () => {
+  it("reads the host from an address, and keeps text that isn't one", () => {
+    expect(host("http://nas.brook.example:2283")).toBe("nas.brook.example:2283");
+    expect(host("demo")).toBe("demo");
+  });
+
+  it("chooses the chip for each state", () => {
+    expect(sourceChip(source(), false)).toEqual({ label: "Up to date", tone: "ok" });
+    expect(sourceChip(source(), true)).toEqual({ label: "Syncing", tone: "info" });
+    expect(sourceChip(source({ status: "off" }), false)).toEqual({ label: "Paused", tone: "quiet" });
+    expect(sourceChip(source({ status: "unreachable" }), false)).toEqual({ label: "Can’t reach Immich", tone: "warn" });
+    expect(sourceChip(theirs, false)).toEqual({ label: "Connected", tone: "quiet" });
+  });
+
+  it("keeps Waypoint's own connection problems apart from Immich's", () => {
+    expect(outcome(new Refusal("Can’t reach Waypoint.", 0), "Can’t reach Waypoint.")).toEqual({ text: "Can’t reach Waypoint." });
+    expect(outcome(new Error("odd"), "odd")).toEqual({ text: "odd" });
+  });
+});

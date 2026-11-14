@@ -48,7 +48,8 @@ describe("SideNav", () => {
     const chip = screen.getByTestId("side-user");
     expect(links[links.length - 1]).toBe(chip);
     expect(chip.getAttribute("href")).toBe("#settings");
-    expect(chip.getAttribute("aria-label")).toBe("Signed in as Demo Person");
+    expect(chip).toHaveAccessibleName("Signed in as Demo Person");
+    expect(chip).not.toHaveAttribute("aria-label");
     expect(chip.textContent).toContain("Signed in");
     expect(chip.textContent).toContain("DP");
   });
@@ -64,6 +65,15 @@ describe("TopBar", () => {
   it("is hidden from lg up, where the side nav carries the mark", () => {
     render(TopBar);
     expect(screen.getByRole("banner").className).toContain("lg:hidden");
+  });
+
+  it("names the signed-in person's avatar link by who is signed in, from text it shows to screen readers", () => {
+    app.state = state({ user: demoUser });
+    render(TopBar);
+    const avatar = screen.getByRole("link", { name: "Signed in as Demo Person" });
+    expect(avatar).toHaveAttribute("href", "#settings");
+    expect(avatar).not.toHaveAttribute("aria-label");
+    expect(avatar).toHaveTextContent("DP");
   });
 });
 

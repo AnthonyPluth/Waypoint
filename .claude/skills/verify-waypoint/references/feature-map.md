@@ -735,6 +735,23 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `isn’t available on this device`.
 - **Drive it:** `tools/control flow offline-settings`; or `poetry run python run.py verify --flow offline-settings`.
 
+#### `photos-connect-refused`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Immich didn’t accept this key.`.
+- **Fakes (the demo server can't):** `fake_immich`.
+- **Console errors it expects:** `the server responded with a status of 400`.
+- **Drive it:** `tools/control flow photos-connect-refused`; or `poetry run python run.py verify --flow photos-connect-refused`.
+
+#### `photos-connect`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `It belongs to the Immich user Demo Person.`, `Not synced yet`.
+- **Fakes (the demo server can't):** `fake_immich`.
+- **Drive it:** `tools/control flow photos-connect`; or `poetry run python run.py verify --flow photos-connect`.
+
 #### `review-at-a-glance`
 
 - **Starts at:** `#settings`; goes to: `#settings/mail`.
