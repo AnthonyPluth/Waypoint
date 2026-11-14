@@ -15,6 +15,7 @@
   import { clearRouteCache } from "$lib/driving-routes";
   import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
+  import PhotosSection from "$lib/components/settings/PhotosSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
   import { onMount } from "svelte";
@@ -22,6 +23,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import UserRound from "@lucide/svelte/icons/user-round";
   import Mail from "@lucide/svelte/icons/mail";
+  import Images from "@lucide/svelte/icons/images";
   import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
   import Bell from "@lucide/svelte/icons/bell";
   import Bot from "@lucide/svelte/icons/bot";
@@ -43,6 +45,7 @@
   const GROUPS = [
     { id: "account", label: "Account", icon: UserRound, about: "Your profile and app information." },
     { id: "mail", label: "Mail & review", icon: Mail, about: "Connected mailboxes, email preferences and AI booking extraction." },
+    { id: "photos", label: "Photos", icon: Images, about: "Immich libraries whose photos show on the trips their people were on." },
     { id: "travel", label: "Travel preferences", icon: SlidersHorizontal, about: "Home, distances and trip costs." },
     { id: "offline", label: "Offline & notifications", icon: Bell, about: "Saved trips, travel reminders and your calendar subscription." },
     { id: "assistants", label: "Connected assistants", icon: Bot, about: "Manage your assistants and choose what they can access." },
@@ -140,6 +143,8 @@
     <GmailSection />
 
     <AiSection />
+  {:else if group.id === "photos"}
+    <PhotosSection />
   {:else if group.id === "travel"}
     <HomeSection />
 

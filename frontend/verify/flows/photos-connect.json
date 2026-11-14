@@ -1,0 +1,20 @@
+{
+  "name": "photos-connect",
+  "page": "settings",
+  "signed_in": true,
+  "steps": [
+    { "fake_immich": "Demo Person" },
+    { "goto": "#settings/photos" },
+    { "wait_for": "[data-testid=photo-source]" },
+    { "screenshot": "cards" },
+    { "click": "role=button[name='Connect']" },
+    { "fill": { "selector": "#photo-url", "text": "https://photos.immich.example" } },
+    { "fill": { "selector": "#photo-key", "text": "madeUpDemoKeyForTheVerifyFlow0123456789" } },
+    { "click": "role=button[name='Test']" },
+    { "expect_text": { "selector": "#photo-connect", "text": "It belongs to the Immich user Demo Person." } },
+    { "screenshot": "tested" },
+    { "click": "role=button[name='Save']" },
+    { "wait_for": "[data-testid=photo-source]:has-text('photos.immich.example')" },
+    { "expect_text": { "selector": "[data-testid=photo-source]:has-text('photos.immich.example')", "text": "Not synced yet" } }
+  ]
+}
