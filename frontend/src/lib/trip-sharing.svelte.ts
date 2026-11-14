@@ -47,6 +47,7 @@ export class PersonSharing {
   opener: HTMLElement | null = null;
   private ticket = 0;
   private freed: (() => void)[] = [];
+  private undos: Promise<void> = Promise.resolve();
   private gone = false;
   who = $state<Who>(whoIs(-1, null, []));
 
@@ -312,7 +313,13 @@ export class PersonSharing {
     return true;
   }
 
-  private undoRemoval = async (removed: { id: number; created: number | null }[]): Promise<void> => {
+  private undoRemoval = (removed: { id: number; created: number | null }[]): Promise<void> => {
+    const run = this.undos.then(() => this.undoNow(removed));
+    this.undos = run.catch(() => undefined);
+    return run;
+  };
+
+  private async undoNow(removed: { id: number; created: number | null }[]): Promise<void> {
     await this.free();
     await this.hold(async () => {
       let done = 0;
@@ -327,7 +334,7 @@ export class PersonSharing {
       }
       if (!this.gone) await this.afterChange();
     });
-  };
+  }
 
   private putBackRequest(id: number, created: number | null): Promise<PhotoSharing> {
     const stamp = created === null ? "" : `?created=${encodeURIComponent(String(created))}`;

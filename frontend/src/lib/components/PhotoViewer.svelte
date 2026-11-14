@@ -42,7 +42,8 @@
   const zoneWords = $derived(!photo?.zone ? "" : photo.zone.includes("/") ? `${zoneCity(photo.zone)} time` : photo.zone);
 
   $effect(() => {
-    void index;
+    void photo?.id;
+    void gone;
     void open;
     playing = false;
     failed = false;

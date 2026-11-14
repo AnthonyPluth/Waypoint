@@ -36,7 +36,7 @@ HEIC = b"\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic" + bytes(64)
 TIFF = b"II*\x00" + bytes(64)
 GIF = b"GIF89a" + bytes(64)
 SVG = b"<svg xmlns='http://www.w3.org/2000/svg'></svg>" + bytes(64)
-IMAGE_ROUTES = ("/api/photos/{id}/thumbnail", "/api/photos/{id}/preview", "/api/photos/{id}/original")
+IMAGE_ROUTES = ("/api/photos/{id}/thumbnail", "/api/photos/{id}/preview", "/api/photos/{id}/original", "/api/trips/{id}/photo-exclusions/{id}/thumbnail")
 
 
 class Reply:
@@ -229,21 +229,28 @@ class RenditionTests(ProxyCase):
         self.assertEqual(self.get("ana", f"/api/photos/{private}/thumbnail")[0], 200)
 
     def test_the_key_and_the_host_stay_out_of_logs_replies_and_errors(self):
-        route = f"{self.asset}/thumbnail"
+        removed = self.photo("ben")
+        self.exclude("ben", removed)
+        self.immich.routes[f"/api/assets/{self.asset_of(removed)}"] = fixed(200, b"{}", {"Content-Type": "application/json"})
+        reached = [("ana", f"/api/photos/{self.mine}/thumbnail", f"{self.asset}/thumbnail"),
+                   ("ben", f"/api/trips/{self.trip}/photo-exclusions/{removed}/thumbnail", f"/api/assets/{self.asset_of(removed)}/thumbnail")]
         outcomes = [(self.rendition, 200), (failing(http_error(401)), 404), (failing(http_error(404)), 404), (failing(TimeoutError(f"timed out {KEY}")), 503),
                     (failing(http_error(500)), 503)]
         with no_leaks(self, KEY, HOST, sent_ok=True):
-            for answer, status in outcomes:
-                with self.subTest(status=status):
-                    self.immich.routes[route] = answer
-                    got, headers, raw = self.get("ana", f"/api/photos/{self.mine}/thumbnail")
-                    self.assertEqual(got, status, raw)
-                    self.assertNotIn(KEY.encode(), raw)
-                    self.assertNotIn(HOST.encode(), raw)
-                    self.assertNotIn(KEY, str(headers))
-                    self.assertNotIn(HOST, str(headers))
-                    if status == 503:
-                        self.assertEqual(json.loads(raw), {"error": photoproxy.UNAVAILABLE})
+            for who, path, route in reached:
+                with db.session() as conn:
+                    conn.execute(update(PhotoSource).where(PhotoSource.id == self.sources["ben"]).values(status="ok", last_error=None))
+                for answer, status in outcomes:
+                    with self.subTest(path=path, status=status):
+                        self.immich.routes[route] = answer
+                        got, headers, raw = self.get(who, path)
+                        self.assertEqual(got, status, raw)
+                        self.assertNotIn(KEY.encode(), raw)
+                        self.assertNotIn(HOST.encode(), raw)
+                        self.assertNotIn(KEY, str(headers))
+                        self.assertNotIn(HOST, str(headers))
+                        if status == 503:
+                            self.assertEqual(json.loads(raw), {"error": photoproxy.UNAVAILABLE})
         for call in self.immich.calls:
             self.assertNotIn(KEY, call["url"])
             self.assertEqual(call["headers"]["x-api-key"], KEY)

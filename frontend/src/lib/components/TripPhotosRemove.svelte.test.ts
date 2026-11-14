@@ -178,6 +178,20 @@ describe("Remove from this trip, in the viewer", () => {
     expect(within(mine).getByRole("button", { name: "Removed from this trip (1)" })).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("shows the next photo’s picture, not a video player, when the playing video is removed", async () => {
+    visible = [shot(1), shot(2, 1, { kind: "video" }), shot(3)];
+    mount();
+    await photosSection();
+    await user.click(await tile(/^Video, 10:00 AM/));
+    await viewer();
+    await user.click(screen.getByRole("button", { name: "Play video" }));
+    expect(screen.getByRole("dialog").querySelector("video")?.getAttribute("src")).toBe("/api/photos/2/original");
+    await user.click(removeButton());
+    await waitFor(() => expect(screen.getByRole("dialog")).toHaveAccessibleName("Photo 2 of 2"));
+    expect(screen.getByRole("dialog").querySelector("video")).toBeNull();
+    expect(screen.getByRole("dialog").querySelector("img")?.getAttribute("src")).toBe("/api/photos/3/preview");
+  });
+
   it("moves to the previous photo when the last one is removed", async () => {
     mount();
     await photosSection();
@@ -328,6 +342,44 @@ describe("Remove from this trip, in the viewer", () => {
     gone = [{ ...shot(1), removed_at: 1800000001 }, { ...shot(2), removed_at: 1800000002 }];
     second.resolve(sharingFor(1));
     await waitFor(() => expect(calls("DELETE", "/photo-exclusions")).toHaveLength(1));
+  });
+});
+
+describe("Undo pressed more than once", () => {
+  it("runs a second Undo only after the first, and its reload, are done, even while another change is under way", async () => {
+    mount();
+    await photosSection();
+    await user.click(await tile(/^Photo, 9:00 AM/));
+    await viewer();
+    await user.click(removeButton());
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(removeButton()).toBeEnabled());
+    await user.click(removeButton());
+    await waitFor(() => expect(toast).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(removeButton()).toBeEnabled());
+    const third = deferred<PhotoSharing>();
+    onExclude = () => third.promise;
+    await user.click(removeButton());
+    await waitFor(() => expect(sent("POST", "/photo-exclusions")).toHaveLength(3));
+    const first = deferred<PhotoSharing>();
+    onPutBack = (id) => (id === 1 ? first.promise : undefined);
+    toastOf(0)[1].action.onClick();
+    toastOf(1)[1].action.onClick();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls("DELETE", "/photo-exclusions")).toHaveLength(0);
+    visible = [shot(1), shot(2)];
+    gone = [{ ...shot(3), removed_at: 1800000003 }];
+    third.resolve(sharingFor(1));
+    await waitFor(() => expect(calls("DELETE", "/photo-exclusions")).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(calls("DELETE", "/photo-exclusions")).toHaveLength(1);
+    const before = vi.mocked(api).mock.calls.length;
+    first.resolve(sharingFor(1));
+    await waitFor(() => expect(calls("DELETE", "/photo-exclusions")).toHaveLength(2));
+    const paths = vi.mocked(api).mock.calls.slice(before).map(([p, o]) => `${(o as Call | undefined)?.method ?? "GET"} ${p}`);
+    const second = paths.findIndex((p) => p.startsWith("DELETE /api/trips/7/photo-exclusions/2"));
+    expect(paths.slice(0, second).some((p) => p.endsWith("/photos"))).toBe(true);
+    expect(paths.slice(0, second).some((p) => p.includes("/photo-sharing?"))).toBe(true);
   });
 });
 

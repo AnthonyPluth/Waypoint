@@ -26,6 +26,14 @@
     {"wait_for": "[data-testid=your-photos] ul img"},
     {"scroll_to": "[data-testid=your-photos] ul"},
     {"wait_for": "[data-testid=your-photos] ul li:nth-child(4) img"},
-    {"screenshot": "removed"}
+    {"screenshot": "removed"},
+    {"click": "role=button[name='Put back the photo from Sun, Feb 15, 4:30 PM']"},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "11 photos from your library"}},
+    {"click": "role=button[name='Put back the photo from Mon, Feb 16, 5:00 PM']"},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "12 photos from your library"}},
+    {"click": "role=button[name='Put back the photo from Mon, Feb 16, 9:00 PM']"},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "13 photos from your library"}},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "Removed from this trip (1)"}},
+    {"expect_text": {"selector": "#trip-photos-title", "text": "13"}}
   ]
 }

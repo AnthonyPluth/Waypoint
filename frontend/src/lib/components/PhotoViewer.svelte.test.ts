@@ -232,4 +232,39 @@ describe("PhotoViewer", () => {
     (component as unknown as { focusStage: () => void }).focusStage();
     expect(document.activeElement).toBe(info().querySelector(".photo-viewer-stage"));
   });
+
+  it("shows the preview of the photo that takes the place of a playing video at the same position", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await userEvent.click(screen.getByRole("button", { name: "Play video" }));
+    expect(info().querySelector("video")?.getAttribute("src")).toBe("/api/photos/12/original");
+    await rerender({ photos: [photos[0], photos[2]] });
+    await dialog("Photo 2 of 2");
+    expect(info().querySelector("video")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/13/preview");
+  });
+
+  it("does not carry a failed preview over to the photo that takes its place at the same position", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 0, photos, people: [ada], segments });
+    await dialog("Photo 1 of 3");
+    await fireEvent.error(info().querySelector("img")!);
+    await dialog("Photo can’t be loaded");
+    await rerender({ photos: [photos[1], photos[2]] });
+    await dialog("Video 1 of 2");
+    expect(screen.queryByText("Can’t load this photo right now")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/12/preview");
+  });
+
+  it("clears a failed preview when the photo is found to be no longer shared and the next one is shown", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await fireEvent.error(info().querySelector("img")!);
+    await dialog("Video can’t be loaded");
+    await rerender({ photos: [photos[0], photos[2]], gone: "next" });
+    await dialog("Photo no longer shared");
+    await userEvent.click(screen.getByRole("button", { name: "Next photo" }));
+    await dialog("Photo 2 of 2");
+    expect(screen.queryByText("Can’t load this photo right now")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/13/preview");
+  });
 });
