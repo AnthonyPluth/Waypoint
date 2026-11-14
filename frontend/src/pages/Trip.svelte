@@ -35,6 +35,7 @@
   import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
   import TripPhotos from "$lib/components/TripPhotos.svelte";
+  import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
@@ -290,6 +291,7 @@
       {#key id}
         <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
       {/key}
+      {#if !editingTrip}<TripSummary tripId={t.id} revision={t.segments.map((s) => `${s.id}:${s.status}:${s.start_local}:${s.end_local}`).join()} />{/if}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
