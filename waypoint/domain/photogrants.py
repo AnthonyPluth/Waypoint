@@ -303,6 +303,11 @@ def dated_trips(conn: db.Connection) -> list[int]:
     return list(conn.execute(select(Trip.id).where(Trip.start_date.is_not(None), Trip.end_date.is_not(None), Trip.id.not_in(booked)).order_by(Trip.id)).scalars())
 
 
+def _unasked(conn: db.Connection, person_id: int, trip_id: int) -> bool:
+    return (person_id in trippeople.of(conn, [trip_id])[trip_id] and not prefs_of(conn, person_id)["share_all"]
+            and photos.trip_window(conn, trip_id) is not None)
+
+
 def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, count: Counter = uncounted, tokened: bool = True) -> Sharing:
     row = conn.orm.get(PhotoGrant, (person_id, trip_id))
     placed = photos.segment_points(conn, visibility.visible_segments(conn, viewer, [trip_id]))
@@ -315,12 +320,16 @@ def sharing(conn: db.Connection, viewer: Viewer, person_id: int, trip_id: int, c
             out["removed_at"] = stamps.get(p.asset_id)
             gone.append(out)
     state: State = NONE if row is None else DECLINED if row.revoked is not None else ASK if row.ask_again else SHARED
-    counting = tokened and state == DECLINED and count is not uncounted
+    unasked = row is None and count is not uncounted and _unasked(conn, person_id, trip_id)
+    live = state == DECLINED or unasked
+    counting = tokened and live and count is not uncounted
     before = count_token(conn, person_id, [trip_id]) if counting else None
-    counted = count(conn, person_id, [trip_id])[trip_id] if state == DECLINED else sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
+    counted = count(conn, person_id, [trip_id])[trip_id] if live else sum(1 for _, person in photos.visible_rows(conn, viewer, trip_id) if person == person_id)
     token = count_token(conn, person_id, [trip_id]) if tokened else ""
     if counting and token != before:
         counted = None
+    if unasked:
+        state, counted = (ASK, counted) if counted else (NONE, 0)
     return {"state": state, "scope": row.scope if row is not None and row.revoked is None else None,  # type: ignore[typeddict-item]
             "count": counted, "removed_count": len(gone), "removed": gone, "window": photos.window_out(photos.trip_window(conn, trip_id)),
             "changed": row.changed if row is not None else None, "audience": audience_of(conn, trip_id), "sources": sources_of(conn, person_id),

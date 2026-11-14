@@ -6,6 +6,7 @@ from unittest import mock
 
 from sqlalchemy import delete, insert, select, update
 
+from tests.privacy import no_leaks
 from tests.test_photos_api import LONDON, SOHO, grant_row, photo_row, source_row, utc
 from tests.test_trips import HOTEL, OUT, Household
 from waypoint.domain import home, people, photogrants, photomatch, photos, trippeople, trips, visibility
@@ -2171,3 +2172,108 @@ class ClaimTests(GrantCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AskTests(GrantCase):
+    CANARY = "asset-ask-canary-7k2m"
+
+    def counts(self, total):
+        calls = []
+
+        def counter(_conn, person, ids):
+            calls.append((person, list(ids)))
+            return dict.fromkeys(ids, total)
+        counter.calls = calls
+        return counter
+
+    def ask(self, count, who=None, person=None, trip=None):
+        return photogrants.state_of(self.c, who or self.jane, person or self.jid, trip or self.a, count)
+
+    def share_all(self):
+        self.c.orm.add(PhotoSharingPrefs(person_id=self.jid, default_scope="only_me", share_all=True, set_by="u-jane", share_all_since=1.0, steward_sub=None))
+        self.c.orm.flush()
+
+    def test_an_unshared_trip_with_photos_in_its_window_asks_with_the_count(self):
+        asked = self.ask(self.counts(3))
+        self.assertEqual((asked["state"], asked["count"], asked["scope"], asked["changed"]), ("ask", 3, None, None))
+        self.assertEqual((asked["removed_count"], asked["removed"]), (0, []))
+        self.assertEqual(asked["audience"], sorted([self.jid, self.sid]))
+        self.assertNotEqual(asked["count_token"], "")
+
+    def test_an_unshared_trip_with_no_photos_in_its_window_answers_none(self):
+        none = self.ask(self.counts(0))
+        self.assertEqual((none["state"], none["count"]), ("none", 0))
+
+    def test_a_failed_check_answers_none_rather_than_a_partial_count(self):
+        none = self.ask(self.counts(None))
+        self.assertEqual((none["state"], none["count"]), ("none", 0))
+
+    def test_no_sources_or_only_paused_ones_answer_none(self):
+        from waypoint.domain import photocount
+        self.c.execute(update(PhotoSource).where(PhotoSource.id == self.janes).values(status="off"))
+        self.assertEqual(self.ask(photocount.unshared_counts)["state"], "none")
+        self.c.execute(delete(PhotoSource))
+        self.assertEqual(self.ask(photocount.unshared_counts)["state"], "none")
+
+    def test_the_standing_setting_on_answers_none_and_never_counts(self):
+        self.share_all()
+        counter = self.counts(5)
+        self.assertEqual(self.ask(counter)["state"], "none")
+        self.assertEqual(counter.calls, [])
+
+    def test_a_trip_without_a_window_answers_none_and_never_counts(self):
+        bare = trips.create_trip(self.c, self.jane, {"name": "Bare", "people": [self.jid]})["id"]
+        counter = self.counts(5)
+        self.assertEqual(self.ask(counter, trip=bare)["state"], "none")
+        self.assertEqual(counter.calls, [])
+
+    def test_a_booker_who_sees_the_trip_without_being_on_it_is_not_asked(self):
+        booked = self.add(self.jane, {**OUT, "start_local": "2027-03-01T19:00", "end_local": "2027-03-02T07:10"}, None, self.on(self.sid))["trip_id"]
+        self.assertIsNotNone(visibility.visible_trip(self.c, self.jane, booked))
+        self.assertNotIn(self.jid, trippeople.of(self.c, [booked])[booked])
+        counter = self.counts(5)
+        self.assertEqual(self.ask(counter, trip=booked)["state"], "none")
+        self.assertEqual(counter.calls, [])
+
+    def test_a_row_still_decides_the_state_without_a_new_count_for_a_shared_trip(self):
+        self.share(self.jid, self.a)
+        counter = self.counts(9)
+        self.assertEqual(self.ask(counter)["state"], "shared")
+        self.assertEqual(counter.calls, [])
+
+    def test_a_declined_trip_stays_declined(self):
+        self.share(self.jid, self.a, revoked=5.0)
+        got = self.ask(self.counts(4))
+        self.assertEqual((got["state"], got["count"]), ("declined", 4))
+
+    def test_only_the_person_or_who_acts_for_them_can_read_the_ask(self):
+        counter = self.counts(3)
+        self.assertIsNone(self.ask(counter, who=self.sam))
+        self.assertIsNone(self.ask(counter, who=Viewer(None, household=True)))
+        self.assertIsNone(self.ask(counter, trip=self.b + 1000))
+        self.assertEqual(counter.calls, [])
+
+    def test_the_ask_carries_no_photo_identity(self):
+        self.photo(None, INSIDE_B, asset=self.CANARY, match="none")
+        with no_leaks(self, self.CANARY, "immich-user-1"):
+            asked = self.ask(self.counts(2))
+        self.assertEqual(asked["state"], "ask")
+        self.assertNotIn(self.CANARY, repr(asked))
+        self.assertEqual(self.seen(self.jane, self.a), [])
+        self.assertEqual(self.seen(self.sam, self.a), [])
+
+    def test_the_ask_token_confirms_a_grant_and_goes_stale_when_the_trip_changes(self):
+        asked = self.ask(self.counts(2))
+        self.assertEqual(self.ask(self.counts(2))["count_token"], asked["count_token"])
+        self.c.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="gone-asset-1", trip_id=self.a, created=5.0))
+        with self.assertRaises(photogrants.Stale):
+            photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=asked["count_token"])
+        fresh = self.ask(self.counts(2))
+        photogrants.grant(self.c, self.jane, self.jid, self.a, "trip", 90.0, token=fresh["count_token"])
+        self.assertEqual(self.grant(self.jid, self.a), ("trip", None, "u-jane"))
+
+    def test_a_change_during_the_count_answers_none_instead_of_a_stale_count(self):
+        def racing(conn, _person, ids):
+            conn.execute(insert(PhotoExclusion).values(person_id=self.jid, asset_id="gone-asset-1", trip_id=self.a, created=5.0))
+            return dict.fromkeys(ids, 4)
+        self.assertEqual(self.ask(racing)["state"], "none")
