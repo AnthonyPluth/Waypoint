@@ -2013,6 +2013,7 @@ describe("Review as a queue of decisions", () => {
     await u.click(within(menu).getByRole("button", { name: /^Dismiss/ }));
     expect(menu).not.toHaveAttribute("open");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
   });
 
   it("keeps the warning about where the text goes beside the button that sends it", async () => {
