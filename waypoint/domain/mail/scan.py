@@ -17,7 +17,7 @@ from ...providers import gmail, mailimages
 from ...storage import db, gate_codes, stored_mail
 from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
-from .. import airports, people, trips
+from .. import airports, people, trips, visibility
 from ..visibility import Viewer
 from . import ai, autoask, extract, followup, gatecode, glance, ingest, newer, nothing_new, query, review, triage
 from .booking import Passenger
@@ -524,8 +524,18 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
             pending.append(suggestion)
             continue
         candidates: list[int] = []
+        decision = newer.decide(conn, viewer, fields, row["received"], False, cancelled=True)
         try:
-            outcome = trips.merge_email_segment(conn, viewer, fields, touched=touched, candidates=candidates)
+            if decision is not None and decision.action == "older":
+                target = visibility.visible_segment(conn, viewer, decision.segment_id)
+                if target is not None and nothing_new.adds_nothing(conn, target, suggestion):
+                    touched.append(target.id)
+                else:
+                    pending.append(suggestion)
+                continue
+            undated = decision is not None and decision.action == "undated"
+            outcome = trips.merge_email_segment(conn, viewer, fields, touched=touched, candidates=candidates, fill_only=undated,
+                                                into=decision.segment_id if decision is not None and undated else None)
         except trips.Invalid:
             pending.append(suggestion)
             continue
