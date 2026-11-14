@@ -210,6 +210,32 @@ describe("Settings index", () => {
   });
 });
 
+describe("Settings photos", () => {
+  beforeEach(() => { route.sub = "photos"; });
+
+  it("puts Photo sharing under the library cards, for the people the viewer acts for", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => {
+      if (path === "/api/photo-sources") return { sources: [], permissions: [] } as never;
+      if (path === "/api/photo-grants") return { people: [{ person_id: 1, prefs: { default_scope: "only_me", share_all: false }, count_token: "a".repeat(32), trips: [] }] } as never;
+      if (path === "/api/people") return { people: [] } as never;
+      return {} as never;
+    });
+    render(Settings);
+    const sharing = await screen.findByRole("heading", { level: 2, name: "Photo sharing" });
+    const cards = screen.getByRole("heading", { level: 2, name: "Photos" });
+    expect(cards.compareDocumentPosition(sharing) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: /Share on all my trips/ })).toBeInTheDocument();
+  });
+
+  it("leaves Photo sharing out of the other groups", () => {
+    route.sub = "travel";
+    vi.mocked(api).mockImplementation(async () => ({}) as never);
+    render(Settings);
+    expect(screen.queryByRole("heading", { name: "Photo sharing" })).toBeNull();
+    expect(vi.mocked(api).mock.calls.some(([path]) => path === "/api/photo-grants")).toBe(false);
+  });
+});
+
 describe("Settings data", () => {
   beforeEach(() => { route.sub = "backup"; });
 

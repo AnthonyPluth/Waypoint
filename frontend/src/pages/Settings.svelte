@@ -15,6 +15,7 @@
   import { clearRouteCache } from "$lib/driving-routes";
   import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
+  import PhotoSharingSettings from "$lib/components/settings/PhotoSharingSettings.svelte";
   import PhotosSection from "$lib/components/settings/PhotosSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
@@ -145,6 +146,8 @@
     <AiSection />
   {:else if group.id === "photos"}
     <PhotosSection />
+
+    <PhotoSharingSettings />
   {:else if group.id === "travel"}
     <HomeSection />
 
