@@ -19,34 +19,43 @@
   type Props = {
     open?: boolean; index?: number; photos: TripPhoto[]; people: Person[]; segments: Map<number, Segment>;
     returnTo?: () => HTMLElement | null; actions?: Snippet<[TripPhoto]>;
+    gone?: "next" | "previous" | null; notice?: string; onfail?: (photo: TripPhoto) => void;
   };
-  let { open = $bindable(false), index = $bindable(0), photos, people, segments, returnTo, actions }: Props = $props();
+  let { open = $bindable(false), index = $bindable(0), photos, people, segments, returnTo, actions, gone = $bindable(null), notice = "", onfail }: Props = $props();
 
   const SWIPE = 50;
   const CLOSE_DISTANCE = 96;
 
   let closeButton = $state<HTMLElement | null>(null);
+  let stage = $state<HTMLElement | null>(null);
   let playing = $state(false);
   let failed = $state(false);
   let attempt = $state(0);
   let start: { x: number; y: number } | null = null;
 
   const photo = $derived(photos[index] as TripPhoto | undefined);
+  const photoId = $derived(photos[index]?.id);
   const segment = $derived(photo && photo.segment_id !== null ? segments.get(photo.segment_id) : undefined);
   const place = $derived(photo ? placeOf(photo, segment) : "");
   const owner = $derived(photo ? fullName(people, photo.person_id) : "");
   const word = $derived(photo?.kind === "video" ? "Video" : "Photo");
-  const title = $derived(failed ? `${word} can’t be loaded` : `${word} ${index + 1} of ${photos.length}`);
+  const title = $derived(gone ? "Photo no longer shared" : failed ? `${word} can’t be loaded` : `${word} ${index + 1} of ${photos.length}`);
   const zoneWords = $derived(!photo?.zone ? "" : photo.zone.includes("/") ? `${zoneCity(photo.zone)} time` : photo.zone);
 
   $effect(() => {
-    void index;
+    void photoId;
+    void gone;
     void open;
     playing = false;
     failed = false;
   });
 
+  export function focusStage() {
+    stage?.focus();
+  }
+
   function move(by: number) {
+    if (gone) return;
     const next = index + by;
     if (next < 0 || next >= photos.length) return;
     index = next;
@@ -89,6 +98,11 @@
     returnTo?.()?.focus();
   }
 
+  function lost() {
+    failed = true;
+    if (photo) onfail?.(photo);
+  }
+
   function retry() {
     failed = false;
     playing = false;
@@ -107,14 +121,29 @@
             <Button {...props} bind:ref={closeButton} variant="ghost" size="icon" aria-label="Close"><X /></Button>
           {/snippet}
         </Dialog.Close>
-        {#if !failed}<p class="font-mono text-caption text-muted-foreground" aria-hidden="true">{index + 1} of {photos.length}</p>{/if}
-        <span class="flex gap-1 desktop:hidden">
-          <Button variant="ghost" size="icon" aria-label="Previous photo" disabled={index === 0} onclick={() => move(-1)}><ChevronLeft /></Button>
-          <Button variant="ghost" size="icon" aria-label="Next photo" disabled={index >= photos.length - 1} onclick={() => move(1)}><ChevronRight /></Button>
-        </span>
+        {#if !failed && !gone}<p class="font-mono text-caption text-muted-foreground" aria-hidden="true">{index + 1} of {photos.length}</p>{/if}
+        {#if gone}<span></span>{:else}
+          <span class="flex gap-1 desktop:hidden">
+            <Button variant="ghost" size="icon" aria-label="Previous photo" disabled={index === 0} onclick={() => move(-1)}><ChevronLeft /></Button>
+            <Button variant="ghost" size="icon" aria-label="Next photo" disabled={index >= photos.length - 1} onclick={() => move(1)}><ChevronRight /></Button>
+          </span>
+        {/if}
       </div>
-      {#if photo}
-        <div class="photo-viewer-stage" onpointerdown={press} onpointermove={track} onpointerup={lift} onpointercancel={cancel} role="presentation">
+      {#if notice}<p class="sr-only" role="status">{notice}</p>{/if}
+      {#if gone}
+        <div class="photo-viewer-stage" role="presentation">
+          <div class="flex flex-col items-center gap-2 px-6 text-center text-muted-foreground" role="status">
+            <ImageOff class="size-8" aria-hidden="true" />
+            <p class="text-heading text-foreground">This photo is no longer shared</p>
+            <p class="text-caption">It isn’t shared with you any more.</p>
+            <div class="mt-2 flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onclick={() => (gone = null)}>{gone === "next" ? "Next photo" : "Previous photo"}</Button>
+              <Button variant="ghost" onclick={() => (open = false)}>Back to the trip</Button>
+            </div>
+          </div>
+        </div>
+      {:else if photo}
+        <div class="photo-viewer-stage" bind:this={stage} tabindex="-1" onpointerdown={press} onpointermove={track} onpointerup={lift} onpointercancel={cancel} role="presentation">
           <Button class="photo-viewer-nav left-4" variant="outline" size="icon" aria-label="Previous photo" disabled={index === 0} onclick={() => move(-1)}><ChevronLeft /></Button>
           {#if failed}
             <div class="flex flex-col items-center gap-2 px-6 text-center text-muted-foreground" role="status">
@@ -128,10 +157,10 @@
               </div>
             </div>
           {:else if playing}
-            <video class="photo-viewer-media" src={originalUrl(photo.id)} controls autoplay playsinline onerror={() => (failed = true)}><track kind="captions" /></video>
+            <video class="photo-viewer-media" src={originalUrl(photo.id)} controls autoplay playsinline onerror={lost}><track kind="captions" /></video>
           {:else}
             {#key `${photo.id}-${attempt}`}
-              <img class="photo-viewer-media" src={previewUrl(photo.id)} alt={photo.kind === "video" ? "Video still" : "Photo"} draggable="false" onerror={() => (failed = true)} />
+              <img class="photo-viewer-media" src={previewUrl(photo.id)} alt={photo.kind === "video" ? "Video still" : "Photo"} draggable="false" onerror={lost} />
             {/key}
             {#if photo.kind === "video"}
               <button type="button" class="photo-viewer-play" aria-label="Play video" onclick={() => (playing = true)}><Play class="size-6 fill-current" /></button>

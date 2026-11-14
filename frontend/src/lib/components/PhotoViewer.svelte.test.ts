@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { createRawSnippet } from "svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Person, TripPhoto } from "$lib/api-types";
 import { segment } from "../../test/fixtures";
 import PhotoViewer from "./PhotoViewer.svelte";
@@ -189,5 +189,82 @@ describe("PhotoViewer", () => {
     const actions = createRawSnippet((p: () => TripPhoto) => ({ render: () => `<button type="button">Act on ${p().id}</button>` }));
     render(PhotoViewer, { open: true, index: 0, photos, people: [ada], segments, actions });
     expect(await screen.findByRole("button", { name: "Act on 11" })).toBeTruthy();
+  });
+
+  it("tells the parent which photo failed to load, so it can check the list again", async () => {
+    const onfail = vi.fn();
+    render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments, onfail });
+    await dialog("Video 2 of 3");
+    await fireEvent.error(info().querySelector("img")!);
+    expect(onfail).toHaveBeenCalledTimes(1);
+    expect(onfail.mock.calls[0][0].id).toBe(12);
+  });
+
+  it("says a photo is no longer shared when it left the list, and goes on to the next photo from there", async () => {
+    render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments, gone: "next" });
+    expect(await dialog("Photo no longer shared")).toBeTruthy();
+    expect(info().querySelector("img")).toBeNull();
+    const notice = screen.getByRole("status");
+    expect(notice.textContent).toContain("This photo is no longer shared");
+    expect(notice.textContent).toContain("It isn’t shared with you any more.");
+    expect(screen.queryByText("2 of 3")).toBeNull();
+    expect(screen.queryByRole("link", { name: "Open original" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Previous photo" })).toBeNull();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(await dialog("Photo no longer shared")).toBeTruthy();
+    await userEvent.click(within(notice).getByRole("button", { name: "Next photo" }));
+    expect(await dialog("Video 2 of 3")).toBeTruthy();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/12/preview");
+  });
+
+  it("offers the previous photo when the one that left was the last, and Back to the trip", async () => {
+    render(PhotoViewer, { open: true, index: 2, photos, people: [ada], segments, gone: "previous" });
+    await dialog("Photo no longer shared");
+    expect(screen.queryByRole("button", { name: "Next photo" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Back to the trip" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("shows a line for screen readers when it is given one, and focuses the picture on request", async () => {
+    const { component } = render(PhotoViewer, { open: true, index: 0, photos, people: [ada], segments, notice: "Photo 1 of 3" });
+    await dialog("Photo 1 of 3");
+    expect(screen.getByRole("status").textContent).toBe("Photo 1 of 3");
+    (component as unknown as { focusStage: () => void }).focusStage();
+    expect(document.activeElement).toBe(info().querySelector(".photo-viewer-stage"));
+  });
+
+  it("shows the preview of the photo that takes the place of a playing video at the same position", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await userEvent.click(screen.getByRole("button", { name: "Play video" }));
+    expect(info().querySelector("video")?.getAttribute("src")).toBe("/api/photos/12/original");
+    await rerender({ photos: [photos[0], photos[2]] });
+    await dialog("Photo 2 of 2");
+    expect(info().querySelector("video")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/13/preview");
+  });
+
+  it("does not carry a failed preview over to the photo that takes its place at the same position", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 0, photos, people: [ada], segments });
+    await dialog("Photo 1 of 3");
+    await fireEvent.error(info().querySelector("img")!);
+    await dialog("Photo can’t be loaded");
+    await rerender({ photos: [photos[1], photos[2]] });
+    await dialog("Video 1 of 2");
+    expect(screen.queryByText("Can’t load this photo right now")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/12/preview");
+  });
+
+  it("clears a failed preview when the photo is found to be no longer shared and the next one is shown", async () => {
+    const { rerender } = render(PhotoViewer, { open: true, index: 1, photos, people: [ada], segments });
+    await dialog("Video 2 of 3");
+    await fireEvent.error(info().querySelector("img")!);
+    await dialog("Video can’t be loaded");
+    await rerender({ photos: [photos[0], photos[2]], gone: "next" });
+    await dialog("Photo no longer shared");
+    await userEvent.click(screen.getByRole("button", { name: "Next photo" }));
+    await dialog("Photo 2 of 2");
+    expect(screen.queryByText("Can’t load this photo right now")).toBeNull();
+    expect(info().querySelector("img")?.getAttribute("src")).toBe("/api/photos/13/preview");
   });
 });

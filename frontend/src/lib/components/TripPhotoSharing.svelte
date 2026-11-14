@@ -3,7 +3,10 @@
   import SharePrompt from "$lib/components/SharePrompt.svelte";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
-  import { allTitle, COULDNT_CHECK, plural, stopText, stopTitle, widenText, widenTitle } from "$lib/photo-sharing";
+  import { allTitle, COULDNT_CHECK, plural, putBackLabel, removedList, removedThumbnail, removedTitle, stopText, stopTitle, widenText, widenTitle } from "$lib/photo-sharing";
+  import ImageOff from "@lucide/svelte/icons/image-off";
+  import { tick } from "svelte";
+  import type { TripPhoto } from "$lib/api-types";
   import { NOT_LOADED_HERE, OUT_OF_DATE_HERE, type PersonSharing } from "$lib/trip-sharing.svelte";
 
   let { sharing, tripName, part }: { sharing: PersonSharing; tripName: string; part: "prompt" | "reminder" | "card" | "problem" | "dialog" } = $props();
@@ -21,6 +24,20 @@
     if (asking?.kind === "widen") return widenTitle(who, asking.sharing.count);
     return stopTitle(who);
   });
+  let lost = $state<Set<number>>(new Set());
+  let heading = $state<HTMLElement | null>(null);
+  let disclosure = $state<HTMLElement | null>(null);
+  const removed = $derived(s?.removed ?? []);
+  const removedCount = $derived(s?.removed_count ?? 0);
+  const listId = $derived(`photo-removed-${id}`);
+
+  async function putBack(p: TripPhoto) {
+    const next = removed.filter((r) => r.id !== p.id).length > 0;
+    if (!(await sharing.putBack(p))) return;
+    await tick();
+    (next ? disclosure : heading)?.focus();
+  }
+
   const blocked = $derived((asking?.kind === "all" && asking.photos === null && asking.person.eligible.length > 0) || (asking?.kind === "widen" && asking.sharing.count === null));
 </script>
 
@@ -49,8 +66,8 @@
   <section class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card" aria-labelledby={`photo-card-${id}`} data-testid="your-photos">
     <div class="flex flex-wrap items-start gap-3">
       <div class="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
-        <h3 id={`photo-card-${id}`} class="text-heading">{sharing.title}</h3>
-        <p class="text-caption text-muted-foreground">{s.count ? `${plural(s.count, "photo", "photos")} from ${who.library}` : `No photos from ${who.library} yet`}</p>
+        <h3 id={`photo-card-${id}`} class="text-heading" tabindex="-1" bind:this={heading}>{sharing.title}</h3>
+        <p class="text-caption text-muted-foreground">{s.count ? `${plural(s.count, "photo", "photos")} from ${who.library}` : removedCount ? `No photos from ${who.library} on this trip` : `No photos from ${who.library} yet`}</p>
       </div>
       <StatusChip chip={s.scope === "trip" ? { label: "Everyone on this trip", tone: "info" } : { label: who.only, tone: "quiet" }} />
     </div>
@@ -67,7 +84,27 @@
     </fieldset>
     <div class="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" class="text-status-bad-ink" disabled={sharing.locked} onclick={sharing.askStop}>Stop sharing on this trip</Button>
+      {#if removedCount > 0}
+        <Button variant="ghost" size="sm" bind:ref={disclosure} aria-expanded={sharing.removedOpen} aria-controls={listId} onclick={() => (sharing.removedOpen = !sharing.removedOpen)}>{removedTitle(removedCount)}</Button>
+      {/if}
     </div>
+    {#if removedCount > 0 && sharing.removedOpen}
+      <div id={listId} class="flex flex-col gap-2.5">
+        <p class="text-caption text-muted-foreground">Only you see these. Nobody else on the trip can tell they were here.</p>
+        <ul class="grid grid-cols-4 gap-2 desktop:grid-cols-8" aria-label={removedList(who)}>
+          {#each removed as p (p.id)}
+            <li class="flex flex-col gap-1">
+              {#if lost.has(p.id)}
+                <span class="flex aspect-square w-full items-center justify-center rounded-md bg-surface-3 text-muted-foreground" aria-hidden="true"><ImageOff class="size-4" /></span>
+              {:else}
+                <img class="aspect-square w-full rounded-md bg-surface-3 object-cover" src={removedThumbnail(sharing.tripId, p.id)} alt="" loading="lazy" decoding="async" draggable="false" onerror={() => (lost = new Set([...lost, p.id]))} />
+              {/if}
+              <Button variant="ghost" size="sm" class="h-auto px-1 py-1 text-caption" aria-label={putBackLabel(p)} disabled={sharing.locked} onclick={() => void putBack(p)}>Put back</Button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
   </section>
 {:else if part === "dialog"}
   <ConfirmDialog bind:open={() => sharing.dialog, sharing.setDialog} title={dialogTitle} returnFocus={() => sharing.opener}

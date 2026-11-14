@@ -702,7 +702,9 @@
       "method": "POST",
       "path": "/api/trips/{id}/photo-exclusions",
       "handler": "waypoint/server/api/photos.py:api_photo_exclude",
-      "web": [],
+      "web": [
+        "frontend/src/lib/trip-sharing.svelte.ts"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -718,11 +720,27 @@
       "method": "DELETE",
       "path": "/api/trips/{id}/photo-exclusions/{id}",
       "handler": "waypoint/server/api/photos.py:api_photo_put_back",
-      "web": [],
+      "web": [
+        "frontend/src/lib/trip-sharing.svelte.ts"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_photo_access.py",
         "tests/test_photos_api.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/trips/{id}/photo-exclusions/{id}/thumbnail",
+      "handler": "waypoint/server/api/photos.py:api_photo_removed_thumbnail",
+      "web": [],
+      "tests": [
+        "tests/test_mcp_routes.py",
+        "tests/test_photo_proxy.py",
         "tests/test_trips.py"
       ],
       "docs": [

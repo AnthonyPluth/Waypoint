@@ -37,7 +37,7 @@ BLOCKED = [
     "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}", "DELETE /api/photo-sources/{id}",
     "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync", "GET /api/photo-sources/{id}/resume",
     "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
-    "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/photo-grants", "POST /api/photo-sharing-prefs/{id}",
+    "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/trips/{id}/photo-exclusions/{id}/thumbnail", "GET /api/photo-grants", "POST /api/photo-sharing-prefs/{id}",
     "GET /api/mapkit/token",
 ]
 NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|home|show-costs|photo-sources|mapkit)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)|^/api/photos(/|$)|^/api/trips/\{id\}/photos(/|$)|^/api/trips/\{id\}/photo-(sharing|exclusions)(/|$)|^/api/photo-grants(/|$)|^/api/photo-sharing-prefs(/|$)")

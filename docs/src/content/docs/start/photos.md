@@ -64,6 +64,16 @@ Once you have shared, the section ends with **Your photos on this trip**: how ma
 
 Each change reloads the trip’s photos, map pins and summary, and so does editing the trip’s dates or people, or a booking’s times, zones, status (a cancellation too), kind, places (an address too) or itinerary, so a card that must ask again does. If the page can’t reload something after a change that went through, it says so, with **Try again**, and holds the controls that depend on it until it can show the current state.
 
+### Removing a photo from a trip
+
+You can take your own photos off a single trip, and put them back, without touching Immich. Nobody else can: not the trip’s organiser, not another person on the trip. A person without a sign-in whom you manage has the same controls for their photos, with their name on the buttons (**Remove June’s photo from this trip**).
+
+- **In the viewer**, **Remove from this trip** sits beside **Open original** on your own photos only. The viewer moves to the next photo (to the previous one when you removed the last), and the counter drops. If it was the only photo left, the viewer closes and focus goes back to the **Photos** heading. A message, “Removed from Four Corners loop.”, offers **Undo**.
+- **In the gallery**, **Select** (shown when you have photos on the trip) turns your tiles into checkboxes; other people’s tiles stay pictures and can’t be selected (“You can select only your own photos.”). The bar shows “3 selected” with **Remove from this trip** and **Cancel** (Escape does the same). One request removes them all or none, at most 500 at a time, and **Undo** in “3 photos removed from Four Corners loop.” puts them all back.
+- **Removed from this trip (3)**, at the end of **Your photos on this trip**, opens the list of what you removed: a small tile for each, with **Put back** (“Only you see these. Nobody else on the trip can tell they were here.”). **Put back** returns the photo to the trip, to where it was if you had placed it by hand and the trip’s dates still hold it.
+
+A removal takes effect on the next request, for everyone: the gallery, the strip, the viewer, the map pins, the summary’s photo count and the card’s count all follow, and the photos stay removed through every later sync. Someone with the viewer open on a photo you remove sees “This photo is no longer shared” the next time the page checks, and can go on to the next photo. While a removal, **Put back** or **Undo** is under way (the request and the reload that follows) the other controls wait; an **Undo** pressed meanwhile runs when the first change is done. If the page can’t reload after a change that went through, it says what may be out of date, with **Try again**, and holds the controls that depend on it. **Undo** and **Put back** carry the stamp of the removal they were shown, so one can never undo a newer removal: the page then says so and looks again.
+
 ### Photo sharing in Settings
 
 Under the library cards, **Settings → Photos** has a **Photo sharing** section for the person it is about: you, and a person without a sign-in whom you manage (a switch named **Whose sharing** picks between them, and the section says you manage their sharing because they don’t sign in). Nobody sees anyone else’s sharing here.
