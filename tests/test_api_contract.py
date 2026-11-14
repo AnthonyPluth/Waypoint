@@ -498,8 +498,10 @@ class Replies(DbCase):
         self.check("POST /api/trips/{id}/photo-sharing", photos_api.api_photo_sharing_set(self.c, {}, {"declined": True}, trip))
         self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
         seen = photos_api.api_photo_sharing(self.c, {}, {}, trip)
+        token = next(g["count_token"] for g in photos_api.api_photo_grants(self.c, {}, {})["people"] if g["person_id"] == me)
         self.check("POST /api/photo-sharing-prefs/{id}", photos_api.api_photo_prefs_set(self.c, {}, {"default_scope": "trip", "share_all": True, "windows": {trip: seen["window"]},
-                                                                                                    "audiences": {trip: seen["audience"]}, "sources": seen["sources"]}, str(me)))
+                                                                                                    "audiences": {trip: seen["audience"]}, "sources": seen["sources"],
+                                                                                                    "count_token": token}, str(me)))
         self.check("GET /api/photo-grants", photos_api.api_photo_grants(self.c, {}, {}))
 
     def test_photo_sources(self):

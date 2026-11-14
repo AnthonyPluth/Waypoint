@@ -960,7 +960,7 @@ class SnapshotRoutes(RouteCase):
         return self.ok("ana", "GET", f"/api/trips/{self.trip if trip is None else trip}/photo-sharing")
 
     def snapshot(self, seen):
-        return {"window": seen["window"], "audience": seen["audience"], "sources": seen["sources"]}
+        return {"window": seen["window"], "audience": seen["audience"], "sources": seen["sources"], "count_token": seen["count_token"]}
 
     def test_a_first_sharing_confirmed_before_someone_joined_is_refused_by_the_route(self):
         seen = self.sharing()
@@ -988,13 +988,15 @@ class SnapshotRoutes(RouteCase):
 
     def test_share_on_all_confirmed_before_someone_joined_a_pending_trip_is_refused_by_the_route(self):
         seen = self.sharing()
-        stale = {"share_all": True, "windows": {str(self.trip): seen["window"]}, "audiences": {str(self.trip): seen["audience"]}, "sources": seen["sources"]}
+        stale = {"share_all": True, "windows": {str(self.trip): seen["window"]}, "audiences": {str(self.trip): seen["audience"]}, "sources": seen["sources"],
+                 "count_token": seen["count_token"]}
         self.book("ana", BACK, trip_id=self.trip, travelers=[{"person_id": self.person["ben"]}])
         self.assertEqual(self.call("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", stale), (409, {"error": photogrants.STALE_SETTING}))
         self.assertFalse(self.ok("ana", "GET", "/api/photo-grants")["people"][0]["prefs"]["share_all"])
         fresh = self.sharing()
         got = self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}",
-                      {"share_all": True, "windows": {str(self.trip): fresh["window"]}, "audiences": {str(self.trip): fresh["audience"]}, "sources": fresh["sources"]})
+                      {"share_all": True, "windows": {str(self.trip): fresh["window"]}, "audiences": {str(self.trip): fresh["audience"]}, "sources": fresh["sources"],
+                       "count_token": fresh["count_token"]})
         self.assertTrue(got["share_all"])
         self.assertEqual(self.sharing()["state"], "shared")
 
