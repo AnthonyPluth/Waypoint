@@ -431,6 +431,54 @@ describe("changing a trip in the pane", () => {
     expect(location.hash).toBe("#trips?trip=2");
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]).toHaveAttribute("aria-current", "true");
   });
+
+  async function fillBooking(u: ReturnType<typeof user>) {
+    await u.click((await screen.findAllByRole("button", { name: /Add a booking/ }))[0]);
+    await u.type(screen.getByLabelText(/From \(airport\)/), "BOS");
+    await u.type(screen.getByLabelText(/To \(airport\)/), "CDG");
+    await u.type(screen.getByLabelText(/^Departs/), "2026-12-01T19:00");
+    await u.type(screen.getByLabelText(/^Arrives/), "2026-12-02T07:10");
+    await u.click(screen.getByRole("checkbox", { name: "Jane Doe" }));
+    await u.click(screen.getByRole("button", { name: "Add booking" }));
+  }
+  const addToLondon = () => {
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const added = segment({ id: 9, trip_id: 1, origin: "BOS", destination: "CDG", start_local: "2026-12-01T19:00", end_local: "2026-12-02T07:10" });
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/segments" && opts?.method === "POST") {
+        store = store.map((t) => (t.id === 1 ? { ...t, segments: [...t.segments, added] } : t));
+        return added;
+      }
+      return answer(path, opts);
+    });
+  };
+
+  it("shows a booking added to the trip that is already open, without a refresh", async () => {
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    addToLondon();
+    await fillBooking(user());
+    expect(await within(pane).findByRole("button", { name: "Edit BOS → CDG" })).toBeInTheDocument();
+  });
+
+  it("says so and offers Try again when the reload after adding a booking fails", async () => {
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    addToLondon();
+    const answer = vi.mocked(api).getMockImplementation()!;
+    let failing = true;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (failing && path === "/api/trips/1") throw new Error("Waypoint is unreachable");
+      return answer(path, opts);
+    });
+    await fillBooking(user());
+    expect(await within(pane).findByText("Waypoint is unreachable")).toBeInTheDocument();
+    failing = false;
+    await user().click(within(pane).getByRole("button", { name: "Try again" }));
+    expect(await within(pane).findByRole("button", { name: "Edit BOS → CDG" })).toBeInTheDocument();
+  });
 });
 
 describe("overlapping loads", () => {

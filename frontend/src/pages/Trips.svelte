@@ -97,6 +97,7 @@
     leave(() => setQuery(queryFor({ trip: t.id })));
   };
   let revealed = $state(1);
+  let paneRevision = $state(0);
 </script>
 
 <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
@@ -116,7 +117,7 @@
 {#if adding === "trip" && trips}
   <QuickTripForm me={people.some((p) => p.id === app.state?.person_id) ? (app.state?.person_id ?? null) : null} oncancel={closeForm} oncreated={(t) => { adding = null; dropDrafts(); location.hash = `#trip/${t.id}`; }} />
 {:else if adding && trips}
-  <SegmentForm initial={adding === "past" ? { ...blankFor(people, app.state?.person_id), kind: "visit" } : blankFor(people, app.state?.person_id)} {people} oncancel={closeForm} onsaved={(s) => { adding = null; dropDrafts(); location.hash = `#trip/${s.trip_id}`; }} />
+  <SegmentForm initial={adding === "past" ? { ...blankFor(people, app.state?.person_id), kind: "visit" } : blankFor(people, app.state?.person_id)} {people} oncancel={closeForm} onsaved={(s) => { adding = null; dropDrafts(); if (s.trip_id === selected?.id) paneRevision++; void load(); location.hash = `#trip/${s.trip_id}`; }} />
 {/if}
 
 {#if loadError}
@@ -225,7 +226,7 @@
   {#if panes.two && selected}
     <div class="grid grid-cols-[clamp(16rem,28%,24rem)_minmax(0,1fr)] items-start gap-8">
       <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
-      <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} />{/key}</div>
+      <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} revision={paneRevision} />{/key}</div>
     </div>
   {:else}
     {@render list()}
