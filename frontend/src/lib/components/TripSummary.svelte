@@ -55,9 +55,9 @@
 {#if items.length}
   <dl class="-ml-[1.25em] mt-1 flex flex-wrap items-baseline gap-y-0.5 text-sm [clip-path:inset(0_0_0_1.25em)]" aria-label="Trip summary" data-testid="trip-summary">
     {#each items as item (item.term)}
-      <div class="inline before:inline-block before:w-[1.25em] before:text-center before:text-muted-foreground before:[content:'·'_/_'']">
+      <div class="relative min-w-0 pl-[1.25em] before:absolute before:left-0 before:w-[1.25em] before:text-center before:text-muted-foreground before:[content:'·'_/_'']" data-summary-item>
         <dt class="sr-only">{item.term}</dt>
-        <dd class="inline font-medium">{item.text}{#if item.note}{" "}<span class="font-normal text-muted-foreground">{item.note}</span>{/if}</dd>
+        <dd class="font-medium">{item.text}{#if item.note}{" "}<span class="font-normal text-muted-foreground">{item.note}</span>{/if}</dd>
       </div>
     {/each}
   </dl>

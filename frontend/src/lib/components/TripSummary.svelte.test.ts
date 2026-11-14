@@ -165,4 +165,16 @@ describe("TripSummary", () => {
     expect(await screen.findByText("20 days", { selector: "dd" })).toBeTruthy();
     expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary")).toHaveLength(2);
   });
+
+  it("keeps each item’s separator in a gutter of its own, so a wrapped line of text is never cut by the clip that hides a row’s first separator", async () => {
+    summary = reply({ states: ["Alabama", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Washington"], countries: ["United States"], photos: { total: 248, inferred: 23 } });
+    render(TripSummary, { tripId: 1 });
+    const items = (await line()).querySelectorAll("[data-summary-item]");
+    expect(items).toHaveLength(5);
+    for (const item of items) {
+      expect(item.className).toContain("pl-[1.25em]");
+      expect(item.className).toContain("before:absolute");
+      expect(item.className).not.toMatch(/(^|\s)inline(\s|$)/);
+    }
+  });
 });
