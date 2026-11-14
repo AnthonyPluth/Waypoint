@@ -402,7 +402,7 @@ class TriageScanTests(ScanCase):
         self.scan()
         self.assertEqual(scan.summary(self.mailbox), scan.Summary(3, 2, 1, 1, 1, False, 0, 3, 3))
         self.assertEqual(scan.decode(self.row()["scan_summary"]), scan.summary(self.mailbox))
-        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["ai_asked", "attached", "bookings", "capped", "dismissed", "followups", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged", "with_facts"])
+        self.assertEqual(sorted(json.loads(self.row()["scan_summary"])), ["ai_asked", "attached", "bookings", "capped", "dismissed", "dismissed_known", "dismissed_older", "followups", "found", "labels_dropped", "not_travel", "read", "review", "skipped", "total", "triaged", "with_facts"])
 
     def test_a_reply_or_an_offer_looking_subject_from_a_travel_sender_is_still_read(self):
         for subject in ("Re: Your reservation", "Autumn sale: your hotel booking is confirmed", "Your deal is booked: hotel reservation H77"):
@@ -2997,7 +2997,7 @@ class MailScanApiTests(GoogleCase):
             return self.call(who, "POST", f"/api/review/{item_id}/suggest", {})
 
     def test_asking_the_ai_about_an_email_that_is_plainly_not_a_booking_dismisses_it_and_says_why(self):
-        self.put("no_markup", "no_markup_ids")
+        self.put("promo_offer", "promo_ids")
         self.scan_now()
         items = self.call("ana", "GET", "/api/review")[1]["items"]
         self.assertEqual(len(items), 2)
@@ -3011,7 +3011,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"], [])
 
     def test_a_member_asking_about_a_shared_item_dismisses_it_for_everyone_and_the_next_scan_does_not_bring_it_back(self):
-        self.put("no_markup")
+        self.put("promo_offer")
         self.scan_now()
         [item] = self.call("ana", "GET", "/api/review")[1]["items"]
         self.ai_on()

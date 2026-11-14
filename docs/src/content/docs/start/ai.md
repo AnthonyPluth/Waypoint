@@ -37,14 +37,30 @@ What is sent and where it goes are exactly as for **Ask AI**. The item in Review
 
 ## Emails that aren’t bookings
 
-When the AI finds no booking in a message and judges it plainly not about a booking at all, Waypoint dismisses the Review item itself, with no step for you. This applies to **Ask AI** and to the automatic reading alike. The model can say so for three kinds of email: a **promotion** (a sale, a discount or another offer), a **loyalty or account statement**, and a **newsletter**.
+When the AI finds no booking in a message and judges it plainly not about a booking at all, Waypoint dismisses the Review item itself, with no step for you. This applies to **Ask AI** and to the automatic reading alike. The model can say so for five kinds of email: a **promotion** (a sale, a discount or another offer), a **loyalty or account statement**, a **newsletter**, a **receipt** and an **account notification**, the last two only when they name no booking, place, date or time.
 
 - **Ask AI** takes the item off the list and says why, for example “Dismissed: a promotion, not a booking.”
 - A scan counts these in the mailbox’s last-scan line in Settings (“AI dismissed 3 emails as not bookings”), never with a subject, sender or text.
 - Only that one item is dismissed, not others that Review groups with it. The stored copy of the email is deleted, as for any dismissal, and the scan remembers the message so it isn’t queued again.
+- The model proposes and Waypoint decides: even with the verdict, an email whose text has a time of day, a confirmation or reservation label, an airport code in brackets, a flight number, a passenger, check-in or check-out, a departure or arrival, a pick-up or drop-off, or any word about a cancellation, change, refund, delay, gate, terminal or seat stays in Review.
 - Only an answer with no bookings at all and that verdict dismisses anything. “No booking found” without the verdict leaves the item in Review as before, and so does an error, a timeout, an answer Waypoint can’t read or a result with a booking in it. The model is told to leave the verdict out for a confirmation, a cancellation, a change, a reminder or anything about a trip, and whenever it is unsure.
 
 An AI assistant connected over [MCP](/Waypoint/start/mcp/) never dismisses this way: it still asks you before every change.
+
+## Emails that add nothing new
+
+When the AI reads a message automatically during a scan and the booking it describes is one you can already see, Waypoint dismisses the Review item when nothing in the email is new. The model only reads the email. Waypoint makes the decision by comparing the fields the model found with the saved booking, and never takes the model’s own word that nothing is new. Dismissal is the same as dismissing by hand: the stored copy is deleted and nothing is added to your trips, and there is no Undo.
+
+An email is dismissed this way only when all of these hold:
+
+- Every booking the model found matches exactly one booking you can see, that is still confirmed. A flight matches on its flight number and its date and at least one airport; any other booking matches on its confirmation code and its dates. A match that is unsure, a booking nobody you share it with can see, or two bookings that both fit leaves the email in Review.
+- Every field the email states is already saved on the booking, the same: times, airports, flight number, confirmation, company, cabin, address, phone, price, and each traveller on their own seat. A different or new field, a new traveller or a new price keeps it in Review.
+- The email’s text has no word about a cancellation, change, refund, delay, gate, terminal, seat or boarding.
+- The model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
+
+A message dated before the newest email already kept for the booking is dismissed as an older copy, by the same rule as when a newer email replaces an older one ([updated from a newer email](/Waypoint/start/trips/#updated-from-a-newer-email)), whatever times it states.
+
+The mailbox’s last-scan line in Settings counts these with the reason, “already known” or “older than a saved copy” (“AI dismissed 3 emails as nothing new (2 already known, 1 older than a saved copy)”), and the log carries the same counts. Never a subject, sender or text.
 
 ## What is sent
 

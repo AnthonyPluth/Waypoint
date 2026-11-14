@@ -71,6 +71,8 @@ class ScanSummary(TypedDict):
     attached: int
     ai_asked: int
     dismissed: int
+    dismissed_known: int
+    dismissed_older: int
 
 
 class Mailbox(TypedDict):

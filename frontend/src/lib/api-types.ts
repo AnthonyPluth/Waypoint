@@ -941,6 +941,8 @@ export interface ScanSummary {
   attached: number;
   ai_asked: number;
   dismissed: number;
+  dismissed_known: number;
+  dismissed_older: number;
 }
 
 export interface Segment {

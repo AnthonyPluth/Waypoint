@@ -166,7 +166,7 @@ class WhenItDoesNotTests(PushCase):
         self.turn_on()
         self.fake.content = VERDICT
         self.device()
-        self.put("no_markup_ids")
+        self.put("promo_ids")
         self.scan_job()
         self.assertEqual((self.items(), scan.summary(self.mailbox).dismissed, self.sent, self.remembered()), ([], 1, [], []))
 
@@ -176,7 +176,7 @@ class WhenItDoesNotTests(PushCase):
         answers = [VERDICT, json.dumps(GOOD)]
         self.fake.on_request = lambda n: setattr(self.fake, "content", answers[n - 1])
         original = b"Sun, 18 Oct 2026 09:10:00 -0400"
-        self.add_mail("msg-new", eml("no_markup_ids"))
+        self.add_mail("msg-new", eml("promo_ids"))
         self.add_mail("msg-old", eml("no_markup_ids").replace(original, b"Fri, 16 Oct 2026 09:10:00 -0400"))
         self.scan_job()
         self.assertEqual(self.bodies(), [ONE])

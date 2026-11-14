@@ -8062,6 +8062,12 @@
           },
           "dismissed": {
             "type": "integer"
+          },
+          "dismissed_known": {
+            "type": "integer"
+          },
+          "dismissed_older": {
+            "type": "integer"
           }
         },
         "required": [
@@ -8079,7 +8085,9 @@
           "with_facts",
           "attached",
           "ai_asked",
-          "dismissed"
+          "dismissed",
+          "dismissed_known",
+          "dismissed_older"
         ],
         "additionalProperties": false
       },

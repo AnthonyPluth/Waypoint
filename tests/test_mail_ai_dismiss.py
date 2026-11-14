@@ -64,11 +64,12 @@ class VerdictParseTests(unittest.TestCase):
     def test_the_note_names_the_category_in_plain_words(self):
         self.assertEqual([ai.dismissed_note(c) for c in ai.NOT_BOOKINGS],
                          ["Dismissed: a promotion, not a booking.", "Dismissed: a loyalty or account statement, not a booking.",
-                          "Dismissed: a newsletter, not a booking."])
+                          "Dismissed: a newsletter, not a booking.", "Dismissed: a receipt with no trip details, not a booking.",
+                          "Dismissed: an account notification with no trip details, not a booking."])
 
     def test_the_prompt_asks_for_the_verdict_only_for_plain_cases(self):
         self.assertIn('"not_a_booking"', ai.SYSTEM)
-        for word in ('"promotion"', '"statement"', '"newsletter"', "when you are unsure, leave it out", "cancellation"):
+        for word in ('"promotion"', '"statement"', '"newsletter"', '"receipt"', '"notification"', "when you are unsure, leave it out", "cancellation"):
             self.assertIn(word, ai.SYSTEM)
         self.assertIn('If the email holds no booking, reply {"bookings": []}.', ai.SYSTEM)
 
@@ -96,9 +97,9 @@ class SuggestVerdictTests(unittest.TestCase):
 
 
 class DismissCase(ScanAiCase):
-    def asked_by_hand(self):
+    def asked_by_hand(self, name="promo_ids"):
         self.turn_on(auto=False)
-        self.put("no_markup_ids")
+        self.put(name)
         self.assertEqual(self.scan().review, 1)
         [item] = self.items()
         self.fake.content = VERDICT
@@ -133,7 +134,7 @@ class AskAiDismissTests(DismissCase):
         self.assertEqual(len(self.stored()), 1)
         scan.suggest_now("u-jane", item["id"], NOW)
         self.assertEqual(self.stored(), [])
-        self.assertEqual(self.outcomes(), {"msg-no_markup_ids": "unreadable"})
+        self.assertEqual(self.outcomes(), {"msg-promo_ids": "unreadable"})
 
     def test_the_next_scan_does_not_queue_it_again_or_ask_again(self):
         item = self.asked_by_hand()
@@ -154,7 +155,7 @@ class AskAiDismissTests(DismissCase):
     def test_only_the_item_that_was_read_is_dismissed_not_the_ones_grouped_with_it(self):
         self.turn_on(auto=False)
         for message_id in ("m-a", "m-b", "m-c"):
-            self.google.mail[message_id] = eml("no_markup_ids")
+            self.google.mail[message_id] = eml("promo_ids")
         with db.session() as conn:
             for message_id in ("m-a", "m-b", "m-c"):
                 review.add(conn, self.mailbox, message_id, "example-air.example", "2026-10-17", "no_markup", NOW, reference="QW4R7T")
@@ -178,7 +179,7 @@ class AskAiDismissTests(DismissCase):
         self.assertEqual(len(self.stored()), 1)
 
     def test_an_answer_with_a_booking_never_dismisses_even_with_the_verdict(self):
-        item = self.asked_by_hand()
+        item = self.asked_by_hand("no_markup_ids")
         self.fake.content = json.dumps({"bookings": [GOOD], "not_a_booking": "promotion"})
         self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
         [kept] = self.items()
@@ -216,7 +217,7 @@ class AskAiDismissTests(DismissCase):
         from waypoint.storage import settings_keys as sk
         with db.session() as conn:
             db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
-        self.put("no_markup_ids")
+        self.put("promo_ids")
         self.scan()
         [item] = self.items()
         self.fake.content = VERDICT
@@ -231,14 +232,14 @@ class AutomaticDismissTests(DismissCase):
     def test_the_scan_dismisses_the_item_and_counts_it_without_naming_it(self):
         self.turn_on()
         self.fake.content = VERDICT
-        self.put("no_markup_ids")
+        self.put("promo_ids")
         with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=True):
             result = self.scan()
         self.assertEqual((result.state, result.review, self.items()), ("done", 0, []))
         found = scan.summary(self.mailbox)
         self.assertEqual((found.dismissed, found.ai_asked, found.review), (1, 1, 0))
         self.assertEqual(self.stored(), [])
-        self.assertEqual(self.outcomes(), {"msg-no_markup_ids": "unreadable"})
+        self.assertEqual(self.outcomes(), {"msg-promo_ids": "unreadable"})
         self.assertEqual(self.waiting_items(), [])
 
     def waiting_items(self):
@@ -246,13 +247,14 @@ class AutomaticDismissTests(DismissCase):
 
     def dated(self):
         original = b"Sun, 18 Oct 2026 09:10:00 -0400"
-        for name, day in (("new", original), ("mid", b"Sat, 17 Oct 2026 09:10:00 -0400"), ("old", b"Fri, 16 Oct 2026 09:10:00 -0400")):
-            self.add_mail(f"msg-{name}", eml("no_markup_ids").replace(original, day))
+        for name, day, fixture in (("new", original, "promo_ids"), ("mid", b"Sat, 17 Oct 2026 09:10:00 -0400", "no_markup_ids"),
+                                   ("old", b"Fri, 16 Oct 2026 09:10:00 -0400", "no_markup_ids")):
+            self.add_mail(f"msg-{name}", eml(fixture).replace(original, day))
 
     def test_the_next_scan_neither_queues_nor_asks_about_it_again(self):
         self.turn_on()
         self.fake.content = VERDICT
-        self.put("no_markup_ids")
+        self.put("promo_ids")
         self.scan()
         for later, kwargs in ((NOW + 60, {}), (NOW + 120, {"backfill": True})):
             result = self.scan(now=later, **kwargs)
@@ -310,7 +312,7 @@ class AutomaticDismissTests(DismissCase):
     def test_a_dismissal_is_not_an_unfiled_item_for_the_review_count(self):
         self.turn_on()
         self.fake.content = VERDICT
-        self.put("no_markup_ids", "hotel_jsonld")
+        self.put("promo_ids", "hotel_jsonld")
         result = self.scan()
         self.assertEqual((result.bookings, result.review), (1, 0))
         found = scan.summary(self.mailbox)
@@ -319,7 +321,7 @@ class AutomaticDismissTests(DismissCase):
     def test_nothing_of_the_email_the_answer_or_the_dismissal_is_logged_stored_or_summarised(self):
         self.turn_on()
         self.fake.content = json.dumps({"bookings": [], "not_a_booking": "promotion", "note": REPLY_CANARY})
-        self.put("no_markup_ids")
+        self.put("promo_ids")
         said = []
         real = scan.monitoring.log
         with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, REPLY_CANARY, database=self.path, sent_ok=True), \
