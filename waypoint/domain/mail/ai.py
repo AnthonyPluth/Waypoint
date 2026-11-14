@@ -32,8 +32,7 @@ LOCAL_TIMEOUT = 3600
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
-NOT_BOOKINGS = {"promotion": "a promotion", "statement": "a loyalty or account statement", "newsletter": "a newsletter",
-                "receipt": "a receipt with no trip details", "notification": "an account notification with no trip details"}
+NOT_BOOKINGS = {"promotion": "a promotion", "statement": "a loyalty or account statement", "newsletter": "a newsletter"}
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
 NEEDS_LOCAL = "Reading email with AI needs Local (Ollama) in Settings → AI."
@@ -192,10 +191,8 @@ SYSTEM = (
     'nightly rate, a refund or points. When one total covers several bookings in the email, give it on the first of them only. '
     'Leave out a key you can\'t find; never guess. If the email holds no booking, reply {"bookings": []}. '
     'If it is plainly not about a booking at all, also give "not_a_booking": "promotion" (a sale, discount or other marketing offer), '
-    '"statement" (a loyalty points or account statement), "newsletter", "receipt" (a payment receipt or invoice that names no booking, '
-    'place, date or time) or "notification" (an account, security or app notice that names no booking, place, date or time), '
-    'as in {"bookings": [], "not_a_booking": "promotion"}. '
-    'Give it for those only: a confirmation, change, cancellation, reminder, or any email about a booking or a trip is not one of '
+    '"statement" (a loyalty points or account statement) or "newsletter", as in {"bookings": [], "not_a_booking": "promotion"}. '
+    'Give it for those only: a confirmation, receipt, change, cancellation, reminder, or any email about a booking or a trip is not one of '
     'them, and when you are unsure, leave it out.')
 
 

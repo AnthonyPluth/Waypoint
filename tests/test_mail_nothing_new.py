@@ -371,7 +371,7 @@ class NotTravelTests(NothingNewCase):
 
     def test_a_verdict_on_an_email_whose_subject_states_a_change_stays(self):
         for n, subject in enumerate(CHANGED_TRIP_SUBJECTS):
-            for category in ("promotion", "receipt"):
+            for category in ("promotion", "statement"):
                 with self.subTest(subject=subject, category=category):
                     with db.session() as conn:
                         conn.execute(ReviewItem.__table__.delete())
@@ -383,8 +383,8 @@ class NotTravelTests(NothingNewCase):
             self.plain("Thank you for being a customer.", VERDICT, "rv")
         self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
 
-    def test_marketing_a_receipt_and_a_notice_with_no_travel_details_are_dismissed_by_the_existing_count(self):
-        for category in ("promotion", "statement", "newsletter", "receipt", "notification"):
+    def test_marketing_a_statement_and_a_newsletter_with_no_travel_details_are_dismissed_by_the_existing_count(self):
+        for category in ("promotion", "statement", "newsletter"):
             with self.subTest(category=category):
                 self.plain("Thank you for being a customer. Save on your next purchase this week.", {"bookings": [], "not_a_booking": category}, f"n-{category}")
                 self.assertEqual((self.kept(), scan.summary(self.mailbox).dismissed, self.counted()), ([], 1, (0, 0)))
@@ -394,7 +394,7 @@ class NotTravelTests(NothingNewCase):
                  "confirmation": "Your confirmation code is ZZ9Y8X.", "flight": "Take flight EX 101 for less.",
                  "passenger": "Passenger Jane Doe, thank you.", "check in": "Online check-in is open for your trip."}
         for what, line in cases.items():
-            for category in ("promotion", "receipt"):
+            for category in ("promotion", "statement"):
                 with self.subTest(what=what, category=category):
                     with db.session() as conn:
                         conn.execute(ReviewItem.__table__.delete())
@@ -404,12 +404,20 @@ class NotTravelTests(NothingNewCase):
     def test_a_verdict_on_an_email_naming_a_booking_code_or_flight_stays(self):
         for n, line in enumerate(("Booking reference: ZQ4P8W", "Booking reference: QXMKZB", "Reservation number 88231", "Your PNR is ZZ9Y8X",
                                   "Thanks for flying ex-102.")):
-            for category in ("receipt", "notification", "promotion"):
+            for category in ("promotion", "statement", "newsletter"):
                 with self.subTest(line=line, category=category):
                     with db.session() as conn:
                         conn.execute(ReviewItem.__table__.delete())
                     self.plain(f"Thank you for your payment. {line}", {"bookings": [], "not_a_booking": category}, f"code-{n}-{category}")
                     self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+
+    def test_a_receipt_or_a_notification_verdict_is_not_one_waypoint_honours(self):
+        for category in ("receipt", "notification"):
+            with self.subTest(category=category):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.plain("Thank you for being a customer. Save on your next purchase this week.", {"bookings": [], "not_a_booking": category}, f"r-{category}")
+                self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
 
     def test_a_cancellation_or_change_wearing_a_promotion_verdict_stays(self):
         for line in ("Your booking was cancelled. Save 10 percent on your next trip.", "Fare change: save on your next trip."):

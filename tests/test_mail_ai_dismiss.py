@@ -64,12 +64,11 @@ class VerdictParseTests(unittest.TestCase):
     def test_the_note_names_the_category_in_plain_words(self):
         self.assertEqual([ai.dismissed_note(c) for c in ai.NOT_BOOKINGS],
                          ["Dismissed: a promotion, not a booking.", "Dismissed: a loyalty or account statement, not a booking.",
-                          "Dismissed: a newsletter, not a booking.", "Dismissed: a receipt with no trip details, not a booking.",
-                          "Dismissed: an account notification with no trip details, not a booking."])
+                          "Dismissed: a newsletter, not a booking."])
 
     def test_the_prompt_asks_for_the_verdict_only_for_plain_cases(self):
         self.assertIn('"not_a_booking"', ai.SYSTEM)
-        for word in ('"promotion"', '"statement"', '"newsletter"', '"receipt"', '"notification"', "when you are unsure, leave it out", "cancellation"):
+        for word in ('"promotion"', '"statement"', '"newsletter"', "when you are unsure, leave it out", "cancellation"):
             self.assertIn(word, ai.SYSTEM)
         self.assertIn('If the email holds no booking, reply {"bookings": []}.', ai.SYSTEM)
 
