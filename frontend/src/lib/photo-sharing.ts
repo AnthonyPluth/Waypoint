@@ -54,6 +54,26 @@ export function allTitle(who: Who, p: PhotoGrantPerson, photos: number | null): 
   return photos === null ? `Show ${who.own} photos to everyone on ${trips}?` : `Show ${who.own} ${plural(photos, "photo", "photos")} to everyone on ${trips}?`;
 }
 
+export type ResumeKind = "resume" | "connect";
+
+export const resumeTitle = (library: string, kind: ResumeKind): string => (kind === "connect" ? `${library} is connected. Resume it now?` : `Resume ${library}?`);
+
+export function resumeText(who: Who, kind: ResumeKind, count: number, trips: number): string {
+  const lead = who.mine ? "Your" : `${who.first}’s`;
+  const where = `everyone on ${plural(trips, "trip", "trips")}`;
+  const state = kind === "connect" ? "is connected and paused, until you confirm this" : "is paused";
+  const effect = count
+    ? `Resuming it shows ${plural(count, "photo", "photos")} from it to everyone on ${trips === 1 ? "that trip" : "those trips"}: in the gallery, on the map, in the replay and in the trip’s counts.`
+    : "Resuming it adds no new photos to those trips, but they are shared with everyone, so Waypoint asks first.";
+  return `${lead} library ${state}, because ${who.shares} photos with ${where}. ${effect} Nothing changes in Immich.`;
+}
+
+export const resumeStale = "Your trips changed meanwhile, so what’s below is new. Check it, then press Resume again.";
+
+export const resumeUnchecked = "Your trips changed meanwhile, and Waypoint couldn’t check them again, so what’s below may be out of date.";
+
+export const resumeSettled = "Your trips changed meanwhile and nothing needs confirming now, so nothing was resumed. Press Resume again.";
+
 export const stopTitle = (who: Who): string => `Stop sharing ${who.own} photos on this trip?`;
 
 export function stopText(who: Who, tripName: string, count: number | null): string {

@@ -1,0 +1,23 @@
+{
+  "name": "photos-resume-confirm",
+  "page": "settings",
+  "signed_in": true,
+  "allow_console": ["the server responded with a status of 409"],
+  "steps": [
+    { "fake_resume": 12 },
+    { "goto": "#settings/photos" },
+    { "wait_for": "[data-testid=photo-source]:has-text('Paused')" },
+    { "screenshot": "paused" },
+    { "click": "role=button[name^='Resume,']" },
+    { "expect_text": { "selector": "[role=alertdialog]", "text": "Resuming it shows 12 photos from it to everyone on those trips" } },
+    { "screenshot": "ask" },
+    { "click": "[role=alertdialog] >> role=button[name='Resume']" },
+    { "expect_text": { "selector": "[role=alertdialog] [role=alert]", "text": "Your trips changed meanwhile, so what’s below is new." } },
+    { "expect_text": { "selector": "[role=alertdialog]", "text": "Resuming it shows 15 photos from it to everyone on those trips" } },
+    { "screenshot": "changed" },
+    { "click": "[role=alertdialog] >> role=button[name='Resume']" },
+    { "wait_for": "[data-testid=photo-source] >> role=button[name^='Pause,']" },
+    { "expect_text": { "selector": "[data-testid=photo-source]", "text": "Up to date" } },
+    { "screenshot": "resumed" }
+  ]
+}
