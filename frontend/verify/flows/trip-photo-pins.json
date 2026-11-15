@@ -17,6 +17,7 @@
     { "click": "[data-testid='pin-card'] button:has-text('Show these photos')" },
     { "wait_for": "section[data-day]" },
     { "expect_text": { "selector": "section[data-day]", "text": "Day 1" } },
-    { "screenshot": "pin-gallery" }
+    { "screenshot": "pin-gallery" },
+    { "click": "[data-testid='pin-card'] button[aria-label='Close']" }
   ]
 }

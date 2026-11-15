@@ -1,5 +1,6 @@
 import type { Person, PhotoGrantPerson, PhotoGrantTrip, PhotoPrefsBody, PhotoSharing, PhotoSharingBody } from "./api-types";
 import { apiCall } from "./contract";
+import { clock, dayLabel } from "./trips";
 
 export type Scope = "only_me" | "trip";
 
@@ -65,3 +66,30 @@ export const widenText = (who: Who, tripName: string): string => `Everyone else 
 export const narrowedToast = (who: Who, where: string): string => `Now only ${who.subject} see${who.mine ? "" : "s"} ${who.own} photos on ${where}.`;
 
 export const photosTitle = (who: Who): string => (who.mine ? "Your photos on this trip" : `${who.first}’s photos on this trip`);
+
+export const MAX_REMOVED = 500;
+
+export const REMOVE = "Remove from this trip";
+
+export const removeText = (who: Who, count = 1): string => (who.mine ? REMOVE : `Remove ${who.first}’s ${count === 1 ? "photo" : "photos"} from this trip`);
+
+export function removedToast(who: Who, count: number, tripName: string): string {
+  if (who.mine) return count === 1 ? `Removed from ${tripName}.` : `${count} photos removed from ${tripName}.`;
+  return count === 1 ? `Removed ${who.first}’s photo from ${tripName}.` : `${count} of ${who.first}’s photos removed from ${tripName}.`;
+}
+
+export const removedTitle = (n: number): string => `Removed from this trip (${n})`;
+
+export const removedList = (who: Who): string => (who.mine ? "Photos you removed from this trip" : `${who.first}’s photos removed from this trip`);
+
+export const putBackLabel = (p: { kind: "image" | "video"; taken_local: string }): string =>
+  `Put back the ${p.kind === "video" ? "video" : "photo"} from ${dayLabel(p.taken_local)}, ${clock(p.taken_local)}`;
+
+export const removedThumbnail = (tripId: number, photoId: number): string => `/api/trips/${tripId}/photo-exclusions/${photoId}/thumbnail`;
+
+export function toggled(selected: ReadonlySet<number>, id: number, max = MAX_REMOVED): Set<number> {
+  const next = new Set(selected);
+  if (next.has(id)) next.delete(id);
+  else if (next.size < max) next.add(id);
+  return next;
+}
