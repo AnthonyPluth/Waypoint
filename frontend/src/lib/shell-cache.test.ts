@@ -20,10 +20,10 @@ function startWorker(cached: Record<string, Response> = {}, fetcher: (url: strin
     skipWaiting: () => {},
     clients: { claim: async () => {} },
   };
-  const caches = { open: async () => cache, keys: async () => [], match: async (key: string) => store.get(key), delete: async () => true };
+  const workerStorage = { open: async () => cache, keys: async () => [], match: async (key: string) => store.get(key), delete: async () => true };
   const fetched: string[] = [];
   const fetchStub = async (target: string) => { fetched.push(target); return fetcher(target); };
-  new Function("self", "caches", "location", "fetch", "URL", "Set", SOURCE)(scope, caches, { origin: ORIGIN }, fetchStub, URL, Set);
+  new Function("self", "caches", "location", "fetch", "URL", "Set", SOURCE)(scope, workerStorage, { origin: ORIGIN }, fetchStub, URL, Set);
   const send = async (data: unknown) => {
     const waits: Promise<unknown>[] = [];
     handlers.message({ data, waitUntil: (p: Promise<unknown>) => waits.push(p) });

@@ -29,7 +29,7 @@ const keepLoaded = async (paths) => {
     try {
       const res = await fetch(path);
       if (res.ok && !res.redirected) await cache.put(path, res);
-    } catch {}
+    } catch { continue; }
   }
 };
 
