@@ -9,7 +9,7 @@ from sqlalchemy import delete, insert, select, update
 
 from tests.privacy import no_leaks
 from tests.shared import ServerCase
-from tests.test_photos_api import ASSET, KEY, SOHO, URL, grant_row, photo_row, source_row, stored
+from tests.test_photos_api import ASSET, KEY, ROME, SOHO, URL, grant_row, photo_row, source_row, stored
 from tests.test_trips import HOTEL, OUT, RouteCase
 from waypoint.domain import demo, photocount, trips
 from waypoint.domain.visibility import Viewer
@@ -22,7 +22,8 @@ from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPref
 STATE, COUNTRY = "Canaryshire-7q2x", "Canaryland-3k9v"
 EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": []}
 NO_TRIP, NO_PHOTO = {"error": "No such trip"}, {"error": "No such photo"}
-PHOTO_ROUTES = (("GET", "/api/trips/{id}/photos"), ("GET", "/api/photos/review"), ("POST", "/api/photos/{id}"), ("GET", "/api/trips/{id}/photo-sharing"),
+PHOTO_ROUTES = (("GET", "/api/trips/{id}/photos"), ("GET", "/api/photos/review"), ("POST", "/api/photos/{id}"), ("POST", "/api/photos/{id}/undo"),
+                ("GET", "/api/trips/{id}/photo-sharing"),
                 ("POST", "/api/trips/{id}/photo-sharing"), ("DELETE", "/api/trips/{id}/photo-sharing"), ("POST", "/api/trips/{id}/photo-exclusions"),
                 ("DELETE", "/api/trips/{id}/photo-exclusions/{id}"), ("GET", "/api/photo-grants"), ("POST", "/api/photo-sharing-prefs/{id}"),
                 ("GET", "/api/photos/{id}/thumbnail"), ("GET", "/api/photos/{id}/preview"), ("GET", "/api/photos/{id}/original"))
@@ -474,6 +475,17 @@ class StewardTests(AccessCase):
         self.assertEqual(self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing?person_id={self.kid}")["state"], "declined")
         self.assertEqual(self.seen_by("ben"), [])
 
+    def test_the_steward_undoes_a_choice_for_the_person_they_manage_and_nobody_else_can(self):
+        self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.kid, "scope": "only_me"})
+        far = self.keep(photo_row(self.sources["kid"], self.trip, "2026-06-03T10:00", where=ROME, match="far", distance=1400.0, segment_id=self.stay["id"]))
+        placed = self.ok("ana", "POST", f"/api/photos/{far}", {"trip_id": self.trip})
+        undoing = {"trip_id": self.trip, "decided_at": placed["decided_at"]}
+        self.assertEqual(self.ok("ana", "GET", "/api/photos/review")["photos"], [])
+        self.assertEqual(self.call("ben", "POST", f"/api/photos/{far}/undo", undoing), (404, NO_PHOTO))
+        self.assertEqual(self.ok("ana", "POST", f"/api/photos/{far}/undo", undoing)["person_id"], self.kid)
+        self.assertEqual([(p["id"], p["person_id"]) for p in self.ok("ana", "GET", "/api/photos/review")["photos"]], [(far, self.kid)])
+        self.assertEqual(self.ok("ben", "GET", "/api/photos/review"), {"photos": []})
+
     def test_a_steward_reads_the_childs_sharing_state_and_removed_list_and_nobody_else_does(self):
         self.keep(grant_row(self.kid, self.trip, "only_me", by="sub-ana"))
         theirs = self.kids()
@@ -820,7 +832,7 @@ class LocalModeTests(ServerCase):
         self.assertEqual(status, 200)
         trip = seg["trip_id"]
         calls = [("GET", f"/api/trips/{trip}/photos", None), ("GET", "/api/photos/review", None), ("POST", "/api/photos/1", {"trip_id": trip}),
-                 ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
+                 ("POST", "/api/photos/1/undo", {"trip_id": trip, "decided_at": 1.0}), ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
                  ("DELETE", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [1]}),
                  ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", "/api/photo-grants", None), ("POST", "/api/photo-sharing-prefs/1", {"share_all": True}),
                  ("GET", "/api/photos/1/thumbnail", None), ("GET", "/api/photos/1/preview", None), ("GET", "/api/photos/1/original", None)]

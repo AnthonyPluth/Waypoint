@@ -1,0 +1,19 @@
+{
+  "name": "photos-needs-a-look",
+  "page": "settings",
+  "signed_in": true,
+  "steps": [
+    { "goto": "#settings/photos" },
+    { "wait_for": "[data-testid=needs-a-look] li" },
+    { "expect_text": { "selector": "[data-testid=needs-a-look]", "text": "2 photos" } },
+    { "expect_text": { "selector": "[data-testid=needs-a-look]", "text": "from every booking" } },
+    { "scroll_to": "[data-testid=needs-a-look]" },
+    { "screenshot": "list" },
+    { "click": "[data-testid=needs-a-look] button:has-text('Pick a trip') >> nth=0" },
+    { "wait_for": "role=dialog[name='Pick a trip for this photo']" },
+    { "expect_text": { "selector": "[role=dialog]", "text": "Waypoint won’t move it again by itself." } },
+    { "screenshot": "sheet" },
+    { "click": "[role=dialog] button:has-text('Cancel')" },
+    { "wait_for": "[data-testid=needs-a-look] li" }
+  ]
+}

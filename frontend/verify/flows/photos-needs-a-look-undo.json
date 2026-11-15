@@ -1,0 +1,97 @@
+{
+  "name": "photos-needs-a-look-undo",
+  "page": "settings",
+  "signed_in": true,
+  "steps": [
+    {
+      "goto": "#settings/photos"
+    },
+    {
+      "wait_for": "[data-testid=needs-a-look] li"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "2 photos"
+      }
+    },
+    {
+      "click": "[data-testid=needs-a-look] button:has-text('Keep on this trip')"
+    },
+    {
+      "wait_for": "[data-sonner-toast] button:has-text('Undo')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-sonner-toast]",
+        "text": "Kept on"
+      }
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "1 photo"
+      }
+    },
+    {
+      "scroll_to": "[data-testid=needs-a-look]"
+    },
+    {
+      "screenshot": "kept"
+    },
+    {
+      "click": "[data-sonner-toast] button:has-text('Undo')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "2 photos"
+      }
+    },
+    {
+      "expect_text": {
+        "selector": "[data-sonner-toast]",
+        "text": "Back in Needs a look."
+      }
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "from every booking"
+      }
+    },
+    {
+      "screenshot": "undone"
+    },
+    {
+      "click": "[data-testid=needs-a-look] button:has-text('Remove from this trip')"
+    },
+    {
+      "wait_for": "[data-sonner-toast] button:has-text('Undo')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "1 photo"
+      }
+    },
+    {
+      "screenshot": "removed"
+    },
+    {
+      "click": "[data-sonner-toast] button:has-text('Undo')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "2 photos"
+      }
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=needs-a-look]",
+        "text": "from every booking"
+      }
+    }
+  ]
+}

@@ -440,6 +440,7 @@ class Photo(Base):
     distance_km: Mapped[float | None]
     decided_by: Mapped[str | None]
     seen: Mapped[float]
+    decided_at: Mapped[float | None]
 
 
 class PhotoTripSync(Base):

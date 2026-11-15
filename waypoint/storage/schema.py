@@ -520,6 +520,7 @@ photos = Table(
     Column('distance_km', Float),
     Column('decided_by', Text, doc='auto | owner; the sync never overwrites the trip of an owner row'),
     Column('seen', Float, nullable=False, doc='epoch seconds the sync last saw it in Immich'),
+    Column('decided_at', Float, doc='epoch seconds of the owner placement, set with decided_by = owner and cleared with it; Undo must name it, so an older request never reverses a newer choice on the same trip'),
     UniqueConstraint('source_id', 'asset_id', name='uq_photos_source_asset'),
     Index('ix_photos_trip_id', 'trip_id'),
     Index('ix_photos_segment_id', 'segment_id'),

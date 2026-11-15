@@ -905,6 +905,56 @@
         }
       }
     },
+    "/api/photos/{id}/undo": {
+      "post": {
+        "operationId": "api_photo_undo",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_undo",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoUndoBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPhoto"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/photo-sources": {
       "get": {
         "operationId": "api_photo_sources",
@@ -7297,6 +7347,22 @@
         ],
         "additionalProperties": false
       },
+      "PhotoUndoBody": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "decided_at": {
+            "type": "number"
+          },
+          "left_off": {
+            "type": "number"
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
       "PhotoWindow": {
         "type": "object",
         "properties": {
@@ -7990,6 +8056,12 @@
             ]
           },
           "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "decided_at": {
             "type": [
               "number",
               "null"
@@ -10000,6 +10072,12 @@
             ]
           },
           "removed_at": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "decided_at": {
             "type": [
               "number",
               "null"

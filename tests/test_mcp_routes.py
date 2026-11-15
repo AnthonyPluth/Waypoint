@@ -33,7 +33,7 @@ BLOCKED = [
     "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "POST /api/review/{id}/suggest",
     "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
     "GET /api/home", "POST /api/home", "DELETE /api/home", "POST /api/show-costs",
-    "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}", "GET /api/photos/{id}/thumbnail", "GET /api/photos/{id}/preview", "GET /api/photos/{id}/original",
+    "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}", "POST /api/photos/{id}/undo", "GET /api/photos/{id}/thumbnail", "GET /api/photos/{id}/preview", "GET /api/photos/{id}/original",
     "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}", "DELETE /api/photo-sources/{id}",
     "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync", "GET /api/photo-sources/{id}/resume",
     "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
@@ -75,7 +75,7 @@ class RouteTests(unittest.TestCase):
     def test_blocked_areas_block_what_is_added_under_them_too(self):
         for path in ("/api/mailboxes/{id}/anything", "/api/review/new/thing", "/api/ai/key", "/api/backup/x", "/api/feed/key",
                      "/api/reminders/devices/{id}/x", "/api/review/{id}/images/{id}", "/api/segments/{id}/emails/{id}/images/{id}", "/api/segments/{id}/emails/0/images/1", "/api/segments/{id}/code", "/api/segments/{id}/code/anything", "/api/trips/{id}/emails/clear", "/api/trips/{id}/emails/anything", "/api/mcp-settings/x", "/api/flight-status/{id}/x", "/api/import/csv", "/api/loyalty", "/api/loyalty/{id}/reveal", "/api/home", "/api/home/anything",
-                     "/api/photos", "/api/photos/{id}", "/api/photos/{id}/thumbnail", "/api/photos/review", "/api/trips/{id}/photos", "/api/trips/{id}/photos/anything",
+                     "/api/photos", "/api/photos/{id}", "/api/photos/{id}/undo", "/api/photos/{id}/thumbnail", "/api/photos/review", "/api/trips/{id}/photos", "/api/trips/{id}/photos/anything",
                      "/api/photo-sources", "/api/photo-sources/{id}", "/api/photo-sources/{id}/sync", "/api/photo-sources/anything",
                      "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions", "/api/trips/{id}/photo-exclusions/{id}/thumbnail", "/api/photo-grants",
                      "/api/photo-grants/anything", "/api/photo-sharing-prefs", "/api/photo-sharing-prefs/{id}"):

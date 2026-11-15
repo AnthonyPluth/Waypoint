@@ -29,7 +29,7 @@
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
-  let { refresh = 0 }: { refresh?: number } = $props();
+  let { refresh = 0, onchange = () => {} }: { refresh?: number; onchange?: () => void } = $props();
 
   let grants = $state<PhotoGrants | null>(null);
   let people = $state<Person[]>([]);
@@ -102,6 +102,7 @@
 
   const saveDefault = (p: PhotoGrantPerson, next: Scope) => act(async () => {
     patchPrefs(p.person_id, await apiCall<"POST /api/photo-sharing-prefs/{id}">(`/api/photo-sharing-prefs/${p.person_id}`, { method: "POST", body: { default_scope: next }, failed: "Couldn’t save it" }));
+    onchange();
     toast.success("Saved");
   }, { busy: (on) => (saving = on) });
 
@@ -126,6 +127,7 @@
     if (on && p.prefs.default_scope === "trip") { ask(allOf(p, "")); return; }
     await act(async () => {
       patchPrefs(p.person_id, await apiCall<"POST /api/photo-sharing-prefs/{id}">(`/api/photo-sharing-prefs/${p.person_id}`, { method: "POST", body: { share_all: on }, failed: on ? "Couldn’t turn it on" : "Couldn’t turn it off" }));
+      onchange();
       toast.success("Saved");
       if (on) await load(true);
     }, { busy: (busy) => (saving = busy) });
@@ -148,6 +150,7 @@
       if (fresh) asking = allOf(fresh, note); else dialog = false;
       return false;
     }
+    onchange();
     toast.success("Saved");
     await load(true);
     return true;
@@ -180,6 +183,7 @@
       if (fresh) asking = { kind: "widen", person: a.person, trip: a.trip, sharing: fresh, note }; else dialog = false;
       return false;
     }
+    onchange();
     toast.success(`Shared with everyone on ${a.trip.name}`);
     await load(true);
     return true;
@@ -187,6 +191,7 @@
 
   const narrow = (p: PhotoGrantPerson, t: PhotoGrantTrip) => act(async () => {
     const reply = await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { person_id: p.person_id, scope: "only_me" }, failed: "Couldn’t change it" });
+    onchange();
     toast(narrowedToast(who, t.name), { action: { label: "Undo", onClick: () => { void undo(p, t, reply); } } });
     await load(true);
   }, { busy: (on) => (saving = on) });
@@ -200,6 +205,7 @@
       await widen(p, t, errMsg(err));
       return;
     }
+    onchange();
     await load(true);
   });
 
@@ -217,6 +223,7 @@
     if (a?.kind !== "stop") return false;
     return act(async () => {
       await apiCall<"DELETE /api/trips/{id}/photo-sharing">(`/api/trips/${a.trip.trip_id}/photo-sharing?person_id=${a.person.person_id}`, { method: "DELETE", failed: "Couldn’t stop sharing" });
+      onchange();
       await load(true);
     });
   });
@@ -242,6 +249,7 @@
       prompt = sharing ? { ...open, sharing, note } : null;
       return;
     }
+    onchange();
     toast.success(`Shared with ${sharedWith(open.scope, who)}. Change it any time under Your photos on this trip.`);
     prompt = null;
     await load(true);
@@ -249,6 +257,7 @@
 
   const notNow = (p: PhotoGrantPerson, t: PhotoGrantTrip) => act(async () => {
     await apiCall<"POST /api/trips/{id}/photo-sharing">(`/api/trips/${t.trip_id}/photo-sharing`, { method: "POST", body: { person_id: p.person_id, declined: true }, failed: "Couldn’t save it" });
+    onchange();
     prompt = null;
     await load(true);
   }, { busy: (on) => (saving = on) });
