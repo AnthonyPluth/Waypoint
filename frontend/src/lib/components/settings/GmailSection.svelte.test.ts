@@ -135,6 +135,12 @@ describe("Settings → Gmail", () => {
     expect(await screen.findByTestId("scan-summary")).toHaveTextContent("AI attached 3 emails that add nothing new to their bookings (2 already known, 1 older than a saved copy).");
   });
 
+  it("says one email the AI attached as nothing new in the singular", async () => {
+    serve(list([box({ scan_summary: { found: 3, read: 3, bookings: 0, review: 1, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 0, with_facts: 0, attached: 0, ai_asked: 2, dismissed_known: 1, dismissed_older: 0 } })]));
+    render(GmailSection);
+    expect(await screen.findByTestId("scan-summary")).toHaveTextContent("AI attached 1 email that adds nothing new to its booking (1 already known).");
+  });
+
   it("counts the follow-ups attached to bookings, and those with details it did not apply", async () => {
     serve(list([box({ scan_summary: { found: 9, read: 8, bookings: 1, review: 0, skipped: 0, capped: false, labels_dropped: 0, triaged: 0, total: 0, not_travel: 0, followups: 4, with_facts: 1, attached: 0, ai_asked: 0, dismissed_known: 0, dismissed_older: 0 } })]));
     render(GmailSection);
