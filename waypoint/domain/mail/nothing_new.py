@@ -4,11 +4,11 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from ...storage import db
+from ...storage import db, stored_mail
 from ...storage.models import Segment
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai, followup, ingest, newer, price, references, when, words
+from . import ai, ingest, newer, price, references, when, words
 from .booking import Passenger
 
 Reason = Literal["already_known", "older_copy"]
@@ -44,6 +44,9 @@ NAMED_HOURS = {"noon": (12, 0), "midday": (12, 0), "midnight": (0, 0), "midi": (
                "mediodía": (12, 0), "medianoche": (0, 0), "正午": (12, 0)}
 NAMED_HOUR = re.compile(r"(?i)(?<![^\W\d_])(?:" + "|".join(sorted(NAMED_HOURS, key=len, reverse=True)) + r")(?![^\W\d_])")
 
+SHARED_MAIL = frozenset({"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "hotmail.co.uk", "live.com", "msn.com", "yahoo.com", "yahoo.co.uk",
+                         "ymail.com", "aol.com", "icloud.com", "me.com", "mac.com", "proton.me", "protonmail.com", "pm.me", "gmx.com", "gmx.net", "gmx.de",
+                         "web.de", "mail.com", "zoho.com", "yandex.com", "fastmail.com", "hey.com", "comcast.net", "privaterelay.appleid.com"})
 
 @dataclass(frozen=True)
 class Signals:
@@ -210,9 +213,15 @@ def covers(sign: Signals, suggestions: list[ai.Suggestion]) -> bool:
     return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told and all(readings & days for readings in sign.days)
 
 
+def _kept_sender(conn: db.Connection, seg: Segment, sender: str | None) -> bool:
+    if not sender or sender in SHARED_MAIL:
+        return False
+    return any(sender == kept or sender.endswith("." + kept) for kept in stored_mail.senders_for_segment(conn, seg.id) if kept not in SHARED_MAIL)
+
+
 def vouched_for(conn: db.Connection, seg: Segment, sign: Signals, sender: str | None) -> bool:
     code = references.normal(seg.confirmation or "")
-    return (len(code) >= references.MIN_LENGTH and code in sign.tokens) or followup.sent_like_kept(conn, seg, sender)
+    return (len(code) >= references.MIN_LENGTH and code in sign.tokens) or _kept_sender(conn, seg, sender)
 
 
 def matched(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,

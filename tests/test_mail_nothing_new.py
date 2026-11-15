@@ -710,6 +710,62 @@ class WhoMayAttachTests(NothingNewCase):
         self.assertEqual(self.assess(earlier, received="2026-10-10", convert=True, sender="example-air-alerts.example",
                                      sign=nothing_new.signals(OLD_TEXT)), "older_copy")
 
+    def forwarded(self, body: str, sender: str, subject: str = f"Fwd: {SUBJECT}", marker: str = "---------- Forwarded message ---------") -> None:
+        text = f"{marker}\nFrom: Example Air <reservations@example-air.example>\nSubject: Your upcoming flight\n\n{body}"
+        self.read_mail(text, SAME, subject=subject, sender=sender)
+
+    def test_a_forward_shaped_reminder_from_an_outside_sender_naming_the_airline_in_its_body_stays_in_review(self):
+        self.forwarded(REMINDER, OUTSIDER)
+        self.stays_in_review()
+
+    def test_a_forward_shaped_reminder_stays_in_review_however_it_is_marked(self):
+        for n, (subject, marker) in enumerate(((SUBJECT, "---------- Forwarded message ---------"), (f"Fwd: {SUBJECT}", "Begin forwarded message:"),
+                                               (f"FW: {SUBJECT}", "Begin forwarded message:"))):
+            with self.subTest(subject=subject, marker=marker):
+                with db.session() as conn:
+                    conn.execute(ReviewItem.__table__.delete())
+                self.tick += 60
+                text = f"{marker}\nFrom: Example Air <reservations@example-air.example>\nSubject: Your upcoming flight\n\n{REMINDER}"
+                self.add_mail(f"fw-{n}", mail(text, subject, SAME_DAY, f"fw-{n}", OUTSIDER))
+                self.fake.content = json.dumps(SAME)
+                with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
+                    self.scan(now=NOW + self.tick)
+                self.assertEqual((self.counted(), self.scanned()[f"fw-{n}"]), ((0, 0), "unreadable"))
+                self.assertNotIn(f"fw-{n}", [a["message_id"] for a in self.attached()])
+
+    def test_even_the_booking_s_own_sender_forwarding_a_reminder_without_the_code_stays_in_review(self):
+        self.forwarded(REMINDER, "Example Air <reservations@example-air.example>")
+        self.stays_in_review()
+
+    def test_a_household_member_s_forward_that_carries_the_booking_s_code_is_still_a_follow_up(self):
+        self.forwarded(f"{REMINDER} Booking reference QX7M2K.", "Jane Doe <jane@gmail.example>")
+        self.assertEqual((self.kept(), self.scanned()["reminder"]), ([], "follow-up"))
+
+    def only_kept_from(self, domain: str) -> None:
+        seg = self.add_flight(self.jane, "EX 202", "ZT4P8Q")
+        content = {"subject": "Booked", "sender_domain": domain, "received": "2026-10-12", "text": "Booked.", "html": None,
+                   "truncated": False, "original": True, "images": 0}
+        def link(conn):
+            stored_mail.put(conn, self.mailbox, f"kept-{domain}", content, NOW)
+            stored_mail.link(conn, seg["id"], self.mailbox, f"kept-{domain}")
+        self.read(link)
+
+    def test_a_sender_is_trusted_at_the_kept_domain_or_below_it_never_above_it(self):
+        self.only_kept_from("alerts.example-air.example")
+        said = {**SAME, "flight_number": "EX 202"}
+        self.assertEqual(self.assess(said, sender="alerts.example-air.example"), "already_known")
+        self.assertEqual(self.assess(said, sender="news.alerts.example-air.example"), "already_known")
+        self.assertIsNone(self.assess(said, sender="example-air.example"))
+        self.assertIsNone(self.assess(said, sender="other.example-air.example"))
+        self.assertIsNone(self.assess(said, sender="badalerts.example-air.example"))
+
+    def test_a_shared_mail_service_never_vouches_for_its_users(self):
+        self.only_kept_from("gmail.com")
+        said = {**SAME, "flight_number": "EX 202"}
+        self.assertIsNone(self.assess(said, sender="gmail.com"))
+        self.assertIsNone(self.assess(said, sender="mail.gmail.com"))
+        self.assertEqual(self.assess(said, sender=None, sign=nothing_new.signals("EX 202 JFK to LHR. Booking reference ZT4P8Q.")), "already_known")
+
     def test_assess_needs_the_code_in_the_text_or_a_kept_sender(self):
         self.assertEqual(self.assess(SAME), "already_known")
         self.assertIsNone(self.assess(SAME, sender="example-air-alerts.example"))
@@ -737,6 +793,16 @@ class SendersDateTests(NothingNewCase):
         [seg] = self.segments()
         self.assertEqual((seg["id"], seg["start_local"], seg["status"]), (self.known["id"], "2026-11-20T21:30", "changed"))
         self.assertIn("newer", [a["message_id"] for a in self.attached()])
+
+    def test_the_sender_that_vouches_is_the_message_s_own_never_one_written_in_its_body(self):
+        def own(body: str, subject: str = SUBJECT, sender: str = OUTSIDER) -> str | None:
+            return extract.own_sender({"raw": base64.urlsafe_b64encode(mail(body, subject, sender=sender)).decode()})
+        self.assertEqual(own(REMINDER), "example-air-alerts.example")
+        self.assertEqual(own(REMINDER, sender="Example Air <reservations@example-air.example>"), "example-air.example")
+        fwd = "---------- Forwarded message ---------\nFrom: Example Air <reservations@example-air.example>\nSubject: Hi\n\n" + REMINDER
+        self.assertIsNone(own(fwd))
+        self.assertIsNone(own(REMINDER, "Fwd: Your upcoming flight"))
+        self.assertIsNone(extract.own_sender({"raw": "!!"}))
 
     def test_the_sender_s_date_is_kept_when_it_is_not_after_the_message_arrived(self):
         def read(date: str, arrived: str | None) -> str | None:

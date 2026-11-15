@@ -488,7 +488,7 @@ class Filed(NamedTuple):
 
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
              auto: bool | None, now: float, parking: int = 0,
-             signals: nothing_new.Signals | None = None, dismiss_known: bool = False) -> Filed:
+             signals: nothing_new.Signals | None = None, dismiss_known: bool = False, sender: str | None = None) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id).with_for_update(of=ReviewItem)).fetchone()
@@ -498,7 +498,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
     review.raise_parking(conn, mailbox_id, message_id, parking)
     if (dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change
             and nothing_new.covers(signals, suggestions)):
-        found = [nothing_new.matched(conn, viewer, s, _ai_fields(conn, s), row["received"], signals, row["sender_domain"]) for s in suggestions]
+        found = [nothing_new.matched(conn, viewer, s, _ai_fields(conn, s), row["received"], signals, sender) for s in suggestions]
         if all(found):
             reasons = [f[0] for f in found if f]
             kept = list(dict.fromkeys(f[1] for f in found if f))
@@ -612,7 +612,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
             filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(),
-                             read.parking, signals=read.signals, dismiss_known=True)
+                             read.parking, signals=read.signals, dismiss_known=True, sender=extract.own_sender(raw))
             made, cleared = made + filed.added, cleared + filed.cleared
             if filed.known:
                 known[filed.known] += 1

@@ -807,6 +807,19 @@ def guard(message: Mapping[str, Any]) -> tuple[str, bool]:
     return subject, read(message).revises
 
 
+def own_sender(message: Mapping[str, Any]) -> str | None:
+    parsed = _parsed(message)
+    if parsed is None:
+        return None
+    try:
+        sender, subject = _domain(parsed.get("From")), str(parsed.get("Subject") or "")
+    except (ValueError, LookupError, TypeError):
+        return None
+    if FORWARD_SUBJECT.match(subject) or unwrap(_plain(_bodies(message), MAX_PART)) is not None or read(message).forwarded_by is not None:
+        return None
+    return sender
+
+
 def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Content, list[Image]]:
     parsed = _parsed(message)
     subject: str | None = None
