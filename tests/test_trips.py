@@ -1106,7 +1106,7 @@ class VisibilityRouteTests(RouteCase):
                  ("POST", f"/api/trips/{trip}/destination/suggest", None),
                  ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
                  ("DELETE", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [1]}),
-                 ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None),
+                 ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", f"/api/trips/{trip}/photo-exclusions/1/thumbnail", None),
                  ("POST", "/api/segments", {**HOTEL, "trip_id": trip})]
         for s in segs:
             calls += [("GET", f"/api/segments/{s}", None), ("GET", f"/api/segments/{s}/logo", None), ("GET", f"/api/segments/{s}/emails", None), ("GET", f"/api/segments/{s}/emails/0/images/0", None),
@@ -1136,6 +1136,7 @@ class VisibilityRouteTests(RouteCase):
                    ("POST", "/api/trips/{id}/destination/suggest"),
                    ("GET", "/api/trips/{id}/photo-sharing"), ("POST", "/api/trips/{id}/photo-sharing"), ("DELETE", "/api/trips/{id}/photo-sharing"),
                    ("POST", "/api/trips/{id}/photo-exclusions"), ("DELETE", "/api/trips/{id}/photo-exclusions/{id}"),
+                   ("GET", "/api/trips/{id}/photo-exclusions/{id}/thumbnail"),
                    ("GET", "/api/segments/{id}"), ("POST", "/api/segments/{id}"), ("DELETE", "/api/segments/{id}"),
                    ("GET", "/api/segments/{id}/logo"), ("GET", "/api/segments/{id}/emails"),
                    ("GET", "/api/segments/{id}/emails/{id}/images/{id}"), ("POST", "/api/segments/{id}/move"),
