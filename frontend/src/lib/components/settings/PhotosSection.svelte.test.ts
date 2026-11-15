@@ -176,6 +176,26 @@ describe("Settings → Photos, the source cards", () => {
     expect(toast.success).toHaveBeenCalledWith("Ada Brook’s library removed");
   });
 
+  it("tells the page after a pause, a resume and a removal, so what depends on the libraries loads again", async () => {
+    let status: PhotoSource["status"] = "ok";
+    let gone = false;
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources" && !opts?.method) return { sources: gone ? [] : [source({ status })], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/7/resume") return { asks: false, count: 0, grants: [], snapshot: "a".repeat(32) };
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") { status = (opts.body as { paused: boolean }).paused ? "off" : "ok"; return source({ status }); }
+      if (path === "/api/photo-sources/7" && opts?.method === "DELETE") { gone = true; return {}; }
+    });
+    const onchange = vi.fn();
+    render(PhotosSection, { onchange });
+    await userEvent.click(await screen.findByRole("button", { name: "Pause, Ada Brook’s library" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(1));
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(2));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove Ada Brook’s library" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(onchange).toHaveBeenCalledTimes(3));
+  });
+
   it("pauses a library, and resumes it with the snapshot when nothing needs confirming", async () => {
     let status: PhotoSource["status"] = "ok";
     serve([], (path, opts) => {

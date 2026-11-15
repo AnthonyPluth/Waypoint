@@ -342,6 +342,26 @@ describe("evidence on a pass", () => {
     }
     offline.mockRestore();
   });
+  it("keeps the plane at the origin with no landed label when the booked arrival has passed but the flight is delayed and not departed", () => {
+    const now = arr + HOUR;
+    flightStatus.list = list({ statuses: [status({ fetched_at: new Date(now - 60_000).toISOString() })] });
+    const { container } = render(PassCard, { segment: flight, now });
+    expect(container.querySelector("[data-headline]")?.textContent).toBe("Delayed 50 min, not yet confirmed as departed");
+    expect(progressOf(container)).toBe("0");
+    expect(screen.getByRole("img", { name: "Route" })).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Route, with the plane at the destination" })).toBeNull();
+  });
+  it("places the plane from the live times once departed, and at the destination once landed", () => {
+    const now = instant("2026-11-20T19:50", NY) + (instant("2026-11-21T08:05", LON) - instant("2026-11-20T19:50", NY)) / 2;
+    flightStatus.list = list({ statuses: [status({ state: "departed", fetched_at: new Date(now - 60_000).toISOString() })] });
+    const air = render(PassCard, { segment: flight, now });
+    expect(Number(progressOf(air.container))).toBeCloseTo(0.5, 5);
+    air.unmount();
+    flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: new Date(now - 60_000).toISOString() })] });
+    const down = render(PassCard, { segment: flight, now });
+    expect(progressOf(down.container)).toBe("1");
+    expect(screen.getByRole("img", { name: "Route, with the plane at the destination" })).toBeInTheDocument();
+  });
   it("keeps the plane at the destination for a landed status however old, and at the clock's place for a stale non-terminal one", () => {
     const old = new Date(dep - 30 * 24 * HOUR).toISOString();
     flightStatus.list = list({ statuses: [status({ state: "landed", fetched_at: old })] });

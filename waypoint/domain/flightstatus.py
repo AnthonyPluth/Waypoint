@@ -23,8 +23,13 @@ REDUCED_FROM = 0.9
 CHECKS = (("24h", timedelta(hours=24)), ("3h", timedelta(hours=3)), ("1h", timedelta(hours=1)),
           ("20m", timedelta(minutes=20)))
 ONE_HOUR = "1h"
+AHEAD_OF_DELAY = (("1h late", timedelta(hours=1)), ("20m late", timedelta(minutes=20)))
 REFRESH_AFTER = timedelta(minutes=15)
 LATE = timedelta(hours=6)
+OVERDUE_EVERY = timedelta(minutes=15)
+OVERDUE_FAST_FOR = timedelta(hours=2)
+OVERDUE_SLOW_EVERY = timedelta(hours=1)
+MOST_LATE = timedelta(days=1)
 PAUSE = timedelta(hours=1)
 CHECK_KEEP_DAYS = 7
 OVER = (service.LANDED, service.CANCELLED, service.DIVERTED)
@@ -35,6 +40,7 @@ Shown = Literal["scheduled", "delayed", "departed", "landed", "cancelled", "dive
 _lock = threading.Lock()
 _held_lock = threading.Lock()
 _held: dict[tuple[str, str], tuple[service.Status, datetime, datetime]] = {}
+_failed: set[tuple[str, str]] = set()
 
 
 class NotAFlight(ValueError):
@@ -103,15 +109,54 @@ class Overview(TypedDict):
     statuses: list[StatusOut]
 
 
-def checkpoints(flight: Flight) -> list[tuple[datetime, str]]:
-    return [(flight.departs - before, name) for name, before in CHECKS] + [(flight.arrives, "arrival")]
+def _at(local: str | None, zone: str | None) -> datetime | None:
+    if not (local and zone):
+        return None
+    try:
+        return trips.instant(local, zone)
+    except (ValueError, KeyError):
+        return None
 
 
-def due(flight: Flight, now: datetime, last: datetime | None, state: str | None, reduced: bool = False) -> bool:
-    if state in OVER or now > flight.arrives + LATE:
+def _later(booked: datetime, said: datetime | None) -> datetime:
+    return min(max(booked, said or booked), booked + MOST_LATE)
+
+
+def expected(flight: Flight, seen: service.Status | None = None) -> tuple[datetime, datetime]:
+    if seen is None:
+        return flight.departs, flight.arrives
+    return (_later(flight.departs, _at(seen.dep_actual or seen.dep_estimated, seen.dep_zone)),
+            _later(flight.arrives, _at(seen.arr_actual or seen.arr_estimated, seen.arr_zone)))
+
+
+def _left(state: str | None, seen: service.Status | None, now: datetime) -> bool:
+    if state == service.DEPARTED:
+        return True
+    left = _at(seen.dep_actual, seen.dep_zone) if seen else None
+    return left is not None and left <= now
+
+
+def checkpoints(flight: Flight, seen: service.Status | None = None) -> list[tuple[datetime, str]]:
+    departs, arrives = expected(flight, seen)
+    points = [(flight.departs - before, name) for name, before in CHECKS]
+    if departs - flight.departs >= timedelta(minutes=service.DELAYED_AFTER_MINUTES):
+        points += [(departs - before, name) for name, before in AHEAD_OF_DELAY if departs - before > flight.departs - CHECKS[-1][1]]
+    return sorted([*points, (arrives, "arrival")])
+
+
+def due(flight: Flight, now: datetime, last: datetime | None, state: str | None, reduced: bool = False,
+        seen: service.Status | None = None, failed: bool = False) -> bool:
+    departs, arrives = expected(flight, seen)
+    if state in OVER or now > arrives + LATE:
         return False
-    passed = [at for at, name in checkpoints(flight) if at <= now and (name == ONE_HOUR or not reduced)]
-    return bool(passed) and (last is None or last < passed[-1])
+    passed = [at for at, name in checkpoints(flight, seen) if at <= now and (name == ONE_HOUR or not reduced)]
+    if passed and (last is None or last < passed[-1]):
+        return True
+    since = arrives if now >= arrives else departs if now >= departs and not _left(state, seen, now) else None
+    if reduced or failed or seen is None or since is None:
+        return False
+    every = OVERDUE_EVERY if now - since < OVERDUE_FAST_FOR else OVERDUE_SLOW_EVERY
+    return last is None or now - last >= every
 
 
 def limit() -> int:
@@ -222,8 +267,22 @@ def drop_held(number: str | None = None, day: str | None = None) -> None:
     with _held_lock:
         if number is None or day is None:
             _held.clear()
+            _failed.clear()
         else:
             _held.pop((number, day), None)
+
+
+def _note_failure(flight: Flight, failed: bool) -> None:
+    with _held_lock:
+        if failed:
+            _failed.add((flight.number, flight.day))
+        else:
+            _failed.discard((flight.number, flight.day))
+
+
+def _last_failed(flight: Flight) -> bool:
+    with _held_lock:
+        return (flight.number, flight.day) in _failed
 
 
 def _fresh(number: str, day: str, now: datetime) -> tuple[service.Status, datetime] | None:
@@ -232,10 +291,11 @@ def _fresh(number: str, day: str, now: datetime) -> tuple[service.Status, dateti
     return (entry[0], entry[1]) if entry and entry[1] <= now < entry[2] else None
 
 
-def _answer(conn: db.Connection, number: str, day: str, now: datetime) -> tuple[service.Status, datetime] | None:
-    if (row := _final(conn, number, day)) is not None:
-        return _known(row), _fetched(row)
-    return _fresh(number, day, now)
+def _answered(conn: db.Connection, number: str, day: str, now: datetime) -> bool:
+    if _final(conn, number, day) is not None:
+        return True
+    held = _fresh(number, day, now)
+    return held is not None and now - held[1] < REFRESH_AFTER
 
 
 def _last_call(conn: db.Connection, flight: Flight) -> datetime | None:
@@ -258,7 +318,7 @@ def _store(conn: db.Connection, flight: Flight, found: service.Status | None, no
         db.upsert(conn, FlightStatus, values, key=["flight_number", "date"])
         drop_held(flight.number, flight.day)
     elif found is not None and found.state != service.UNKNOWN:
-        hold(flight.number, flight.day, found, now, now + REFRESH_AFTER)
+        hold(flight.number, flight.day, found, now, max(now + REFRESH_AFTER, expected(flight, found)[1] + LATE))
     else:
         drop_held(flight.number, flight.day)
 
@@ -278,6 +338,9 @@ def _note_aircraft(conn: db.Connection, flight: Flight, found: service.Status | 
 
 
 def purge(conn: db.Connection, now: datetime) -> None:
+    gone = (now.astimezone().date() - timedelta(days=CHECK_KEEP_DAYS)).isoformat()
+    with _held_lock:
+        _failed.difference_update({key for key in _failed if key[1] <= gone})
     conn.execute(delete(FlightCheck).where(FlightCheck.date <= (now.astimezone().date() - timedelta(days=CHECK_KEEP_DAYS)).isoformat()))
 
 
@@ -286,6 +349,7 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
     try:
         found = service.fetch(flight.number, flight.day, flight.origin)
     except service.FlightStatusError as e:
+        _note_failure(flight, True)
         _touch(conn, flight, now)
         conn.commit()
         if isinstance(e, service.RateLimited):
@@ -293,6 +357,7 @@ def _check(conn: db.Connection, flight: Flight, now: datetime) -> None:
         elif isinstance(e, service.Refused):
             _pause(conn, now, "key")
         raise
+    _note_failure(flight, False)
     _store(conn, flight, found, now)
     _note_aircraft(conn, flight, found)
     conn.commit()
@@ -308,7 +373,9 @@ def run_due(conn: db.Connection, now: datetime) -> int:
         if spent.paused:
             break
         row = _final(conn, flight.number, flight.day)
-        if not due(flight, now, _last_call(conn, flight), row.state if row else None, spent.reduced):
+        seen = None if row else _fresh(flight.number, flight.day, now)
+        state = row.state if row else seen[0].state if seen else None
+        if not due(flight, now, _last_call(conn, flight), state, spent.reduced, seen[0] if seen else None, _last_failed(flight)):
             continue
         try:
             _check(conn, flight, now)
@@ -377,6 +444,6 @@ def refresh(conn: db.Connection, viewer: Viewer, segment_id: int, now: datetime)
         raise NotAFlight("Live status is for flights that have a flight number.")
     if not service.configured():
         raise service.NotConfigured("Flight status isn’t set up: RAPIDAPI_KEY isn’t set.")
-    if _answer(conn, flight.number, flight.day, now) is None and not usage(conn, now).paused:
+    if not _answered(conn, flight.number, flight.day, now) and not usage(conn, now).paused:
         _check(conn, flight, now)
     return _overview(conn, now, _statuses(conn, [seg], now))

@@ -15,6 +15,7 @@
   import { clearRouteCache } from "$lib/driving-routes";
   import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
+  import PhotoSharingSettings from "$lib/components/settings/PhotoSharingSettings.svelte";
   import PhotosSection from "$lib/components/settings/PhotosSection.svelte";
   import RemindersSection from "$lib/components/settings/RemindersSection.svelte";
   import { flightStatus, loadFlightStatus } from "$lib/flightstatus.svelte";
@@ -32,6 +33,7 @@
   const s = $derived(app.state);
   const user = $derived(s?.user);
   let signingOut = $state(false);
+  let librariesChanged = $state(0);
   const flights = $derived(flightStatus.list);
   onMount(loadFlightStatus);
   onMount(() => {
@@ -144,7 +146,9 @@
 
     <AiSection />
   {:else if group.id === "photos"}
-    <PhotosSection />
+    <PhotosSection onchange={() => (librariesChanged += 1)} />
+
+    <PhotoSharingSettings refresh={librariesChanged} />
   {:else if group.id === "travel"}
     <HomeSection />
 

@@ -76,8 +76,8 @@ function serve(failOn?: string) {
   });
 }
 
-afterEach(() => { setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset(); calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; dismissedOnAsk = {}; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+afterEach(() => { vi.useRealTimers(); setQuery(""); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset();  calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; dismissedOnAsk = {}; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -139,21 +139,116 @@ describe("Review", () => {
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await settled();
     await userEvent.click(within(row).getByRole("button", { name: /Dismiss/ }));
-    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Dismiss" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/4", "DELETE", undefined]));
   });
 
-  it("dismisses an item", async () => {
+  const deletes = () => calls.filter(([, method]) => method === "DELETE");
+
+  it("dismisses an item at once, with no question and no toast, and sends the request once", async () => {
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
-    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/deletes its stored copy of this email/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/can’t be undone/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Dismiss" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Dismissed");
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(deletes()).toHaveLength(1);
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("takes the item off the list before the request answers", async () => {
+    render(ReviewPage);
+    const base = vi.mocked(api).getMockImplementation()!;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (opts?.method === "DELETE") await gate;
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    release();
+    await waitFor(() => expect(deletes()).toHaveLength(1));
+  });
+
+  it("brings the item back with the error when the request fails", async () => {
+    serve("/api/review/1");
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Refused."));
+    expect(await screen.findByTestId("review-item")).toBeInTheDocument();
+  });
+
+  it("keeps a dismissed item off the list when an older reload answers after a newer one", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    const stale = structuredClone(held);
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let reloads = 0;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/review" && reloads++ === 0) { await gate; return stale; }
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await userEvent.click(screen.getByRole("button", { name: /^Dismiss: / }));
+    await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await waitFor(() => expect(reloads).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(deletes()).toHaveLength(2));
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.queryByTestId("review-item")).toBeNull();
+  });
+
+  it("keeps a dismissed item off the list when its own reload is thrown away for a newer one", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3 })], who: [], ai: false };
+    render(ReviewPage);
+    await screen.findAllByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    const gates: (() => void)[] = [];
+    let reloads = 0;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      if (path === "/api/review") {
+        reloads++;
+        await new Promise<void>((resolve) => { gates.push(resolve); });
+      }
+      return base(path, opts as never);
+    }) as never);
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(reloads).toBe(1));
+    await userEvent.click((await screen.findAllByRole("button", { name: /^Dismiss: / }))[0]!);
+    await waitFor(() => expect(reloads).toBe(2));
+    gates[0]!();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getAllByTestId("review-item")).toHaveLength(1);
+    gates[1]!();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(screen.getAllByTestId("review-item")).toHaveLength(1);
+    expect(deletes()).toHaveLength(2);
+  });
+
+  it("lists a new item that reuses the id of one dismissed earlier", async () => {
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((async (path: string, opts?: { method?: string; body?: unknown }) => {
+      const reply = await base(path, opts as never);
+      if (opts?.method === "DELETE") held = { ...held, items: [item({ id: 1, subject: "A later email" })] };
+      return reply;
+    }) as never);
+    await userEvent.click(await screen.findByRole("button", { name: /Dismiss: .Mail from example-air.example/ }));
+    expect(await screen.findByText("A later email")).toBeInTheDocument();
+  });
+
+  it("moves focus to the next item after a dismissal", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    render(ReviewPage);
+    const menus = await screen.findAllByTestId("action-menu");
+    const next = within(menus[1]!).getByText("More").closest("summary") as HTMLElement;
+    await userEvent.click(within(menus[0]!).getByText("More"));
+    await userEvent.click(within(menus[0]!).getByRole("button", { name: /^Dismiss/ }));
+    await waitFor(() => expect(next).toHaveFocus());
   });
 
   it("shows items about one reservation as one row with a count, the newest first, and the others behind a disclosure", async () => {
@@ -180,17 +275,17 @@ describe("Review", () => {
     expect(screen.queryByTestId("same-reservation")).toBeNull();
   });
 
-  it("dismisses the whole group from its row and says how many went", async () => {
+  it("dismisses the whole group from its row with one request and no toast", async () => {
     held = { ...held, who: [], items: [item({ subject: "Online check-in is open", count: 3, others: [
       { id: 2, subject: "Your payment receipt", has_email: true, received: "2026-10-12" },
       { id: 3, subject: "Your reminder", has_email: true, received: "2026-10-10" }] })] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: "Dismiss all: 3 emails about “Online check-in is open”" }));
-    expect(within(await screen.findByRole("dialog")).getByText(/all 3 emails about this reservation/)).toBeInTheDocument();
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Dismiss all" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
-    expect(toast.success).toHaveBeenCalledWith("Dismissed 3 emails");
+    expect(screen.queryByRole("dialog")).toBeNull();
     await waitFor(() => expect(screen.queryByTestId("review-item")).toBeNull());
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
+    expect(deletes()).toHaveLength(1);
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it("adds a legacy generic suggestion without a sender-trust prompt", async () => {
@@ -1924,7 +2019,7 @@ describe("Review as a queue of decisions", () => {
     expect(menu).not.toHaveAttribute("open");
   });
 
-  it("closes the menu when an action in it is chosen, and returns focus to it when the question is cancelled", async () => {
+  it("closes the menu when an action in it is chosen", async () => {
     render(ReviewPage);
     const u = userEvent.setup();
     const menu = await screen.findByTestId("action-menu");
@@ -1932,11 +2027,8 @@ describe("Review as a queue of decisions", () => {
     await u.click(summary);
     await u.click(within(menu).getByRole("button", { name: /^Dismiss/ }));
     expect(menu).not.toHaveAttribute("open");
-    const dialog = await screen.findByRole("dialog");
-    await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(summary).toHaveFocus());
-    expect(calls.filter(([, method]) => method === "DELETE")).toEqual([]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
   });
 
   it("keeps the warning about where the text goes beside the button that sends it", async () => {

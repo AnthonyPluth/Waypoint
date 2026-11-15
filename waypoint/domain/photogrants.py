@@ -134,10 +134,18 @@ class GrantedTrip(TypedDict):
     removed_count: int
 
 
+class EligibleTrip(TypedDict):
+    trip_id: int
+    window: photos.WindowOut
+    audience: list[int]
+
+
 class PersonGrants(TypedDict):
     person_id: int
     prefs: Prefs
     count_token: str
+    sources: list[SourceVersion]
+    eligible: list[EligibleTrip]
     trips: list[GrantedTrip]
 
 
@@ -925,6 +933,15 @@ def _reachable(conn: db.Connection, person_id: int) -> list[int]:
     return sorted(found)
 
 
+def _offered(conn: db.Connection, trip_ids: Sequence[int]) -> list[EligibleTrip]:
+    out: list[EligibleTrip] = []
+    for trip_id in trip_ids:
+        window = photos.window_out(photos.trip_window(conn, trip_id))
+        if window is not None:
+            out.append({"trip_id": trip_id, "window": window, "audience": audience_of(conn, trip_id)})
+    return out
+
+
 def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> Grants:
     if viewer.household:
         return {"people": []}
@@ -936,6 +953,7 @@ def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> G
         unshared = sorted(t for t in seen if (t in rows and rows[t].revoked is not None) or (t not in rows and person in aboard[t]))
         by = photos.viewer_sub(conn, viewer)
         eligible = _eligible(conn, person, by) if by else []
+        versions = sources_of(conn, person)
         before = count_token(conn, person, eligible)
         counted = count(conn, person, unshared)
         token = count_token(conn, person, eligible)
@@ -951,5 +969,6 @@ def grants(conn: db.Connection, viewer: Viewer, count: Counter = uncounted) -> G
             listed.append({"trip_id": trip.id, "name": trip.name, "start_date": trip.start_date, "end_date": trip.end_date, "state": shown,
                            "scope": state["scope"], "count": state["count"] if shown == "shared" else counts, "removed_count": state["removed_count"]})
         listed.sort(key=lambda t: (t["start_date"] is None, t["start_date"] or "", t["trip_id"]))
-        out.append({"person_id": person, "prefs": prefs_of(conn, person), "count_token": token, "trips": listed})
+        offered = _offered(conn, eligible)
+        out.append({"person_id": person, "prefs": prefs_of(conn, person), "count_token": token, "sources": versions, "eligible": offered, "trips": listed})
     return {"people": out}

@@ -35,6 +35,7 @@ FAKETIME_LIBRARIES = (
 FAKETIME_INSTALL = "sudo apt-get install libfaketime"
 SIGNED_IN_AS = ("jane", "sam")
 SIGNED_IN_ENV = "WAYPOINT_VERIFY_AS"
+SIGNED_PAGES = ("trip",)
 MAPKIT_KEY_FILE = "mapkit-key.p8"
 MAPKIT_KEY_ID = "VERIFYKEY1"
 MAPKIT_TEAM_ID = "VERIFYTEAM"
@@ -86,6 +87,12 @@ def mapkit_env(env: dict[str, str], folder: str, url: str | None) -> dict[str, s
 
 def flows_need_signed_in(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
     return flows_asking("signed_in", pages, only, folder)
+
+
+def pages_need_signed_in(pages: list[str] | None = None, only: list[str] | None = None) -> bool:
+    if only and not pages:
+        return False
+    return any(page in SIGNED_PAGES for page in (pages or SIGNED_PAGES))
 
 
 def flows_need_mapkit(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
@@ -267,7 +274,7 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     root = tempfile.mkdtemp(prefix="waypoint-verify-")
     instances: list[Instance] = []
     try:
-        signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) else None
+        signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) or pages_need_signed_in(pages, flows) else None
         with_mapkit = flows_need_mapkit(pages, flows)
         try:
             instances = start_instances(root, count, library, signed, with_mapkit)
@@ -278,7 +285,7 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
         signed_url = instances[count].url if signed else None
         mapkit_url = instances[-1].url if with_mapkit else None
         print(f"verify: demo data served at {', '.join(urls)}" + (f" ({count} servers, each with its own copy of the data)" if count > 1 else "")
-              + (f"; signed in as {signed} at {signed_url} for the flows that ask for it" if signed_url else "")
+              + (f"; signed in as {signed} at {signed_url} for the pages and flows that ask for it" if signed_url else "")
               + (f"; MapKit on, with a throwaway key and a stand-in for Apple's script, at {mapkit_url} for the flows that ask for it" if mapkit_url else ""))
         code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url, mapkit_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
         for instance in instances:

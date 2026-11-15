@@ -25,6 +25,8 @@ function serve() {
   vi.mocked(api).mockImplementation(async (path) => {
     if (path === "/api/people") return { people: [] };
     if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+    if (path === "/api/distance-unit") return { distance_unit: "mi" };
+    if (String(path).endsWith("/summary")) throw new Error("no summary");
     if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }] };
     return held;
   });
@@ -106,6 +108,8 @@ describe("Trip: the saved offline copy", () => {
     vi.mocked(api).mockImplementation(async (path) => {
       if (path === "/api/people") return { people: [] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+    if (path === "/api/distance-unit") return { distance_unit: "mi" };
+    if (String(path).endsWith("/summary")) throw new Error("no summary");
       if (path === "/api/offline") throw new Error("Server error");
       return held;
     });
@@ -205,6 +209,8 @@ describe("Trip: the saved offline copy", () => {
     vi.mocked(api).mockImplementation(async (path) => {
       if (path === "/api/people") return { people: [] };
       if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+    if (path === "/api/distance-unit") return { distance_unit: "mi" };
+    if (String(path).endsWith("/summary")) throw new Error("no summary");
       if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }, { trip: { ...held, id: 2, name: "Trip to Paris" }, messages: [] }] };
       return held;
     });

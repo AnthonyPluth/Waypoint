@@ -52,6 +52,10 @@ class Reading(unittest.TestCase):
         self.assertIn("phone: tab bar > More", ufm.reach("settings", labels, tabs, more, inside, []))
         self.assertIn("keeps Settings lit", ufm.reach("design", labels, tabs, more, inside, []))
         self.assertIn("can't", ufm.reach("oauth-approve", labels, tabs, more, inside, ["oauth-approve"]))
+        signed_in = ufm.reach("trip", labels, tabs, more, {"trip": "trips"}, [], ("trip",))
+        self.assertIn("URL `#trip/<id>`", signed_in)
+        self.assertIn("--signed-in jane", signed_in)
+        self.assertNotIn("goto trip`", signed_in)
 
 
 class Gotchas(unittest.TestCase):

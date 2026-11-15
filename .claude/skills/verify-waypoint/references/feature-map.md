@@ -248,6 +248,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Stats`.
 - **Drive it:** `tools/control flow past-trip-countries`; or `poetry run python run.py verify --flow past-trip-countries`.
 
+#### `photos-remove`
+
+- **Starts at:** `#trips`; goes to: `#trip/7`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Remove from this trip`, `1 of 12`, `2 selected`, `10 photos from your library`, `11 photos from your library`, `12 photos from your library`, `13 photos from your library`, `Removed from this trip (1)`, `13`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-remove`; or `poetry run python run.py verify --flow photos-remove`.
+
 #### `photos-signed-in`
 
 - **Starts at:** `#trips`; goes to: `/api/photos/15/thumbnail`, `/api/photo-sources`, `/api/trips/3/photos`.
@@ -255,6 +263,22 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Demo library`, `"match": "place"`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-signed-in`; or `poetry run python run.py verify --flow photos-signed-in`.
+
+#### `photos-trip-sharing-desktop`
+
+- **Starts at:** `#trips`; goes to: `#trip/5`, `#trip/7`.
+- **Widths:** desktop.
+- **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `aren’t on it. Only you see this.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `Denver`, `13 photos from your library`, `Everyone on this trip`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-trip-sharing-desktop`; or `poetry run python run.py verify --flow photos-trip-sharing-desktop`.
+
+#### `photos-trip-sharing`
+
+- **Starts at:** `#trips`; goes to: `#trip/2`, `#trip/7`.
+- **Widths:** phone.
+- **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `aren’t on it. Only you see this.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `Denver`, `13 photos from your library`, `Everyone on this trip`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-trip-sharing`; or `poetry run python run.py verify --flow photos-trip-sharing`.
 
 #### `seats`
 
@@ -346,6 +370,22 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `London`, `Orlando`, `San Francisco`.
 - **Expects to see:** `Trips`, `Check-in`, `Pick-up`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
+
+#### `trip-photo-pins`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`, `Close`.
+- **Expects to see:** `Trips`, `5 photos`, `Day 1`.
+- **Drive it:** `tools/control flow trip-photo-pins`; or `poetry run python run.py verify --flow trip-photo-pins`.
+
+#### `trip-photos`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Denver`, `See all`, `km from every booking`.
+- **Expects to see:** `Trips`, `13`, `Day 1`, `Far from the trip’s bookings`, `12 of 13`.
+- **Drive it:** `tools/control flow trip-photos`; or `poetry run python run.py verify --flow trip-photos`.
 
 #### `trip-route-replay-backtrack`
 
@@ -453,6 +493,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `London`, `Add address`, `Time zone`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow zone-search-trip`; or `poetry run python run.py verify --flow zone-search-trip`.
+
+## trip (`trip`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** not in the navigation (it keeps Trips lit); URL `#trip/<id>`, opened by clicking an item on `#trips`; it shows its photos only to a signed-in member, so control `tools/control start --signed-in jane`, then `tools/control goto trips` and `click` one.
+- **Drive it:** `tools/control start --signed-in jane`, `tools/control goto trips`, `click` an item, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in frontend/verify/verify.mjs names).
+- **What usually breaks:**
+  - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the Photos section isn't there at all.
+  - The route replay plays on its own; press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
 
 ## Stats (`stats`)
 
@@ -586,13 +635,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Review`, `Show the email`.
 - **Drive it:** `tools/control flow review-collapse-email`; or `poetry run python run.py verify --flow review-collapse-email`.
 
-#### `review-dismiss-confirm`
+#### `review-dismiss`
 
 - **Starts at:** `#review`.
 - **Widths:** phone, desktop.
 - **Touches:** `Dismiss`.
-- **Expects to see:** `can’t be undone`.
-- **Drive it:** `tools/control flow review-dismiss-confirm`; or `poetry run python run.py verify --flow review-dismiss-confirm`.
+- **Fakes (the demo server can't):** `fake_dismiss`.
+- **Drive it:** `tools/control flow review-dismiss`; or `poetry run python run.py verify --flow review-dismiss`.
 
 #### `review-held-match`
 
@@ -751,6 +800,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `It belongs to the Immich user Demo Person.`, `Not synced yet`.
 - **Fakes (the demo server can't):** `fake_immich`.
 - **Drive it:** `tools/control flow photos-connect`; or `poetry run python run.py verify --flow photos-connect`.
+
+#### `photos-sharing`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Touches:** `Everyone on the trip`, `Share on all my trips`, `Only me`.
+- **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `This applies to every trip you’re on now and to trips you join later.`.
+- **Drive it:** `tools/control flow photos-sharing`; or `poetry run python run.py verify --flow photos-sharing`.
 
 #### `review-at-a-glance`
 

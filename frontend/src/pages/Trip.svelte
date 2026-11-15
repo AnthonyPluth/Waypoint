@@ -1,10 +1,10 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
   import { app, route } from "$lib/app.svelte";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { apiCall } from "$lib/contract";
   import { emailNews } from "$lib/email-news";
-  import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
+  import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip, TripPhotos as PhotoReply } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
@@ -19,7 +19,7 @@
   import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
-  import { loadFlightStatus } from "$lib/flightstatus.svelte";
+  import { loadFlightStatus, followFlightStatus } from "$lib/flightstatus.svelte";
   import { isSavedCopy } from "$lib/offline";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
@@ -34,6 +34,8 @@
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
+  import TripPhotos from "$lib/components/TripPhotos.svelte";
+  import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
@@ -42,10 +44,15 @@
   import { toast } from "svelte-sonner";
 
   const staticDemo = import.meta.env.MODE === "demo";
+  let tripPhotos = $state<PhotoReply | null>(null);
+  let gallery = $state<{ showCluster: (cluster: number) => Promise<void> } | null>(null);
 
-  let { tripId = null, onchanged = null }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null } = $props();
+  let { tripId = null, onchanged = null, revision = 0 }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null; revision?: number } = $props();
 
   let trip = $state<Trip | null>(null);
+  let loads = $state(0);
+  let photoChanges = $state(0);
+  const replace = (next: Trip) => { trip = next; loads++; };
   let people = $state<Person[]>([]);
   let loyalty = $state<LoyaltyEntry[]>([]);
   let loadError = $state("");
@@ -112,6 +119,7 @@
     const tick = setInterval(() => (now = Date.now()), 30_000);
     return () => clearInterval(tick);
   });
+  followFlightStatus(() => trip?.segments ?? [], () => app.sessionExpired);
 
   const id = $derived(tripId === null ? route.sub : String(tripId));
 
@@ -124,7 +132,7 @@
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
       if (mine !== latest) return;
-      trip = t; people = p.people; loyalty = l.loyalty;
+      replace(t); people = p.people; loyalty = l.loyalty;
       void loadFlightStatus();
       void afterOnlineLoad(t);
     } catch (err) {
@@ -133,6 +141,8 @@
       await offerSavedCopy();
     }
   }
+  let seenRevision = untrack(() => revision);
+  $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
   $effect(() => { void id; form = null; editingTrip = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
@@ -195,7 +205,7 @@
     if (!trip || !mergeWith) return;
     const body = { merge: Number(mergeWith), ...(confirm ? { confirm: true } : {}) };
     try {
-      trip = await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body });
+      replace(await apiCall<"POST /api/trips/{id}/merge">(`/api/trips/${trip.id}/merge`, { method: "POST", body }));
     } catch (e) {
       const said = e as { status?: number; data?: { see_booking?: unknown; see_trip?: unknown } };
       if (said.status === 409 && Array.isArray(said.data?.see_booking)) {
@@ -286,8 +296,9 @@
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       {#key id}
-        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { trip = next; onchanged?.(); }} />
+        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { replace(next); onchanged?.(); }} />
       {/key}
+      {#if !editingTrip}<TripSummary tripId={t.id} revision={`${loads}.${photoChanges}`} />{/if}
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
         <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
       {/if}
@@ -309,7 +320,8 @@
     {/if}
   </div>
 
-  <RouteReplay trip={t} {now} />
+  <RouteReplay trip={t} {now} photos={tripPhotos} onshow={(cluster) => void gallery?.showCluster(cluster)} />
+  <TripPhotos bind:this={gallery} onloaded={(found) => (tripPhotos = found)} onchanged={() => photoChanges++} trip={t} {people} {now} />
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

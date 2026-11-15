@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -402,6 +403,20 @@ class SignedInTests(unittest.TestCase):
             self.assertFalse(need(["settings"], ["a"]))
             self.assertTrue(need(["settings"], ["c"]))
         self.assertFalse(verify.flows_need_signed_in(None, None, "/no/such/folder"))
+
+    def test_a_signed_in_server_is_started_for_a_page_that_needs_one(self):
+        self.assertTrue(verify.pages_need_signed_in())
+        self.assertTrue(verify.pages_need_signed_in(["trip"]))
+        self.assertTrue(verify.pages_need_signed_in(["trip"], ["a"]))
+        self.assertFalse(verify.pages_need_signed_in(["trips", "settings"]))
+        self.assertFalse(verify.pages_need_signed_in([], ["a"]))
+        self.assertFalse(verify.pages_need_signed_in(None, ["a"]))
+
+    def test_the_signed_pages_are_the_ones_the_browser_side_opens_signed_in(self):
+        with open(os.path.join(verify.ROOT, "frontend", "verify", "verify.mjs")) as f:
+            found = re.search(r"export const SIGNED_PAGES = \[([^\]]*)\]", f.read())
+        assert found is not None
+        self.assertEqual(tuple(json.loads(f"[{found.group(1)}]")), verify.SIGNED_PAGES)
 
     def test_the_node_command_names_the_signed_in_server_only_when_there_is_one(self):
         plain = verify.node_command("node", "/f", ["http://a"], [], [])

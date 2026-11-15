@@ -22,7 +22,7 @@
   import KindTile from "$lib/components/KindTile.svelte";
   import TrainFront from "@lucide/svelte/icons/train-front";
   import { duration } from "$lib/stats";
-  import { appWord, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, shipLeft, shipProgress, shipTrail, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, flightProgress, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, shipLeft, shipProgress, shipTrail, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -43,7 +43,7 @@
   const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
   const evidence = $derived(flight ? flightEvidence(status, now, online) : "scheduled");
   const grounded = $derived(cancelled || evidence === "cancelled");
-  const progress = $derived(evidence === "landed" ? 1 : routeProgress(s, now));
+  const progress = $derived(flight ? flightProgress(s, now, status, online) : routeProgress(s, now));
   const headlineText = $derived(passHeadline(s, now, status, online));
   const bad = $derived(grounded || evidence === "diverted");
   const seat = $derived(seatsInOrder(s.details.seat || s.travelers.map((t) => t.seat).filter(Boolean).join(", ")));

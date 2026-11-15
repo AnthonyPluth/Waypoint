@@ -414,6 +414,28 @@ export function flightEvidence(live: Pick<FlightStatus, "state" | "fetched_at"> 
 
 const lead = (word: string, ms: number, soon: string): string => (ms >= 60_000 ? `${word} ${until(ms)}` : soon);
 
+export const AIRBORNE_MAX = 0.95;
+
+export function flightProgress(s: Segment, now: number, live?: FlightStatus | null, online = true): number {
+  const evidence = flightEvidence(live, now, online);
+  if (evidence === "landed") return 1;
+  if (evidence === "cancelled") return 0;
+  const booked = routeProgress(s, now);
+  if (!live || evidence === "scheduled") return booked;
+  const from = startAt(s), to = endAt(s);
+  if (untimed(s) || Number.isNaN(from) || Number.isNaN(to)) return 0;
+  const left = live.dep_actual ?? (evidence === "delayed" ? null : live.dep_estimated ?? live.dep_scheduled);
+  const parsed = left ? instant(left, live.dep_zone) : evidence === "delayed" ? NaN : from;
+  const leftAt = Number.isNaN(parsed) && evidence !== "delayed" ? from : parsed;
+  if (Number.isNaN(leftAt) || leftAt > now) return 0;
+  const expected = live.arr_estimated ?? live.arr_actual;
+  const arrives = expected ? instant(expected, live.arr_zone) : NaN;
+  const bookedLength = to - from;
+  const end = arrives > leftAt ? arrives : bookedLength > 0 ? leftAt + bookedLength : NaN;
+  const along = end > leftAt ? Math.min(1, Math.max(0, (now - leftAt) / (end - leftAt))) : 0;
+  return Math.min(AIRBORNE_MAX, along);
+}
+
 export function passHeadline(s: Segment, now: number, live?: FlightStatus | null, online = true): string {
   if (s.status === "cancelled") return "Cancelled";
   const from = startAt(s), to = endAt(s);

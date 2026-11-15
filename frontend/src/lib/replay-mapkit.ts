@@ -8,7 +8,7 @@ import {
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
 export type Palette = { route: string; stay: string; border: string };
-export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void };
+export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
 export const WORLD = 1;
@@ -45,9 +45,9 @@ function centreLongitude(stops: Stop[]): number {
   return west + span / 2;
 }
 
-export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads): GeoProjection => {
+export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads, more: Pick<Stop, "latitude" | "longitude">[] = []): GeoProjection => {
   const centre = centreLongitude(stops);
-  return routeProjection(stops, width, height, undefined, roads, () => geoMercator().rotate([-centre, 0]));
+  return routeProjection(stops, width, height, undefined, roads, () => geoMercator().rotate([-centre, 0]), more);
 };
 
 type Path = { points: Spot[]; along: number[] };
@@ -154,8 +154,8 @@ function shieldElement(ref: string): HTMLElement {
 }
 
 export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOptions): ReplayMap {
-  const { stops, roads, boundaries, width, height, palette, scale, onFailure } = options;
-  const projection = mercatorFor(stops, width, height, roads);
+  const { stops, roads, boundaries, width, height, palette, scale, onFailure, more = [], onView } = options;
+  const projection = mercatorFor(stops, width, height, roads, more);
   const legs = legsOf(stops, projection, roads);
   const spots = positions(stops, projection);
   const paths = legs.map(legPath);
@@ -235,6 +235,7 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       seen = view;
       map.setVisibleMapRectAnimated(rectOf(box), false);
       host.setAttribute("data-zoomed", String(box.w < width - 0.5));
+      onView?.(box);
     }
     const zoom = box.w / width;
     const now = calm ? stops.length - 1 : activeStop(stops.length, progress);

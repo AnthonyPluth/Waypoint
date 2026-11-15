@@ -311,6 +311,38 @@ class GrantTests(GrantCase):
         self.assertNotEqual(raced["count_token"], before["count_token"])
         self.assertEqual({t["trip_id"]: t["count"] for t in raced["trips"]}, {self.a: None, self.b: None})
 
+    def test_the_grants_list_offers_every_eligible_trip_with_its_window_and_people_even_when_it_has_no_photos(self):
+        theirs = self.add(self.sam, {**OUT, "start_local": "2026-09-01T19:00", "end_local": "2026-09-02T07:10"}, None, self.on(self.sid))["trip_id"]
+
+        def empty(_conn, _person, ids):
+            return dict.fromkeys(ids, 0)
+        mine = next(p for p in photogrants.grants(self.c, self.jane, empty)["people"] if p["person_id"] == self.jid)
+        self.assertEqual(mine["trips"], [])
+        self.assertEqual([t["trip_id"] for t in mine["eligible"]], [self.a, self.b])
+        for offered in mine["eligible"]:
+            self.assertEqual(offered["window"], photos.window_out(photos.trip_window(self.c, offered["trip_id"])))
+            self.assertEqual(offered["audience"], sorted(trippeople.of(self.c, [offered["trip_id"]])[offered["trip_id"]]))
+        self.assertNotIn(theirs, [t["trip_id"] for t in mine["eligible"]])
+        self.assertEqual(mine["sources"], [{"id": self.janes, "status": "ok"}])
+
+    def test_the_eligible_trips_leave_out_what_is_shared_and_what_the_viewer_cannot_see(self):
+        self.share(self.jid, self.a)
+        mine = next(p for p in photogrants.grants(self.c, self.jane)["people"] if p["person_id"] == self.jid)
+        self.assertEqual([t["trip_id"] for t in mine["eligible"]], [self.b])
+        sams = photogrants.grants(self.c, self.sam)["people"]
+        self.assertEqual([p["person_id"] for p in sams], [self.sid])
+        self.assertEqual([t["trip_id"] for t in sams[0]["eligible"]], [self.a])
+        self.assertEqual(sams[0]["sources"], [])
+
+    def test_share_on_all_succeeds_from_the_listed_snapshot_when_an_eligible_trip_has_no_photos(self):
+        def empty(_conn, _person, ids):
+            return dict.fromkeys(ids, 0)
+        mine = next(p for p in photogrants.grants(self.c, self.jane, empty)["people"] if p["person_id"] == self.jid)
+        got = photogrants.set_prefs(self.c, self.jane, self.jid, "trip", True, 50.0, windows={str(t["trip_id"]): t["window"] for t in mine["eligible"]},
+                                    audiences={str(t["trip_id"]): t["audience"] for t in mine["eligible"]}, sources=mine["sources"], strict=True, token=mine["count_token"])
+        self.assertEqual(got, {"default_scope": "trip", "share_all": True})
+        self.assertEqual((self.grant(self.jid, self.a), self.grant(self.jid, self.b)), (("trip", None, "u-jane"), ("trip", None, "u-jane")))
+
     def test_a_non_ascii_count_token_is_refused_as_stale_not_as_a_crash(self):
         for bad in ("é", "é" * 32):
             with self.assertRaises(photogrants.Stale):

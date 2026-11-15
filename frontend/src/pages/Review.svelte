@@ -60,12 +60,17 @@
   let people = $state<Person[]>([]);
   let loadError = $state("");
 
+  let loadSeq = 0;
+  const deleted = new Map<number, number>();
   async function load() {
+    const seq = ++loadSeq;
     loadError = "";
     try {
       const [r, p] = await Promise.all([apiCall<"GET /api/review">("/api/review"), apiCall<"GET /api/people">("/api/people")]);
+      if (seq !== loadSeq) return;
       review = r; people = p.people;
-    } catch (err) { review = null; loadError = errMsg(err); }
+      for (const [id, at] of [...deleted]) if (at < seq) { deleted.delete(id); hidden.delete(id); }
+    } catch (err) { if (seq !== loadSeq) return; review = null; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
 
@@ -82,7 +87,9 @@
     const from = q.get("sender");
     return from ? { sender: from, mailbox: q.get("mailbox") } : null;
   });
-  const shown = $derived(review ? (only ? review.items.filter((i) => i.sender_domain === only.sender && (!only.mailbox || i.address === only.mailbox)) : review.items) : []);
+  const hidden = new SvelteSet<number>();
+  const items = $derived(review ? review.items.filter((i) => !hidden.has(i.id)) : []);
+  const shown = $derived(only ? items.filter((i) => i.sender_domain === only.sender && (!only.mailbox || i.address === only.mailbox)) : items);
 
   const sender = (i: ReviewItem) => i.sender_domain || "Unknown sender";
   const subject = (i: ReviewItem) => i.subject || `Mail from ${sender(i).toLowerCase() === "unknown sender" ? "an unknown sender" : sender(i)}${i.received ? ` on ${i.received}` : ""}`;
@@ -178,7 +185,7 @@
   const suggested = $derived(shown.filter((i) => i.suggestions.length > 0));
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
   const unasked = $derived(askable(shown));
-  const unaskedElsewhere = $derived(only ? askable(review?.items ?? []).length - unasked.length : 0);
+  const unaskedElsewhere = $derived(only ? askable(items).length - unasked.length : 0);
   const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to your own Ollama server, unredacted.`;
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
@@ -310,17 +317,24 @@
     heading.focus({ preventScroll: true });
   };
 
-  let dismissing = $state<ReviewItem | null>(null);
-  let dismissAsking = $state(false);
-  const dismiss = (i: ReviewItem) => act(async () => {
-    await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
-    toast.success(i.count > 1 ? `Dismissed ${i.count} emails` : "Dismissed");
-    await settle();
-  });
+  const dismiss = async (i: ReviewItem) => {
+    const order = [...suggested, ...missing];
+    const at = order.findIndex((x) => x.id === i.id);
+    const next = order[at + 1] ?? order[at - 1];
+    hidden.add(i.id);
+    const sent = act(async () => {
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${i.id}`, { method: "DELETE" });
+      deleted.set(i.id, loadSeq);
+      await settle();
+    });
+    await tick();
+    if (next) menuButtons[next.id]?.focus();
+    if (!(await sent) && !deleted.has(i.id)) hidden.delete(i.id);
+  };
 
   let ignoring = $state<ReviewItem | null>(null);
   let asking = $state(false);
-  const goingCount = $derived(ignoring && review ? review.items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).reduce((n, i) => n + i.count, 0) : 0);
+  const goingCount = $derived(ignoring && review ? items.filter((i) => i.address === ignoring?.address && i.sender_domain === ignoring?.sender_domain && !i.holds_bookings).reduce((n, i) => n + i.count, 0) : 0);
   const UNDO_MS = 8000;
   const undoIgnore = (mailboxId: number, domain: string) => act(async () => {
     await apiCall<"POST /api/mailboxes/{id}/unignore">(`/api/mailboxes/${mailboxId}/unignore`, { method: "POST", body: { domain }, failed: "Couldn’t undo that" });
@@ -513,7 +527,7 @@
             <p class="eyebrow px-1">This email</p>
             {#if item.suggestions.length}<Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); startAdd(item); }} aria-label={`Add by hand instead: “${subject(item)}”`}>Add by hand instead</Button>{/if}
             {#if review?.ai && item.reason !== "generic"}<Button variant="ghost" size="sm" class="justify-start" disabled={asking_all || asking_ai.has(item.id)} onclick={() => { close(); void askAi(item); }} aria-label={`${askWord(item)}: “${subject(item)}”`}>{askWord(item)}</Button>{/if}
-            <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); dismissing = item; dismissAsking = true; }} aria-label={item.count > 1 ? `Dismiss all: ${item.count} emails about “${subject(item)}”` : `Dismiss: “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
+            <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); void dismiss(item); }} aria-label={item.count > 1 ? `Dismiss all: ${item.count} emails about “${subject(item)}”` : `Dismiss: “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
           </div>
           {#if item.sender_domain && item.mine}
             <div class="flex flex-col items-stretch gap-1 border-t border-border pt-2" role="group" aria-label={`All future mail from ${item.sender_domain}`}>
@@ -536,7 +550,7 @@
   </AlertDescription></Alert>
 {:else if review === null}
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
-{:else if review.items.length === 0 && review.who.length === 0 && review.matches.length === 0}
+{:else if items.length === 0 && review.who.length === 0 && review.matches.length === 0}
   <div class="flex flex-col items-start gap-3 rounded-2xl border border-dashed p-6 text-muted-foreground">
     <CircleCheck class="size-6 text-primary" aria-hidden="true" />
     <p class="max-w-prose leading-relaxed">Nothing to review. Mail Waypoint can’t read, and names on bookings it can’t match to a person, will show up here.</p>
@@ -668,14 +682,6 @@
     {#if ignoring?.known_sender}<p class="text-signal-ink" data-testid="known-sender-warning">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p>{/if}
     <p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and {goingCount === 1 ? "this item leaves" : `${goingCount} items from them (this one included) leave`} this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p>
     <p>You can undo this in Settings → Mail & review → Gmail.</p>
-  {/snippet}
-</ConfirmDialog>
-
-<ConfirmDialog bind:open={dismissAsking} title={dismissing && dismissing.count > 1 ? `Dismiss ${dismissing.count} emails?` : "Dismiss this email?"} confirmLabel={dismissing && dismissing.count > 1 ? "Dismiss all" : "Dismiss"} busyLabel="Dismissing…" destructive
-  returnFocus={() => (dismissing ? menuButtons[dismissing.id] : null)} onconfirm={async () => { const i = dismissing; return i ? await dismiss(i) : true; }}>
-  {#snippet description()}
-    <p>{dismissing && dismissing.count > 1 ? `Waypoint deletes its stored copy of all ${dismissing.count} emails about this reservation` : "Waypoint deletes its stored copy of this email"} and takes {dismissing && dismissing.count > 1 ? "them" : "it"} off this list. Nothing is added to your trips, and this can’t be undone.</p>
-    <p>Your mailbox isn’t touched. Waypoint won’t look at {dismissing && dismissing.count > 1 ? "these messages" : "this message"} again, and later mail from the same sender is still read as usual. Bookings you already added from {dismissing && dismissing.count > 1 ? "them" : "it"} stay.</p>
   {/snippet}
 </ConfirmDialog>
 
