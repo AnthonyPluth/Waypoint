@@ -2,7 +2,7 @@
 
 A native shell around the Waypoint web app. The person types the address of their own Waypoint; the app signs in to it with the system sign-in sheet and shows the web app in a Capacitor web view. Setup and sign-in are described in the [iPhone app page](https://anthonypluth.github.io/Waypoint/start/ios/).
 
-**Status: written without Xcode or a Mac, never compiled or run.** Expect to fix compile errors on first build. The server side it talks to is tested (`tests/test_app_sign_in.py`).
+**Status: built and unit-tested in CI, not run on a device or against a real server as far as this repo shows.** The iOS workflow (`.github/workflows/ios.yml`) builds the app and runs its unit tests on every change to `ios/`. Nothing signs the app or ships it to TestFlight yet: the bundle id and team in `Config.xcconfig` are placeholders. The server side it talks to is tested (`tests/test_app_sign_in.py`).
 
 ## Build
 
