@@ -1,0 +1,151 @@
+name: iOS TestFlight
+
+# Builds a signed release of the iPhone app (ios/) and uploads it to TestFlight. Started by hand only (never by a pull
+# request or a push): the job runs in the protected "testflight" environment, which holds the signing secrets, and only
+# from main. Setup is in ios/README.md. The unsigned build and tests are the "iOS" workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  upload:
+    name: Build and upload to TestFlight
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-15   # hosted: Xcode only runs on macOS
+    timeout-minutes: 45
+    environment: testflight
+    steps:
+      - name: Check the signing secrets and variables are set
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+          DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM }}
+          WAYPOINT_BUNDLE_ID: ${{ vars.WAYPOINT_BUNDLE_ID }}
+        run: |
+          missing=""
+          for name in IOS_DIST_CERT_P12_BASE64 IOS_DIST_CERT_PASSWORD IOS_PROVISIONING_PROFILE_BASE64 \
+              APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8_BASE64 \
+              DEVELOPMENT_TEAM WAYPOINT_BUNDLE_ID; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::TestFlight is not set up yet. Missing in the 'testflight' environment:$missing. See ios/README.md, 'TestFlight'."
+            exit 1
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ios/package-lock.json
+      - name: Install the packages
+        working-directory: ios
+        run: npm ci --no-audit --no-fund
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate the Xcode project
+        working-directory: ios
+        run: xcodegen
+      - name: Import the certificate and provisioning profile
+        env:
+          IOS_DIST_CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          keychain="$RUNNER_TEMP/waypoint-signing.keychain-db"
+          keychain_password=$(openssl rand -base64 32)
+          echo "::add-mask::$keychain_password"
+          echo "$IOS_DIST_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/dist.p12" -k "$keychain" -P "$IOS_DIST_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
+          security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
+          profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
+          profile_name=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+          echo "PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+      - name: Archive the app
+        working-directory: ios
+        env:
+          DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM }}
+          WAYPOINT_BUNDLE_ID: ${{ vars.WAYPOINT_BUNDLE_ID }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          xcodebuild archive \
+            -project Waypoint.xcodeproj \
+            -scheme Waypoint \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath "$RUNNER_TEMP/Waypoint.xcarchive" \
+            -derivedDataPath build \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+            WAYPOINT_BUNDLE_ID="$WAYPOINT_BUNDLE_ID" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+      - name: Export the .ipa
+        env:
+          DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM }}
+          WAYPOINT_BUNDLE_ID: ${{ vars.WAYPOINT_BUNDLE_ID }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$DEVELOPMENT_TEAM</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict><key>$WAYPOINT_BUNDLE_ID</key><string>$PROFILE_NAME</string></dict>
+            <key>uploadSymbols</key><true/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Waypoint.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export"
+      - name: Upload to TestFlight
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_KEY_P8_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$APP_STORE_CONNECT_KEY_P8_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8"
+          xcrun altool --upload-app --type ios \
+            --file "$RUNNER_TEMP/export/Waypoint.ipa" \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+      - name: Delete the keychain, profile and keys
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/waypoint-signing.keychain-db" || true
+          rm -rf "$HOME/.appstoreconnect/private_keys" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles" \
+            "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist" \
+            "$RUNNER_TEMP/ExportOptions.plist" "$RUNNER_TEMP/export" "$RUNNER_TEMP/Waypoint.xcarchive"

@@ -17,6 +17,33 @@ open Waypoint.xcodeproj
 
 Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholders: `com.anthonypluth.waypoint`, empty). The bundle identifier must match the one registered in the Apple developer account.
 
+## TestFlight
+
+The "iOS TestFlight" workflow (`.github/workflows/ios-testflight.yml`) archives a signed release, exports an `.ipa` and uploads it to TestFlight. It starts only by hand (Actions, "iOS TestFlight", Run workflow, on `main`), never for a pull request. The build number is the run number (`CURRENT_PROJECT_VERSION`); the version is `MARKETING_VERSION` in `Config.xcconfig`. It uploads with `xcrun altool --upload-app` and an App Store Connect API key: altool is still Apple's supported command-line upload for an `.ipa` (its notarization mode is gone, and `notarytool` is for macOS apps only). Until the secrets below exist, the workflow stops at its first step and says which are missing.
+
+One-time setup:
+
+1. Join the Apple Developer Program and note the Team ID (Membership details).
+2. Register the bundle identifier (Certificates, Identifiers & Profiles, Identifiers) and create the app in App Store Connect with it.
+3. Create an Apple Distribution certificate, export it with its private key from Keychain Access as a `.p12` and choose a password.
+4. Create an App Store provisioning profile for the bundle identifier and that certificate; download it.
+5. In App Store Connect (Users and Access, Integrations), create an API key with the App Manager role and download the `.p8` (Apple gives it once). Note the key ID and issuer ID.
+6. In the repository's Settings, Environments, create an environment named `testflight`. Restrict it to the `main` branch and add required reviewers so a run waits for approval.
+7. In that environment add these secrets (values are base64 of the file, for example `base64 -i file | pbcopy`):
+
+   | Secret | Holds |
+   | --- | --- |
+   | `IOS_DIST_CERT_P12_BASE64` | the distribution certificate `.p12`, base64 |
+   | `IOS_DIST_CERT_PASSWORD` | the `.p12` password |
+   | `IOS_PROVISIONING_PROFILE_BASE64` | the `.mobileprovision`, base64 |
+   | `APP_STORE_CONNECT_KEY_ID` | the API key ID |
+   | `APP_STORE_CONNECT_ISSUER_ID` | the API issuer ID |
+   | `APP_STORE_CONNECT_KEY_P8_BASE64` | the API key `.p8`, base64 |
+
+8. In the same environment add these variables: `DEVELOPMENT_TEAM` (the Team ID) and `WAYPOINT_BUNDLE_ID` (the bundle identifier from step 2). The workflow passes them to the build, so `Config.xcconfig` keeps its placeholders.
+
+**Not run yet:** the signing and upload path has never been run (no Mac or Apple account when it was written). Expect to fix the first run.
+
 ## What is here
 
 | File | Does |
