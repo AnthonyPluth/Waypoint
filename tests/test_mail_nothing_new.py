@@ -9,7 +9,7 @@ from tests.test_mail_ai import ScanAiCase
 from tests.test_mail_scan import NOW
 from waypoint import tls
 from waypoint.domain import trips
-from waypoint.domain.mail import newer, nothing_new, review, scan
+from waypoint.domain.mail import ai, newer, nothing_new, review, scan
 from waypoint.storage import db, stored_mail
 from waypoint.storage.models import ReviewItem, Segment, StoredMessage
 
@@ -78,7 +78,7 @@ class NothingNewCase(ScanAiCase):
     def assess(self, said, received=None, convert=False, sign=None):
         def run(conn):
             fields = scan._ai_fields(conn, said) if convert else None
-            return nothing_new.assess(conn, self.jane, said, fields, received, sign or nothing_new.Signals(False, False))
+            return nothing_new.assess(conn, self.jane, said, fields, received, sign or nothing_new.Signals(False))
         return self.read(run)
 
     def edit_known(self, **changes):
@@ -93,7 +93,6 @@ class AlreadyKnownTests(NothingNewCase):
         result = self.read_mail(REMINDER, SAME)
         self.assertEqual((result.state, result.review, self.kept()), ("done", 0, []))
         self.assertEqual(self.counted(), (1, 0))
-        self.assertEqual(scan.summary(self.mailbox).dismissed, 0)
         self.assertEqual(self.scanned()["reminder"], "booking")
         self.assertEqual(len(self.stored()), 2)
         self.assertEqual([a["message_id"] for a in self.attached()], ["msg-flight_jsonld", "reminder"])
@@ -387,75 +386,60 @@ class OlderCopyTests(NothingNewCase):
         self.assertEqual(self.counted(), (0, 0))
 
 
-class NotTravelTests(NothingNewCase):
-    def plain(self, body: str, reply: dict, name: str, subject: str = "Your trip: save on flights and hotels"):
-        return self.read_mail(body, reply, name=name, subject=subject)
+class VerdictStaysTests(NothingNewCase):
+    CATEGORIES = ("promotion", "statement", "newsletter", "receipt", "notification")
+    BODIES = {
+        "plain marketing": "Thank you for being a customer. Save on your next purchase this week.",
+        "time": "Sale ends at 11:59 pm tonight.",
+        "airports": "Fly from Boston (BOS) to Denver (DEN) this winter.",
+        "confirmation": "Your confirmation code is ZZ9Y8X.",
+        "booking reference": "Thank you for your payment. Booking reference: QXMKZB",
+        "flight": "Take flight EX 101 for less.",
+        "passenger": "Passenger Jane Doe, thank you.",
+        "check in": "Online check-in is open for your trip.",
+        "cancellation": "Your booking was cancelled. Save 10 percent on your next trip.",
+        "cancellation in german": "Ihre Buchung wurde storniert. Sparen Sie diese Woche.",
+        "cancellation in japanese": "ご予約はキャンセルされました。今週のセール。",
+        "fare change": "Fare change: save on your next trip.",
+    }
+
+    def stays(self, body: str, category: str, name: str, subject: str = "Your trip: save on flights and hotels") -> None:
+        with db.session() as conn:
+            conn.execute(ReviewItem.__table__.delete())
+            stored_mail.prune(conn)
+        result = self.read_mail(body, {"bookings": [], "not_a_booking": category}, name=name, subject=subject)
+        self.assertEqual(result.state, "done")
+        [item] = self.kept()
+        self.assertEqual(item["suggestion_error"], ai.NO_BOOKING)
+        self.assertEqual(len(self.stored()), 2)
+        self.assertEqual(self.counted(), (0, 0))
+        self.assertEqual(self.scanned()[name], "unreadable")
+
+    def test_every_verdict_on_every_kind_of_text_leaves_the_email_stored_and_in_review(self):
+        for what, line in self.BODIES.items():
+            for category in self.CATEGORIES:
+                with self.subTest(what=what, category=category):
+                    self.stays(line, category, f"v-{what}-{category}".replace(" ", "-"))
 
     def test_a_verdict_on_an_email_whose_subject_states_a_change_stays(self):
         for n, subject in enumerate(CHANGED_TRIP_SUBJECTS):
-            for category in ("promotion", "statement"):
-                with self.subTest(subject=subject, category=category):
-                    with db.session() as conn:
-                        conn.execute(ReviewItem.__table__.delete())
-                    self.plain("Thank you for being a customer.", {"bookings": [], "not_a_booking": category}, f"vs-{n}-{category}", subject)
-                    self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+            with self.subTest(subject=subject):
+                self.stays("Thank you for being a customer.", "promotion", f"vs-{n}", subject)
 
     def test_the_revision_signal_alone_keeps_a_verdict_in_review(self):
         with mock.patch.object(scan.extract, "guard", return_value=("", True)):
-            self.plain("Thank you for being a customer.", VERDICT, "rv")
-        self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
+            self.stays("Thank you for being a customer.", "promotion", "rv")
 
-    def test_marketing_a_statement_and_a_newsletter_with_no_travel_details_are_dismissed_by_the_existing_count(self):
-        for category in ("promotion", "statement", "newsletter"):
-            with self.subTest(category=category):
-                self.plain("Thank you for being a customer. Save on your next purchase this week.", {"bookings": [], "not_a_booking": category}, f"n-{category}")
-                self.assertEqual((self.kept(), scan.summary(self.mailbox).dismissed, self.counted()), ([], 1, (0, 0)))
+    def test_a_person_dismissing_the_item_is_what_deletes_the_email(self):
+        self.stays("Thank you for being a customer.", "promotion", "mine")
+        [item] = self.kept()
+        with db.session() as conn:
+            review.dismiss(conn, "u-jane", item["id"])
+        self.assertEqual((self.kept(), len(self.stored())), ([], 1))
 
-    def test_the_same_verdict_on_an_email_with_a_time_a_place_or_a_confirmation_stays(self):
-        cases = {"time": "Sale ends at 11:59 pm tonight.", "airports": "Fly from Boston (BOS) to Denver (DEN) this winter.",
-                 "confirmation": "Your confirmation code is ZZ9Y8X.", "flight": "Take flight EX 101 for less.",
-                 "passenger": "Passenger Jane Doe, thank you.", "check in": "Online check-in is open for your trip."}
-        for what, line in cases.items():
-            for category in ("promotion", "statement"):
-                with self.subTest(what=what, category=category):
-                    with db.session() as conn:
-                        conn.execute(ReviewItem.__table__.delete())
-                    self.plain(line, {"bookings": [], "not_a_booking": category}, f"t-{what}-{category}".replace(" ", "-"))
-                    self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
-
-    def test_a_verdict_on_an_email_naming_a_booking_code_or_flight_stays(self):
-        for n, line in enumerate(("Booking reference: ZQ4P8W", "Booking reference: QXMKZB", "Reservation number 88231", "Your PNR is ZZ9Y8X",
-                                  "Thanks for flying ex-102.")):
-            for category in ("promotion", "statement", "newsletter"):
-                with self.subTest(line=line, category=category):
-                    with db.session() as conn:
-                        conn.execute(ReviewItem.__table__.delete())
-                    self.plain(f"Thank you for your payment. {line}", {"bookings": [], "not_a_booking": category}, f"code-{n}-{category}")
-                    self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
-
-    def test_a_receipt_or_a_notification_verdict_is_not_one_waypoint_honours(self):
-        for category in ("receipt", "notification"):
-            with self.subTest(category=category):
-                with db.session() as conn:
-                    conn.execute(ReviewItem.__table__.delete())
-                self.plain("Thank you for being a customer. Save on your next purchase this week.", {"bookings": [], "not_a_booking": category}, f"r-{category}")
-                self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
-
-    def test_a_cancellation_in_another_language_wearing_a_verdict_stays(self):
-        for n, line in enumerate(("Ihre Buchung wurde storniert. Sparen Sie diese Woche.", "ご予約はキャンセルされました。今週のセール。")):
-            with self.subTest(line=line):
-                with db.session() as conn:
-                    conn.execute(ReviewItem.__table__.delete())
-                self.plain(line, VERDICT, f"wl-{n}")
-                self.assertEqual((len(self.kept()), scan.summary(self.mailbox).dismissed), (1, 0))
-
-    def test_a_cancellation_or_change_wearing_a_promotion_verdict_stays(self):
-        for line in ("Your booking was cancelled. Save 10 percent on your next trip.", "Fare change: save on your next trip."):
-            with self.subTest(line=line):
-                with db.session() as conn:
-                    conn.execute(ReviewItem.__table__.delete())
-                self.plain(line, VERDICT, f"w-{len(line)}")
-                self.assertEqual(len(self.kept()), 1)
+    def test_an_answer_with_a_booking_beside_the_verdict_is_not_a_verdict(self):
+        result = self.read_mail(REMINDER, {"bookings": [SAME], "not_a_booking": "promotion"}, name="booked")
+        self.assertEqual((result.state, self.counted()), ("done", (1, 0)))
 
 
 class ComparisonTests(NothingNewCase):
@@ -693,9 +677,9 @@ class SignalTests(unittest.TestCase):
                 self.assertEqual(nothing_new.signals(text).flights, frozenset())
 
     def test_times_and_names_are_seen_in_the_formats_the_readers_accept(self):
-        for text in ("Départ 19h00", "出発 19時30分", "Leaves 7:15pm"):
+        for text, clock in (("Départ 19h00", (19, 0)), ("出発 19時30分", (19, 30)), ("Leaves 7:15pm", (19, 15))):
             with self.subTest(text=text):
-                self.assertTrue(nothing_new.signals(text).travel)
+                self.assertIn(clock, nothing_new.signals(text).clocks)
         for text, name in (("Passagier: Alex Stranger", "Alex Stranger"), ("Pasajero: Mia Rose Doe", "Mia Rose Doe"),
                            ("Passagers : Alex Stranger", "Alex Stranger")):
             with self.subTest(text=text):
@@ -704,10 +688,7 @@ class SignalTests(unittest.TestCase):
     def test_change_and_travel_words_are_seen_without_regard_to_case(self):
         self.assertTrue(nothing_new.signals("FLIGHT CANCELLED").change)
         self.assertTrue(nothing_new.signals("Your boarding pass").change)
-        self.assertTrue(nothing_new.signals("Departs at 7:15 am").travel)
-        self.assertTrue(nothing_new.signals("Leaves JFK (JFK)").travel)
-        self.assertTrue(nothing_new.signals("Flight EX 101").travel)
-        self.assertEqual(nothing_new.signals("Save big this week on everything"), nothing_new.Signals(False, False))
+        self.assertEqual(nothing_new.signals("Save big this week on everything"), nothing_new.Signals(False))
         self.assertTrue(nothing_new.signals("Hello", "Your flight has been cancelled").change)
         self.assertTrue(nothing_new.signals("Hello", "", True).change)
 
@@ -717,7 +698,7 @@ class SignalTests(unittest.TestCase):
         self.assertEqual(nothing_new.signals("No names here").passengers, ())
 
     def test_the_summary_keeps_its_counts_through_storage_and_old_summaries_read_as_zero(self):
-        found = scan.Summary(3, 3, 0, 0, 0, False, dismissed=1, dismissed_known=2, dismissed_older=1)
+        found = scan.Summary(3, 3, 0, 0, 0, False, dismissed_known=2, dismissed_older=1)
         self.assertEqual(scan.decode(scan.encode(found)), found)
         self.assertEqual(scan.decode(json.dumps({"found": 1, "read": 1, "bookings": 0, "review": 0, "skipped": 0, "capped": False})),
                          scan.Summary(1, 1, 0, 0, 0, False))
