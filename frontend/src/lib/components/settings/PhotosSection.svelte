@@ -39,7 +39,7 @@
 
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
-  import type { Person, PhotoSources, ReviewPhoto } from "$lib/api-types";
+  import type { Person, PhotoSourceResume, PhotoSources, ReviewPhoto } from "$lib/api-types";
   import { app } from "$lib/app.svelte";
   import { avatarTone } from "$lib/avatar";
   import StatusChip from "$lib/components/StatusChip.svelte";
@@ -49,7 +49,7 @@
   import { apiCall } from "$lib/contract";
   import { draftGuard } from "$lib/drafts.svelte";
   import { initials } from "$lib/nav";
-  import { whoIs } from "$lib/photo-sharing";
+  import { isStale, resumeSettled, resumeStale, resumeText, resumeTitle, resumeUnchecked, whoIs, type ResumeKind } from "$lib/photo-sharing";
   import PhotosNeedsLook from "./PhotosNeedsLook.svelte";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import KeyRound from "@lucide/svelte/icons/key-round";
@@ -204,18 +204,84 @@
   let pausing = $state<number | null>(null);
   let notices = $state<Record<number, Outcome | undefined>>({});
   const clearNotice = (id: number) => { notices = { ...notices, [id]: undefined }; };
-  const RESUME_WAITS = "Resuming this library would add its photos to trips you share with everyone, which needs a confirmation Waypoint can’t ask for here yet.";
+  type Ask = { source: PhotoSource; kind: ResumeKind; check: PhotoSourceResume; names: string[]; note: string; stale: boolean };
+  let asking = $state<Ask | null>(null);
+  let askOpen = $state(false);
+  let askTicket = 0;
+  const pauseButton = (id: number) => document.getElementById(`photo-pause-${id}`);
+
+  $effect(() => {
+    if (!askOpen) untrack(() => { askTicket += 1; });
+  });
+
+  async function tripNames(check: PhotoSourceResume, personId: number): Promise<string[]> {
+    try {
+      const found = await apiCall<"GET /api/photo-grants">("/api/photo-grants", { keep: true });
+      const trips = found.people.find((p) => p.person_id === personId)?.trips ?? [];
+      const names = check.grants.map((g) => trips.find((t) => t.trip_id === g.trip_id)?.name);
+      return names.every((n): n is string => !!n) ? names : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function resumeNow(s: PhotoSource, snapshot: string) {
+    await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: { paused: false, snapshot }, failed: "Couldn’t resume it" });
+    toast.success("Resumed");
+    await refresh();
+    onchange();
+  }
+
+  async function askFirst(s: PhotoSource, kind: ResumeKind) {
+    const mineTicket = ++askTicket;
+    const check = await apiCall<"GET /api/photo-sources/{id}/resume">(`/api/photo-sources/${s.id}/resume`);
+    if (!check.asks) { await resumeNow(s, check.snapshot); return; }
+    const names = await tripNames(check, s.person_id);
+    if (mineTicket !== askTicket) return;
+    asking = { source: s, kind, check, names, note: "", stale: false };
+    askOpen = true;
+  }
+
+  async function renew(a: Ask, note: string) {
+    const mineTicket = ++askTicket;
+    try {
+      const check = await apiCall<"GET /api/photo-sources/{id}/resume">(`/api/photo-sources/${a.source.id}/resume`);
+      if (mineTicket !== askTicket) return;
+      if (!check.asks) {
+        askOpen = false;
+        notices = { ...notices, [a.source.id]: { text: resumeSettled } };
+        return;
+      }
+      const names = await tripNames(check, a.source.person_id);
+      if (mineTicket !== askTicket) return;
+      asking = { ...a, check, names, note, stale: false };
+    } catch {
+      if (mineTicket === askTicket) asking = { ...a, note: resumeUnchecked, stale: true };
+    }
+  }
+
+  async function confirmResume(): Promise<boolean> {
+    const a = asking;
+    if (!a) return false;
+    let resumed = false;
+    await act(async () => {
+      if (a.stale) { await renew(a, resumeStale); return; }
+      try {
+        await resumeNow(a.source, a.check.snapshot);
+        resumed = true;
+      } catch (err) {
+        if (!isStale(err)) throw err;
+        await renew(a, resumeStale);
+      }
+    }, { busy: (on) => (pausing = on ? a.source.id : null), onError: (message) => { if (asking) asking = { ...asking, note: message }; } });
+    return resumed;
+  }
 
   const setPaused = (s: PhotoSource, paused: boolean) => act(async () => {
     clearNotice(s.id);
-    let snapshot: string | undefined;
-    if (!paused) {
-      const check = await apiCall<"GET /api/photo-sources/{id}/resume">(`/api/photo-sources/${s.id}/resume`);
-      if (check.asks) { notices = { ...notices, [s.id]: { text: RESUME_WAITS } }; return; }
-      snapshot = check.snapshot;
-    }
-    await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: snapshot ? { paused, snapshot } : { paused }, failed: paused ? "Couldn’t pause it" : "Couldn’t resume it" });
-    toast.success(paused ? "Paused" : "Resumed");
+    if (!paused) { await askFirst(s, "resume"); return; }
+    await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: { paused }, failed: "Couldn’t pause it" });
+    toast.success("Paused");
     await refresh();
     onchange();
   }, { busy: (on) => (pausing = on ? s.id : null), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
@@ -328,12 +394,15 @@
     event.preventDefault();
     if (!passed) return;
     return act(async () => {
-      await apiCall<"POST /api/photo-sources">("/api/photo-sources", { method: "POST", body: { person_id: chosen, url: url.trim(), key: key.trim() } });
+      const added = await apiCall<"POST /api/photo-sources">("/api/photo-sources", { method: "POST", body: { person_id: chosen, url: url.trim(), key: key.trim() } });
       clearForm();
       connecting = false;
       toast.success("Library connected");
       await refresh();
       onchange();
+      if (added.status === "off") {
+        await act(() => askFirst(added, "connect"), { busy: (on) => (pausing = on ? added.id : null), onError: (message, err) => (notices = { ...notices, [added.id]: outcome(err, message) }) });
+      }
     }, { busy: (on) => (saving = on), onError: (message, err) => { tested = null; result = outcome(err, message); } });
   };
 
@@ -368,13 +437,14 @@
           {#if s.mine}
             {@const library = libraryOf(s)}
             {#if syncing.includes(s.id)}<p class="text-sm text-muted-foreground" role="status">Sync started for {library}. This card updates when it finishes.</p>{/if}
+            {#if pausing === s.id}<p class="text-sm text-muted-foreground" role="status">{s.status === "off" ? `Checking what resuming ${library} would show…` : `Pausing ${library}…`}</p>{/if}
             <div class="flex flex-wrap gap-2">
               {#if s.status === "refused"}
                 <Button size="sm" aria-label={`Change key, ${library}`} aria-expanded={rekeying === s.id} onclick={() => openRekey(s)}><KeyRound aria-hidden="true" />Change key</Button>
               {:else}
                 <Button variant="outline" size="sm" aria-label={`Sync now, ${library}`} disabled={starting === s.id || syncing.includes(s.id) || s.status === "off"} onclick={() => syncNow(s)}><RefreshCw aria-hidden="true" />{starting === s.id || syncing.includes(s.id) ? "Syncing…" : "Sync now"}</Button>
                 <Button variant="outline" size="sm" aria-label={`Change key, ${library}`} aria-expanded={rekeying === s.id} onclick={() => openRekey(s)}>Change key</Button>
-                <Button variant="outline" size="sm" aria-label={`${s.status === "off" ? "Resume" : "Pause"}, ${library}`} disabled={pausing === s.id} onclick={() => setPaused(s, s.status !== "off")}>{s.status === "off" ? "Resume" : "Pause"}</Button>
+                <Button id={`photo-pause-${s.id}`} variant="outline" size="sm" aria-label={`${s.status === "off" ? "Resume" : "Pause"}, ${library}`} disabled={pausing === s.id} onclick={() => setPaused(s, s.status !== "off")}>{s.status === "off" ? "Resume" : "Pause"}</Button>
               {/if}
               <Button variant="outline" size="sm" class="text-status-bad-ink" aria-label={`Remove ${library}`} onclick={(e: MouseEvent) => askRemove(s, e)}>Remove</Button>
             </div>
@@ -457,6 +527,19 @@
     {/if}
   </div>
 </section>
+
+{#snippet resumeBody()}
+  {#if asking}
+    {@const who = whoIs(asking.source.person_id, me, people)}
+    {#if asking.note}<p role="alert" class="text-signal-ink">{asking.note}</p>{/if}
+    <p>{resumeText(who, asking.kind, asking.check.count, asking.check.grants.length)}</p>
+    {#if asking.names.length}<ul class="list-disc pl-5">{#each asking.names as name (name)}<li>{name}</li>{/each}</ul>{/if}
+  {/if}
+{/snippet}
+
+<ConfirmDialog bind:open={askOpen} alert title={asking ? resumeTitle(libraryOf(asking.source), asking.kind) : "Resume this library?"}
+  confirmLabel={asking?.stale ? "Try again" : "Resume"} cancelLabel="Not now" busyLabel={asking?.stale ? "Checking…" : "Resuming…"}
+  returnFocus={() => (asking ? pauseButton(asking.source.id) : null)} onconfirm={confirmResume} description={resumeBody} />
 
 <ConfirmDialog bind:open={askingToRemove} title={`Remove ${removing ? libraryOf(removing) : "this library"}?`} confirmLabel="Remove" busyLabel="Removing…" destructive
   returnFocus={() => removeButton} onconfirm={remove} description={removeText(removing)} />

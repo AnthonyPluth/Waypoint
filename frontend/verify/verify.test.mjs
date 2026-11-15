@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -100,6 +100,17 @@ describe("flowProblems", () => {
     expect(fakeImmichTest("unreachable")).toMatchObject({ status: 502 });
     expect(fakeImmichSource({ person_id: 3, url: "https://photos.immich.example/", key: "secret" }, 9000)).toEqual({ id: 9000, person_id: 3, url: "https://photos.immich.example",
       label: null, status: "ok", mine: true, last_sync: null, last_error: null, photos: 0, trips: 0 });
+  });
+
+  it("asks about a resume with a count that grows, and a snapshot that changes, after the trips change", () => {
+    expect(flowProblems({ ...ok, steps: [{ fake_resume: 12 }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_resume: "12" }] })).toEqual(["step 1: fake_resume takes a number"]);
+    const before = fakeResumeCheck(12, 0, [3, 4]);
+    const after = fakeResumeCheck(12, 1, [3, 4]);
+    expect(before).toMatchObject({ asks: true, count: 12, grants: [{ trip_id: 3 }, { trip_id: 4 }] });
+    expect(after.count).toBe(15);
+    expect(after.snapshot).not.toBe(before.snapshot);
+    expect(before.snapshot).toHaveLength(32);
   });
 
   it("takes a download to click and save, named", () => {

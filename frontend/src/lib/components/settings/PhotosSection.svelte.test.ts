@@ -216,14 +216,172 @@ describe("Settings → Photos, the source cards", () => {
     expect(await screen.findByRole("button", { name: "Pause, Ada Brook’s library" })).toBeInTheDocument();
   });
 
-  it("leaves a paused library paused when resuming it would need the sharing confirmation", async () => {
-    serve([source({ status: "off" })], (path) => {
-      if (path === "/api/photo-sources/7/resume") return { asks: true, count: 12, grants: [], snapshot: "b".repeat(32) };
+  const GRANTS = { people: [{ person_id: 1, prefs: { default_scope: "trip", share_all: false }, count_token: "t", sources: [], eligible: [], trips: [
+    { trip_id: 31, name: "Four Corners loop", start_date: null, end_date: null, state: "shared", scope: "trip", count: 9, removed_count: 0 },
+    { trip_id: 32, name: "Coast weekend", start_date: null, end_date: null, state: "shared", scope: "trip", count: 3, removed_count: 0 },
+  ] }] };
+  const grant = (trip_id: number) => ({ trip_id, changed: 1, window: null });
+  const asks = (snapshot: string, count = 12) => ({ asks: true, count, grants: [grant(31), grant(32)], snapshot });
+
+  function resuming(checks: unknown[], onPost: (body: unknown) => unknown = () => ({})) {
+    let next = 0;
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") return checks[Math.min(next++, checks.length - 1)];
+      if (path === "/api/photo-grants") return GRANTS;
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") return onPost(opts.body);
+    });
+  }
+
+  it("asks first when resuming would add photos to trips shared with everyone, and resumes with the snapshot it showed", async () => {
+    resuming([asks("b".repeat(32))]);
+    render(PhotosSection);
+    const resume = await screen.findByRole("button", { name: "Resume, Ada Brook’s library" });
+    await userEvent.click(resume);
+    const dialog = await screen.findByRole("alertdialog", { name: "Resume Ada Brook’s library?" });
+    expect(dialog).toHaveTextContent("Your library is paused, because you share photos with everyone on 2 trips.");
+    expect(dialog).toHaveTextContent("Resuming it shows 12 photos from it to everyone on those trips");
+    expect(within(dialog).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Four Corners loop", "Coast weekend"]);
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Not now" })).toHaveFocus());
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1));
+    expect(calls("POST", "/api/photo-sources/7")[0][1]).toMatchObject({ body: { paused: false, snapshot: "b".repeat(32) } });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(toast.success).toHaveBeenCalledWith("Resumed");
+  });
+
+  it("leaves the library paused and gives focus back when the person says Not now or presses Escape", async () => {
+    resuming([asks("b".repeat(32))]);
+    render(PhotosSection);
+    const resume = await screen.findByRole("button", { name: "Resume, Ada Brook’s library" });
+    for (const close of ["button", "escape"]) {
+      await userEvent.click(resume);
+      const dialog = await screen.findByRole("alertdialog");
+      if (close === "button") await userEvent.click(within(dialog).getByRole("button", { name: "Not now" }));
+      else await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+      await waitFor(() => expect(resume).toHaveFocus());
+      await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
+    }
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(0);
+  });
+
+  it("speaks of the person a steward resumes for, and counts a single photo on a single trip", async () => {
+    serve([source({ status: "off", person_id: 3 })], (path) => {
+      if (path === "/api/photo-sources/7/resume") return { asks: true, count: 1, grants: [grant(41)], snapshot: "d".repeat(32) };
+      if (path === "/api/photo-grants") return { people: [] };
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, June Brook’s library" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "Resume June Brook’s library?" });
+    expect(dialog).toHaveTextContent("June’s library is paused, because June shares photos with everyone on 1 trip.");
+    expect(dialog).toHaveTextContent("Resuming it shows 1 photo from it to everyone on that trip");
+    expect(within(dialog).queryByRole("listitem")).toBeNull();
+  });
+
+  it("says a resume adds no photos when the count is zero, and still asks", async () => {
+    resuming([{ asks: true, count: 0, grants: [grant(31), grant(32)], snapshot: "e".repeat(32) }]);
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("Resuming it adds no new photos to those trips, but they are shared with everyone, so Waypoint asks first.");
+  });
+
+  it("shows a fresh count with a fresh snapshot when the trips changed, and needs a new press before resuming", async () => {
+    resuming([asks("b".repeat(32), 12), asks("c".repeat(32), 15)], (body) => {
+      if ((body as { snapshot: string }).snapshot === "b".repeat(32)) throw new Refusal("Your trips changed meanwhile; try again", 409);
+      return {};
     });
     render(PhotosSection);
     await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/needs a confirmation/);
-    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(0);
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("Your trips changed meanwhile, so what’s below is new."));
+    expect(dialog).toHaveTextContent("Resuming it shows 15 photos");
+    expect(screen.getByRole("alertdialog")).toBe(dialog);
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(calls("POST", "/api/photo-sources/7")).toHaveLength(2));
+    expect(calls("POST", "/api/photo-sources/7")[1][1]).toMatchObject({ body: { paused: false, snapshot: "c".repeat(32) } });
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+
+  it("closes the question with a note when the trips changed and nothing needs confirming now", async () => {
+    resuming([asks("b".repeat(32)), { asks: false, count: 0, grants: [], snapshot: "f".repeat(32) }], () => { throw new Refusal("Your trips changed meanwhile; try again", 409); });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(await screen.findByRole("alert")).toHaveTextContent("nothing was resumed. Press Resume again.");
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1);
+  });
+
+  it("says the view may be out of date, with Try again, when the trips changed and cannot be checked again", async () => {
+    let fail = false;
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") { if (fail) throw new Error("offline"); return asks("b".repeat(32)); }
+      if (path === "/api/photo-grants") return GRANTS;
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") { fail = true; throw new Refusal("Your trips changed meanwhile; try again", 409); }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("may be out of date"));
+    expect(within(dialog).queryByRole("button", { name: "Resume" })).toBeNull();
+    fail = false;
+    await userEvent.click(within(dialog).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Resume" })).toBeInTheDocument());
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1);
+  });
+
+  it("keeps the question open and says why when the resume itself fails", async () => {
+    resuming([asks("b".repeat(32))], () => { throw new Refusal(KEY_LOST, 400); });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent(KEY_LOST));
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+  });
+
+  it("holds the Resume button and says it is checking while the count is fetched", async () => {
+    let release: (v: unknown) => void = () => {};
+    serve([source({ status: "off" })], (path) => {
+      if (path === "/api/photo-sources/7/resume") return new Promise((resolve) => (release = resolve));
+    });
+    render(PhotosSection);
+    const resume = await screen.findByRole("button", { name: "Resume, Ada Brook’s library" });
+    await userEvent.click(resume);
+    expect((await screen.findByText(/^Checking what resuming Ada Brook’s library would show/)).closest("[role=status]")).not.toBeNull();
+    expect(resume).toBeDisabled();
+    release({ asks: false, count: 0, grants: [], snapshot: "a".repeat(32) });
+    await waitFor(() => expect(resume).toBeEnabled());
+  });
+
+  it("asks the same way right after connecting a library that was saved paused, and carries the snapshot", async () => {
+    const paused = source({ id: 9, person_id: 3, status: "off", last_sync: null, photos: null, trips: null });
+    serve([], (path, opts) => {
+      if (path === "/api/photo-sources/test") return { name: "june@brook.example", same_account: null };
+      if (path === "/api/photo-sources" && opts?.method === "POST") return paused;
+      if (path === "/api/photo-sources") return { sources: calls("POST", "/api/photo-sources").length ? [paused] : [], permissions: PERMISSIONS };
+      if (path === "/api/photo-sources/9/resume") return { asks: true, count: 40, grants: [grant(31)], snapshot: "9".repeat(32) };
+      if (path === "/api/photo-grants") return { people: [{ ...GRANTS.people[0], person_id: 3 }] };
+      if (path === "/api/photo-sources/9" && opts?.method === "POST") return {};
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await userEvent.selectOptions(screen.getByLabelText("Whose library"), "3");
+    await userEvent.type(screen.getByLabelText("Immich address"), "https://nas.brook.example");
+    await userEvent.type(screen.getByLabelText("API key"), KEY);
+    await userEvent.click(screen.getByRole("button", { name: "Test" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Save" }));
+    const dialog = await screen.findByRole("alertdialog", { name: "June Brook’s library is connected. Resume it now?" });
+    expect(dialog).toHaveTextContent("June’s library is connected and paused, until you confirm this, because June shares photos with everyone on 1 trip.");
+    expect(dialog).toHaveTextContent("Resuming it shows 40 photos");
+    expect(calls("POST", "/api/photo-sources/9")).toHaveLength(0);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(calls("POST", "/api/photo-sources/9")).toHaveLength(1));
+    expect(calls("POST", "/api/photo-sources/9")[0][1]).toMatchObject({ body: { paused: false, snapshot: "9".repeat(32) } });
   });
 
   it("turns Sync now off while the sync starts and runs, and on again once the library has synced", async () => {

@@ -2,15 +2,16 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { cn } from "$lib/utils";
-  import { Dialog } from "bits-ui";
+  import { AlertDialog, Dialog } from "bits-ui";
   import type { Snippet } from "svelte";
 
   let { open = $bindable(false), title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", busyLabel, destructive = false,
-    typeToConfirm, disabled = false, returnFocus, onconfirm }: {
+    typeToConfirm, disabled = false, alert = false, returnFocus, onconfirm }: {
     open?: boolean; title: string; description?: string | Snippet; confirmLabel?: string; cancelLabel?: string; busyLabel?: string;
-    destructive?: boolean; typeToConfirm?: string; disabled?: boolean; returnFocus?: () => HTMLElement | null | undefined; onconfirm: () => unknown;
+    destructive?: boolean; typeToConfirm?: string; disabled?: boolean; alert?: boolean; returnFocus?: () => HTMLElement | null | undefined; onconfirm: () => unknown;
   } = $props();
 
+  const Parts = $derived(alert ? AlertDialog : Dialog);
   let typed = $state("");
   let busy = $state(false);
   let box = $state<HTMLInputElement | null>(null);
@@ -27,19 +28,19 @@
   }
 </script>
 
-<Dialog.Root bind:open={() => open, (v) => { if (!busy) open = v; }}>
-  <Dialog.Portal>
-    <Dialog.Overlay data-slot="confirm-overlay"
+<Parts.Root bind:open={() => open, (v) => { if (!busy) open = v; }}>
+  <Parts.Portal>
+    <Parts.Overlay data-slot="confirm-overlay"
       class="fixed inset-0 z-[60] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-    <Dialog.Content data-slot="confirm-dialog" onOpenAutoFocus={(e) => { e.preventDefault(); (box ?? cancel)?.focus(); }}
+    <Parts.Content data-slot="confirm-dialog" onOpenAutoFocus={(e) => { e.preventDefault(); (box ?? cancel)?.focus(); }}
       onCloseAutoFocus={(e) => { const target = returnFocus?.(); if (target?.isConnected) { e.preventDefault(); target.focus(); } }}
       class="bg-card text-card-foreground fixed top-1/2 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-150">
       <form class="flex flex-col gap-4" onsubmit={confirm}>
-        <Dialog.Title class="text-foreground text-base font-semibold">{title}</Dialog.Title>
+        <Parts.Title class="text-foreground text-base font-semibold">{title}</Parts.Title>
         {#if description}
-          <Dialog.Description class="text-muted-foreground flex flex-col gap-2 text-sm leading-relaxed">
+          <Parts.Description class="text-muted-foreground flex flex-col gap-2 text-sm leading-relaxed">
             {#if typeof description === "string"}<p>{description}</p>{:else}{@render description()}{/if}
-          </Dialog.Description>
+          </Parts.Description>
         {/if}
         {#if typeToConfirm}
           <label class="flex flex-col gap-1.5 text-sm text-muted-foreground">
@@ -54,6 +55,6 @@
             class={cn(busy && "cursor-progress")}>{busy ? (busyLabel ?? confirmLabel) : confirmLabel}</Button>
         </div>
       </form>
-    </Dialog.Content>
-  </Dialog.Portal>
-</Dialog.Root>
+    </Parts.Content>
+  </Parts.Portal>
+</Parts.Root>

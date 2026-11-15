@@ -776,6 +776,7 @@
       "handler": "waypoint/server/api/photos.py:api_photo_grants",
       "web": [
         "frontend/src/lib/components/settings/PhotoSharingSettings.svelte",
+        "frontend/src/lib/components/settings/PhotosSection.svelte",
         "frontend/src/lib/trip-sharing.svelte.ts"
       ],
       "tests": [
