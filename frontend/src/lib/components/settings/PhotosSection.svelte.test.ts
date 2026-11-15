@@ -250,6 +250,27 @@ describe("Settings → Photos, the source cards", () => {
     expect(toast.success).toHaveBeenCalledWith("Resumed");
   });
 
+  it("lists two trips that share a name, when asking and again after the trips changed", async () => {
+    const twins = { people: [{ ...GRANTS.people[0], trips: [
+      { trip_id: 31, name: "Coast weekend", start_date: null, end_date: null, state: "shared", scope: "trip", count: 9, removed_count: 0 },
+      { trip_id: 32, name: "Coast weekend", start_date: null, end_date: null, state: "shared", scope: "trip", count: 3, removed_count: 0 },
+    ] }] };
+    let next = 0;
+    const checks = [asks("b".repeat(32), 12), asks("c".repeat(32), 15)];
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") return checks[Math.min(next++, 1)];
+      if (path === "/api/photo-grants") return twins;
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") throw new Refusal("Your trips changed meanwhile; try again", 409);
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(within(dialog).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Coast weekend", "Coast weekend"]);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(dialog).toHaveTextContent("Resuming it shows 15 photos"));
+    expect(within(dialog).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Coast weekend", "Coast weekend"]);
+  });
+
   it("leaves the library paused and gives focus back when the person says Not now or presses Escape", async () => {
     resuming([asks("b".repeat(32))]);
     render(PhotosSection);

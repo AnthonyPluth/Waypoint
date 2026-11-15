@@ -204,7 +204,7 @@
   let pausing = $state<number | null>(null);
   let notices = $state<Record<number, Outcome | undefined>>({});
   const clearNotice = (id: number) => { notices = { ...notices, [id]: undefined }; };
-  type Ask = { source: PhotoSource; kind: ResumeKind; check: PhotoSourceResume; names: string[]; note: string; stale: boolean };
+  type Ask = { source: PhotoSource; kind: ResumeKind; check: PhotoSourceResume; trips: { id: number; name: string }[]; note: string; stale: boolean };
   let asking = $state<Ask | null>(null);
   let askOpen = $state(false);
   let askTicket = 0;
@@ -214,12 +214,12 @@
     if (!askOpen) untrack(() => { askTicket += 1; });
   });
 
-  async function tripNames(check: PhotoSourceResume, personId: number): Promise<string[]> {
+  async function tripNames(check: PhotoSourceResume, personId: number): Promise<{ id: number; name: string }[]> {
     try {
       const found = await apiCall<"GET /api/photo-grants">("/api/photo-grants", { keep: true });
       const trips = found.people.find((p) => p.person_id === personId)?.trips ?? [];
-      const names = check.grants.map((g) => trips.find((t) => t.trip_id === g.trip_id)?.name);
-      return names.every((n): n is string => !!n) ? names : [];
+      const named = check.grants.map((g) => ({ id: g.trip_id, name: trips.find((t) => t.trip_id === g.trip_id)?.name }));
+      return named.every((t): t is { id: number; name: string } => !!t.name) ? named : [];
     } catch {
       return [];
     }
@@ -236,9 +236,9 @@
     const mineTicket = ++askTicket;
     const check = await apiCall<"GET /api/photo-sources/{id}/resume">(`/api/photo-sources/${s.id}/resume`);
     if (!check.asks) { await resumeNow(s, check.snapshot); return; }
-    const names = await tripNames(check, s.person_id);
+    const trips = await tripNames(check, s.person_id);
     if (mineTicket !== askTicket) return;
-    asking = { source: s, kind, check, names, note: "", stale: false };
+    asking = { source: s, kind, check, trips, note: "", stale: false };
     askOpen = true;
   }
 
@@ -252,9 +252,9 @@
         notices = { ...notices, [a.source.id]: { text: resumeSettled } };
         return;
       }
-      const names = await tripNames(check, a.source.person_id);
+      const trips = await tripNames(check, a.source.person_id);
       if (mineTicket !== askTicket) return;
-      asking = { ...a, check, names, note, stale: false };
+      asking = { ...a, check, trips, note, stale: false };
     } catch {
       if (mineTicket === askTicket) asking = { ...a, note: resumeUnchecked, stale: true };
     }
@@ -533,7 +533,7 @@
     {@const who = whoIs(asking.source.person_id, me, people)}
     {#if asking.note}<p role="alert" class="text-signal-ink">{asking.note}</p>{/if}
     <p>{resumeText(who, asking.kind, asking.check.count, asking.check.grants.length)}</p>
-    {#if asking.names.length}<ul class="list-disc pl-5">{#each asking.names as name (name)}<li>{name}</li>{/each}</ul>{/if}
+    {#if asking.trips.length}<ul class="list-disc pl-5">{#each asking.trips as trip (trip.id)}<li>{trip.name}</li>{/each}</ul>{/if}
   {/if}
 {/snippet}
 
