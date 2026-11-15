@@ -12,13 +12,16 @@ export function loadedAssetPaths(entries: { name: string }[], origin: string): s
   return [...paths];
 }
 
-type Scope = Pick<Window, "location" | "PerformanceObserver">;
+type Entries = { getEntries: () => { name: string }[] };
+type Observer = { observe: (options: { type: string; buffered: boolean }) => void; disconnect: () => void };
+export type Scope = { location: { origin: string }; PerformanceObserver?: new (callback: (list: Entries) => void) => Observer };
 
 function loadedResources(win: Scope): Promise<{ name: string }[]> {
   return new Promise((resolve) => {
-    if (typeof win.PerformanceObserver === "undefined") return resolve([]);
+    const Watcher = win.PerformanceObserver;
+    if (!Watcher) return resolve([]);
     const finish = (entries: { name: string }[]) => { observer.disconnect(); clearTimeout(timer); resolve(entries); };
-    const observer = new win.PerformanceObserver((list) => finish(list.getEntries()));
+    const observer = new Watcher((list) => finish(list.getEntries()));
     const timer = setTimeout(() => finish([]), GIVE_UP_MS);
     observer.observe({ type: "resource", buffered: true });
   });

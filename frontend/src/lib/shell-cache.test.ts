@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { loadedAssetPaths, registerShellCache } from "./shell-cache";
+import { loadedAssetPaths, registerShellCache, type Scope } from "./shell-cache";
 
 const ORIGIN = "https://trips.example.test";
 const SOURCE = readFileSync(new URL("../../../waypoint/static/sw.js", import.meta.url), "utf8");
@@ -47,9 +47,9 @@ class FakeObserver {
   disconnect() {}
 }
 
-const pageWith = (entries: { name: string }[], observer: unknown = FakeObserver) => {
+const pageWith = (entries: { name: string }[], observer: Scope["PerformanceObserver"] = FakeObserver): Scope => {
   FakeObserver.entries = entries;
-  return { location: { origin: ORIGIN }, PerformanceObserver: observer } as unknown as Window;
+  return { location: { origin: ORIGIN }, PerformanceObserver: observer };
 };
 
 describe("registerShellCache", () => {
@@ -74,7 +74,7 @@ describe("registerShellCache", () => {
     try {
       const postMessage = vi.fn();
       const container = { ready: Promise.resolve({ active: { postMessage } }), register: async () => ({}), addEventListener: () => {} } as unknown as ServiceWorkerContainer;
-      registerShellCache(container, pageWith([], undefined));
+      registerShellCache(container, { location: { origin: ORIGIN } });
       await vi.advanceTimersByTimeAsync(0);
       expect(postMessage).toHaveBeenLastCalledWith({ type: "keep-loaded", paths: [] });
       class Silent { observe() {} disconnect() {} }
