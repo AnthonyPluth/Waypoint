@@ -767,6 +767,12 @@ export interface PhotoSources {
   permissions: string[];
 }
 
+export interface PhotoUndoBody {
+  trip_id?: number;
+  decided_at?: number;
+  left_off?: number;
+}
+
 export interface PhotoWindow {
   start: string;
   end: string;
@@ -922,6 +928,7 @@ export interface ReviewPhoto {
   distance_km: number | null;
   cluster: number | null;
   removed_at: number | null;
+  decided_at?: number | null;
   candidates: PhotoCandidate[];
 }
 
@@ -1355,6 +1362,7 @@ export interface TripPhoto {
   distance_km: number | null;
   cluster: number | null;
   removed_at: number | null;
+  decided_at?: number | null;
 }
 
 export interface TripPhotoCounts {
@@ -1467,6 +1475,7 @@ export interface Endpoints {
   "GET /api/trips/{id}/photos": { body: never; reply: TripPhotos };
   "GET /api/photos/review": { body: never; reply: PhotoReview };
   "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
+  "POST /api/photos/{id}/undo": { body: PhotoUndoBody; reply: TripPhoto };
   "GET /api/photo-sources": { body: never; reply: PhotoSources };
   "POST /api/photo-sources": { body: PhotoSourceBody; reply: PhotoSource };
   "POST /api/photo-sources/test": { body: PhotoSourceNewTestBody; reply: PhotoSourceTest };

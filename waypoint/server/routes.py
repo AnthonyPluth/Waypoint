@@ -20,7 +20,7 @@ from .api.assistant import (api_assistant_review, api_assistant_review_create, a
 from .api.mcp import api_mcp_mail, api_mcp_revoke, api_mcp_settings, api_mcp_writes
 from .api.photos import (api_photo_decide, api_photo_exclude, api_photo_grants, api_photo_original, api_photo_prefs_set, api_photo_preview, api_photo_put_back,
                          api_photo_review, api_photo_sharing, api_photo_sharing_set, api_photo_sharing_stop, api_photo_source_add, api_photo_source_edit,
-                         api_photo_source_remove, api_photo_source_resume, api_photo_source_sync, api_photo_source_test, api_photo_source_test_new, api_photo_sources, api_photo_thumbnail,
+                         api_photo_source_remove, api_photo_source_resume, api_photo_source_sync, api_photo_source_test, api_photo_source_test_new, api_photo_sources, api_photo_thumbnail, api_photo_undo,
                          api_trip_photos)
 from .api.people import (api_claim_dismiss, api_claim_suggestions, api_people, api_person_add, api_person_claim,
                           api_person_edit, api_person_remove)
@@ -64,6 +64,7 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("GET", "/api/trips/{id}/photos", api_trip_photos),
     ("GET", "/api/photos/review", api_photo_review),
     ("POST", "/api/photos/{id}", api_photo_decide),
+    ("POST", "/api/photos/{id}/undo", api_photo_undo),
     ("GET", "/api/photos/{id}/thumbnail", api_photo_thumbnail),
     ("GET", "/api/photos/{id}/preview", api_photo_preview),
     ("GET", "/api/photos/{id}/original", api_photo_original),
