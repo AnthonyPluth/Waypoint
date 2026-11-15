@@ -162,15 +162,15 @@ class WhenItDoesNotTests(PushCase):
             found = review.arrived(conn, "u-jane", 0.0, [self.mailbox])
         self.assertEqual(sorted(found), sorted(f"{self.mailbox}/m-{each}" for each in ("incomplete", "match", "suggested")))
 
-    def test_a_scan_that_only_dismissed_emails_as_not_bookings_sends_nothing(self):
+    def test_a_scan_that_only_found_emails_the_ai_called_not_bookings_sends_nothing_and_keeps_them_in_review(self):
         self.turn_on()
         self.fake.content = VERDICT
         self.device()
         self.put("promo_ids")
         self.scan_job()
-        self.assertEqual((self.items(), scan.summary(self.mailbox).dismissed, self.sent, self.remembered()), ([], 1, [], []))
+        self.assertEqual((len(self.items()), self.sent, self.remembered()), (1, [], []))
 
-    def test_dismissed_emails_are_left_out_of_the_count_beside_ones_that_stay(self):
+    def test_emails_the_ai_called_not_bookings_are_left_out_of_the_count_beside_ones_that_hold_a_suggestion(self):
         self.turn_on()
         self.device()
         answers = [VERDICT, json.dumps(GOOD)]
@@ -180,7 +180,7 @@ class WhenItDoesNotTests(PushCase):
         self.add_mail("msg-old", eml("no_markup_ids").replace(original, b"Fri, 16 Oct 2026 09:10:00 -0400"))
         self.scan_job()
         self.assertEqual(self.bodies(), [ONE])
-        self.assertEqual(scan.summary(self.mailbox).dismissed, 1)
+        self.assertEqual(len(self.items()), 2)
 
     def test_a_scan_with_no_new_mail_sends_nothing_and_an_item_is_never_told_twice(self):
         self.device()

@@ -17,11 +17,6 @@ CHANGE = re.compile(
     r"(?i)\b(?:cancel\w*|refund\w*|delay\w*|reschedul\w*|re-?book\w*|re-?issu\w*|chang(?:e|es|ed|ing)|modif\w*|amend\w*|revis\w*|updated|"
     r"diverted|missed|waitlist\w*|upgrad\w*|downgrad\w*|no longer|name correction|new (?:departure|arrival|time|flight|seat|gate)|"
     r"gate|terminal|seat|seats|boarding|added (?:a )?(?:passenger|traveller|traveler|guest))\b")
-TRAVEL_WORDS = re.compile(
-    r"(?i)\b\d{1,2}:\d{2}\b|\b\d{1,2}\s?[ap]\.?m\b|\bconfirmation\b|\breservation (?:number|code|no\b|#)|record locator|\bpnr\b|e-?ticket|ticket number|"
-    r"\bitinerary\b|check-?in\b|check-?out\b|\bdepart\w*|\barriv\w*|pick-?up|drop-?off|\bpassengers?\b|\bflight\s*(?:no\.?|number|#)")
-LABELS = re.compile(r"(?i)" + "|".join(re.escape(w) for w in sorted(words.CONFIRMATION, key=len, reverse=True)))
-TRAVEL_CODES = re.compile(r"\([A-Z]{3}\)|\b[A-Z][A-Z0-9] ?\d{2,4}\b")
 
 
 UNCOMPARED = re.compile(
@@ -53,7 +48,6 @@ NAMED_HOUR = re.compile(r"(?i)(?<![^\W\d_])(?:" + "|".join(sorted(NAMED_HOURS, k
 @dataclass(frozen=True)
 class Signals:
     change: bool
-    travel: bool
     passengers: tuple[str, ...] = ()
     uncompared: bool = False
     flights: frozenset[str] = frozenset()
@@ -108,10 +102,8 @@ def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
     named = tuple(dict.fromkeys(n for m in PASSENGER.finditer(whole) for part in JOINED.split(m[1]) if (n := " ".join(part.split()))))
     flights = frozenset({*(f"{m[1]}{m[2]}".upper() for m in FLIGHT_TOKEN.finditer(whole) if m[1].isupper() or m[1].lower() not in PLAIN_WORDS),
                          *(f"{a}{n}".upper() for a, n in ai.LISTED_FLIGHT.findall(whole))})
-    timed = any(c.search(whole) for c in (when.CLOCK, when.FRENCH_CLOCK, when.JP_CLOCK))
-    return Signals(change=revises or bool(CHANGE.search(whole) or words.CANCEL.search(whole)), travel=bool(timed or LABELS.search(whole) or TRAVEL_WORDS.search(whole) or TRAVEL_CODES.search(whole)),
-                   passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights,
-                   codes=references.labelled(whole), days=_days(whole),
+    return Signals(change=revises or bool(CHANGE.search(whole) or words.CANCEL.search(whole)),
+                   passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights, codes=references.labelled(whole), days=_days(whole),
                    seats=frozenset(m[1].upper() for m in SEAT_TOKEN.finditer(whole)), clocks=_clocks(whole))
 
 
@@ -214,10 +206,6 @@ def covers(sign: Signals, suggestions: list[ai.Suggestion]) -> bool:
     told = {k for s in suggestions if (k := trips.flight_key(s.get("flight_number"))) is not None}
     days = _told_days(suggestions)
     return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told and all(readings & days for readings in sign.days)
-
-
-def names_nothing(sign: Signals) -> bool:
-    return not sign.codes and not sign.flights
 
 
 def matched(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,

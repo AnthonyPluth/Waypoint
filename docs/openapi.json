@@ -4262,17 +4262,10 @@
         "properties": {
           "ok": {
             "type": "boolean"
-          },
-          "dismissed": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": [
-          "ok",
-          "dismissed"
+          "ok"
         ],
         "additionalProperties": false
       },
@@ -8097,9 +8090,6 @@
           "ai_asked": {
             "type": "integer"
           },
-          "dismissed": {
-            "type": "integer"
-          },
           "dismissed_known": {
             "type": "integer"
           },
@@ -8122,7 +8112,6 @@
           "with_facts",
           "attached",
           "ai_asked",
-          "dismissed",
           "dismissed_known",
           "dismissed_older"
         ],
