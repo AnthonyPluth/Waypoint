@@ -70,7 +70,6 @@ export interface AppPush {
 
 export interface Asked {
   ok: boolean;
-  dismissed: string | null;
 }
 
 export interface AssistantCandidate {
@@ -955,7 +954,8 @@ export interface ScanSummary {
   with_facts: number;
   attached: number;
   ai_asked: number;
-  dismissed: number;
+  dismissed_known: number;
+  dismissed_older: number;
 }
 
 export interface Segment {

@@ -823,7 +823,7 @@ class HostedModeTests(ScanAiCase):
         self.hosted()
         asked: list[str] = []
         with refusing_ai_hosts(self, asked):
-            self.assertEqual(scan._ask_waiting(self.mailbox, self.token(), scan._clock()), (0, 0, 0, 0))
+            self.assertEqual(scan._ask_waiting(self.mailbox, self.token(), scan._clock()), (0, 0, 0))
             self.assertEqual(self.scan(again=True).state, "done")
         self.assertEqual((asked, self.fake.requests), ([], []))
         self.assertEqual([(r[1], r[2], r[3]) for r in self.unread()], [(None, None, "waiting")])
