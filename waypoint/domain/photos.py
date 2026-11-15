@@ -715,10 +715,14 @@ def _apply(photo: Photo, placed: photomatch.Match, chosen: TripWindow | None, de
     photo.location_source = INFERRED if here else None
 
 
-def _place(photo: Photo, person: int, chosen: TripWindow | None, stamp: float | None = None) -> None:
+def _settle_owner(photo: Photo, person: int, chosen: TripWindow | None, stamp: float | None) -> None:
+    _apply(photo, photomatch.settle(_shot(photo, person), chosen), chosen, OWNER, stamp)
+
+
+def _place(photo: Photo, person: int, chosen: TripWindow | None) -> None:
     now = time.time()
     after = photo.decided_at + 1e-6 if photo.decided_at is not None else now
-    _apply(photo, photomatch.settle(_shot(photo, person), chosen), chosen, OWNER, stamp if stamp is not None else max(now, after))
+    _settle_owner(photo, person, chosen, max(now, after))
 
 
 def home_in(conn: db.Connection) -> photomatch.HomeIn | None:
@@ -729,7 +733,7 @@ def home_in(conn: db.Connection) -> photomatch.HomeIn | None:
 
 
 def keep_on(photo: Photo, person: int, chosen: TripWindow) -> None:
-    _place(photo, person, chosen)
+    _settle_owner(photo, person, chosen, photo.decided_at)
 
 
 def re_place(conn: db.Connection, photo: Photo, person: int, windows: Sequence[TripWindow] | None = None,
@@ -796,7 +800,7 @@ def copy_placement(conn: db.Connection, photo: Photo, person: int) -> None:
     for twin in _same_asset(conn, photo, person):
         twin.trip_id = photo.trip_id
         if photo.decided_by == OWNER:
-            _place(twin, person, chosen, photo.decided_at)
+            _settle_owner(twin, person, chosen, photo.decided_at)
         else:
             _apply(twin, photomatch.settle(_shot(twin, person), chosen) if chosen is not None else photomatch.Match(cast(MatchKind, photo.match)), chosen, AUTO)
     conn.orm.flush()
