@@ -1,15 +1,18 @@
+import base64
 import json
 import unittest
+from email.utils import parsedate_to_datetime
 from unittest import mock
 
 from sqlalchemy import select
 
 from tests.privacy import no_leaks
 from tests.test_mail_ai import ScanAiCase
+from tests.test_mail_newer import BODY_CANARY, revised
 from tests.test_mail_scan import NOW
 from waypoint import tls
 from waypoint.domain import trips
-from waypoint.domain.mail import ai, newer, nothing_new, review, scan
+from waypoint.domain.mail import ai, extract, newer, nothing_new, review, scan
 from waypoint.storage import db, stored_mail
 from waypoint.storage.models import ReviewItem, Segment, StoredMessage
 
@@ -56,9 +59,13 @@ class NothingNewCase(ScanAiCase):
         return found.dismissed_known, found.dismissed_older
 
     def read_mail(self, body: str, reply: dict, name: str = "reminder", subject: str = SUBJECT, date: str = SAME_DAY,
-                  sender: str = "Example Air <reservations@example-air.example>") -> scan.Result:
+                  sender: str = "Example Air <reservations@example-air.example>", arrived: str | None = None) -> scan.Result:
         self.tick += 60
-        self.add_mail(name, mail(body, subject, date, name, sender))
+        raw = mail(body, subject, date, name, sender)
+        self.assertTrue(all(k.encode() in raw for k in CANARIES))
+        self.add_mail(name, raw)
+        if arrived is not None:
+            self.google.arrived[name] = str(int(parsedate_to_datetime(arrived).timestamp() * 1000))
         self.fake.content = json.dumps(reply)
         with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
             return self.scan(now=NOW + self.tick)
@@ -75,10 +82,10 @@ class NothingNewCase(ScanAiCase):
                   "end_local": "2026-11-21T07:10", "end_zone": "Europe/London", "details": {"flight_number": number}, **changes}
         return self.read(lambda conn: trips.add_segment(conn, viewer, fields))
 
-    def assess(self, said, received=None, convert=False, sign=None):
+    def assess(self, said, received=None, convert=False, sign=None, sender="example-air.example"):
         def run(conn):
             fields = scan._ai_fields(conn, said) if convert else None
-            return nothing_new.assess(conn, self.jane, said, fields, received, sign or nothing_new.Signals(False))
+            return nothing_new.assess(conn, self.jane, said, fields, received, sign or nothing_new.Signals(False), sender)
         return self.read(run)
 
     def edit_known(self, **changes):
@@ -659,6 +666,88 @@ class UnextractedDetailTests(NothingNewCase):
     def test_the_booking_s_own_times_may_be_printed(self):
         self.read_mail(f"{CHECK_IN} Departs 7:00 pm, lands 07:10.", SAME)
         self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+
+
+OUTSIDER = "Example Air Alerts <alerts@example-air-alerts.example>"
+LOOKALIKE = "Example Air <trips@exampleair.lookalike.example>"
+FAR_FUTURE = "Fri, 10 Oct 2031 09:30:00 -0400"
+ARRIVED = "Tue, 13 Oct 2026 09:30:00 -0400"
+
+
+class WhoMayAttachTests(NothingNewCase):
+    def attached(self) -> list[stored_mail.Attached]:
+        return self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))
+
+    def stays_in_review(self) -> None:
+        self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+        self.assertEqual([a["message_id"] for a in self.attached()], ["msg-flight_jsonld"])
+        self.assertNotEqual(self.scanned()["reminder"], "booking")
+
+    def test_a_reminder_from_the_sender_of_an_email_kept_with_the_booking_is_attached(self):
+        for n, sender in enumerate(("Example Air <reservations@example-air.example>", "Example Air <news@alerts.example-air.example>")):
+            with self.subTest(sender=sender):
+                self.read_mail(REMINDER, SAME, name=f"same-{n}", sender=sender)
+                self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+                self.assertIn(f"same-{n}", [a["message_id"] for a in self.attached()])
+
+    def test_an_identical_reminder_from_another_sender_domain_stays_in_review(self):
+        self.read_mail(REMINDER, SAME, sender=OUTSIDER)
+        self.stays_in_review()
+
+    def test_a_sender_whose_domain_only_names_the_airline_stays_in_review(self):
+        self.read_mail(REMINDER, SAME, sender=LOOKALIKE)
+        self.stays_in_review()
+
+    def test_a_reminder_from_another_sender_that_carries_the_booking_s_code_is_attached(self):
+        self.read_mail(f"{REMINDER} Booking reference QX7M2K.", SAME, sender=OUTSIDER)
+        self.assertEqual((self.kept(), self.counted()), ([], (1, 0)))
+        self.assertEqual([a["message_id"] for a in self.attached()], ["msg-flight_jsonld", "reminder"])
+
+    def test_an_older_copy_needs_the_code_in_its_text_or_the_booking_s_own_sender(self):
+        earlier = {**FULL, "start_local": "2026-11-20T18:00"}
+        self.assertEqual(self.assess(earlier, received="2026-10-10", convert=True), "older_copy")
+        self.assertIsNone(self.assess(earlier, received="2026-10-10", convert=True, sender="example-air-alerts.example"))
+        self.assertEqual(self.assess(earlier, received="2026-10-10", convert=True, sender="example-air-alerts.example",
+                                     sign=nothing_new.signals(OLD_TEXT)), "older_copy")
+
+    def test_assess_needs_the_code_in_the_text_or_a_kept_sender(self):
+        self.assertEqual(self.assess(SAME), "already_known")
+        self.assertIsNone(self.assess(SAME, sender="example-air-alerts.example"))
+        self.assertIsNone(self.assess(SAME, sender=None))
+        self.assertEqual(self.assess(SAME, sender=None, sign=nothing_new.signals(f"{REMINDER} Booking reference QX7M2K.")), "already_known")
+        self.assertIsNone(self.assess(SAME, sender=None, sign=nothing_new.signals(f"{REMINDER} Booking reference ZZ9Y8X.")))
+
+
+class SendersDateTests(NothingNewCase):
+    def attached(self) -> list[stored_mail.Attached]:
+        return self.read(lambda conn: stored_mail.attached(conn, self.known["id"]))
+
+    def test_a_future_dated_reminder_is_kept_as_of_the_day_it_arrived(self):
+        self.read_mail(REMINDER, SAME, date=FAR_FUTURE, arrived=ARRIVED)
+        self.assertEqual(self.counted(), (1, 0))
+        self.assertEqual(max(a["received"] or "" for a in self.attached()), "2026-10-13")
+
+    def test_a_future_dated_reminder_does_not_make_a_later_airline_change_older(self):
+        self.read_mail(REMINDER, SAME, date=FAR_FUTURE, arrived=ARRIVED)
+        raw = revised()
+        self.assertIn(BODY_CANARY.encode(), raw)
+        self.add_mail("newer", raw)
+        with no_leaks(self, BODY_CANARY, database=self.path, sent_ok=True):
+            self.scan(now=NOW + 600)
+        [seg] = self.segments()
+        self.assertEqual((seg["id"], seg["start_local"], seg["status"]), (self.known["id"], "2026-11-20T21:30", "changed"))
+        self.assertIn("newer", [a["message_id"] for a in self.attached()])
+
+    def test_the_sender_s_date_is_kept_when_it_is_not_after_the_message_arrived(self):
+        def read(date: str, arrived: str | None) -> str | None:
+            message = {"raw": base64.urlsafe_b64encode(mail(REMINDER, date=date)).decode()}
+            if arrived:
+                message["internalDate"] = str(int(parsedate_to_datetime(arrived).timestamp() * 1000))
+            return extract.read(message).received
+        self.assertEqual(read(SAME_DAY, ARRIVED), "2026-10-12")
+        self.assertEqual(read(FAR_FUTURE, ARRIVED), "2026-10-13")
+        self.assertEqual(read(FAR_FUTURE, None), "2031-10-10")
+        self.assertEqual(read("Mon, 12 Oct 2026 23:30:00 -0400", "Tue, 13 Oct 2026 03:31:00 +0000"), "2026-10-12")
 
 
 class SignalTests(unittest.TestCase):

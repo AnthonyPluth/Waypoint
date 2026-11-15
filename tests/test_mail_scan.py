@@ -123,7 +123,7 @@ class FakeGmail(FakeGoogle):
                 return self.reply({"error": "backend_error"}, 500)
             if mid not in g.mail:
                 return self.reply({"error": "not_found"}, 404)
-            return self.reply({"id": mid, "raw": b64(g.mail[mid])})
+            return self.reply({"id": mid, "raw": b64(g.mail[mid]), **({"internalDate": arrived[mid]} if mid in (arrived := getattr(g, "arrived", {})) else {})})
         if rest == "/history":
             g.history_calls.append(q)
             if g.history_gone:
@@ -148,6 +148,7 @@ def reset(g) -> None:
     g.fail_on, g.history_gone, g.history_id, g.page = None, False, "200", 100
     g.heads, g.snippets, g.labels = [], {}, {}
     g.mailbox_labels, g.label_mail, g.label_queries = [], {}, []
+    g.arrived = {}
 
 
 def serve_fake_gmail(case) -> Google:
@@ -2998,15 +2999,20 @@ class MailScanApiTests(GoogleCase):
 
     def test_asking_the_ai_about_an_email_that_is_plainly_not_a_booking_leaves_it_in_review_with_its_text_stored(self):
         self.put("promo_offer", "promo_ids")
+        canaries = ("CANARY-BODY-PROMO-2R7H", "CANARY-BODY-AI-5J2K", "FXLOY-4400123", "2207781905", "TT87654321")
+        self.assertTrue(all(any(k.encode() in eml(n) for n in ("promo_offer", "promo_ids")) for k in canaries))
         self.scan_now()
         items = self.call("ana", "GET", "/api/review")[1]["items"]
         self.assertEqual(len(items), 2)
         self.ai_on()
         stored = self.read_stored()
+        sent = ""
         for item in items:
-            with mock.patch.object(scan.ai, "suggest", return_value=ai.Reading([])) as asked, no_leaks(self, "CANARY-BODY-NOMARKUP-6H9C"):
+            with mock.patch.object(scan.ai, "suggest", return_value=ai.Reading([])) as asked, no_leaks(self, *canaries, database=os.path.join(os.environ["WAYPOINT_DATA"], "waypoint.db")):
                 self.assertEqual(self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {}), (200, {"ok": True}))
             self.assertEqual(asked.call_count, 1)
+            sent += asked.call_args.args[1]
+        self.assertTrue(all(k in sent for k in canaries))
         self.assertEqual(sorted(i["id"] for i in self.call("ana", "GET", "/api/review")[1]["items"]), sorted(i["id"] for i in items))
         self.assertEqual((self.call("ana", "GET", "/api/state")[1]["review_count"], self.read_stored()), (2, stored))
 

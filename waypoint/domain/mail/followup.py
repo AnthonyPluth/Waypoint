@@ -37,7 +37,11 @@ def _same_sender(conn: db.Connection, segment: Segment, domain: str) -> bool:
     name = _squash(trips.provider_key(segment.provider))
     if len(name) >= MIN_NAME and name not in GENERIC_NAMES and name in _labels(domain):
         return True
-    return any(_related(domain, known) for known in stored_mail.senders_for_segment(conn, segment.id))
+    return sent_like_kept(conn, segment, domain)
+
+
+def sent_like_kept(conn: db.Connection, segment: Segment, domain: str | None) -> bool:
+    return bool(domain) and any(_related(domain or "", known) for known in stored_mail.senders_for_segment(conn, segment.id))
 
 
 def _lacks(conn: db.Connection, segment: Segment, facts: frozenset[str]) -> bool:

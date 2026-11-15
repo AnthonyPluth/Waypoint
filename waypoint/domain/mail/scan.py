@@ -498,7 +498,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
     review.raise_parking(conn, mailbox_id, message_id, parking)
     if (dismiss_known and suggestions and error is None and not parking and signals is not None and not signals.change
             and nothing_new.covers(signals, suggestions)):
-        found = [nothing_new.matched(conn, viewer, s, _ai_fields(conn, s), row["received"], signals) for s in suggestions]
+        found = [nothing_new.matched(conn, viewer, s, _ai_fields(conn, s), row["received"], signals, row["sender_domain"]) for s in suggestions]
         if all(found):
             reasons = [f[0] for f in found if f]
             kept = list(dict.fromkeys(f[1] for f in found if f))

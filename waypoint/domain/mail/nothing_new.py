@@ -8,7 +8,7 @@ from ...storage import db
 from ...storage.models import Segment
 from .. import trips, visibility
 from ..visibility import Viewer
-from . import ai, ingest, newer, price, references, when, words
+from . import ai, followup, ingest, newer, price, references, when, words
 from .booking import Passenger
 
 Reason = Literal["already_known", "older_copy"]
@@ -55,6 +55,7 @@ class Signals:
     days: frozenset[frozenset[Day]] = frozenset()
     seats: frozenset[str] = frozenset()
     clocks: frozenset[Clock] = frozenset()
+    tokens: frozenset[str] = frozenset()
 
 
 def _twelve_hour(hour: int, half: str) -> int:
@@ -104,7 +105,8 @@ def signals(text: str, subject: str = "", revises: bool = False) -> Signals:
                          *(f"{a}{n}".upper() for a, n in ai.LISTED_FLIGHT.findall(whole))})
     return Signals(change=revises or bool(CHANGE.search(whole) or words.CANCEL.search(whole)),
                    passengers=named, uncompared=bool(UNCOMPARED.search(whole) or price.MONEY.search(whole)), flights=flights, codes=references.labelled(whole), days=_days(whole),
-                   seats=frozenset(m[1].upper() for m in SEAT_TOKEN.finditer(whole)), clocks=_clocks(whole))
+                   seats=frozenset(m[1].upper() for m in SEAT_TOKEN.finditer(whole)), clocks=_clocks(whole),
+                   tokens=references.read(subject, text).codes)
 
 
 def _day(local: str | None) -> str:
@@ -208,25 +210,32 @@ def covers(sign: Signals, suggestions: list[ai.Suggestion]) -> bool:
     return {k for f in sign.flights if (k := trips.flight_key(f)) is not None} <= told and all(readings & days for readings in sign.days)
 
 
+def vouched_for(conn: db.Connection, seg: Segment, sign: Signals, sender: str | None) -> bool:
+    code = references.normal(seg.confirmation or "")
+    return (len(code) >= references.MIN_LENGTH and code in sign.tokens) or followup.sent_like_kept(conn, seg, sender)
+
+
 def matched(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
-            sign: Signals) -> tuple[Reason, int] | None:
+            sign: Signals, sender: str | None) -> tuple[Reason, int] | None:
     if fields is not None:
         decision = newer.decide(conn, viewer, fields, received, False)
         if decision is None or decision.action != "older":
             return None
         same = _same_reservations(conn, viewer, fields)
-        if [s.id for s in same] == [decision.segment_id] and same[0].status == "confirmed" and _fully_held(conn, same[0], said, sign, True):
+        if [s.id for s in same] == [decision.segment_id] and same[0].status == "confirmed" and vouched_for(conn, same[0], sign, sender) \
+                and _fully_held(conn, same[0], said, sign, True):
             return "older_copy", same[0].id
         return None
     found = _flights_like(conn, viewer, said)
-    if len(found) == 1 and found[0].status == "confirmed" and _fully_held(conn, found[0], said, sign, False):
+    if len(found) == 1 and found[0].status == "confirmed" and vouched_for(conn, found[0], sign, sender) \
+            and _fully_held(conn, found[0], said, sign, False):
         return "already_known", found[0].id
     return None
 
 
 def assess(conn: db.Connection, viewer: Viewer, said: ai.Suggestion, fields: trips.SegmentIn | None, received: str | None,
-           sign: Signals) -> Reason | None:
-    found = matched(conn, viewer, said, fields, received, sign)
+           sign: Signals, sender: str | None) -> Reason | None:
+    found = matched(conn, viewer, said, fields, received, sign, sender)
     return found[0] if found else None
 
 
