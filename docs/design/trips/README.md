@@ -21,6 +21,17 @@ Each page says what it replaces: the Past list in `frontend/src/pages/Trips.svel
 - Photos shown follow sharing: only photos the viewer may see (see [the photo designs](../photos/README.md) and `docs/PHOTOS.md`): the hero, the grids, the pins, the counts and the need-a-look chip are built from them alone.
 - Distance is shown in the household's unit, one unit throughout the app.
 
+## Owner decisions on the build (2026-11-16, PR #748)
+
+The phone frames do not draw these; the owner settled them when reviewing the build of the completed trip page (#709).
+
+1. Editing a trip's name, destination and notes: a pencil button beside Trip options.
+2. The map hero (fewer than three photos to show): the title and dates, then the replay map with its controls and stops, then the quiet line "No photos yet", then the facts.
+3. Replay trip in the facts line opens the replay inline under the line; a trip's notes show as a paragraph under the facts.
+4. The gallery's Select is not on this page; a photo is removed from the viewer.
+
+Until the Bookings sheet (#711) and the booking detail sheet (#712) land, a past trip keeps its existing booking cards below the days, with Edit, Move and Remove; they go away when those land.
+
 ## Open questions for the owner
 
 1. Six photos per day, or three on phone?

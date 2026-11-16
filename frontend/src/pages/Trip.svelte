@@ -305,7 +305,7 @@
   {#if completedPage}
     <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }} />
     {#if form && form.id === null}
-      <div class="mt-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
+      <div class="mt-6 mb-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
     {/if}
   {:else}
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -341,11 +341,12 @@
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />
   {/if}
+  {/if}
 
   {#if t.segments.length === 0}
     <p class="text-muted-foreground">Nothing booked on this trip yet.</p>
   {/if}
-  <ul class="ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6" aria-label="Bookings">
+  <ul class={`ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6 ${completedPage ? "mt-6" : ""}`} aria-label="Bookings">
     {#each cards as card (card.id)}
       {@const s = card.lead}
       {#if card.segments.length === 1}
@@ -410,7 +411,6 @@
       {/if}
     {/each}
   </ul>
-  {/if}
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 

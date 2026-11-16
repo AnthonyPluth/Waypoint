@@ -30,7 +30,7 @@
   let looks = $state(0);
   let stopCount = $state(0);
   let replaying = $state(false);
-  let gallery = $state<{ showCluster: (cluster: number) => Promise<void> } | null>(null);
+  let gallery = $state<{ showCluster: (cluster: number) => Promise<void>; viewFirst: () => void } | null>(null);
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let lost = $state<Set<number>>(new Set());
@@ -68,7 +68,7 @@
       <span></span>
     {/if}
     <div class="flex items-center">
-      <Button bind:ref={editButton} variant="ghost" size="icon" aria-label="Edit trip details" onclick={() => void details?.open()}><Pencil /></Button>
+      {#if !editing}<Button bind:ref={editButton} variant="ghost" size="icon" aria-label="Edit trip details" onclick={() => void details?.open()}><Pencil /></Button>{/if}
       {#if options.length}<OptionsMenu popup iconOnly variant="ghost" label="Trip options" text="Trip options" icon={Ellipsis} items={options} />{/if}
     </div>
   </div>
@@ -102,6 +102,10 @@
           {#if caption}<span class="text-sm text-foreground/85">{caption}</span>{/if}
         </div>
       </div>
+    {/if}
+
+    {#if heroKind === "photos" && found && found.photos.length === heroIds.length}
+      <div><Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button></div>
     {/if}
 
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">

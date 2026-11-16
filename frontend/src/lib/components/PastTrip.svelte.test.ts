@@ -151,6 +151,27 @@ describe("PastTrip hero", () => {
   });
 });
 
+describe("PastTrip with a hero that takes every photo", () => {
+  it("keeps a way into the photo viewer, since the days are empty", async () => {
+    photos = [1, 2, 3].map((id) => shot(id));
+    best = [1, 2, 3];
+    show();
+    const open = await screen.findByRole("button", { name: "View photos" });
+    expect(document.querySelector("[data-day]")).toBeNull();
+    await userEvent.click(open);
+    expect(within(await screen.findByRole("dialog")).getByText("Photo 1 of 3")).toBeTruthy();
+  });
+
+  it("has no View photos button while the days show photos", async () => {
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show();
+    await screen.findByTestId("trip-hero");
+    await waitFor(() => expect(days()).toHaveLength(1));
+    expect(screen.queryByRole("button", { name: "View photos" })).toBeNull();
+  });
+});
+
 describe("PastTrip facts", () => {
   it("is the Trip summary list with its hidden terms, the household's unit, the avatars as one image and the total", async () => {
     photos = [1, 2, 3, 4].map((id) => shot(id));
@@ -357,6 +378,15 @@ describe("PastTrip top row and Trip options", () => {
     expect(await screen.findByRole("textbox", { name: "Name" })).toHaveValue("Spring loop");
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.queryByTestId("trip-hero")).toBeNull();
+  });
+
+  it("takes the pencil away while the form is open, so a draft is never reset", async () => {
+    show();
+    await userEvent.click(screen.getByRole("button", { name: "Edit trip details" }));
+    const name = await screen.findByRole("textbox", { name: "Name" });
+    await userEvent.type(name, " draft");
+    expect(screen.queryByRole("button", { name: "Edit trip details" })).toBeNull();
+    expect(name).toHaveValue("Spring loop draft");
   });
 });
 

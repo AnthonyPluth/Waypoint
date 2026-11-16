@@ -77,4 +77,27 @@ describe("OptionsMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
     expect(trigger).toHaveFocus();
   });
+
+  it("moves between the items of a popup menu with the arrow keys, Home and End, and gives focus back on Escape", async () => {
+    render(PopupHarness, { onmerge: vi.fn(), ondelete: vi.fn() });
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: "Trip options" });
+    await user.click(trigger);
+    const [merge, remove] = screen.getAllByRole("menuitem");
+    expect(merge).toHaveFocus();
+    expect(merge).toHaveAttribute("tabindex", "-1");
+    await user.keyboard("{ArrowDown}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(merge).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("{Home}");
+    expect(merge).toHaveFocus();
+    await user.keyboard("{End}");
+    expect(remove).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
+  });
 });

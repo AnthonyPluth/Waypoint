@@ -239,10 +239,19 @@
     const near = photos.filter((p) => p.cluster === target.cluster).length;
     announce = `Showing ${near} ${near === 1 ? "photo" : "photos"} from the map, from ${clock(target.taken_local)}`;
     await tick();
-    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`) ?? gallery?.querySelector<HTMLElement>(`#photo-day-${day.day}`);
-    if (!tile) return;
+    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`);
+    if (!tile) {
+      announce = `Showing the photo from the map, from ${clock(target.taken_local)}`;
+      openViewer(target, gallery?.querySelector<HTMLElement>(`#photo-day-${day.day}`) ?? null);
+      return;
+    }
     tile.scrollIntoView?.({ block: "center", behavior: "auto" });
     tile.focus({ preventScroll: true });
+  }
+
+  export function viewFirst() {
+    const first = photos[0];
+    if (first) openViewer(first, null);
   }
 
   export async function showCluster(index: number) {
