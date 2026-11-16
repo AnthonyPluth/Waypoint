@@ -108,6 +108,7 @@ enum ServerReachability {
 }
 
 final class OfflineNavigation: NSObject {
+    static var events: [String] = []
     private let wrapped: WKNavigationDelegate?
     private let server: URL
     private let gate: OfflineGate
@@ -135,6 +136,7 @@ final class OfflineNavigation: NSObject {
 extension OfflineNavigation: WKNavigationDelegate {
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
         wrapped?.webView?(webView, didFailProvisionalNavigation: navigation, withError: error)
+        OfflineNavigation.events.append("fail \((error as NSError).domain) \((error as NSError).code) \(String(describing: (error as NSError).userInfo[NSURLErrorFailingURLErrorKey]))")
         let failedURL = (error as NSError).userInfo[NSURLErrorFailingURLErrorKey] as? URL
         if OfflineFallback.shouldShowCachedPage(error: error, failedURL: failedURL, server: server, gate: gate) {
             showCachedPage(webView)
@@ -143,6 +145,7 @@ extension OfflineNavigation: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         wrapped?.webView?(webView, didFinish: navigation)
+        OfflineNavigation.events.append("finish \(String(describing: webView.url))")
         if let url = webView.url, Endpoints.origin(url) == Endpoints.origin(server) {
             serverPageLoaded(webView)
         }

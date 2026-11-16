@@ -272,7 +272,7 @@ final class OfflineShellTests: XCTestCase {
             title = try? await webView.evaluateJavaScript("document.title") as? String
             if title != "cached shell" { try await Task.sleep(nanoseconds: 100_000_000) }
         }
-        XCTAssertEqual(title, "cached shell")
+        XCTAssertEqual(title, "cached shell", "\(OfflineNavigation.events)")
         XCTAssertEqual(webView.url, OfflinePageAddress.home)
         let ran = try await webView.evaluateJavaScript("document.documentElement.dataset.ran") as? String
         XCTAssertEqual(ran, "yes")
