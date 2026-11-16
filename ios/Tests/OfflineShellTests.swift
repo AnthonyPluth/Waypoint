@@ -65,6 +65,24 @@ final class OfflineShellTests: XCTestCase {
     """
     private static let script = "document.documentElement.dataset.ran = 'yes';"
 
+    private static func closedPort() -> UInt16 {
+        let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        defer { close(descriptor) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        address.sin_port = 0
+        _ = withUnsafePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(descriptor, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) }
+        }
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        _ = withUnsafeMutablePointer(to: &address) { pointer in
+            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(descriptor, $0, &length) }
+        }
+        return UInt16(bigEndian: address.sin_port)
+    }
+
     override func setUp() {
         super.setUp()
         root = FileManager.default.temporaryDirectory.appendingPathComponent("offline-shell-\(UUID().uuidString)", isDirectory: true)
@@ -257,7 +275,7 @@ final class OfflineShellTests: XCTestCase {
 
     @MainActor
     func testTheShellShowsTheCachedPageWhenARemoteServerCannotBeReached() async throws {
-        let server = URL(string: "https://127.0.0.1:1")!
+        let server = URL(string: "https://127.0.0.1:\(Self.closedPort())")!
         try saveTrips(for: server)
         try savePages(for: server)
         let before = (ShellViewController.serverURL, ShellViewController.gate)
@@ -280,7 +298,7 @@ final class OfflineShellTests: XCTestCase {
 
     @MainActor
     func testTheShellShowsNoCachedPageWhenNoTripsAreSaved() async throws {
-        let server = URL(string: "https://127.0.0.1:1")!
+        let server = URL(string: "https://127.0.0.1:\(Self.closedPort())")!
         try savePages(for: server)
         let before = (ShellViewController.serverURL, ShellViewController.gate)
         ShellViewController.serverURL = server
