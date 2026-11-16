@@ -49,6 +49,17 @@ describe("TripSummary", () => {
     expect(screen.getByTestId("trip-summary").querySelectorAll("button, a")).toHaveLength(0);
   });
 
+  it("shows the facts form of the line with Days first and leaves out places and the placed-from-the-itinerary note", async () => {
+    summary = reply({ states: ["Arizona"], countries: ["United States"], photos: { total: 248, inferred: 23 } });
+    render(TripSummary, { tripId: 1, facts: true });
+    expect(await line()).toHaveAttribute("aria-label", "Trip summary");
+    const terms = [...screen.getByTestId("trip-summary").querySelectorAll("dt")];
+    expect(terms.map((t) => t.textContent)).toEqual(["Days", "Nights away", "Distance", "Photos"]);
+    expect(terms.every((t) => t.classList.contains("sr-only"))).toBe(true);
+    expect(value("Days")).toHaveTextContent("15 days");
+    expect(value("Photos")).toHaveTextContent(/^248 photos$/);
+  });
+
   it("shows the distance in kilometres when that is the household’s unit", async () => {
     unit = "km";
     summary = reply({ distance_km: 2940.4 });

@@ -104,6 +104,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_immich: true }] })).toEqual(["step 1: fake_immich takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: 2 }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: "2" }] })).toEqual(["step 1: fake_photo_limit takes a number"]);
   });
 
   it("makes a made-up archive of the asked size from a trip of the demo, with ids of their own", () => {
@@ -162,6 +164,7 @@ describe("flowProblems", () => {
   it("opens the trip page on the signed-in server, from the trips list", () => {
     expect(SIGNED_PAGES).toEqual(["trip"]);
     expect(OPENED_PAGES.trip.from).toBe("trips");
+    expect(OPENED_PAGES.trip.ready).toContain("[data-testid='trip-hero'] img");
     expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trip")).toBe("http://b");
     expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trips")).toBe("http://a");
     expect(() => pageBase({ base: "http://a" }, "trip")).toThrow("page trip needs the signed-in demo server");
