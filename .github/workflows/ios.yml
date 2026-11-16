@@ -6,10 +6,10 @@ name: iOS
 on:
   push:
     branches: [main]
-    paths: [ios/**, .github/workflows/ios.yml]
+    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   pull_request:
     branches: [main]
-    paths: [ios/**, .github/workflows/ios.yml]
+    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,7 @@ defaults:
 jobs:
   build:
     name: iOS build and tests
-    runs-on: macos-15   # hosted: Xcode only runs on macOS
+    runs-on: macos-26   # hosted: Xcode only runs on macOS; Apple requires the iOS 26 SDK (Xcode 26) to upload
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
@@ -40,6 +40,11 @@ jobs:
       - name: Install the packages
         working-directory: ios
         run: npm ci --no-audit --no-fund
+      - name: Require Xcode 26 or later
+        # Apple rejects uploads built with an older SDK; the macos-26 image's default Xcode is 26.x.
+        run: |
+          xcodebuild -version
+          [ "$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')" -ge 26 ]
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate the Xcode project
