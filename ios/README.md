@@ -19,7 +19,7 @@ Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholde
 
 ## App icon
 
-The icon is one 1024x1024 PNG with no transparency (`AppIcon` in `Waypoint/Assets.xcassets`, the single-size format; iOS rounds the corners). It is the Waypoint logo (`waypoint/static/logo.svg`) on its dark tile, full bleed. The PNG is committed once as `waypoint/static/ios-icon-1024.png`, the only place a raster image may live (its vector source is `waypoint/static/ios-icon.svg`); `xcodegen` copies it into the asset catalog (`preGenCommand` in `project.yml`, the copy is not committed), and `ASSETCATALOG_COMPILER_APPICON_NAME` / `CFBundleIconName` name it. App Store Connect refuses a build without it. The owner's sign-off on the icon is pending.
+The icon is one 1024x1024 PNG with no transparency (`AppIcon` in `Waypoint/Assets.xcassets`, the single-size format; iOS rounds the corners). It is the Waypoint logo (`waypoint/static/logo.svg`) on its dark tile, full bleed. The PNG is committed once as `waypoint/static/ios-icon-1024.png`, the only place a raster image may live (its vector source is `waypoint/static/ios-icon.svg`); `xcodegen` copies it into the asset catalog (`preGenCommand` in `project.yml`, the copy is not committed), and `ASSETCATALOG_COMPILER_APPICON_NAME` / `CFBundleIconName` name it. App Store Connect refuses a build without it.
 
 ## TestFlight
 
