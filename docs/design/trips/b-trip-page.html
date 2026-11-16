@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Completed trips: Trip page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f; --action: #3563e0;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8; --accent: #1a1e29; --destructive: #ff7b72;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-bad-soft: #3a1512; --status-bad-ink: #ff9d96;
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --surface-2: var(--popover); --surface-3: #1f2433;
+  --chart-1: #4f9dff; --chart-2: #f6b73c; --chart-3: #4fd1b0; --chart-4: #c79bff; --chart-5: #ff8fab; --chart-6: #9be15d;
+  --kind-flight: var(--primary); --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --kind-train: var(--chart-4); --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
+  --kind-car: var(--signal); --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
+  --kind-cruise: var(--chart-5); --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
+  --kind-parking: var(--chart-6); --kind-parking-soft: color-mix(in srgb, var(--kind-parking) 15%, transparent);
+  --kind-quiet: var(--muted-foreground); --kind-quiet-soft: var(--surface-3);
+  --avatar-1: #1d3a63; --avatar-1-ink: #d6e6ff; --avatar-2: #14463c; --avatar-2-ink: #c9f3e6;
+  --map-sea: #0b0e15; --map-land: #1c2230; --map-border: #343c52; --map-visited: #3d7bc7;
+  --map-route: #8fc2ff; --map-airport: #f6b73c; --map-stay: #4fd1b0; --map-photo: var(--foreground);
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--doc-bg); }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a, .lede a { color: var(--status-info-ink); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; background: color-mix(in srgb, var(--doc-bg) 88%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--doc-line); border-radius: 16px; }
+.segc { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--secondary); border: 1px solid var(--input); }
+.segc button { border: 0; background: transparent; border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; }
+.segc button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.bar .toc { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.bar .toc a { color: var(--muted-foreground); padding: 4px 0; }
+.bar .toc a:hover, .bar .toc a[aria-current] { color: var(--foreground); }
+.checks { border: 1px solid var(--doc-line); border-radius: 16px; padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
+.checks h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal-ink); }
+.checks ol { list-style: decimal; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.checks li::marker { color: var(--muted-foreground); }
+.sec { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.stage { overflow-x: auto; padding-bottom: 6px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
+body.desk [data-w="phone"] { display: none; }
+body:not(.desk) [data-w="desk"] { display: none; }
+.fig { display: flex; flex-direction: column; gap: 8px; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec li { overflow-wrap: anywhere; }
+.spec code, .checks code, .lede code, .dochead code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "\201C" "\201D"; }
+
+.dev { position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
+body.desk .dev { width: 1280px; border-radius: 14px; }
+body.desk .dev.frag { width: 960px; }
+body.desk .dev.col { width: 400px; }
+.dev.tall { height: 844px; }
+.dev.taller { height: 900px; }
+.dev.sheetdev { height: 760px; background: var(--popover); border-radius: 26px; }
+body.desk .dev.panel { height: 800px; }
+
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.meta { color: var(--muted-foreground); font-size: 13px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 14px; font-weight: 600; min-height: 44px; padding: 0 14px; border: 1px solid var(--input); background: var(--secondary); color: var(--foreground); cursor: pointer; white-space: nowrap; }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.icon { width: 44px; padding: 0; }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 99px; font-size: 12px; font-weight: 600; padding: 3px 10px; width: fit-content; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.chip.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.chip.bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.chip.info { background: var(--status-info-soft); color: var(--status-info-ink); }
+.avs { display: inline-flex; }
+.av { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 700; border: 2px solid var(--card); }
+.av + .av { margin-left: -7px; }
+.a1 { background: var(--avatar-1); color: var(--avatar-1-ink); }
+.a2 { background: var(--avatar-2); color: var(--avatar-2-ink); }
+.kind { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.k-flight { background: var(--kind-flight-soft); color: var(--kind-flight); }
+.k-stay { background: var(--kind-stay-soft); color: var(--kind-stay); }
+.k-car { background: var(--kind-car-soft); color: var(--kind-car); }
+.k-train { background: var(--kind-train-soft); color: var(--kind-train); }
+.k-cruise { background: var(--kind-cruise-soft); color: var(--kind-cruise); }
+.k-parking { background: var(--kind-parking-soft); color: var(--kind-parking); }
+.k-quiet { background: var(--kind-quiet-soft); color: var(--kind-quiet); }
+.code { font-family: var(--mono); letter-spacing: .04em; color: var(--foreground); }
+
+.ph { position: relative; overflow: hidden; background-size: cover; }
+.s1 { background: radial-gradient(circle at 78% 26%,#fff1c9 0 5%,transparent 5.6%),radial-gradient(90% 55% at 18% 110%,#7a3b22 0 58%,transparent 59%),radial-gradient(70% 45% at 88% 114%,#a4502b 0 55%,transparent 56%),linear-gradient(180deg,#f0a56a 0%,#e9845a 45%,#b95c3b 100%); }
+.s2 { background: radial-gradient(circle at 70% 38%,#ffe9c2 0 6%,transparent 6.8%),radial-gradient(120% 55% at 30% 112%,#14202e 0 60%,transparent 61%),linear-gradient(180deg,#f4b183 0%,#c0546a 48%,#2a2f55 100%); }
+.s3 { background: radial-gradient(100% 60% at 25% 112%,#1c3b32 0 60%,transparent 61%),radial-gradient(80% 50% at 85% 112%,#2a5a49 0 58%,transparent 59%),linear-gradient(180deg,#a9dccf 0%,#58a08a 100%); }
+.s4 { background: radial-gradient(60% 70% at 35% 105%,#eef4ff 0 38%,transparent 39%),radial-gradient(50% 60% at 75% 108%,#dfe9fb 0 36%,transparent 37%),radial-gradient(120% 40% at 50% 120%,#1d2b45 0 60%,transparent 61%),linear-gradient(180deg,#bcd8ff 0%,#6d9be0 100%); }
+.s5 { background: radial-gradient(circle at 18% 72%,#ffd58a 0 1.4%,transparent 1.9%),radial-gradient(circle at 34% 80%,#ffd58a 0 1.2%,transparent 1.7%),radial-gradient(circle at 58% 70%,#ffe3b3 0 1.4%,transparent 1.9%),radial-gradient(circle at 76% 84%,#ffd58a 0 1.2%,transparent 1.7%),linear-gradient(180deg,#0e1a33 0%,#31407a 70%,#101733 100%); }
+.s6 { background: radial-gradient(90% 30% at 40% 78%,#e9fffb 0 46%,transparent 47%),linear-gradient(180deg,#bff3e6 0%,#2aa9a0 55%,#0d4f58 100%); }
+.scrim { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(7,9,14,0) 38%,rgba(7,9,14,.84) 100%); }
+.cap { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; flex-direction: column; gap: 2px; color: #fff; }
+.cap h3, .cap h1 { margin: 0; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.cap h3 { font-size: 19px; }
+.cap .meta { color: #e1e6f0; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; background: rgba(7,9,14,.72); color: #fff; }
+.pill .ic { width: 13px; height: 13px; }
+.mosaic { position: relative; display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; }
+.mosaic > .big { grid-row: 1 / 3; }
+.mosaic > .scrim { right: 34%; }
+
+.pcard { display: block; border-radius: 20px; overflow: hidden; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.pcard:hover { background: var(--surface-3); }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; }
+.stat { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13px; color: var(--muted-foreground); }
+.stat b { color: var(--foreground); font-weight: 600; }
+.yearh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.yearh h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.cards { display: flex; flex-direction: column; gap: 14px; }
+.pad { padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+.pagetitle { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pagetitle h1 { font-size: 2.25rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; }
+.up { display: flex; min-height: 92px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.up .stub { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px dashed var(--border); text-align: center; }
+.up .stub b { font-size: 26px; line-height: 1; }
+.up .stub span { font-size: 13px; font-weight: 600; letter-spacing: .06em; color: var(--signal); }
+.up .body { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.up .body b { font-size: 17px; letter-spacing: -0.015em; }
+.more-link { align-self: flex-start; color: var(--primary); font-size: 14px; font-weight: 600; padding: 8px 4px; background: none; border: 0; cursor: pointer; }
+
+.page { display: flex; flex-direction: column; gap: 20px; background: var(--background); padding: 16px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 14px; min-height: 44px; }
+.hero { position: relative; display: grid; gap: 2px; border-radius: 22px; overflow: hidden; border: 1px solid var(--border); }
+.hero .cap { left: 18px; right: 18px; bottom: 16px; gap: 4px; }
+.hero .cap h1 { font-size: 24px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 650; }
+.hero .cap .meta { font-size: 14px; }
+.facts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; color: var(--muted-foreground); }
+.stats > div { display: inline; }
+.stats dd { display: inline; }
+.stats b { color: var(--foreground); font-weight: 650; }
+.facts2 { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 14px; color: var(--muted-foreground); }
+.facts2 b { color: var(--foreground); font-weight: 650; }
+.list { border: 1px solid var(--border); border-radius: 18px; background: var(--card); overflow: hidden; }
+.rowb { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; }
+.rowb:last-child { border-bottom: 0; }
+.rowb:hover, .rowb.sel { background: var(--surface-3); }
+.rowb .t { min-width: 0; flex: 1 1 0; display: flex; flex-direction: column; }
+.rowb .t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rowb .chev { color: var(--muted-foreground); }
+.kinds { display: inline-flex; gap: 4px; }
+.sech { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sech h2 { font-size: 17px; font-weight: 650; letter-spacing: -0.015em; }
+.timeline { display: flex; flex-direction: column; gap: 22px; }
+.day { position: relative; margin-left: 6px; padding-left: 20px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.day .dot { position: absolute; left: -8px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--primary); border: 3px solid var(--background); }
+.dayh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px 6px; }
+.dayh b { font-size: 14px; font-weight: 650; }
+.day .dayh { padding: 0; align-items: center; }
+.day .dayh h3 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; }
+.glyph { width: 48px; height: 30px; padding: 3px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); flex: none; }
+.grid { display: grid; gap: 3px; border-radius: 14px; overflow: hidden; }
+.tile { position: relative; display: block; aspect-ratio: 1/1; overflow: hidden; border: 0; padding: 0; cursor: pointer; width: 100%; }
+.tile .more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(7,9,14,.62); color: #fff; font-weight: 700; font-size: 15px; }
+.mapbox { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background: var(--map-sea); }
+.mapbox svg { display: block; width: 100%; height: 100%; }
+.pin { position: absolute; transform: translate(-50%,-50%); display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--map-photo); color: #07090e; font: 700 10px var(--sans); box-shadow: 0 0 0 3px rgba(11,14,21,.7); }
+.stay { position: absolute; transform: translate(-50%,-50%); width: 10px; height: 10px; border-radius: 50%; background: var(--map-stay); box-shadow: 0 0 0 3px rgba(11,14,21,.7); }
+.menu { position: absolute; right: 0; top: 48px; z-index: 4; min-width: 220px; padding: 6px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); display: flex; flex-direction: column; }
+.menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.menu button:hover { background: var(--surface-3); }
+.menu button.bad { color: var(--status-bad-ink); }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; width: 100%; }
+
+.shade { position: absolute; inset: 0; background: rgba(3,4,6,.6); z-index: 2; }
+.dim { opacity: .55; }
+.sheet { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; background: var(--popover); border-radius: 26px 26px 0 0; box-shadow: 0 -20px 60px -20px rgba(0,0,0,.9); display: flex; flex-direction: column; overflow: hidden; }
+.sheet.free { position: relative; border-radius: 26px; box-shadow: none; height: 100%; }
+.grab { display: flex; justify-content: center; padding: 10px 0 2px; }
+.grab span { width: 40px; height: 5px; border-radius: 5px; background: var(--map-border); }
+.shead { display: flex; align-items: center; gap: 12px; padding: 6px 16px 12px; }
+.shead .ttl { min-width: 0; flex: 1 1 0; }
+.shead h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.shead .meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp { padding: 14px 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); }
+.grp + .list { border-radius: 0; border-left: 0; border-right: 0; background: transparent; }
+.badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 600; width: fit-content; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.b-bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.dl { margin: 0; border-top: 1px solid var(--border); }
+.dl > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.dl > div:last-child { border-bottom: 0; }
+.dl dt { flex: none; padding-top: 2px; }
+.dl dd { text-align: right; font-size: 15px; font-weight: 500; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.dl dd.col { flex-direction: column; align-items: flex-end; }
+.dl .strike { text-decoration: line-through; color: var(--muted-foreground); }
+.copy { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--input); background: var(--secondary); color: var(--foreground); cursor: pointer; font-size: 13px; font-weight: 600; flex: none; }
+.copy .ic { width: 14px; height: 14px; }
+.panelside { position: absolute; z-index: 3; top: 0; right: 0; bottom: 0; width: 460px; background: var(--popover); border-left: 1px solid var(--border); box-shadow: -30px 0 60px -30px rgba(0,0,0,.9); display: flex; flex-direction: column; }
+.panelside .shead { padding: 22px 24px 16px; gap: 14px; }
+.panelside .shead h2 { font-size: 22px; }
+.panelside .dlwrap { padding: 0 24px; }
+.panelside .dl > div { padding: 13px 0; }
+.deskcols { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 24px; align-items: start; }
+.deskcols .left { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 16px; }
+.deskpage { padding: 28px 40px; gap: 20px; }
+@media (max-width: 480px) { .doc { gap: 40px; } .dochead h1 { font-size: 2rem; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m6 4 14 8-14 8z"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+<symbol id="i-merge" viewBox="0 0 24 24"><path d="M6 3v6a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4M6 21V9M18 3v10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+<symbol id="i-flight" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></symbol>
+<symbol id="i-stay" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
+<symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h12l3 5h1v5h-2M7 17h8M9 17h6"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
+<symbol id="i-train" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2zM4 11h16M8 21l2-3M16 21l-2-3"/></symbol>
+<symbol id="i-cruise" viewBox="0 0 24 24"><path d="M2 20c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1M4 17l-1-5h18l-1 5M12 12V4M12 4l5 3-5 2"/></symbol>
+<symbol id="i-parking" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM10 17V7h3a3 3 0 0 1 0 6h-3"/></symbol>
+<symbol id="i-visit" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></symbol>
+</defs></svg>
+<div class="doc">
+  <header class="dochead">
+    <p class="eyebrow">Waypoint · issue <a href="https://github.com/AnthonyPluth/Waypoint/issues/705">#705</a> · for the owner’s sign-off</p>
+    <h1>Completed trips: Trip page</h1>
+    <p>Mockups for the trip page of a trip that is over, drawn with Waypoint’s own tokens (<code>frontend/src/app.css</code>). Dark only. Use the toggle to see each screen at phone width (390 px) or desktop width (1280 px). Every name, place and date here is made up.</p>
+  </header>
+
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="a-past-trips-list.html">a Past trips</a><a href="b-trip-page.html" aria-current="page">b Trip page</a><a href="c-bookings.html">c Bookings</a><a href="d-booking-details.html">d Booking details</a></nav>
+  </div>
+
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>The phone page: mosaic hero, one facts line with avatars, total (costs shown), the need-a-look chip, Replay, the Bookings · 6 row and the day timeline (b1).</li><li>The desktop page: full-width hero, a 400 px sticky left column (facts, map with photo-count pins, Replay, bookings list) and photos by day, six across (b2).</li><li>Add a booking, Merge another trip and Delete trip live in the Trip options menu once a trip is over (b3).</li><li>No per-day booking chips and no <q>Night x of y</q> lines; each photo appears once (hero versus day grids).</li><li>Replaces the completed-trip view of <code>Trip.svelte</code>; the frames leave out the app's own navigation.</li></ol>
+  </section>
+
+  <section class="sec" id="b" aria-labelledby="b-title">
+    <div class="sechead"><span class="letter">b</span><h2 id="b-title">Trip page of a completed trip</h2></div>
+    <p class="lede">A completed trip leads with its photos. On phone: a compact mosaic hero, one facts line with avatars, the total when costs are shown, a chip for photos that need a look and Replay, a Bookings row that opens the Bookings sheet, then a day-by-day timeline (a dot on a rail, the date, place and photo count, a small route glyph, six photos with a +N tile) and Show all 8 days. On desktop: a full-width mosaic hero, a 400 px left column that stays in view (facts, the map with photo-count pins and Replay, the full bookings list) and the photos by day on the right, six across, with Show all 8 days and Open gallery.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>b1 · Phone</figcaption><div class="dev"><div class="page"><div class="top"><a class="back" href="a-past-trips-list.html"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg> Past trips</a><button class="btn icon ghost" type="button" aria-label="Trip options" aria-haspopup="menu" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div><div class="hero" style="grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;height:170px"><div class="ph s1" style="grid-row:1/3" aria-hidden="true"></div><div class="ph s4" aria-hidden="true"></div><div class="ph s3" aria-hidden="true"></div><div class="scrim" style="right:34%"></div><div class="cap" style="right:38%"><h1>Four Corners loop</h1><span class="meta">Jun 12–19, 2025 · Utah, Arizona</span></div></div><div class="facts"><dl class="stats" aria-label="Trip summary"><div><dt class="sr">Days</dt><dd><b>8 days</b></dd></div><div><dt class="sr">Nights away</dt><dd>7 nights</dd></div><div><dt class="sr">Distance</dt><dd>1,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>214 photos</dd></div></dl><span class="avs" role="img" aria-label="Ada Brook and June Brook"><span class="av a1" aria-hidden="true">AB</span><span class="av a2" aria-hidden="true">JB</span></span><div class="facts2"><span>Total <b>$4,312</b></span><a class="chip warn" href="../photos/h-needs-a-look.html">3 photos need a look</a><button class="btn sm" type="button" aria-label="Replay trip"><svg class="ic" aria-hidden="true" style="width:14px;height:14px"><use href="#i-play"/></svg> Replay</button></div></div><div class="list"><button class="rowb" type="button" aria-haspopup="dialog"><span class="kinds"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span></span><span class="t"><b>Bookings · 6</b><span class="meta">2 flights · 3 stays · 1 car</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></button></div><div class="timeline"><section class="day" aria-labelledby="pd0"><span class="dot" aria-hidden="true"></span>
+<div class="dayh"><span><h3 id="pd0">Thu Jun 12</h3><span class="meta" style="display:block">Moab, UT · 38 photos</span></span>
+<svg class="glyph" viewBox="0 0 48 30" aria-hidden="true"><path d="M6 22 C 14 18 20 12 26 14 S 38 16 42 8" fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" class="tile ph s1" aria-label="Photo 1, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s4" aria-label="Photo 2, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s3" aria-label="Photo 3, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s2" aria-label="Photo 4, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s1" aria-label="Photo 5, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s6" aria-label="Photo 6 and 32 more, Thu Jun 12, Moab, UT"><span class="more" aria-hidden="true">+32</span></button></div></section><section class="day" aria-labelledby="pd1"><span class="dot" aria-hidden="true"></span>
+<div class="dayh"><span><h3 id="pd1">Fri Jun 13</h3><span class="meta" style="display:block">Arches · 52 photos</span></span>
+<svg class="glyph" viewBox="0 0 48 30" aria-hidden="true"><path d="M8 14 C 14 8 22 8 26 14 S 36 22 42 16" fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" class="tile ph s2" aria-label="Photo 1, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 2, Fri Jun 13, Arches"></button><button type="button" class="tile ph s4" aria-label="Photo 3, Fri Jun 13, Arches"></button><button type="button" class="tile ph s3" aria-label="Photo 4, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 5, Fri Jun 13, Arches"></button><button type="button" class="tile ph s2" aria-label="Photo 6 and 46 more, Fri Jun 13, Arches"><span class="more" aria-hidden="true">+46</span></button></div></section><section class="day" aria-labelledby="pd2"><span class="dot" aria-hidden="true"></span>
+<div class="dayh"><span><h3 id="pd2">Sat Jun 14</h3><span class="meta" style="display:block">Canyonlands · 61 photos</span></span>
+<svg class="glyph" viewBox="0 0 48 30" aria-hidden="true"><path d="M6 10 C 14 14 20 22 28 20 S 38 12 42 20" fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" class="tile ph s1" aria-label="Photo 1, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s5" aria-label="Photo 2, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s2" aria-label="Photo 3, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 4, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s4" aria-label="Photo 5, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 6 and 55 more, Sat Jun 14, Canyonlands"><span class="more" aria-hidden="true">+55</span></button></div></section><section class="day" aria-labelledby="pd3"><span class="dot" aria-hidden="true"></span>
+<div class="dayh"><span><h3 id="pd3">Sun Jun 15</h3><span class="meta" style="display:block">Page, AZ · 29 photos</span></span>
+<svg class="glyph" viewBox="0 0 48 30" aria-hidden="true"><path d="M6 20 C 14 20 18 12 26 12 S 38 8 42 6" fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button type="button" class="tile ph s6" aria-label="Photo 1, Sun Jun 15, Page, AZ"></button><button type="button" class="tile ph s3" aria-label="Photo 2, Sun Jun 15, Page, AZ"></button><button type="button" class="tile ph s1" aria-label="Photo 3, Sun Jun 15, Page, AZ"></button><button type="button" class="tile ph s2" aria-label="Photo 4, Sun Jun 15, Page, AZ"></button><button type="button" class="tile ph s5" aria-label="Photo 5, Sun Jun 15, Page, AZ"></button><button type="button" class="tile ph s4" aria-label="Photo 6 and 23 more, Sun Jun 15, Page, AZ"><span class="more" aria-hidden="true">+23</span></button></div></section><a class="btn" href="#b">Show all 8 days</a></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>b2 · Desktop</figcaption><div class="dev"><div class="page deskpage"><div class="top"><a class="back" href="a-past-trips-list.html"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg> Past trips</a><button class="btn icon ghost" type="button" aria-label="Trip options" aria-haspopup="menu" aria-expanded="false"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button></div><div class="hero" style="grid-template-columns:2fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr;height:260px"><div class="ph s1" style="grid-row:1/3" aria-hidden="true"></div><div class="ph s4" aria-hidden="true"></div><div class="ph s3" aria-hidden="true"></div><div class="ph s2" aria-hidden="true"></div><div class="ph s5" aria-hidden="true"></div><div class="ph s1" aria-hidden="true"></div><div class="ph s6" aria-hidden="true"></div><div class="scrim" style="right:60%"></div><div class="cap" style="right:62%;left:26px;bottom:22px"><h1 style="font-size:40px">Four Corners loop</h1><span class="meta" style="font-size:15px">Jun 12–19, 2025 · Utah, Arizona</span></div></div><div class="deskcols"><div class="left"><div style="display:flex;flex-direction:column;gap:10px">
+<dl class="stats" aria-label="Trip summary"><div><dt class="sr">Days</dt><dd><b>8 days</b></dd></div><div><dt class="sr">Nights away</dt><dd>7 nights</dd></div><div><dt class="sr">Distance</dt><dd>1,240 mi</dd></div><div><dt class="sr">Places</dt><dd>3 states</dd></div></dl>
+<div class="stats"><span>Total <b>$4,312</b></span><span>214 photos</span></div>
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="avs" role="img" aria-label="Ada Brook and June Brook"><span class="av a1" aria-hidden="true">AB</span><span class="av a2" aria-hidden="true">JB</span></span><span class="meta">Ada Brook, June Brook</span><a class="chip warn" href="../photos/h-needs-a-look.html">3 photos need a look</a></div></div>
+<div class="mapbox" style="height:270px" role="group" aria-label="Trip map, photo pins show how many photos are there">
+<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M0 18 L26 10 L58 16 L100 4 L100 100 L0 100 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="1" vector-effect="non-scaling-stroke"/><path d="M26 30 C 46 18 72 30 78 56 C 76 84 50 82 34 76 C 22 62 20 42 26 30" fill="none" stroke="var(--map-route)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
+<span class="stay" style="left:26%;top:30%" aria-hidden="true"></span><span class="stay" style="left:78%;top:56%" aria-hidden="true"></span><span class="stay" style="left:34%;top:76%" aria-hidden="true"></span>
+<button type="button" class="pin" style="left:46%;top:22%;width:24px;height:24px;border:0" aria-label="38 photos near Moab, UT">38</button>
+<button type="button" class="pin" style="left:70%;top:38%;width:28px;height:28px;border:0" aria-label="52 photos near Arches">52</button>
+<button type="button" class="pin" style="left:82%;top:68%;width:32px;height:32px;border:0" aria-label="61 photos near Canyonlands">61</button>
+<button type="button" class="pin" style="left:56%;top:82%;width:24px;height:24px;border:0" aria-label="29 photos near Page, AZ">29</button>
+<button class="btn sm" type="button" style="position:absolute;left:12px;bottom:12px" aria-label="Replay trip"><svg class="ic" aria-hidden="true" style="width:14px;height:14px"><use href="#i-play"/></svg> Replay trip</button></div>
+<section style="display:flex;flex-direction:column;gap:10px" aria-labelledby="bk"><div class="sech"><h2 id="bk">Bookings · 6</h2><span class="meta">2 flights · 3 stays · 1 car</span></div><div class="list"><a class="rowb" href="d-booking-details.html#car" aria-haspopup="dialog"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="t"><b>Compact SUV, Grand Junction</b><span class="meta">Whole trip · Jun 12–19</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a><a class="rowb" href="d-booking-details.html#flight" aria-haspopup="dialog"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="t"><b>DEN to GJT</b><span class="meta">Thu Jun 12 · 9:40 am</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a><a class="rowb" href="d-booking-details.html#stay" aria-haspopup="dialog"><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span><span class="t"><b>Red Rock Lodge, Moab</b><span class="meta">Jun 12–15 · 3 nights</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a><a class="rowb" href="d-booking-details.html#stay" aria-haspopup="dialog"><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span><span class="t"><b>Cliffside Inn, Page</b><span class="meta">Jun 15–18 · 3 nights</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a><a class="rowb" href="d-booking-details.html#stay" aria-haspopup="dialog"><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span><span class="t"><b>Desert View Cabins, Kayenta</b><span class="meta">Jun 18 · 1 night</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a><a class="rowb" href="d-booking-details.html#flight" aria-haspopup="dialog"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="t"><b>FLG to DEN</b><span class="meta">Thu Jun 19 · 6:15 pm</span></span><svg class="ic chev" aria-hidden="true"><use href="#i-right"/></svg></a></div></section></div><section style="display:flex;flex-direction:column;gap:14px" aria-labelledby="pbd"><div class="sech"><h2 id="pbd">Photos by day</h2><a class="btn sm" href="../photos/a-trip-page.html">Open gallery</a></div><section aria-labelledby="dd0"><div class="dayh"><h3 id="dd0" style="margin:0;font-size:14px;font-weight:650">Thu Jun 12</h3><span class="meta">Moab, UT · 38 photos</span></div><div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr))"><button type="button" class="tile ph s4" aria-label="Photo 1, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s3" aria-label="Photo 2, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s2" aria-label="Photo 3, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s1" aria-label="Photo 4, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s6" aria-label="Photo 5, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s4" aria-label="Photo 6, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s1" aria-label="Photo 7, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s3" aria-label="Photo 8, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s2" aria-label="Photo 9, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s1" aria-label="Photo 10, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s5" aria-label="Photo 11, Thu Jun 12, Moab, UT"></button><button type="button" class="tile ph s2" aria-label="Photo 12 and 26 more, Thu Jun 12, Moab, UT"><span class="more" aria-hidden="true">+26</span></button></div></section><section aria-labelledby="dd1"><div class="dayh"><h3 id="dd1" style="margin:0;font-size:14px;font-weight:650">Fri Jun 13</h3><span class="meta">Arches · 52 photos</span></div><div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr))"><button type="button" class="tile ph s2" aria-label="Photo 1, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 2, Fri Jun 13, Arches"></button><button type="button" class="tile ph s4" aria-label="Photo 3, Fri Jun 13, Arches"></button><button type="button" class="tile ph s3" aria-label="Photo 4, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 5, Fri Jun 13, Arches"></button><button type="button" class="tile ph s2" aria-label="Photo 6, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 7, Fri Jun 13, Arches"></button><button type="button" class="tile ph s4" aria-label="Photo 8, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 9, Fri Jun 13, Arches"></button><button type="button" class="tile ph s3" aria-label="Photo 10, Fri Jun 13, Arches"></button><button type="button" class="tile ph s2" aria-label="Photo 11, Fri Jun 13, Arches"></button><button type="button" class="tile ph s1" aria-label="Photo 12 and 40 more, Fri Jun 13, Arches"><span class="more" aria-hidden="true">+40</span></button></div></section><section aria-labelledby="dd2"><div class="dayh"><h3 id="dd2" style="margin:0;font-size:14px;font-weight:650">Sat Jun 14</h3><span class="meta">Canyonlands · 61 photos</span></div><div class="grid" style="grid-template-columns:repeat(6,minmax(0,1fr))"><button type="button" class="tile ph s1" aria-label="Photo 1, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s5" aria-label="Photo 2, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s2" aria-label="Photo 3, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 4, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s4" aria-label="Photo 5, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 6, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s3" aria-label="Photo 7, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s2" aria-label="Photo 8, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 9, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s6" aria-label="Photo 10, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s1" aria-label="Photo 11, Sat Jun 14, Canyonlands"></button><button type="button" class="tile ph s4" aria-label="Photo 12 and 49 more, Sat Jun 14, Canyonlands"><span class="more" aria-hidden="true">+49</span></button></div></section><a class="btn" href="#b" style="align-self:flex-start">Show all 8 days</a></section></div></div></div></figure><figure class="fig" data-w="phone"><figcaption>b3 · Trip options on a completed trip</figcaption><div class="dev"><div class="page" style="min-height:300px"><div class="top"><a class="back" href="a-past-trips-list.html"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg> Past trips</a><button class="btn icon ghost" type="button" aria-label="Trip options" aria-haspopup="menu" aria-expanded="true"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button><div class="menu" role="menu" aria-label="Trip options"><button type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Add a booking</button><button type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-merge"/></svg> Merge another trip</button><hr><button type="button" role="menuitem" class="bad"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg> Delete trip</button></div></div><p class="meta" style="margin-top:190px">The menu of a completed trip. Add a booking, Merge another trip and Delete trip are here once a trip is over; on a trip not yet over, Add a booking stays a button beside the title as today.</p></div></div></figure><figure class="fig" data-w="desk"><figcaption>b3 · Trip options on a completed trip</figcaption><div class="dev frag"><div class="page deskpage" style="min-height:260px"><div class="top"><a class="back" href="a-past-trips-list.html"><svg class="ic" aria-hidden="true"><use href="#i-left"/></svg> Past trips</a><button class="btn icon ghost" type="button" aria-label="Trip options" aria-haspopup="menu" aria-expanded="true"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button><div class="menu" role="menu" aria-label="Trip options"><button type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Add a booking</button><button type="button" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-merge"/></svg> Merge another trip</button><hr><button type="button" role="menuitem" class="bad"><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg> Delete trip</button></div></div><p class="meta" style="margin-top:170px;max-width:60ch">The menu of a completed trip: Add a booking, Merge another trip, Delete trip. Nothing else about the trip page moves.</p></div></div></figure></div></div>
+    <div class="spec"><div><h3>Accessible names</h3><ul><li>The hero image is decorative; the trip's name is the page's <code>h1</code>. Back is <q>Past trips</q>; the menu button is <q>Trip options</q> (<code>aria-haspopup="menu"</code>).</li><li>The facts are a <code>dl</code> named <q>Trip summary</q> with visually hidden terms (Days, Nights away, Distance, Photos), as in <code>docs/design/photos/e-trip-summary.html</code>. Avatars are one image named <q>Ada Brook and June Brook</q>.</li><li><q>3 photos need a look</q> is a link to Needs a look; <q>Replay trip</q> names the Replay button (the map's button on desktop too).</li><li>The Bookings row is a button, <q>Bookings · 6, 2 flights · 3 stays · 1 car</q>, that opens the Bookings sheet (<code>aria-haspopup="dialog"</code>).</li><li>Each day is a section labelled by its date (<code>h3</code>); the route glyph is decorative. A photo is a button named <q>Photo 3, Thu Jun 12, Moab, UT</q>; the last tile is named <q>Photo 6 and 32 more, Thu Jun 12, Moab, UT</q>. Map pins are buttons named <q>38 photos near Moab, UT</q>.</li></ul></div><div><h3>Tokens and components</h3><ul><li>Hero: <code>rounded-[22px] border border-border</code>, a mosaic of the trip's best photos (3 on phone, 7 on desktop) with the same scrim as the list card. Timeline rail <code>border-l-2 border-border</code>, dot <code>bg-primary</code> with a <code>--background</code> ring; route glyph in <code>--map-route</code>.</li><li>Photo pins use <code>--map-photo</code> as in <code>docs/design/photos/c-trip-map.html</code> (16 px plus 4 px per doubling, here shown by count); stays use <code>--map-stay</code>. Kind tiles are <code>KindTile</code>; chip is the amber <code>warn</code> tone.</li><li>The Total (<code>$4,312</code>) shows only when costs are shown, as today. No new token.</li></ul></div><div><h3>Replaces</h3><ul><li>The header block, summary, <code>RouteReplay</code>, <code>TripPhotos</code> and the per-booking cards of <code>frontend/src/pages/Trip.svelte</code> for a trip that is over (<code>isPast</code>). A trip under way or upcoming keeps today's page.</li><li>No per-day booking chips and no <q>Night x of y</q> lines: bookings are in the Bookings sheet (phone) or the left column (desktop).</li><li>Each photo appears once: the hero shows the best photos and the day grids show the rest. Day counts in this mockup are each day's photos; whether the hero's are subtracted is open question 7 in the README.</li><li>Photos shown (hero, grids, pins, counts, <q>need a look</q>) are only those the viewer may see.</li></ul></div></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+  document.querySelectorAll('[aria-modal="true"]').forEach(function (dlg) {
+    var dev = dlg.closest(".dev");
+    if (!dev) return;
+    Array.prototype.forEach.call(dev.children, function (el) {
+      if (el === dlg || el.classList.contains("shade")) return;
+      el.inert = true;
+      el.setAttribute("aria-hidden", "true");
+    });
+  });
+})();
+</script>
+
+</body>
+</html>
