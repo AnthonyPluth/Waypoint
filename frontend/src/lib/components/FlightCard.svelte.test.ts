@@ -284,6 +284,8 @@ describe("a stored status that is too old to trust", () => {
     const card = await screen.findByRole("article");
     expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
     expect(card.textContent).not.toMatch(/Originally|Delayed/);
+    expect(facts(card).slice(0, 2)).toEqual([["Terminal", "B"], ["Gate", "B14"]]);
+    expect(within(card).getByText("Updated 4 min ago")).toBeInTheDocument();
   });
 });
 

@@ -220,7 +220,7 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
       const bookedTerminal = state === "cancelled" ? null : s.details.terminal?.trim() || null;
       return [
         { label: "Terminal", value: liveTerminal ?? bookedTerminal, abbreviated: null, source: liveTerminal || !bookedTerminal ? "live" : "booking" } satisfies Fact,
-        { label: "Gate", value: live(gate), abbreviated: null, source: "live" } satisfies Fact,
+        { label: "Gate", value: live(st?.dep_gate), abbreviated: null, source: "live" } satisfies Fact,
         seatFact,
         { label: "Cabin", value: cabin, abbreviated: cabin ? cabinOnPhone(cabin) : null, source: "booking" } satisfies Fact,
       ];

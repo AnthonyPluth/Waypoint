@@ -91,7 +91,7 @@
           <dt class="flex items-center gap-[5px] whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{@render source(fact.source)}{fact.label}</dt>
           {#if fact.value}
             <dd class="mt-0.5 break-words text-[22px] font-[650] tracking-[-0.02em]">
-              {#if fact.abbreviated && fact.abbreviated !== fact.value}<span class="@[24rem]:hidden">{fact.abbreviated}</span><span class="hidden @[24rem]:inline">{fact.value}</span>{:else}{fact.value}{/if}
+              {#if fact.abbreviated && fact.abbreviated !== fact.value}<span class="@[25.5rem]:hidden">{fact.abbreviated}</span><span class="hidden @[25.5rem]:inline">{fact.value}</span>{:else}{fact.value}{/if}
             </dd>
           {:else}
             <dd class="mt-0.5 text-[22px] font-medium tracking-[-0.02em] text-muted-foreground"><span aria-hidden="true">—</span><span class="sr-only">Not known yet</span></dd>
