@@ -34,6 +34,12 @@ For each trip, Waypoint saves:
 
 Never saved: loyalty and Known Traveler numbers, the QR code of a [parking booking](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking), live flight status, any trip that isn’t saved, and People, Settings, the review queue, mailboxes, AI settings and sign-in data.
 
+## The reply, and the iPhone app
+
+`GET /api/offline` is the one source of the saved copy. Its reply is `{"version": 1, "trips": [...]}`: `version` is the shape of the reply, 1 today. The iPhone app checks `version` before it saves a reply, and keeps the copy it already has when it doesn’t know the number. The browser’s own offline vault doesn’t read it today. The trips are those above, only the ones the signed-in person may see.
+
+The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in token (an OAuth access token of scope `app`, sent as `Authorization: Bearer …`), the same way it calls the rest of the API. An assistant’s token is never accepted: assistants can’t read this route, whatever their switches say, and a request with no sign-in is refused with 401.
+
 ## Checking before you travel
 
 Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again**.

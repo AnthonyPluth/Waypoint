@@ -550,6 +550,7 @@ export interface MoveBody {
 }
 
 export interface Offline {
+  version: number;
   trips: OfflineTrip[];
 }
 

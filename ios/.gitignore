@@ -7,3 +7,4 @@ Waypoint/capacitor.config.json
 Waypoint/config.xml
 Waypoint/public/*
 !Waypoint/public/index.html
+Waypoint/Assets.xcassets/AppIcon.appiconset/icon-1024.png

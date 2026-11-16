@@ -6476,6 +6476,9 @@
       "Offline": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer"
+          },
           "trips": {
             "type": "array",
             "items": {
@@ -6484,6 +6487,7 @@
           }
         },
         "required": [
+          "version",
           "trips"
         ],
         "additionalProperties": false

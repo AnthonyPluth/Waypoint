@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Trip photos: sharing button</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f; --action: #3563e0;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8; --accent: #1a1e29; --destructive: #ff7b72;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --sidebar: #0a0c12; --sidebar-accent: #171b26; --sidebar-border: #1b1f2b;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-bad-soft: #3a1512; --status-bad-ink: #ff9d96;
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --surface-2: var(--popover); --surface-3: #1f2433;
+  --chart-3: #4fd1b0;
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --avatar-2: #14463c; --avatar-2-ink: #c9f3e6; --avatar-4: #5a3a12; --avatar-4-ink: #ffe3b3; --avatar-5: #5a2433; --avatar-5-ink: #ffd6df;
+  --map-sea: #0b0e15; --map-land: #1c2230; --map-border: #343c52; --map-visited: #3d7bc7;
+  --map-route: #8fc2ff; --map-airport: #f6b73c; --map-stay: #4fd1b0;
+  --map-photo: var(--foreground);
+  --lightbox: #030406;
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--doc-bg); }
+button, input, select { font: inherit; color: inherit; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a { color: var(--status-info-ink); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; background: color-mix(in srgb, var(--doc-bg) 88%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--doc-line); border-radius: 16px; }
+.seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--secondary); border: 1px solid var(--input); }
+.seg button { border: 0; background: transparent; border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.bar .toc { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.bar .toc a { color: var(--muted-foreground); text-decoration: none; padding: 4px 0; }
+.bar .toc a:hover { color: var(--foreground); }
+.checks { border: 1px solid var(--doc-line); border-radius: 16px; padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
+.checks h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal-ink); }
+.checks ol { list-style: decimal; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.checks li::marker { color: var(--muted-foreground); }
+.sec { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.stage { overflow-x: auto; padding-bottom: 6px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
+.fig { display: flex; flex-direction: column; gap: 8px; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec li { overflow-wrap: anywhere; }
+.spec code, .checks code, .lede code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "“" "”"; }
+
+.dev { container-type: inline-size; position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
+body.desk .dev { width: 1280px; border-radius: 14px; }
+body.desk .dev.frag { width: 960px; }
+.dev.tall { height: 844px; }
+body.desk .dev.tall { height: 800px; }
+
+.shell { display: flex; min-height: 100%; }
+.side { display: none; }
+.app { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+.brand { font-weight: 650; letter-spacing: -0.02em; }
+.main { padding: 8px 16px 104px; display: flex; flex-direction: column; gap: 24px; }
+.frag .main { padding: 20px 16px; }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 6px 22px; background: rgb(255 255 255 / 4%); backdrop-filter: blur(28px) saturate(2) brightness(1.1); box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%); z-index: 3; }
+.tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted-foreground); text-decoration: none; padding: 6px 0; min-height: 44px; position: relative; }
+.tabs a[aria-current] { color: var(--foreground); }
+.tabs .ic { width: 20px; height: 20px; }
+.tabs .count { position: absolute; top: 2px; left: 54%; background: var(--primary); color: var(--primary-foreground); font-size: 10px; border-radius: 99px; padding: 0 5px; }
+@container (min-width: 768px) {
+  .side { display: flex; flex-direction: column; gap: 4px; width: 232px; flex: none; background: var(--sidebar); border-right: 1px solid var(--sidebar-border); padding: 20px 12px; }
+  .side .brand { padding: 0 10px 14px; }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--muted-foreground); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .side a[aria-current] { background: var(--sidebar-accent); color: var(--foreground); }
+  .side .count { margin-left: auto; background: var(--primary); color: var(--primary-foreground); font-size: 11px; border-radius: 99px; padding: 0 7px; font-weight: 600; }
+  .tabs, .top .brand { display: none; }
+  .top { justify-content: flex-end; padding: 16px 40px 0; }
+  .main { padding: 12px 40px 56px; max-width: 920px; width: 100%; }
+  .frag .main { padding: 28px 40px; }
+}
+
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; }
+.t-display { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; }
+.t-title { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.t-heading { font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; }
+.t-caption { font-size: 0.8125rem; line-height: 1.4; }
+.muted { color: var(--muted-foreground); }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 14px; text-decoration: none; min-height: 44px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 14px; font-weight: 600; height: 40px; padding: 0 16px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); }
+.btn.outline { background: var(--secondary); border-color: var(--input); color: var(--foreground); }
+.btn.ghost { background: transparent; color: var(--foreground); }
+.btn.danger { background: var(--secondary); border-color: var(--input); color: var(--status-bad-ink); }
+.btn.sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.btn.icon { width: 40px; padding: 0; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+@container (max-width: 767px) { .btn { min-height: 44px; } .btn.icon { min-width: 44px; } }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 99px; font-size: 12px; font-weight: 600; padding: 2px 10px; width: fit-content; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.chip.ok { background: var(--status-ok-soft); color: var(--status-ok-ink); }
+.chip.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.chip.bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.chip.info { background: var(--status-info-soft); color: var(--status-info-ink); }
+.chip.quiet { background: var(--status-quiet-soft); color: var(--status-quiet-ink); }
+.chip.small { font-size: 11px; padding: 1px 8px; }
+.avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 99px; font-size: 12px; font-weight: 650; flex: none; }
+.avatar.sm { width: 24px; height: 24px; font-size: 10px; }
+.a2 { background: var(--avatar-2); color: var(--avatar-2-ink); }
+.a4 { background: var(--avatar-4); color: var(--avatar-4-ink); }
+.a5 { background: var(--avatar-5); color: var(--avatar-5-ink); }
+.rows { background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
+.rows > * + * { border-top: 1px solid var(--border); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 56px; padding: 12px 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 500; }
+.input { height: 42px; border-radius: 12px; border: 1px solid var(--input); background: var(--secondary); padding: 0 12px; font-size: 15px; width: 100%; min-width: 0; }
+.input.mono { font-size: 14px; }
+.kind { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--kind-stay-soft); color: var(--kind-stay); flex: none; }
+.pass { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 28px; box-shadow: var(--shadow); background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.fade { -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent); mask-image: linear-gradient(180deg, #000 30%, transparent); }
+
+.triphead { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.triphead .who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.triphead .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sumline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; font-size: 14px; }
+.sumline > div { display: inline; }
+.sumline { margin-left: -1.25em; clip-path: inset(0 0 0 1.25em); }
+.sumline > div::before { content: "·"; display: inline-block; width: 1.25em; text-align: center; color: var(--muted-foreground); }
+.sumline dd { display: inline; font-weight: 500; }
+.sumline .muted { font-weight: 400; }
+.meta { font-size: 14px; }
+.meta .eyebrow { margin-right: 6px; }
+
+.g0 { background: linear-gradient(180deg, #7fa6c9 0%, #c9a27a 58%, #8a5a3c 100%); }
+.g1 { background: linear-gradient(170deg, #f2a65a, #c4566b 52%, #3b2c4a); }
+.g2 { background: linear-gradient(160deg, #9cc3a8, #3e6b52 60%, #1f3a2c); }
+.g3 { background: linear-gradient(180deg, #b9d4e6 0%, #6d9cc1 45%, #2d5c7d 46%, #1b3a52); }
+.g4 { background: radial-gradient(circle at 72% 22%, #ffe1ad 0 11%, transparent 12%), linear-gradient(180deg, #e9b77c, #b0603a 60%, #5e2e1f); }
+.g5 { background: radial-gradient(circle at 30% 30%, #fff 0 1.5%, transparent 2%), radial-gradient(circle at 70% 45%, #fff 0 1%, transparent 1.6%), linear-gradient(180deg, #0f1a33, #2a3a66); }
+.g6 { background: linear-gradient(180deg, #a8c6de 0 42%, #e8cfa0 42%, #c99a62); }
+.g7 { background: radial-gradient(ellipse at 50% 42%, #d9a98a 0 17%, transparent 18%), linear-gradient(160deg, #5b6f8a, #2b3446); }
+.g8 { background: linear-gradient(180deg, #9fb9d6 0 50%, #a5573a 50% 70%, #d8a072 70%); }
+.g9 { background: linear-gradient(180deg, #dfe8f1, #9fb3c7 60%, #5d7187); }
+.g10 { background: radial-gradient(circle at 50% 52%, #f0c060 0 21%, #7a3b2e 22% 29%, #e9e2d4 30%); }
+.g11 { background: linear-gradient(100deg, transparent 47%, #e8d48a 47% 49%, transparent 49%), linear-gradient(180deg, #9bb7cf 0 44%, #3c3f45 44%); }
+.g12 { background: linear-gradient(180deg, #8fb3d9 0 38%, #3f6f9a 38% 64%, #e3d6b4 64%); }
+.tile { position: relative; display: block; aspect-ratio: 1; width: 100%; border: 0; padding: 0; border-radius: 6px; overflow: hidden; cursor: pointer; }
+.mk { position: absolute; display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 650; line-height: 1; border-radius: 99px; padding: 3px 6px; }
+.mk-far { top: 5px; left: 5px; background: var(--status-warn-soft); color: var(--status-warn-ink); box-shadow: 0 0 0 1px rgb(0 0 0 / 30%); }
+.mk-inf { bottom: 5px; left: 5px; background: rgb(3 4 6 / 70%); color: var(--foreground); padding: 3px; }
+.mk-inf .ring { width: 10px; height: 10px; border-radius: 99px; border: 2px solid var(--foreground); }
+.mk-vid { bottom: 5px; right: 5px; background: rgb(3 4 6 / 70%); color: var(--foreground); font-family: var(--mono); }
+.mk-vid .ic { width: 9px; height: 9px; fill: currentColor; stroke: none; }
+.mk-off { inset: 0; border-radius: 0; justify-content: center; background: var(--surface-3); color: var(--muted-foreground); }
+.mk-off .ic { width: 20px; height: 20px; }
+.strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.strip > * { flex: none; width: 92px; }
+.strip .tile { border-radius: 12px; }
+.more-tile { aspect-ratio: 1; width: 92px; border-radius: 12px; border: 1px solid var(--input); background: var(--secondary); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.more-tile b { font-size: 17px; font-family: var(--mono); }
+.photos { display: flex; flex-direction: column; gap: 12px; }
+.photos-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.photos-head h2 { display: flex; align-items: baseline; gap: 8px; }
+.look { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; padding: 10px 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); font-size: 14px; }
+.look p { flex: 1 1 200px; min-width: 0; }
+.day { display: flex; flex-direction: column; gap: 8px; }
+.dayh { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; padding: 8px 0; background: var(--background); }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; }
+@container (min-width: 768px) {
+  .strip > *, .more-tile { width: 112px; }
+  .grid { grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; }
+}
+
+.mapwrap { display: flex; flex-direction: column; gap: 12px; }
+.map { position: relative; border-radius: 16px; border: 1px solid var(--border); background: var(--map-sea); aspect-ratio: 8 / 5; max-width: 100%; overflow: hidden; }
+.map svg { display: block; width: 100%; height: 100%; }
+.pin { position: absolute; transform: translate(-50%, -50%); width: var(--s); height: var(--s); border-radius: 99px; display: grid; place-items: center; padding: 0; cursor: pointer; font-family: var(--mono); font-size: 11px; font-weight: 600; background: var(--map-photo); color: var(--map-sea); border: 2px solid var(--map-sea); box-shadow: 0 2px 8px rgb(0 0 0 / 50%); }
+.pin::before { content: ""; position: absolute; inset: min(0px, calc((var(--s) - 44px) / 2)); border-radius: 99px; }
+.pin.hollow { background: var(--map-sea); color: var(--map-photo); border: 2px solid var(--map-photo); box-shadow: 0 0 0 2px var(--map-sea), 0 2px 8px rgb(0 0 0 / 50%); }
+.pin .far { position: absolute; top: -3px; right: -3px; width: 11px; height: 11px; border-radius: 99px; background: var(--signal); border: 2px solid var(--map-sea); }
+.pin.tapped { outline: 3px solid var(--ring); outline-offset: 3px; }
+.pin.dim { opacity: 0.45; }
+.pin.lit::after { content: ""; position: absolute; inset: -9px; border-radius: 99px; border: 2px solid var(--map-photo); opacity: 0.6; animation: ping 1.4s ease-out 1; }
+@keyframes ping { from { transform: scale(0.7); opacity: 0.8; } to { transform: scale(1.25); opacity: 0; } }
+.maplabel { position: absolute; left: 8px; top: 8px; border: 1px solid var(--border); background: var(--card); border-radius: 8px; padding: 4px 8px; font-size: 12px; line-height: 1.25; box-shadow: var(--shadow); max-width: 11rem; }
+.maplabel b { display: block; }
+.maplabel.photo { top: auto; bottom: 8px; max-width: 15rem; display: flex; align-items: center; gap: 6px; }
+.maplabel.photo .dot { width: 10px; height: 10px; border-radius: 99px; background: var(--map-photo); flex: none; }
+.pincard { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); }
+.pincard .thumb { width: 56px; height: 56px; border-radius: 10px; flex: none; }
+.pincard .txt { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pincard .acts { flex: 1 1 100%; display: flex; gap: 4px; align-items: center; justify-content: space-between; }
+.pincard-in { display: none; }
+@container (min-width: 768px) {
+  .pincard-out { display: none; }
+  .pincard-in { display: flex; position: absolute; right: 12px; bottom: 12px; width: 300px; }
+}
+.key { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--muted-foreground); }
+.key li { display: flex; align-items: center; gap: 7px; }
+.kd { display: inline-block; flex: none; }
+.kd.air { width: 10px; height: 10px; border-radius: 99px; background: var(--map-airport); }
+.kd.stay { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg); background: var(--map-stay); }
+.kd.flight { width: 16px; height: 2px; border-radius: 2px; background: var(--map-route); }
+.kd.ground { width: 16px; height: 2px; border-radius: 2px; background: var(--map-stay); }
+.kd.state { width: 16px; border-top: 1px dashed var(--map-border); }
+.kd.ph { width: 12px; height: 12px; border-radius: 99px; background: var(--map-photo); }
+.kd.phh { width: 12px; height: 12px; border-radius: 99px; border: 2px solid var(--map-photo); }
+.kd.farr { width: 10px; height: 10px; border-radius: 99px; background: var(--signal); }
+.ctrl { display: flex; align-items: center; gap: 10px; }
+.ctrl input[type="range"] { flex: 1; min-width: 0; height: 44px; accent-color: var(--primary); }
+.stoplist { font-size: 14px; display: flex; flex-direction: column; }
+.stoplist li { display: flex; gap: 12px; padding: 8px; border-radius: 12px; }
+.stoplist li[aria-current] { background: var(--secondary); }
+.stoplist .n { width: 24px; height: 24px; border-radius: 99px; border: 2px solid var(--map-stay); display: grid; place-items: center; font-size: 12px; font-weight: 650; flex: none; }
+.stoplist li[aria-current] .n { background: var(--foreground); color: var(--background); }
+
+.viewer { position: absolute; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--lightbox); }
+.vbar { display: flex; align-items: center; justify-content: space-between; padding: 44px 8px 4px; }
+.vstage { display: flex; align-items: center; justify-content: center; position: relative; min-height: 0; }
+.vimg { width: 100%; aspect-ratio: 4 / 3; max-height: 100%; }
+.vimg.portrait { width: auto; height: 100%; aspect-ratio: 3 / 4; max-width: 100%; }
+.vplay { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 99px; border: 0; background: rgb(3 4 6 / 65%); color: var(--foreground); display: grid; place-items: center; cursor: pointer; }
+.vplay .ic { width: 26px; height: 26px; fill: currentColor; stroke: none; }
+.vnav { display: none; }
+.vinfo { background: var(--card); border-top: 1px solid var(--border); border-radius: 24px 24px 0 0; padding: 16px 16px 30px; display: flex; flex-direction: column; gap: 12px; }
+.vrow { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
+.vrow .ic { margin-top: 3px; color: var(--muted-foreground); }
+.vacts { display: flex; flex-wrap: wrap; gap: 8px; }
+.vacts .btn { flex: 1 1 auto; }
+.ph-only { display: inline-flex; }
+@container (min-width: 768px) {
+  .viewer { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto minmax(0, 1fr); }
+  .vbar { grid-column: 1 / -1; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .vstage { padding: 24px 72px; }
+  .vimg { width: 100%; height: auto; max-height: 100%; aspect-ratio: 3 / 2; }
+  .vnav { display: inline-flex; position: absolute; top: 50%; transform: translateY(-50%); }
+  .vnav.prev { left: 16px; } .vnav.next { right: 16px; }
+  .vinfo { border-radius: 0; border-top: 0; border-left: 1px solid var(--border); padding: 24px; }
+  .vacts .btn { flex: 0 0 auto; }
+  .ph-only { display: none; }
+}
+
+.dim { position: absolute; inset: 0; background: rgb(0 0 0 / 60%); z-index: 4; }
+.sheet { position: absolute; z-index: 5; left: 0; right: 0; bottom: 0; max-height: 92%; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-bottom: 0; border-radius: 28px 28px 0 0; box-shadow: var(--elevation-3); display: flex; flex-direction: column; }
+.grip { display: flex; justify-content: center; padding: 12px 0 4px; }
+.grip span { width: 40px; height: 5px; border-radius: 99px; background: var(--border); }
+.sheethead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 4px 20px 8px; }
+.sheetbody { padding: 4px 20px 16px; display: flex; flex-direction: column; gap: 14px; }
+.sheetacts { position: sticky; bottom: 0; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px 30px; border-top: 1px solid var(--border); background: var(--card); }
+@container (min-width: 768px) {
+  .sheet { top: 0; left: auto; width: 34rem; max-height: none; border-radius: 0; border: 0; border-left: 1px solid var(--border); }
+  .grip { display: none; }
+  .sheethead { padding: 22px 24px 8px; }
+  .sheetbody { padding: 4px 24px 16px; }
+  .sheetacts { margin-top: auto; padding: 14px 24px; }
+}
+.choice { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: 14px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--ring); background: color-mix(in srgb, var(--primary) 8%, var(--card)); }
+.choice input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--primary); flex: none; }
+
+.src { display: flex; flex-direction: column; gap: 12px; padding: 16px; }
+.src-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.src-top .txt { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.src-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.note { border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); padding: 12px 14px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+.perm { display: flex; flex-wrap: wrap; gap: 6px; }
+.perm code { font-family: var(--mono); font-size: 12px; background: var(--surface-3); border-radius: 6px; padding: 2px 7px; }
+.form { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+@container (min-width: 768px) { .form-grid { grid-template-columns: 1fr 1fr; } .form-grid .wide { grid-column: 1 / -1; } }
+.keyrow { display: flex; gap: 8px; }
+.result { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.lookitem { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; }
+.lookitem + .lookitem { border-top: 1px solid var(--border); }
+.lookitem .thumb { width: 64px; height: 64px; border-radius: 10px; flex: none; position: relative; }
+.lookitem .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+details.looks > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 600; font-size: 14px; }
+details.looks > summary::-webkit-details-marker { display: none; }
+.empty { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+
+.ask { display: flex; flex-direction: column; gap: 12px; }
+.scope { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.scope legend { margin-bottom: 8px; padding: 0; }
+.mine { display: flex; flex-direction: column; gap: 14px; }
+.toast { position: absolute; left: 16px; right: 16px; bottom: 96px; z-index: 6; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); font-size: 14px; }
+.toast.inline { position: static; }
+.viewer .toast { bottom: auto; top: 96px; }
+@container (min-width: 768px) { .toast { left: auto; right: 24px; bottom: 24px; width: 380px; } .viewer .toast { top: 76px; right: 384px; } .toast.inline { width: auto; max-width: 420px; } }
+.confirm { position: absolute; z-index: 6; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--elevation-3); padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.confirm-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@container (min-width: 768px) { .confirm { left: 50%; right: auto; width: 30rem; transform: translate(-50%, -50%); } }
+.btn.destroy { background: var(--destructive); color: #2a0806; }
+.selbar { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; background: var(--background); }
+.tile .chk { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; border-radius: 99px; border: 2px solid var(--foreground); background: rgb(3 4 6 / 35%); display: grid; place-items: center; color: var(--primary-foreground); }
+.tile .chk .ic { width: 13px; height: 13px; stroke-width: 3; visibility: hidden; }
+.tile.sel { outline: 3px solid var(--ring); outline-offset: -3px; }
+.tile.sel .chk { background: var(--primary); border-color: var(--primary); }
+.tile.sel .chk .ic { visibility: visible; }
+.tile.locked { opacity: 0.55; cursor: default; }
+.removed { display: flex; flex-direction: column; gap: 10px; }
+.rgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.rgrid li { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.rgrid .tile { border-radius: 8px; cursor: default; }
+@container (min-width: 768px) { .rgrid { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.viewer.solo { grid-template-rows: auto minmax(0, 1fr); }
+@container (min-width: 768px) { .viewer.solo { grid-template-columns: minmax(0, 1fr); } }
+.gone { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; color: var(--muted-foreground); max-width: 22rem; }
+.gone .ic { width: 36px; height: 36px; stroke-width: 1.5; }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--primary); flex: none; }
+.block { display: block; }
+.grant .txt { flex: 1 1 200px; min-width: 0; }
+.grant .sel { width: auto; height: 34px; font-size: 13px; }
+@container (max-width: 767px) { .grant .sel { height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .pin.lit::after { animation: none; opacity: 0.6; } }
+
+.photos-head .hl { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.photos-head .acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.btn[aria-expanded="true"][aria-haspopup] { background: var(--surface-3); border-color: var(--ring); }
+.anchor { position: relative; display: inline-flex; }
+.pop { position: absolute; z-index: 8; top: calc(100% + 10px); right: -6px; width: 392px; background: var(--popover); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--elevation-3); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.pop::before { content: ""; position: absolute; top: -6px; right: 28px; width: 11px; height: 11px; transform: rotate(45deg); background: var(--popover); border-left: 1px solid var(--border); border-top: 1px solid var(--border); }
+.pn-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.pn-head h2, .pn-head h3 { margin: 0; }
+.pn-sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pn-sec + .pn-sec { border-top: 1px solid var(--border); padding-top: 14px; }
+.pn .choice { padding: 10px 12px; gap: 10px; border-radius: 12px; background: transparent; }
+.pn .choice:has(input:checked) { background: color-mix(in srgb, var(--primary) 8%, var(--popover)); }
+.pn .scope { gap: 6px; }
+.pn .scope legend { margin-bottom: 6px; }
+.pn .sub { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.pn .sub .txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pn .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.pn .collapsed { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+.pn .collapsed .l { display: flex; flex-direction: column; min-width: 0; }
+.pn .rm { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pn .rm li { display: flex; flex-direction: column; gap: 2px; }
+.pn .rm .tile { border-radius: 8px; }
+.pn .rm .btn { height: auto; min-height: 0; padding: 4px; font-size: 12px; }
+.pn .note { font-size: 12.5px; color: var(--muted-foreground); }
+.sheet { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--border); border-radius: 24px 24px 0 0; box-shadow: var(--elevation-3); padding: 8px 16px 26px; display: flex; flex-direction: column; gap: 14px; max-height: 82%; overflow: hidden; }
+.sheet .grip { width: 40px; height: 5px; border-radius: 9px; background: var(--input); margin: 2px auto 4px; }
+.dlg { position: absolute; z-index: 6; left: 16px; right: 16px; top: 50%; transform: translateY(-50%); background: var(--card); border: 1px solid var(--border); border-radius: 24px; box-shadow: var(--elevation-3); padding: 18px 18px 20px; display: flex; flex-direction: column; gap: 14px; max-height: 88%; overflow: hidden; }
+.dlg-d { left: 50%; right: auto; width: 32rem; transform: translate(-50%, -50%); }
+.scrolled { position: absolute; inset: 0; overflow: hidden; }
+.scrolled > .page { position: absolute; left: 0; right: 0; top: var(--off); }
+.page { display: flex; }
+.dev.pg { height: auto; }
+.mapsvg { position: relative; border-radius: 16px; border: 1px solid var(--border); background: var(--map-sea); aspect-ratio: 8 / 5; overflow: hidden; }
+.mapsvg svg { width: 100%; height: 100%; display: block; }
+.saved { position: relative; outline: 2px dashed var(--signal); outline-offset: 5px; border-radius: 20px; }
+.savedtag { position: absolute; z-index: 2; top: -13px; right: 14px; margin: 0; font-size: 12px; font-weight: 650; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; font-family: var(--mono); }
+.pair { display: flex; gap: 32px; align-items: flex-start; flex-wrap: wrap; }
+.cmp { display: inline-flex; flex-direction: column; gap: 14px; padding: 24px; background: var(--doc-bg); }
+.cmp .pair { flex-wrap: nowrap; }
+.cmp .tag { font-size: 13px; font-weight: 650; color: var(--foreground); }
+.cmp .gap { display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.notes > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.notes h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.notes ul { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; list-style: disc; padding-left: 1.1em; }
+.notes code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.notes q { font-weight: 600; quotes: "\201C" "\201D"; }
+.shot { display: inline-block; }
+.dev.wide { width: 1280px; border-radius: 14px; }
+.dev.phone { width: 390px; }
+.dev.wide .side { display: flex; flex-direction: column; gap: 4px; width: 232px; flex: none; background: var(--sidebar); border-right: 1px solid var(--sidebar-border); padding: 20px 12px; }
+.dev.wide .side .brand { padding: 0 10px 14px; }
+.dev.wide .side a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--muted-foreground); text-decoration: none; font-size: 14px; font-weight: 500; }
+.dev.wide .side a[aria-current] { background: var(--sidebar-accent); color: var(--foreground); }
+.dev.wide .tabs, .dev.wide .top .brand { display: none; }
+.dev.wide .top { justify-content: flex-end; padding: 16px 40px 0; }
+.dev.wide .main { padding: 12px 40px 56px; max-width: 920px; width: 100%; }
+.dev.wide .strip > *, .dev.wide .more-tile { width: 112px; }
+.dev.phone .side { display: none; }
+.dev.phone .main { padding: 8px 16px 104px; }
+.dev.wide .btn { min-height: 0; }
+.dev.phone .btn { min-height: 44px; }
+.dev.phone .btn.icon { min-width: 44px; }
+.dev.phone .btn.sm.rmv { min-height: 0; }
+
+.seg label { border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; display: inline-flex; align-items: center; }
+.seg input:checked + label { background: var(--primary); color: var(--primary-foreground); }
+.seg input:focus-visible + label { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+body:not(:has(#w-desk:checked)) .fig[data-w="desk"] { display: none; }
+body:has(#w-desk:checked) .fig[data-w="phone"] { display: none; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+ <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+ <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+ <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+ <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+ <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2Z"/></symbol>
+ <symbol id="i-bag" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 7V4h6v3M9 21V7M15 21V7"/></symbol>
+ <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.1a4 4 0 0 1 0 7.8M21 21v-2a4 4 0 0 0-3-3.9"/></symbol>
+ <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></symbol>
+ <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+ <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+ <symbol id="i-bed" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
+ <symbol id="i-car" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></symbol>
+</defs></svg>
+
+<div class="doc">
+  <header class="dochead">
+    <p class="eyebrow">Waypoint · signed off by the owner (2026-11-16) · build issue #744</p>
+    <h1>Photo sharing behind a Sharing button</h1>
+    <p>The trip page’s Photos section today ends with a full “Your photos on this trip” card. This moves it behind a text button, <b>Sharing</b>, in the Photos header with <b>Select</b> and <b>See all</b>, in their style. It is a layout change only: the same controls, the same words, the same effect for everyone (<code>photogrants</code>, <code>photos.visible</code>). The button opens a popover on desktop and a bottom sheet on phone. Use the toggle to see the frames at phone width (390 px) or desktop width (1280 px). Every name, place and date here is made up; tokens are from <code>frontend/src/app.css</code>.</p>
+  </header>
+
+  <div class="bar">
+    <div class="seg" role="radiogroup" aria-label="Mockup width">
+      <input type="radio" name="w" id="w-phone" class="sr" checked><label for="w-phone">Phone · 390</label>
+      <input type="radio" name="w" id="w-desk" class="sr"><label for="w-desk">Desktop · 1280</label>
+    </div>
+  </div>
+
+  <section class="sec" id="today"><div class="sechead"><span class="letter">0</span><h2>Today, and the closed page with the Sharing button</h2></div>
+    <p class="lede">Dashed amber is what moves behind the button. The Sharing button sits first in the header’s button row: <q>Sharing</q>, <q>Select</q>, <q>See all</q>.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>0a · Phone, today and with the Sharing button</figcaption><div class="cmp shot" id="compare-390"><div class="pair"><div style="display:flex;flex-direction:column;gap:10px"><span class="tag">Today: the card sits under the strip</span><div class="dev phone" id="today-390"><div class="shell"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div><div class="saved"><p class="savedtag" >Moves into Sharing: 456 px less page</p><section class="card mine" aria-labelledby="td-h" data-measure="card"><div class="src-top"><div class="txt"><h3 id="td-h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div><fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend><label class="choice"><input type="radio" name="td-s" ><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label><label class="choice"><input type="radio" name="td-s" checked><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label></fieldset><div class="src-acts"><button class="btn danger" type="button">Stop sharing on this trip</button><button class="btn ghost sm rmv" type="button" aria-expanded="false" aria-controls="td-rm">Removed from this trip (2) <svg class="ic " aria-hidden="true"><use href="#i-down"/></svg></button></div></section></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></div><div style="display:flex;flex-direction:column;gap:10px"><span class="tag">With the Sharing button, closed</span><div class="dev phone" id="closed-390"><div class="shell"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><span class="anchor"><button type="button" class="btn outline sm" aria-haspopup="dialog" aria-expanded="false" aria-controls="photo-sharing">Sharing</button></span><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>0b · Desktop, today</figcaption><div class="dev wide" id="today-1280"><div class="shell"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div><div class="saved"><p class="savedtag" >Moves into Sharing: 331 px less page</p><section class="card mine" aria-labelledby="td-h" data-measure="card"><div class="src-top"><div class="txt"><h3 id="td-h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div><fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend><label class="choice"><input type="radio" name="td-s" ><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label><label class="choice"><input type="radio" name="td-s" checked><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label></fieldset><div class="src-acts"><button class="btn danger" type="button">Stop sharing on this trip</button><button class="btn ghost sm rmv" type="button" aria-expanded="false" aria-controls="td-rm">Removed from this trip (2) <svg class="ic " aria-hidden="true"><use href="#i-down"/></svg></button></div></section></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>0c · Desktop, closed, with the Sharing button</figcaption><div class="dev wide" id="closed-1280"><div class="shell"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><span class="anchor"><button type="button" class="btn outline sm" aria-haspopup="dialog" aria-expanded="false" aria-controls="photo-sharing">Sharing</button></span><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></figure></div></div>
+  </section>
+
+  <section class="sec" id="a"><div class="sechead"><span class="letter">A</span><h2>Popover on desktop, bottom sheet on phone</h2></div>
+    <p class="lede">Desktop: a non-modal popover anchored under the Sharing button, so the photos stay in view while you change who sees them. Phone: the app’s existing bottom sheet.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>A1 · Phone, bottom sheet open</figcaption><div class="dev phone" id="a-open-390" style="height:844px"><div class="scrolled"><div class="page" style="--off:-520px"><div class="shell" style="width:100%"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><span class="anchor"><button type="button" class="btn outline sm" aria-haspopup="dialog" aria-expanded="true" aria-controls="photo-sharing">Sharing</button></span><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></div><div class="dim"></div><div class="sheet pn" id="photo-sharing" role="dialog" aria-modal="true" aria-labelledby="a1-t"><div class="grip" aria-hidden="true"></div><div class="pn-head"><h2 id="a1-t" class="t-heading" tabindex="-1">Photo sharing for this trip</h2><button type="button" class="btn ghost sm icon" aria-label="Close"><svg class="ic " aria-hidden="true"><use href="#i-x"/></svg></button></div><section class="pn-sec" aria-labelledby="a1a-h"><div class="pn-head"><div class="txt" style="display:flex;flex-direction:column;gap:1px"><h3 id="a1a-h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div><fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend><label class="choice"><input type="radio" name="a1a-s" ><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label><label class="choice"><input type="radio" name="a1a-s" checked><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label></fieldset><div class="acts"><button class="btn danger sm" type="button">Stop sharing on this trip</button><button class="btn ghost sm rmv" type="button" aria-expanded="false" aria-controls="a1a-rm">Removed from this trip (2) <svg class="ic " aria-hidden="true"><use href="#i-down"/></svg></button></div></section></div></div></figure><figure class="fig" data-w="desk"><figcaption>A2 · Desktop, popover open (here the viewer also acts for June)</figcaption><div class="dev wide" id="a-open-1280" style="height:800px"><div class="scrolled"><div class="page" style="--off:-650px"><div class="shell" style="width:100%"><nav class="side" aria-label="Main"><span class="brand">Waypoint</span><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span><span class="avatar a2" role="img" aria-label="Settings, Ada Brook">AB</span></div><main class="main"><a class="back" href="#"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Trips</a><div class="triphead"><div class="who"><h1 class="t-display" style="font-size:2rem">Four Corners loop</h1><p class="muted">Sat 6 Sep – Sat 20 Sep 2025</p></div><div style="display:flex;gap:-6px"><span class="avatar a2" role="img" aria-label="Ada Brook">AB</span><span class="avatar a4" role="img" aria-label="Theo Brook">TB</span><span class="avatar a5" role="img" aria-label="June Brook">JB</span></div></div><dl class="sumline" style="margin-block:0"><div><dt class="sr">Days</dt><dd>15 days</dd></div><div><dt class="sr">Distance</dt><dd>3,240 mi</dd></div><div><dt class="sr">Photos</dt><dd>248 photos</dd></div></dl><div class="mapsvg" role="img" aria-label="Route map of the trip"><svg viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><path d="M60 80 L360 40 L520 90 L700 70 L760 260 L640 440 L380 460 L120 400 Z" fill="var(--map-land)" stroke="var(--map-border)" stroke-width="2"/><path d="M120 300 C260 140 420 120 650 200" fill="none" stroke="var(--map-route)" stroke-width="4" stroke-linecap="round"/><circle cx="120" cy="300" r="9" fill="var(--map-airport)"/><circle cx="650" cy="200" r="9" fill="var(--map-airport)"/><rect x="330" y="140" width="16" height="16" transform="rotate(45 338 148)" fill="var(--map-stay)"/><circle cx="250" cy="215" r="14" fill="var(--map-photo)"/><circle cx="470" cy="170" r="20" fill="var(--map-photo)"/></svg></div><section class="photos" aria-labelledby="trip-photos-title" data-measure="photos"><div class="photos-head"><div class="hl"><h2 class="t-heading" id="trip-photos-title">Photos <span class="muted t-caption">248</span></h2></div><div class="acts"><span class="anchor"><button type="button" class="btn outline sm" aria-haspopup="dialog" aria-expanded="true" aria-controls="photo-sharing">Sharing</button><div class="pop pn" id="photo-sharing" role="dialog" aria-modal="false" aria-labelledby="a2-t"><div class="pn-head"><h2 id="a2-t" class="t-heading" tabindex="-1">Photo sharing for this trip</h2><button type="button" class="btn ghost sm icon" aria-label="Close"><svg class="ic " aria-hidden="true"><use href="#i-x"/></svg></button></div><section class="pn-sec" aria-labelledby="a2a-h"><div class="pn-head"><div class="txt" style="display:flex;flex-direction:column;gap:1px"><h3 id="a2a-h" class="t-heading">Your photos on this trip</h3><p class="t-caption muted">169 photos from your library</p></div><span class="chip info">Everyone on this trip</span></div><fieldset class="scope"><legend class="eyebrow">Who can see your photos on this trip</legend><label class="choice"><input type="radio" name="a2a-s" ><span><b>Only me</b><br><span class="t-caption muted">Nobody else on the trip can tell they’re there.</span></span></label><label class="choice"><input type="radio" name="a2a-s" checked><span><b>Everyone on this trip</b><br><span class="t-caption muted">Everyone else on the trip sees them, on the map and in the counts too.</span></span></label></fieldset><div class="acts"><button class="btn danger sm" type="button">Stop sharing on this trip</button><button class="btn ghost sm rmv" type="button" aria-expanded="false" aria-controls="a2a-rm">Removed from this trip (2) <svg class="ic " aria-hidden="true"><use href="#i-down"/></svg></button></div></section><section class="pn-sec" aria-labelledby="a2b-h"><div class="collapsed"><div class="l"><h3 id="a2b-h" class="t-heading">June’s photos on this trip</h3><p class="t-caption muted">41 photos from June’s library</p></div><span class="chip quiet">Only June</span><button type="button" class="btn ghost sm icon" aria-expanded="false" aria-label="Show sharing for June’s photos"><svg class="ic " aria-hidden="true"><use href="#i-down"/></svg></button></div></section></div></span><button type="button" class="btn outline sm" aria-label="Select your photos to remove">Select</button><button type="button" class="btn outline sm" aria-expanded="false" aria-controls="trip-photos-gallery">See all</button></div></div><div class="strip"><button type="button" class="tile g11" aria-label="Photo, 1:05 PM, near Brennan Field, Ada’s library"></button><button type="button" class="tile g0" aria-label="Photo, 2:14 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g2" aria-label="Photo, 2:30 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g7" aria-label="Photo, 3:02 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g10" aria-label="Photo, 6:40 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g5" aria-label="Photo, 10:12 PM, near Cedar Hollow, Ada’s library"></button><button type="button" class="tile g9" aria-label="Photo, 8:20 AM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g8" aria-label="Photo, 12:15 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g4" aria-label="Photo, 1:48 PM, near Marlow Springs, Ada’s library"></button><button type="button" class="tile g12" aria-label="Photo, 7:55 AM, near Saltwick Bay, Ada’s library"></button><button type="button" class="more-tile" aria-label="See all 248 photos"><b>+238</b>See all</button></div></section><h2 class="t-heading" style="margin-top:4px">Bookings</h2><div class="rows" aria-label="Bookings"><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg></span><div><b>Flight BRK 412</b><p class="t-caption muted">Sat 6 Sep · Brennan Field to Saltwick Bay</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-bed"/></svg></span><div><b>Cedar Hollow Lodge</b><p class="t-caption muted">6–9 Sep · 3 nights</p></div></div></div><div class="row"><div style="display:flex;gap:12px;align-items:center"><span class="kind"><svg class="ic " aria-hidden="true"><use href="#i-car"/></svg></span><div><b>Mesa Rentals</b><p class="t-caption muted">6–20 Sep · pick-up Saltwick Bay</p></div></div></div></div></main><nav class="tabs" aria-label="Main"><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class=count>2</span></a><a href="#"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></div></div></div></figure></div></div>
+  </section>
+
+  <section class="sec" id="notes"><div class="sechead"><span class="letter">i</span><h2>Notes</h2></div>
+    <div class="notes">
+      <div><h3>Accessible names and keys</h3><ul>
+        <li>Sharing: a text button; its visible text <q>Sharing</q> is its accessible name (no icon, no extra label), with <code>aria-haspopup="dialog"</code>, <code>aria-expanded</code> and <code>aria-controls</code>.</li>
+        <li>Focus order on the page: <q>Photos</q> heading, <q>Sharing</q>, <q>Select</q>, <q>See all</q>, the strip.</li>
+        <li>Opened panel is <code>role="dialog"</code> titled <q>Photo sharing for this trip</q>. Focus moves to that title (as the app’s Sheet does); Tab goes: Close, then each person’s radio group (<q>Who can see your photos on this trip</q>: <q>Only me</q>, <q>Everyone on this trip</q>), <q>Stop sharing on this trip</q>, <q>Removed from this trip (2)</q> and its <q>Put back</q> buttons.</li>
+        <li>Escape closes; focus returns to the Sharing button. The sheet is modal (page behind inert). The desktop popover is non-modal: Escape or a click outside closes it, and Tab leaving it closes it and continues from the Sharing button.</li>
+        <li><q>Stop sharing on this trip</q> still opens the existing alertdialog on top of the panel (<q>Keep sharing</q> focused first); closing it returns to the panel. Widening to Everyone still asks first, as today.</li>
+        <li>Each person the viewer acts for has their own named section (<q>June’s photos on this trip</q>); the viewer’s own comes first and the others start collapsed.</li>
+      </ul></div>
+      <div><h3>Who sees the Sharing button</h3><ul>
+        <li>Today’s code shows sharing controls only to the people the viewer acts for: the viewer’s own person, plus a managed person without a sign-in who has a photo grant (<code>actingPersons</code> in <code>trip-sharing.svelte.ts</code>). Other travellers on the trip never see any sharing control, only the gallery they may see.</li>
+        <li>The button shows only while there is a sharing card to manage. The first-visit prompt and the reminder row after Not now stay inline with no button. People who cannot change anything see no button, not a disabled one.</li>
+        <li>Nothing about who sees what changes: the button only opens the same controls, and every request, grant and scope check is the one that exists today.</li>
+      </ul></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

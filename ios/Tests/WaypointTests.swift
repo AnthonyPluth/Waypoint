@@ -1,3 +1,4 @@
+import AuthenticationServices
 import XCTest
 @testable import Waypoint
 
@@ -32,6 +33,14 @@ final class ServerAddressTests: XCTestCase {
         for bad in ["", "   ", "ftp://example.com", "https://user:pw@example.com", "https://"] {
             XCTAssertThrowsError(try ServerClient.normalize(bad), bad)
         }
+    }
+}
+
+@MainActor
+final class SignInSessionTests: XCTestCase {
+    func testTheSheetIsEphemeralSoIOSAsksNoConsent() {
+        let session = SignIn.makeSession(url: URL(string: "https://waypoint.example.com/oauth/authorize")!) { _, _ in }
+        XCTAssertTrue(session.prefersEphemeralWebBrowserSession)
     }
 }
 
@@ -239,5 +248,18 @@ final class UnauthorizedReportTests: XCTestCase {
         XCTAssertFalse(ended("401"))
         XCTAssertFalse(ended(["status": "401", "path": "/api/trips"]))
         XCTAssertFalse(ended(["status": 401]))
+    }
+}
+
+final class WebViewInsetTests: XCTestCase {
+    // The shell lets the web view run under the status bar and home indicator (`Shell().ignoresSafeArea()`) and the web
+    // page pads itself once with env(safe-area-inset-*). Capacitor's "always" would inset the scroll view by the safe
+    // area as well, and the page would pad again: a band under the status bar and a doubled gap above the home indicator.
+    func testTheWebViewIsNotInsetByTheSafeAreaBecauseThePagePadsItself() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("capacitor.config.json")
+        let config = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        let ios = try XCTUnwrap(config["ios"] as? [String: Any])
+        XCTAssertEqual(ios["contentInset"] as? String, "never")
     }
 }

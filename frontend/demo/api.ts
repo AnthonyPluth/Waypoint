@@ -43,7 +43,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
       "/api/logodev":{configured:false,searchable:false,with_logo:0,unknown:0,waiting:0,last_error:null},
       "/api/mcp-settings":{allow_writes:false,oauth:false,url:null,reason:"External integrations are disabled in the static demo.",connections:[]},
       "/api/reminders":{public_key:"",check_in:false,day_of:false,devices:[],feed:false},
-      "/api/offline":{trips:[]}
+      "/api/offline":{version:1,trips:[]}
     };
     result = replies[url.pathname];
   }

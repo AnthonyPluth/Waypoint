@@ -14,8 +14,10 @@ actor ServerSession {
     private var open = false
     private var webSessionExpiresAt: Date?
     private let renewals = SingleFlight<String>()
+    private let offline: OfflineSync
 
-    init() {
+    init(offline: OfflineSync = .shared) {
+        self.offline = offline
         if let data = Keychain.get(Self.serverKey), let text = String(data: data, encoding: .utf8) {
             server = URL(string: text)
         }
@@ -30,6 +32,7 @@ actor ServerSession {
     func connect(to address: String, signIn: @MainActor () -> SignIn) async throws {
         let url = try ServerClient.normalize(address)
         if try await ServerClient.opensWithoutSignIn(url) {
+            await offline.serverChanged(from: server, to: url)
             keep(server: url, tokens: nil)
             open = true
             Keychain.set(Data("1".utf8), for: Self.openKey)
@@ -37,6 +40,7 @@ actor ServerSession {
         }
         let endpoints = try await ServerClient.endpoints(url)
         let fresh = try await signIn().run(endpoints: endpoints)
+        await offline.serverChanged(from: server, to: url)
         keep(server: url, tokens: fresh)
         open = false
         Keychain.remove(Self.openKey)
@@ -46,6 +50,11 @@ actor ServerSession {
         guard server != nil, let current = tokens else { throw ServerError.signedOut }
         if current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
         return try await renewals.run { [self] in try await renewAccessToken() }
+    }
+
+    func offlineBearer() async throws -> String? {
+        if open { return nil }
+        return try await accessToken()
     }
 
     private func renewAccessToken() async throws -> String {
@@ -88,6 +97,7 @@ actor ServerSession {
         Keychain.remove(Self.openKey)
         Keychain.remove(Self.serverKey)
         webSessionExpiresAt = nil
+        await offline.purge()
         Task { await retryPendingRevocations() }
         await Self.clearWebData(host: host)
     }

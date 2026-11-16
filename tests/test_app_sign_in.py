@@ -1,15 +1,20 @@
 import os
 import time
 import unittest
+from datetime import date, timedelta
 from unittest import mock
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from tests import test_mcp_oauth_http as base
+from tests.privacy import no_leaks
 from tests.shared import ServerCase
+from waypoint import oidc
+from waypoint.domain import offline, people, trips
+from waypoint.domain.visibility import Viewer
 from waypoint.server import mcp_oauth
 from waypoint.storage import db
-from waypoint.storage.models import AuthSession, OAuthClient, OAuthGrant, User
+from waypoint.storage.models import AuthSession, OAuthClient, OAuthGrant, Trip, User
 
 APP = {"client_id": mcp_oauth.APP_CLIENT, "redirect_uris": [mcp_oauth.APP_REDIRECT]}
 APP_HEADERS = {"X-Waypoint": "1"}
@@ -90,6 +95,58 @@ class SignInFlowTests(AppSignIn):
         self.assertEqual(self.api(t["access_token"], path="/api/trips").status, 200)
         listed = self.api(t["access_token"], path="/api/mcp-settings").json
         self.assertEqual([c for c in listed["connections"] if c["client"] == mcp_oauth.APP_NAME], [])
+
+
+OTHERS_TRIP = "others-trip-canary-4f81c2"
+
+
+class OfflineForTheApp(AppSignIn):
+
+    def book(self, sub: str, email: str, name: str, trip_name: str) -> int:
+        today = date.today()
+        with db.session() as conn:
+            oidc.remember_user(conn, sub, email, name, None)
+            who = Viewer(people.person_for_sub(conn, sub))
+            assert who.person_id is not None
+            made = trips.create_trip(conn, who, {"name": trip_name, "start_date": (today + timedelta(days=2)).isoformat(),
+                                                 "end_date": (today + timedelta(days=4)).isoformat(), "people": [who.person_id]})
+        self.addCleanup(self.drop_trip, made["id"])
+        return made["id"]
+
+    def drop_trip(self, trip_id: int) -> None:
+        with db.session() as conn:
+            conn.execute(delete(Trip).where(Trip.id == trip_id))
+
+    def test_the_app_token_reads_the_offline_copy_with_its_version(self):
+        mine = self.book("user-1", "me@example.com", "Me", "Trip " + base.tag())
+        token = self.app_tokens()["access_token"]
+        r = self.api(token, path="/api/offline")
+        self.assertEqual(r.status, 200, r.body)
+        self.assertEqual(r.json["version"], offline.VERSION)
+        self.assertIn(mine, [c["trip"]["id"] for c in r.json["trips"]])
+
+    def test_the_app_sees_only_trips_its_person_may_see_and_nothing_leaks(self):
+        self.book("user-1", "me@example.com", "Me", "Trip " + base.tag())
+        self.book("other-sub", "other@example.com", "Other", OTHERS_TRIP)
+        token = self.app_tokens()["access_token"]
+        with no_leaks(self, OTHERS_TRIP):
+            r = self.api(token, path="/api/offline")
+        self.assertEqual(r.status, 200, r.body)
+        self.assertNotIn(OTHERS_TRIP.encode(), r.body)
+        self.assertNotIn(b"other@example.com", r.body)
+
+    def test_an_assistant_token_and_a_signed_out_request_are_refused(self):
+        assistant = self.tokens(self.client())["access_token"]
+        self.assertEqual(self.api(assistant, path="/api/offline").status, 401)
+        self.assertEqual(self.http("GET", "/api/offline").status, 401)
+        self.assertEqual(self.api("wpa_nonsense", path="/api/offline").status, 401)
+
+    def test_a_revoked_app_grant_no_longer_reads_the_offline_copy(self):
+        t = self.app_tokens()
+        self.assertEqual(self.api(t["access_token"], path="/api/offline").status, 200)
+        r = self.form("/oauth/revoke", {"token": t["refresh_token"], "client_id": mcp_oauth.APP_CLIENT})
+        self.assertEqual(r.status, 200)
+        self.assertEqual(self.api(t["access_token"], path="/api/offline").status, 401)
 
 
 class BearerTests(AppSignIn):
