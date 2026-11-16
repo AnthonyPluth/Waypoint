@@ -855,6 +855,27 @@
         }
       }
     },
+    "/api/photos/trip-covers": {
+      "get": {
+        "operationId": "api_photo_trip_covers",
+        "x-handler": "waypoint/server/api/photos.py:api_photo_trip_covers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripCovers"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/photos/{id}": {
       "post": {
         "operationId": "api_photo_decide",
@@ -9920,6 +9941,44 @@
         ],
         "additionalProperties": false
       },
+      "TripCover": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "trip_id",
+          "count",
+          "covers"
+        ],
+        "additionalProperties": false
+      },
+      "TripCovers": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripCover"
+            }
+          }
+        },
+        "required": [
+          "trips"
+        ],
+        "additionalProperties": false
+      },
       "TripHome": {
         "type": "object",
         "properties": {
@@ -10138,13 +10197,20 @@
             "items": {
               "$ref": "#/components/schemas/PhotoPerson"
             }
+          },
+          "best": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
           }
         },
         "required": [
           "photos",
           "clusters",
           "counts",
-          "people"
+          "people",
+          "best"
         ],
         "additionalProperties": false
       },

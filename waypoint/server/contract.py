@@ -625,6 +625,17 @@ class TripPhotos(TypedDict):
     clusters: list[PhotoCluster]
     counts: PhotoCounts
     people: list[PhotoPerson]
+    best: list[int]
+
+
+class TripCover(TypedDict):
+    trip_id: int
+    count: int
+    covers: list[int]
+
+
+class TripCovers(TypedDict):
+    trips: list[TripCover]
 
 
 class PhotoCandidate(TypedDict):

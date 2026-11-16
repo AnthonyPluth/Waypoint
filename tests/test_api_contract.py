@@ -487,6 +487,7 @@ class Replies(DbCase):
         trip = str(seg["trip_id"])
         self.check("GET /api/trips/{id}/photos", photos_api.api_trip_photos(self.c, {}, {}, trip))
         self.check("GET /api/photos/review", photos_api.api_photo_review(self.c, {}, {}))
+        self.check("GET /api/photos/trip-covers", photos_api.api_photo_trip_covers(self.c, {}, {}))
         placed_now = photos_api.api_photo_decide(self.c, {}, {"trip_id": seg["trip_id"]}, str(torn.id))
         self.check("POST /api/photos/{id}", placed_now)
         self.check("POST /api/photos/{id}/undo", photos_api.api_photo_undo(self.c, {}, {"trip_id": seg["trip_id"], "decided_at": placed_now["decided_at"]}, str(torn.id)))
@@ -611,7 +612,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/assistant/review", "GET /api/assistant/review/{id}", "GET /api/assistant/review/{id}/email",
                                      "POST /api/assistant/review/{id}/match", "POST /api/assistant/review/{id}/create",
                                      "POST /api/assistant/review/{id}/dismiss", "GET /api/assistant/segments/{id}/email",
-                                     "GET /api/trips/{id}/photos", "GET /api/photos/review", "POST /api/photos/{id}", "POST /api/photos/{id}/undo",
+                                     "GET /api/trips/{id}/photos", "GET /api/photos/review", "GET /api/photos/trip-covers", "POST /api/photos/{id}", "POST /api/photos/{id}/undo",
                                      "GET /api/photo-sources", "POST /api/photo-sources", "POST /api/photo-sources/test", "POST /api/photo-sources/{id}",
                                      "DELETE /api/photo-sources/{id}", "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync",
                                      "GET /api/photo-sources/{id}/resume",

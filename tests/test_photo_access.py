@@ -20,9 +20,9 @@ from waypoint.storage import db
 from waypoint.storage.models import PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, SegmentRecipient, TripPerson
 
 STATE, COUNTRY = "Canaryshire-7q2x", "Canaryland-3k9v"
-EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": []}
+EMPTY = {"photos": [], "clusters": [], "counts": {"total": 0, "located": 0, "inferred": 0, "far": 0}, "people": [], "best": []}
 NO_TRIP, NO_PHOTO = {"error": "No such trip"}, {"error": "No such photo"}
-PHOTO_ROUTES = (("GET", "/api/trips/{id}/photos"), ("GET", "/api/photos/review"), ("POST", "/api/photos/{id}"), ("POST", "/api/photos/{id}/undo"),
+PHOTO_ROUTES = (("GET", "/api/trips/{id}/photos"), ("GET", "/api/photos/review"), ("GET", "/api/photos/trip-covers"), ("POST", "/api/photos/{id}"), ("POST", "/api/photos/{id}/undo"),
                 ("GET", "/api/trips/{id}/photo-sharing"),
                 ("POST", "/api/trips/{id}/photo-sharing"), ("DELETE", "/api/trips/{id}/photo-sharing"), ("POST", "/api/trips/{id}/photo-exclusions"),
                 ("DELETE", "/api/trips/{id}/photo-exclusions/{id}"), ("GET", "/api/photo-grants"), ("POST", "/api/photo-sharing-prefs/{id}"),
@@ -571,8 +571,8 @@ class LeakTests(AccessCase):
         self.photo("ben")
         hers = self.photo("ana", local="2026-06-02T11:00", placed=False)
         with no_leaks(self, ASSET, URL, KEY, STATE, COUNTRY):
-            replies = [self.listing("ana"), self.summary("ana"), self.sharing("ana"), self.ok("ana", "GET", "/api/photos/review"), self.ok("ana", "GET", "/api/photo-grants"),
-                       self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [hers]}), self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{hers}"),
+            replies = [self.listing("ana"), self.summary("ana"), self.sharing("ana"), self.ok("ana", "GET", "/api/photos/review"), self.ok("ana", "GET", "/api/photos/trip-covers"),
+                       self.ok("ana", "GET", "/api/photo-grants"), self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-exclusions", {"photo_ids": [hers]}), self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-exclusions/{hers}"),
                        self.ok("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"scope": "only_me"}), self.ok("ana", "DELETE", f"/api/trips/{self.trip}/photo-sharing"),
                        self.ok("ana", "POST", f"/api/photo-sharing-prefs/{self.person['ana']}", {"share_all": True}),
                        self.call("cy", "GET", f"/api/trips/{self.trip}/photo-sharing")[1], self.call("ana", "POST", f"/api/trips/{self.trip}/photo-sharing", {"person_id": self.person["ben"], "scope": "trip"})[1]]
@@ -831,7 +831,7 @@ class LocalModeTests(ServerCase):
         status, seg = self.req("POST", "/api/segments", OUT)
         self.assertEqual(status, 200)
         trip = seg["trip_id"]
-        calls = [("GET", f"/api/trips/{trip}/photos", None), ("GET", "/api/photos/review", None), ("POST", "/api/photos/1", {"trip_id": trip}),
+        calls = [("GET", f"/api/trips/{trip}/photos", None), ("GET", "/api/photos/review", None), ("GET", "/api/photos/trip-covers", None), ("POST", "/api/photos/1", {"trip_id": trip}),
                  ("POST", "/api/photos/1/undo", {"trip_id": trip, "decided_at": 1.0}), ("GET", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-sharing", {"scope": "trip"}),
                  ("DELETE", f"/api/trips/{trip}/photo-sharing", None), ("POST", f"/api/trips/{trip}/photo-exclusions", {"photo_ids": [1]}),
                  ("DELETE", f"/api/trips/{trip}/photo-exclusions/1", None), ("GET", "/api/photo-grants", None), ("POST", "/api/photo-sharing-prefs/1", {"share_all": True}),

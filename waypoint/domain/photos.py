@@ -5,7 +5,7 @@ import hashlib
 import heapq
 import math
 import time
-from collections import Counter
+from collections import Counter, deque
 from enum import Enum
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -27,6 +27,8 @@ LocationSource = Literal["exif", "inferred"]
 Scope = Literal["only_me", "trip"]
 Rendition = Literal["thumbnail", "preview"]
 Found = tuple[Photo, int]
+BEST = 7
+COVERS = 3
 PLACEHOLDER_PX: dict[Rendition, int] = {"thumbnail": 256, "preview": 1280}
 
 SHOWN: tuple[MatchKind, ...] = ("place", "time", "far")
@@ -124,6 +126,17 @@ class TripPhotos(TypedDict):
     clusters: list[PhotoCluster]
     counts: PhotoCounts
     people: list[PhotoPerson]
+    best: list[int]
+
+
+class TripCover(TypedDict):
+    trip_id: int
+    count: int
+    covers: list[int]
+
+
+class TripCovers(TypedDict):
+    trips: list[TripCover]
 
 
 class PhotoCandidate(TypedDict):
@@ -663,6 +676,39 @@ def clusters(rows: Sequence[TripPhoto]) -> list[PhotoCluster]:
              "last": rows[c.last_at]["taken_local"], "cover": rows[c.first_at]["id"], "inferred": c.inferred} for c in found]
 
 
+def _unclustered_order(photo: TripPhoto) -> tuple[str, int]:
+    return photo["taken_local"], photo["id"]
+
+
+def _within_cluster(photo: TripPhoto) -> tuple[bool, str, int]:
+    return photo["latitude"] is None, photo["taken_local"], photo["id"]
+
+
+def best_photos(photos: Sequence[TripPhoto], found: Sequence[PhotoCluster], limit: int) -> list[int]:
+    members: dict[int, list[TripPhoto]] = {}
+    loose: list[TripPhoto] = []
+    for photo in photos:
+        if photo["kind"] != "image":
+            continue
+        number = photo["cluster"]
+        if number is None or not 0 <= number < len(found):
+            loose.append(photo)
+        else:
+            members.setdefault(number, []).append(photo)
+    queues: list[deque[TripPhoto]] = []
+    for number in sorted(range(len(found)), key=lambda n: (-found[n]["count"], found[n]["first"], n)):
+        pool = sorted(members.get(number, ()), key=_within_cluster)
+        pool.sort(key=lambda photo: photo["id"] != found[number]["cover"])
+        queues.append(deque(pool))
+    chosen: list[int] = []
+    while len(chosen) < limit and any(queues):
+        for queue in queues:
+            if queue and len(chosen) < limit:
+                chosen.append(queue.popleft()["id"])
+    room = max(limit - len(chosen), 0)
+    return chosen + [photo["id"] for photo in sorted(loose, key=_unclustered_order)[:room]]
+
+
 def for_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripPhotos | None:
     trip = visibility.visible_trip(conn, viewer, trip_id) if not viewer.household else None
     if trip is None:
@@ -677,7 +723,23 @@ def for_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripPhotos | 
         "counts": {"total": len(photos), "located": sum(p["location_source"] == "exif" for p in photos),
                    "inferred": sum(p["location_source"] == INFERRED for p in photos), "far": sum(p["match"] == FAR for p in photos)},
         "people": [{"person_id": person, "count": by_person[person]} for person in sorted(by_person)],
+        "best": best_photos(photos, found, BEST),
     }
+
+
+def _is_past(trip: Trip, today: str) -> bool:
+    return bool(trip.end_date) and cast(str, trip.end_date) < today
+
+
+def trip_covers(conn: db.Connection, viewer: Viewer, today: str) -> TripCovers:
+    if viewer.household:
+        return {"trips": []}
+    past = sorted(t.id for t in visibility.visible_trips(conn, viewer) if _is_past(t, today))
+    held: dict[int, list[TripPhoto]] = {trip_id: [] for trip_id in past}
+    for photo, person in (_query(conn, viewer, Photo.trip_id.in_(past)) if past else []):
+        if photo.trip_id is not None:
+            held[photo.trip_id].append(photo_out(photo, person, {}))
+    return {"trips": [{"trip_id": trip_id, "count": len(shots), "covers": best_photos(shots, clusters(shots), COVERS)} for trip_id, shots in held.items()]}
 
 
 def _far_rows(conn: db.Connection, viewer: Viewer) -> list[tuple[Photo, int, list[TripWindow]]]:
