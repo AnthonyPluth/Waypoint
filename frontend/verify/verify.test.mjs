@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -16,6 +16,17 @@ describe("lengthenNames", () => {
   it("leaves codes, numbers and nulls alone", () => {
     expect(lengthenNames({ code: "JFK", longest: null, count: 2 }, "!")).toEqual({ code: "JFK", longest: null, count: 2 });
     expect(lengthenNames([], "!")).toEqual([]);
+  });
+});
+
+describe("the audit step", () => {
+  it("passes when the audit finds nothing and fails with what it finds", async () => {
+    await expect(runStep({}, { audit: true }, undefined, undefined, async () => [])).resolves.toBeUndefined();
+    await expect(runStep({}, { audit: true }, undefined, undefined, async () => ["color-contrast: nav"])).rejects.toThrow("a11y color-contrast: nav");
+  });
+
+  it("says so when no audit is available to run it", async () => {
+    await expect(runStep({}, { audit: true })).rejects.toThrow("no audit");
   });
 });
 
@@ -59,6 +70,16 @@ describe("flowProblems", () => {
     const steps = [{ upload: { selector: "input[type=file]", file: "tests/fixtures/flight_import/flighty.csv" } }, { scroll_to: "#import-title" }];
     expect(flowProblems({ ...ok, steps })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
+  });
+
+  it("takes an element to scroll under the tab bar", () => {
+    expect(flowProblems({ ...ok, steps: [{ scroll_under_bar: "button" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ scroll_under_bar: true }] })).toEqual(["step 1: scroll_under_bar takes a string"]);
+  });
+
+  it("takes an audit of the page where the flow has scrolled to", () => {
+    expect(flowProblems({ ...ok, steps: [{ audit: true }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ audit: "yes" }] })).toEqual(["step 1: audit takes a boolean"]);
   });
 
   it("takes a suffix for the names of a list, to check a long one's layout", () => {
@@ -243,6 +264,7 @@ describe("the assertions a screenshot must not undo", () => {
     checks = checksAfter(checks, { wait_for: "ul" });
     checks = checksAfter(checks, { screenshot: "a" });
     checks = checksAfter(checks, { scroll_to: "#x" });
+    checks = checksAfter(checks, { scroll_under_bar: "button" });
     checks = checksAfter(checks, { expect_text: { selector: "main", text: "Jane" }, timeout: 500 });
     expect(checks).toHaveLength(2);
     expect(checksAfter(checks, { click: "a" })).toEqual([]);

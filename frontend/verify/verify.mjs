@@ -42,7 +42,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -173,7 +173,7 @@ export async function setUpOffline(page, base, timeout = 10000) {
   await page.mouse.move(0, 0);
 }
 
-export async function runStep(page, step, shot, saveDownload) {
+export async function runStep(page, step, shot, saveDownload, audit = undefined) {
   const timeout = step.timeout ?? 10000;
   if ("authenticator" in step) {
     await addAuthenticator(page);
@@ -318,6 +318,18 @@ export async function runStep(page, step, shot, saveDownload) {
     await saveDownload(step.download.name, await pending);
   } else if ("scroll_to" in step) {
     await page.locator(step.scroll_to).first().evaluate((el) => el.scrollIntoView({ block: "start" }), undefined, { timeout });
+  } else if ("audit" in step) {
+    if (!audit) throw new Error("no audit is available to run the audit step");
+    const found = await audit();
+    if (found.length) throw new Error(`a11y ${found.join(" | ")}`);
+  } else if ("scroll_under_bar" in step) {
+    await page.locator(step.scroll_under_bar).first().evaluate((el) => {
+      const bar = [...globalThis.document.querySelectorAll("nav[aria-label='Main']")].find((n) => n.getClientRects().length > 0);
+      if (!bar) throw new Error("no tab bar on this page");
+      const centre = (node) => { const r = node.getBoundingClientRect(); return r.top + r.height / 2; };
+      globalThis.scrollBy(0, centre(el) - centre(bar));
+      if (Math.abs(centre(el) - centre(bar)) > 2) throw new Error("the page can't scroll far enough to put it under the bar");
+    }, undefined, { timeout });
   } else if ("wait_for" in step) {
     await page.locator(step.wait_for).first().waitFor({ timeout });
   } else if ("expect_text" in step) {
@@ -335,7 +347,7 @@ export async function runStep(page, step, shot, saveDownload) {
   }
 }
 
-const NEUTRAL_STEPS = ["wait_for", "screenshot", "scroll_to"];
+const NEUTRAL_STEPS = ["wait_for", "screenshot", "scroll_to", "scroll_under_bar"];
 
 export function checksAfter(checks, step) {
   const action = Object.keys(step).find((k) => k !== "timeout");
@@ -460,7 +472,7 @@ export function runVisit(env, v) {
         if (lost) throw new Error(lost);
       };
       for (const [i, step] of flow.steps.entries()) {
-        try { await runStep(page, step, (n) => shotChecked(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, env.out)); }
+        try { await runStep(page, step, (n) => shotChecked(`flow-${flow.name}-${n}`), (n, d) => saveDownload(`flow-${flow.name}-${n}`, d, env.out), () => auditPage(page, v.viewport)); }
         catch (e) { throw new Error(`step ${i + 1} (${JSON.stringify(step).slice(0, 80)}): ${String(e.message).split("\n")[0]}`, { cause: e }); }
         checks = checksAfter(checks, step);
       }
