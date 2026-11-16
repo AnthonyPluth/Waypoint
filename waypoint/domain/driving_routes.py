@@ -126,15 +126,16 @@ def _on_trip(stops: list[tuple[float, float]], drive: Drive) -> bool:
             and any(_near([lat, lon], lat2, lon2, STOP_REACH_DEGREES) for lat, lon in stops))
 
 
-def cached(conn: db.Connection, viewer: Viewer, trip_id: int, drives: list[Drive], now: float) -> list[CachedRoute] | None:
+def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], now: float) -> list[CachedRoute] | None:
     places = tripmap.places(conn, viewer, trip_id)
     if places is None:
         return None
+    drives = parse_drives(texts)
     stops = _stops(places)
     wanted = {_key(d): d for d in drives if _on_trip(stops, d)}
     if not wanted:
         return []
-    match = or_(*(and_(DrivingRoute.from_lat == a, DrivingRoute.from_lon == b, DrivingRoute.to_lat == c, DrivingRoute.to_lon == d) for a, b, c, d in wanted))
+    match = or_(*(and_(DrivingRoute.trip_id == trip_id, DrivingRoute.from_lat == a, DrivingRoute.from_lon == b, DrivingRoute.to_lat == c, DrivingRoute.to_lon == d) for a, b, c, d in wanted))
     out: list[CachedRoute] = []
     for row in conn.orm.scalars(select(DrivingRoute).where(match, DrivingRoute.stored > now - REPLACE_AFTER_SECONDS).order_by(DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)):
         lat1, lon1, lat2, lon2 = wanted[(row.from_lat, row.from_lon, row.to_lat, row.to_lon)]
@@ -142,17 +143,18 @@ def cached(conn: db.Connection, viewer: Viewer, trip_id: int, drives: list[Drive
     return out
 
 
-def store(conn: db.Connection, viewer: Viewer, trip_id: int, drive: Drive, raw_path: Any, now: float) -> bool | None:
+def store(conn: db.Connection, viewer: Viewer, trip_id: int, start: Any, end: Any, raw_path: Any, now: float) -> bool | None:
     places = tripmap.places(conn, viewer, trip_id)
     if places is None:
         return None
+    drive = drive_of(start, end)
     if not _on_trip(_stops(places), drive):
         raise Invalid("That isn't a drive of this trip")
     path = clean_path(raw_path, drive)
     from_lat, from_lon, to_lat, to_lon = _key(drive)
-    have = conn.orm.get(DrivingRoute, (from_lat, from_lon, to_lat, to_lon))
+    have = conn.orm.get(DrivingRoute, (trip_id, from_lat, from_lon, to_lat, to_lon))
     if have is not None and now - have.stored < REPLACE_AFTER_SECONDS:
         return False
-    db.upsert(conn, DrivingRoute, {"from_lat": from_lat, "from_lon": from_lon, "to_lat": to_lat, "to_lon": to_lon,
-                                   "path": json.dumps(path, separators=(",", ":")), "stored": now}, key=["from_lat", "from_lon", "to_lat", "to_lon"])
+    db.upsert(conn, DrivingRoute, {"trip_id": trip_id, "from_lat": from_lat, "from_lon": from_lon, "to_lat": to_lat, "to_lon": to_lon,
+                                   "path": json.dumps(path, separators=(",", ":")), "stored": now}, key=["trip_id", "from_lat", "from_lon", "to_lat", "to_lon"])
     return True

@@ -12,7 +12,7 @@ from tests.test_trip_roads import DENVER, SALT_LAKE
 from tests.test_trips import HOTEL, RouteCase
 from waypoint.domain import driving_routes
 from waypoint.storage import backup, db
-from waypoint.storage.models import DrivingRoute
+from waypoint.storage.models import DrivingRoute, Trip
 
 
 def drive_of(places):
@@ -77,13 +77,30 @@ class StoringAndReadingTests(RouteCacheCase):
         status, got = self.look_up("ben", trip, drive)
         self.assertEqual((status, len(got["routes"])), (200, 1))
 
-    def test_another_trip_over_the_same_drive_reuses_the_path(self):
+    def test_another_trip_over_the_same_drive_keeps_its_own_path(self):
         trip, drive = self.trip_with_a_drive()
         self.put("ana", trip, drive)
         again = self.book("ana", {**DENVER, "start_local": "2027-06-02T15:00", "end_local": "2027-06-04T10:00"})
         self.book("ana", {**SALT_LAKE, "start_local": "2027-06-04T15:00", "end_local": "2027-06-08T10:00"}, trip_id=again["trip_id"])
-        self.assertNotEqual(again["trip_id"], trip)
-        self.assertEqual(len(self.look_up("ana", again["trip_id"], drive)[1]["routes"]), 1)
+        other = again["trip_id"]
+        self.assertNotEqual(other, trip)
+        self.assertEqual(self.look_up("ana", other, drive), (200, {"routes": []}))
+        self.assertEqual(self.put("ana", other, drive, line(drive, ((41.0, -109.0),)))[1], {"stored": True})
+        self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive))
+        self.assertEqual(self.look_up("ana", other, drive)[1]["routes"][0]["path"], line(drive, ((41.0, -109.0),)))
+        self.assertEqual(sorted(r.trip_id for r in self.rows()), sorted([trip, other]))
+
+    def test_removing_a_trip_removes_its_paths_and_only_its_paths(self):
+        trip, drive = self.trip_with_a_drive()
+        self.put("ana", trip, drive)
+        again = self.book("ana", {**DENVER, "start_local": "2027-06-02T15:00", "end_local": "2027-06-04T10:00"})
+        self.book("ana", {**SALT_LAKE, "start_local": "2027-06-04T15:00", "end_local": "2027-06-08T10:00"}, trip_id=again["trip_id"])
+        self.put("ana", again["trip_id"], drive)
+        self.assertEqual(len(self.rows()), 2)
+        self.ok("ana", "DELETE", f"/api/trips/{trip}")
+        self.assertEqual([r.trip_id for r in self.rows()], [again["trip_id"]])
+        self.ok("ana", "DELETE", f"/api/trips/{again['trip_id']}")
+        self.assertEqual(self.rows(), [])
 
     def test_a_stored_path_is_kept_until_it_is_old_enough_to_be_asked_for_again_and_replaced(self):
         trip, drive = self.trip_with_a_drive()
@@ -112,7 +129,8 @@ class StoringAndReadingTests(RouteCacheCase):
         trip, drive = self.trip_with_a_drive()
         self.put("ana", trip, drive)
         (row,) = self.rows()
-        self.assertEqual([c.name for c in DrivingRoute.__table__.columns], ["from_lat", "from_lon", "to_lat", "to_lon", "path", "stored"])
+        self.assertEqual(row.trip_id, trip)
+        self.assertEqual([c.name for c in DrivingRoute.__table__.columns], ["trip_id", "from_lat", "from_lon", "to_lat", "to_lon", "path", "stored"])
         self.assertEqual((row.from_lat, row.from_lon), (round(drive["start"]["latitude"] * 10000), round(drive["start"]["longitude"] * 10000)))
         self.assertEqual(json.loads(row.path), line(drive))
 
@@ -147,6 +165,19 @@ class VisibilityTests(RouteCacheCase):
         status, got = self.put("ben", mine["trip_id"], drive, line(drive, ((41.0, -109.0),)))
         self.assertEqual((status, got["error"]), (400, "That isn't a drive of this trip"))
         self.assertEqual(json.loads(self.rows()[0].path), line(drive))
+
+    def test_a_members_own_trip_over_the_same_places_never_reads_or_learns_of_a_path_stored_through_a_trip_they_cannot_see(self):
+        trip, drive = self.trip_with_a_drive("ana")
+        self.assertEqual(self.put("ana", trip, drive)[1], {"stored": True})
+        first = self.book("ben", DENVER)
+        self.book("ben", SALT_LAKE, trip_id=first["trip_id"])
+        mine = first["trip_id"]
+        self.assertNotEqual(mine, trip)
+        self.assertEqual(self.look_up("ben", mine, drive), (200, {"routes": []}))
+        self.assertEqual(self.put("ben", mine, drive, line(drive, ((41.0, -109.0),)))[1], {"stored": True})
+        self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive))
+        self.assertEqual(self.look_up("ben", mine, drive)[1]["routes"][0]["path"], line(drive, ((41.0, -109.0),)))
+        self.assertEqual(self.put("ana", trip, drive, line(drive, ((42.0, -110.0),)))[1], {"stored": False})
 
     def test_the_routes_run_inside_no_leaks_and_keep_the_trips_details_out_of_the_cache(self):
         name, code = "Quentin Marlowe-Zzyx", "ZQXW7413"
@@ -226,18 +257,20 @@ class RefusalTests(RouteCacheCase):
 
 class BackupTests(DbCase):
     def test_the_stored_paths_travel_in_a_backup_and_come_back_on_restore(self):
-        self.c.execute(DrivingRoute.__table__.insert().values(from_lat=397392, from_lon=-1049903, to_lat=407608, to_lon=-1118910,
+        self.c.execute(Trip.__table__.insert().values(id=5, name="Trip", auto=True))
+        self.c.execute(DrivingRoute.__table__.insert().values(trip_id=5, from_lat=397392, from_lon=-1049903, to_lat=407608, to_lon=-1118910,
                                                               path="[[39.7392,-104.9903],[40.0,-108.0],[40.7608,-111.891]]", stored=1700000000.5))
         self.c.commit()
         data = backup.load(backup.dump(self.c))
-        self.assertEqual(data["tables"]["driving_routes"]["rows"], [[397392, -1049903, 407608, -1118910, "[[39.7392,-104.9903],[40.0,-108.0],[40.7608,-111.891]]", 1700000000.5]])
+        self.assertEqual(data["tables"]["driving_routes"]["rows"], [[5, 397392, -1049903, 407608, -1118910, "[[39.7392,-104.9903],[40.0,-108.0],[40.7608,-111.891]]", 1700000000.5]])
         other = db.connect(add_database(self, os.path.join(os.path.dirname(self.path), "restored.db")))
         self.addCleanup(other.close)
-        other.execute(DrivingRoute.__table__.insert().values(from_lat=1, from_lon=2, to_lat=3, to_lon=4, path="[]", stored=0.0))
+        other.execute(Trip.__table__.insert().values(id=9, name="Old", auto=True))
+        other.execute(DrivingRoute.__table__.insert().values(trip_id=9, from_lat=1, from_lon=2, to_lat=3, to_lon=4, path="[]", stored=0.0))
         self.assertEqual(backup.restore(other, data)["driving_routes"], 1)
         other.commit()
-        (row,) = list(other.execute(select(DrivingRoute.from_lat, DrivingRoute.path, DrivingRoute.stored)))
-        self.assertEqual(tuple(row), (397392, "[[39.7392,-104.9903],[40.0,-108.0],[40.7608,-111.891]]", 1700000000.5))
+        (row,) = list(other.execute(select(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.path, DrivingRoute.stored)))
+        self.assertEqual(tuple(row), (5, 397392, "[[39.7392,-104.9903],[40.0,-108.0],[40.7608,-111.891]]", 1700000000.5))
 
 
 if __name__ == "__main__":

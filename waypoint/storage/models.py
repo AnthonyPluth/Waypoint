@@ -489,6 +489,7 @@ class PhotoSharingPrefs(Base):
 
 class DrivingRoute(Base):
     __table__ = schema.driving_routes
+    trip_id: Mapped[int]
     from_lat: Mapped[int]
     from_lon: Mapped[int]
     to_lat: Mapped[int]

@@ -11,7 +11,7 @@ from .trips import NO_TRIP, viewer
 def api_driving_routes(conn, q, _b, trip_id) -> DrivingRoutes:
     who, this = viewer(conn), row_id(trip_id, NO_TRIP)
     try:
-        found = driving_routes.cached(conn, who, this, driving_routes.parse_drives(q.get("drive", [])), time.time())
+        found = driving_routes.cached(conn, who, this, q.get("drive", []), time.time())
     except driving_routes.Invalid as e:
         raise ApiError(str(e)) from None
     if found is None:
@@ -22,7 +22,7 @@ def api_driving_routes(conn, q, _b, trip_id) -> DrivingRoutes:
 def api_driving_route_store(conn, _q, body: DrivingRouteBody, trip_id) -> DrivingRouteStored:
     who, this = viewer(conn), row_id(trip_id, NO_TRIP)
     try:
-        stored = driving_routes.store(conn, who, this, driving_routes.drive_of(body.get("start"), body.get("end")), body.get("path"), time.time())
+        stored = driving_routes.store(conn, who, this, body.get("start"), body.get("end"), body.get("path"), time.time())
     except driving_routes.Invalid as e:
         raise ApiError(str(e)) from None
     if stored is None:
