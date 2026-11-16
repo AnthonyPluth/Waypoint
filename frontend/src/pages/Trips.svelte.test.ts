@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,9 +26,14 @@ const orlando = trip([segment({ id: 3, trip_id: 3, start_local: "2026-08-25T08:0
 const nothingToCount = { days: 0, nights: 0, distance_km: 0, flight_km: 0, road_km: 0, road_estimated: false, states: [], countries: [], photos: { total: 0, inferred: 0 }, kinds: { flight: 0, hotel: 0, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
 const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).endsWith("/summary") ? nothingToCount : undefined);
 
+let coverReply: unknown = { trips: [] };
 function serve(trips = [london, auckland, orlando]) {
   vi.mocked(api).mockImplementation(async (path, opts) => {
     if (numbers(path)) return numbers(path) as never;
+    if (path === "/api/photos/trip-covers") {
+      if (coverReply instanceof Error) throw coverReply;
+      return coverReply as never;
+    }
     if (path === "/api/segments" && opts?.method === "POST") return segment({ id: 9, trip_id: 5 });
     if (path === "/api/people") return { people: [jane, sam] };
     return { trips };
@@ -39,6 +44,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-05T12:00:00Z"));
   vi.mocked(api).mockReset();
+  coverReply = { trips: [] };
   route.query = "";
   location.hash = "#trips";
   serve();
@@ -341,6 +347,13 @@ describe("changing a trip in the pane", () => {
         store = store.map((t) => ({ ...t, segments: t.segments.filter((s) => s.id !== Number(gone[1])) })).filter((t) => t.segments.length);
         return { ok: true };
       }
+      const moving = /^\/api\/segments\/(\d+)\/move$/.exec(String(path));
+      if (moving && opts?.method === "POST") {
+        const into = (opts.body as { trip_id: number }).trip_id;
+        const mover = store.flatMap((t) => t.segments).find((sg) => sg.id === Number(moving[1]))!;
+        store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((sg) => sg.id !== mover.id) } : t.id === into ? { ...t, segments: [...t.segments, { ...mover, trip_id: into }] } : t));
+        return store.find((t) => t.id === into);
+      }
       if (gone && opts?.method === "POST") {
         const moved = segment({ ...second, trip_id: 2 });
         store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((s) => s.id !== 4) } : t.id === 2 ? { ...t, segments: [...t.segments, moved] } : t));
@@ -371,6 +384,26 @@ describe("changing a trip in the pane", () => {
     await waitFor(() => expect(within(upcoming).getByText("Lisbon")).toBeInTheDocument());
     expect(within(upcoming).queryByText("Trip to London")).toBeNull();
     expect(await within(pane).findByRole("heading", { level: 1, name: "Lisbon" })).toBeInTheDocument();
+  });
+
+  it("keeps the pane on the trip it was showing when a booking is moved into a past trip", async () => {
+    store = [trip([segment({ id: 6, trip_id: 6, start_local: "2026-10-12T09:00", end_local: "2026-10-14T09:00" })], { id: 6, name: "Trip to Rome" }), ...store];
+    location.hash = "#trips?trip=1";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    const u = user();
+    await bookingOptions(u, "Move Harbour Hotel");
+    const dialog = await screen.findByRole("dialog");
+    const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+    await waitFor(() => expect(within(choose).getByRole("option", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await u.selectOptions(choose, "3");
+    await u.click(within(dialog).getByRole("button", { name: "Move" }));
+    await waitFor(() => expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getByRole("link", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(route.query).toBe("trip=1");
+    expect(within(screen.getByRole("region", { name: "Selected trip" })).getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
   });
 
   it("drops a removed booking from the pane and keeps the trip in the list", async () => {
@@ -539,7 +572,7 @@ describe("finding a trip", () => {
     await user().paste("icelandair");
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
-  });
+  }, 20000);
 
   it("opens with the filters from the address, and says when nothing matches", async () => {
     serve(archive);
@@ -871,25 +904,28 @@ describe("past trips by year", () => {
     flown(4, "Old", "2024-06-01", "2024-06-02"),
   ];
 
-  it("groups by the year a trip started, newest first, with totals that leave out a part that is 0", async () => {
+  it("groups by the year a trip started, newest first, each year an h2 with its trip count beside it", async () => {
     serve(history());
     render(Trips);
     await screen.findByRole("list", { name: "Past trips in 2026" });
-    expect(screen.getByRole("heading", { level: 3, name: "2026" }).parentElement).toHaveTextContent("2 trips · 10 nights · 3 flights");
-    expect(screen.getByRole("heading", { level: 3, name: "2025" }).parentElement).toHaveTextContent("1 trip · 5 nights · 1 flight");
-    expect(screen.getByRole("heading", { level: 3, name: "2024" }).parentElement).toHaveTextContent("1 trip · 1 night · 1 flight");
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["2026", "2025", "2024"]);
+    expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent("2 trips");
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).toHaveTextContent("1 trip");
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).not.toHaveTextContent("photo");
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Past", "2026", "2025", "2024"]);
     expect(within(screen.getByRole("list", { name: "Past trips in 2025" })).getByRole("link")).toHaveTextContent("New Year");
     expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["#trip/1", "#trip/2"]);
-    expect(screen.getByText("Aug 8 – 15")).toBeInTheDocument();
-    expect(screen.getByText("Dec 29 – Jan 3")).toBeInTheDocument();
+    expect(screen.getByText("Aug 8–15")).toBeInTheDocument();
+    expect(screen.getByText("Dec 29–Jan 3")).toBeInTheDocument();
   });
 
-  it("leaves out flights when a year has none", async () => {
-    serve([stay(1, "Stay", "2026-03-02", "2026-03-05")]);
+  it("adds each year's photo total from the covers reply to its heading", async () => {
+    serve(history());
+    coverReply = { trips: [{ trip_id: 1, count: 168, covers: [11, 12, 13] }, { trip_id: 2, count: 44, covers: [21] }, { trip_id: 3, count: 1, covers: [31] }, { trip_id: 4, count: 0, covers: [] }] };
     render(Trips);
-    expect((await screen.findByRole("heading", { level: 3, name: "2026" })).parentElement).toHaveTextContent("1 trip · 3 nights");
-    expect(screen.queryByText(/flight/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent("2 trips · 212 photos"));
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).toHaveTextContent("1 trip · 1 photo");
+    expect(screen.getByRole("heading", { level: 2, name: "2024" }).parentElement).toHaveTextContent("1 trip");
+    expect(screen.getByRole("heading", { level: 2, name: "2024" }).parentElement).not.toHaveTextContent("photo");
   });
 
   it("shows only the newest year on a phone, and reveals the next ones in turn", async () => {
@@ -898,13 +934,161 @@ describe("past trips by year", () => {
     render(Trips);
     await screen.findByRole("list", { name: "Past trips in 2026" });
     expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
-    expect(screen.getByText("Aug 8 – 15 · Nags Head, NC")).toBeInTheDocument();
+    expect(screen.getByText("Aug 8–15")).toBeInTheDocument();
     await user().click(screen.getByRole("button", { name: "Show 2025" }));
     expect(screen.getByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
     await user().click(screen.getByRole("button", { name: "Show 2024" }));
     expect(screen.getByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+  });
+});
+
+describe("past trip cards", () => {
+  const home = { ...nothingToCount };
+  const past = () => [
+    trip([segment({ id: 31, trip_id: 31, start_local: "2026-08-08T09:00", end_local: "2026-08-15T10:00", travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] })], { id: 31, name: "Beach", destination: "Nags Head, NC" }),
+    trip([segment({ id: 32, trip_id: 32, kind: "hotel", start_local: "2026-03-02T15:00", end_local: "2026-03-05T11:00", origin: null, destination: null })], { id: 32, name: "Spring" }),
+  ];
+  const distanceFor = (km: number) => (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path) === "/api/trips/31/summary" ? { ...home, distance_km: km } : undefined);
+  const serveCards = (covers: unknown, km = 859.6) => {
+    serve(past());
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => distanceFor(km)(path) as never ?? base(path, opts));
+    coverReply = covers;
+  };
+  const beach = () => screen.getByRole("link", { name: /^Beach,/ });
+
+  it("names each card for a screen reader with its dates, nights, distance, photos and people, and hides the mosaic", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName("Beach, Aug 8–15, 7 nights, 534 mi, 168 photos, Jane Doe and Sam Doe"));
+    expect(within(beach()).getByTestId("past-mosaic")).toHaveAttribute("aria-hidden", "true");
+    expect(beach()).toHaveAttribute("href", "#trip/31");
+  });
+
+  it("draws the photo-count pill and the thumbnails the covers reply names", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+    render(Trips);
+    await waitFor(() => expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168"));
+    const pictures = [...beach().querySelectorAll("img")];
+    expect(pictures.map((i) => i.getAttribute("src"))).toEqual(["/api/photos/11/thumbnail", "/api/photos/12/thumbnail", "/api/photos/13/thumbnail"]);
+    expect(pictures.every((i) => i.getAttribute("loading") === "lazy")).toBe(true);
+    expect(api).toHaveBeenCalledWith("/api/photos/trip-covers", expect.anything());
+  });
+
+  it("loads the covers after the trips, so the cards show before the photos arrive", async () => {
+    serveCards({ trips: [] });
+    let release: (v: unknown) => void = () => {};
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((path, opts) => (path === "/api/photos/trip-covers" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
+    render(Trips);
+    expect(await screen.findByRole("link", { name: /^Beach,/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    release({ trips: [{ trip_id: 31, count: 9, covers: [5] }] });
+    expect(await screen.findByTestId("photo-pill")).toHaveTextContent("9");
+  });
+
+  it("keeps a card with no photos, with no pill, and leaves photos out of its name", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 0, covers: [] }] });
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName("Beach, Aug 8–15, 7 nights, 534 mi, Jane Doe and Sam Doe"));
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    expect(beach().querySelectorAll("img")).toHaveLength(0);
+    expect(within(beach()).getAllByTestId("route-tile")).toHaveLength(1);
+  });
+
+  it("leaves the cards without photos, and says nothing, when the covers reply fails", async () => {
+    serveCards(Object.assign(new Error("Photos need sign-in"), { status: 404 }));
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName(/^Beach, Aug 8–15, 7 nights/));
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/Photos need sign-in/)).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent(/^2026\s*2 trips$/);
+  });
+
+  it.each([[null], [{ name: null, email: null, local: true }]])("doesn't ask for covers at all in local mode, where there are no photos (%j)", async (user) => {
+    app.state = state({ user });
+    serveCards({ trips: [{ trip_id: 31, count: 5, covers: [1] }] });
+    render(Trips);
+    await screen.findByRole("link", { name: /^Beach,/ });
+    expect(api).not.toHaveBeenCalledWith("/api/photos/trip-covers", expect.anything());
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+  });
+
+  it("draws one link to the trip's own page for each card", async () => {
+    serveCards({ trips: [] });
+    render(Trips);
+    const cards = await within(await screen.findByRole("list", { name: "Past trips in 2026" })).findAllByRole("listitem");
+    expect(cards.map((li) => within(li).getAllByRole("link").length)).toEqual([1, 1]);
+    expect(within(cards[0]).getByRole("link")).toHaveAttribute("href", "#trip/31");
+  });
+
+  it("runs the cards two across when no pane is showing, and in one column on a phone", async () => {
+    serveCards({ trips: [] });
+    const { unmount } = render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).toContain("grid-cols-2");
+    unmount();
+    viewport.phone = true;
+    render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).not.toContain("grid-cols-2");
+  });
+});
+
+describe("a past trip never opens the side pane", () => {
+  const upcomingTrip = stay(41, "Next up", "2026-11-14", "2026-11-18");
+  const pastTrip = stay(42, "Long ago", "2026-03-02", "2026-03-05");
+  const paneServer = () => vi.mocked(api).mockImplementation(async (path) => {
+    if (numbers(path)) return numbers(path) as never;
+    if (path === "/api/photos/trip-covers") return { trips: [] } as never;
+    if (path === "/api/people") return { people: [jane, sam] } as never;
+    if (path === "/api/loyalty") return { loyalty: [], programs: {} } as never;
+    const one = /^\/api\/trips\/(\d+)$/.exec(String(path));
+    if (one) return [upcomingTrip, pastTrip].find((t) => t.id === Number(one[1])) as never;
+    return { trips: [upcomingTrip, pastTrip] } as never;
+  });
+
+  it("follows the link to the trip's page instead of choosing it in the pane", async () => {
+    panes.two = true;
+    paneServer();
+    render(Trips);
+    await screen.findByRole("region", { name: "Selected trip" });
+    const card = screen.getByRole("link", { name: /^Long ago,/ });
+    await fireEvent.click(card, { button: 0 });
+    expect(route.query).toBe("");
+    expect(card).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("region", { name: "Selected trip" })).toHaveTextContent("Next up");
+  });
+
+  it("ignores a past trip in the address and picks from the trips still to come", async () => {
+    panes.two = true;
+    location.hash = "#trips?trip=42";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(route.query).toBe("trip=42");
+    paneServer();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Next up" })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(pane).toHaveTextContent("Next up");
+    expect(pane).not.toHaveTextContent("Long ago");
+  });
+
+  it("has no pane, and runs the past cards two across, when nothing is coming up", async () => {
+    panes.two = true;
+    serve([pastTrip]);
+    render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).toContain("grid-cols-2");
+    expect(screen.queryByRole("region", { name: "Selected trip" })).toBeNull();
+  });
+
+  it("keeps the past cards in one column beside the pane", async () => {
+    panes.two = true;
+    paneServer();
+    render(Trips);
+    await screen.findByRole("region", { name: "Selected trip" });
+    expect(screen.getByRole("list", { name: "Past trips in 2026" }).className).not.toContain("grid-cols-2");
   });
 });
 

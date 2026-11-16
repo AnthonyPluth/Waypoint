@@ -4,14 +4,18 @@
   import { Button } from "$lib/components/ui/button";
   import OfflineTrip from "$lib/components/OfflineTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
+  import { ignoreFailure } from "$lib/act";
   import { clearSaved, expiryOf, isSavedCopy, WHEN_SAVED, type SavedCopy } from "$lib/offline";
   import { offline, refreshOffline } from "$lib/offline.svelte";
+  import { inShell, shellLoad } from "$lib/offline-shell";
   import { onLock } from "$lib/offline-vault";
   import { onMount } from "svelte";
 
   let copies = $state<SavedCopy[]>([]);
   let chosen = $state<number | null>(null);
-  onMount(refreshOffline);
+  const shell = inShell();
+  let loading = $state(shell);
+  onMount(() => (shell ? void openFromShell() : void refreshOffline()));
   $effect(() => onLock(() => { copies = []; chosen = null; }));
 
   const savedTripPage = $derived(route.page === "upcoming" || route.page === "trip");
@@ -30,9 +34,52 @@
     copies = kept;
     chosen = null;
   }
+
+  async function openFromShell() {
+    loading = true;
+    try {
+      await refreshOffline();
+      if (offline.hasCopy) await opened(await shellLoad());
+    } catch {
+      copies = [];
+      offline.damaged = true;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function recheckShellCopies() {
+    if (!shell || copies.length === 0) return;
+    const live = copies.filter((c) => { const expires = expiryOf(c); return expires === null || Date.now() < expires; });
+    if (live.length === copies.length) return;
+    if (live.length === 0) {
+      await clearSaved().catch(ignoreFailure);
+      await refreshOffline();
+      copies = [];
+      chosen = null;
+      return;
+    }
+    copies = live;
+    chosen = null;
+    try { await opened(await shellLoad()); } catch { copies = live; }
+  }
+
+  $effect(() => {
+    if (!shell || copies.length === 0) return;
+    const expiries = copies.map(expiryOf).filter((at): at is number => at !== null);
+    const timer = expiries.length ? setTimeout(() => void recheckShellCopies(), Math.min(Math.max(0, Math.min(...expiries) - Date.now()), 2 ** 31 - 1)) : null;
+    const foreground = () => { if (document.visibilityState !== "hidden") void recheckShellCopies(); };
+    document.addEventListener("visibilitychange", foreground);
+    window.addEventListener("focus", foreground);
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", foreground);
+      window.removeEventListener("focus", foreground);
+    };
+  });
 </script>
 
-{#if !offline.checked}
+{#if !offline.checked || loading}
   <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if !savedTripPage}
   <Card.Root class="mx-auto mt-10 max-w-md" data-testid="needs-connection">
@@ -60,6 +107,17 @@
       {#each copies as c (c.trip.id)}
         <Button variant="outline" class="h-auto justify-start whitespace-normal text-left" href={wanted === null ? undefined : `#trip/${c.trip.id}`} onclick={() => (chosen = c.trip.id)}>{c.trip.name}</Button>
       {/each}
+    </Card.Content>
+  </Card.Root>
+{:else if shell && (offline.hasCopy || offline.damaged)}
+  <Card.Root class="mx-auto mt-10 max-w-md" data-testid="shell-unreadable">
+    <Card.Header>
+      <Card.Title>The saved trips can’t be opened</Card.Title>
+      <Card.Description>Something went wrong reading them from this device.</Card.Description>
+    </Card.Header>
+    <Card.Content class="flex gap-2">
+      <Button onclick={openFromShell}>Try again</Button>
+      <Button variant="outline" onclick={boot}>Reconnect</Button>
     </Card.Content>
   </Card.Root>
 {:else if offline.hasCopy}

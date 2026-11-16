@@ -1,6 +1,6 @@
-import type { Person, PhotoCluster, Segment, Trip, TripPhoto } from "./api-types";
+import type { Person, PhotoCluster, Segment, Trip, TripPhoto, TripPhotos } from "./api-types";
 import { datesOf } from "./route-replay";
-import { clock, daysBetween, headline } from "./trips";
+import { clock, dayLabel, daysBetween, headline } from "./trips";
 
 export type PhotoDay = { day: string; photos: TripPhoto[] };
 
@@ -143,3 +143,63 @@ export const firstOfCluster = (photos: TripPhoto[], index: number): TripPhoto | 
   photos.filter((p) => p.cluster === index).sort((a, b) => a.taken_local.localeCompare(b.taken_local) || a.id - b.id)[0] ?? null;
 
 export const unlocated = (photos: TripPhoto[]): number => photos.filter((p) => p.cluster === null).length;
+
+export const HERO_PHOTOS = 3;
+export const DAY_PHOTOS = 6;
+export const FIRST_DAYS = 3;
+
+export type HeroPhotos = Pick<TripPhotos, "photos" | "best">;
+
+export function heroOf(reply: HeroPhotos | null): number[] {
+  if (!reply) return [];
+  const seen = new Set(reply.photos.map((p) => p.id));
+  const ids = [...new Set(reply.best)].filter((id) => seen.has(id)).slice(0, HERO_PHOTOS);
+  return ids.length === HERO_PHOTOS ? ids : [];
+}
+
+export const hasGps = (p: Pick<TripPhoto, "latitude" | "longitude" | "location_source">): boolean => p.latitude !== null && p.longitude !== null && !isInferred(p);
+
+const inTime = (a: TripPhoto, b: TripPhoto): number => a.taken_local.localeCompare(b.taken_local) || a.id - b.id;
+
+export function dayCover(photos: TripPhoto[]): TripPhoto | null {
+  const sorted = photos.slice().sort(inTime);
+  return sorted.find(hasGps) ?? sorted[0] ?? null;
+}
+
+export function leadWithCover(photos: TripPhoto[]): TripPhoto[] {
+  const sorted = photos.slice().sort(inTime);
+  const cover = dayCover(sorted);
+  return cover ? [cover, ...sorted.filter((p) => p.id !== cover.id)] : [];
+}
+
+export function dayPlace(photos: TripPhoto[], segments: Map<number, Segment>): string {
+  const tally = new Map<string, number>();
+  for (const p of photos.slice().sort(inTime)) {
+    if (isFar(p)) continue;
+    const place = placeOf(p, p.segment_id === null ? undefined : segments.get(p.segment_id));
+    if (place) tally.set(place, (tally.get(place) ?? 0) + 1);
+  }
+  return [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
+
+export type PastDay = { day: string; label: string; place: string; photos: TripPhoto[]; shown: TripPhoto[]; more: number };
+
+export const dayWords = (day: string): string => dayLabel(`${day}T00:00`, false).replace(/^([^,]+),\s*/, "$1 ");
+
+export function pastDays(photos: TripPhoto[], leftOut: ReadonlySet<number>, segments: Map<number, Segment>): PastDay[] {
+  return byDay(photos.filter((p) => !leftOut.has(p.id))).map(({ day, photos: list }) => {
+    const ordered = leadWithCover(list);
+    return { day, label: dayWords(day), place: dayPlace(list, segments), photos: ordered, shown: ordered.slice(0, DAY_PHOTOS), more: Math.max(0, ordered.length - DAY_PHOTOS) };
+  });
+}
+
+export const dayPhotoCount = (day: Pick<PastDay, "photos">): string => noun(day.photos.length);
+
+export function dayTileName(day: Pick<PastDay, "label" | "place" | "more">, n: number, last: boolean, p?: Pick<TripPhoto, "kind" | "match" | "location_source">): string {
+  const word = p?.kind === "video" ? "Video" : "Photo";
+  const lead = last && day.more > 0 ? `${word} ${n} and ${day.more} more` : `${word} ${n}`;
+  const notes = p ? [isFar(p) ? "far from every booking" : "", isInferred(p) ? "place from the itinerary" : ""] : [];
+  return [lead, day.label, day.place, ...notes].filter(Boolean).join(", ");
+}
+
+export const heroCaption = (trip: Pick<Trip, "destination">, dates: string): string => [dates, trip.destination].filter(Boolean).join(" · ");

@@ -20,7 +20,9 @@ final class ShellViewController: CAPBridgeViewController {
         configuration.userContentController.add(UnauthorizedHandler(), name: UnauthorizedReport.handlerName)
         configuration.userContentController.addUserScript(
             WKUserScript(source: UnauthorizedReport.script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        return super.webView(with: frame, configuration: configuration)
+        let webView = super.webView(with: frame, configuration: configuration)
+        webView.allowsBackForwardNavigationGestures = true
+        return webView
     }
 }
 

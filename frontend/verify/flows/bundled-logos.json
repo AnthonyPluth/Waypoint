@@ -2,10 +2,10 @@
   "name": "bundled-logos",
   "page": "trips",
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
-    { "wait_for": "ul[aria-label='Bookings']" },
-    { "wait_for": "ul[aria-label='Bookings'] img[src*='/logo']" },
-    { "screenshot": "included" }
+    {"expect_text": {"selector": "h1", "text": "Trips"}},
+    {"click": "a[href^='#trip/']:has-text('London') >> visible=true"},
+    {"wait_for": "ul[aria-label='Bookings']"},
+    {"wait_for": "ul[aria-label='Bookings'] img[src*='/logo']"},
+    {"screenshot": "included"}
   ]
 }
