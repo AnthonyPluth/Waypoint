@@ -347,6 +347,13 @@ describe("changing a trip in the pane", () => {
         store = store.map((t) => ({ ...t, segments: t.segments.filter((s) => s.id !== Number(gone[1])) })).filter((t) => t.segments.length);
         return { ok: true };
       }
+      const moving = /^\/api\/segments\/(\d+)\/move$/.exec(String(path));
+      if (moving && opts?.method === "POST") {
+        const into = (opts.body as { trip_id: number }).trip_id;
+        const mover = store.flatMap((t) => t.segments).find((sg) => sg.id === Number(moving[1]))!;
+        store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((sg) => sg.id !== mover.id) } : t.id === into ? { ...t, segments: [...t.segments, { ...mover, trip_id: into }] } : t));
+        return store.find((t) => t.id === into);
+      }
       if (gone && opts?.method === "POST") {
         const moved = segment({ ...second, trip_id: 2 });
         store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((s) => s.id !== 4) } : t.id === 2 ? { ...t, segments: [...t.segments, moved] } : t));
@@ -377,6 +384,21 @@ describe("changing a trip in the pane", () => {
     await waitFor(() => expect(within(upcoming).getByText("Lisbon")).toBeInTheDocument());
     expect(within(upcoming).queryByText("Trip to London")).toBeNull();
     expect(await within(pane).findByRole("heading", { level: 1, name: "Lisbon" })).toBeInTheDocument();
+  });
+
+  it("opens a past trip's own page when a booking is moved into it, instead of showing another trip in the pane", async () => {
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    const u = user();
+    await bookingOptions(u, "Move Harbour Hotel");
+    const dialog = await screen.findByRole("dialog");
+    const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+    await waitFor(() => expect(within(choose).getByRole("option", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await u.selectOptions(choose, "3");
+    await u.click(within(dialog).getByRole("button", { name: "Move" }));
+    await waitFor(() => expect(location.hash).toBe("#trip/3"));
+    expect(route.query).not.toContain("trip=3");
   });
 
   it("drops a removed booking from the pane and keeps the trip in the list", async () => {
