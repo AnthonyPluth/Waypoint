@@ -130,8 +130,6 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       add(returnsToEmbarkation ?? city(s.destination), s.end_local, s.end_local, "cruise");
     }
   }
-  // A rental car is how you get around, not somewhere you are: held over days it would stretch the airport it is
-  // collected at (or any stop it sits beside) to cover them all. It is a stop only at a place nothing else in the trip visits.
   return out.filter((v) => !v.rental || !out.some((o) => !o.rental && samePlace(v, o)));
 }
 
