@@ -52,8 +52,6 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1   # v7.1.0
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: ios/package-lock.json
       - name: Install the packages
         working-directory: ios
         run: npm ci --no-audit --no-fund
@@ -76,14 +74,17 @@ jobs:
           security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
           security import "$RUNNER_TEMP/dist.p12" -k "$keychain" -P "$IOS_DIST_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/dist.p12"
           security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
           security list-keychains -d user -s "$keychain" login.keychain-db
           echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/profile.mobileprovision"
           security cms -D -i "$RUNNER_TEMP/profile.mobileprovision" > "$RUNNER_TEMP/profile.plist"
           profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$RUNNER_TEMP/profile.plist")
           profile_name=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/profile.plist")
+          rm -f "$RUNNER_TEMP/profile.plist"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
+          rm -f "$RUNNER_TEMP/profile.mobileprovision"
           echo "PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
       - name: Archive the app
         working-directory: ios
@@ -144,6 +145,7 @@ jobs:
       - name: Delete the keychain, profile and keys
         if: always()
         run: |
+          # Backstop: the certificate and profile files are already deleted after import; -f tolerates that.
           security delete-keychain "$RUNNER_TEMP/waypoint-signing.keychain-db" || true
           rm -rf "$HOME/.appstoreconnect/private_keys" \
             "$HOME/Library/MobileDevice/Provisioning Profiles" \
