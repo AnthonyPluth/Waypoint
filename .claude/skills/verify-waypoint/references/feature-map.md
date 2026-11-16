@@ -375,7 +375,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`, `Close`.
+- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`.
 - **Expects to see:** `Trips`, `5 photos`, `Day 1`.
 - **Drive it:** `tools/control flow trip-photo-pins`; or `poetry run python run.py verify --flow trip-photo-pins`.
 
@@ -862,6 +862,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Widths:** phone, desktop.
 - **Expects to see:** `Mail & review`.
 - **Drive it:** `tools/control flow share-mailbox`; or `poetry run python run.py verify --flow share-mailbox`.
+
+#### `tab-bar-contrast`
+
+- **Starts at:** `#settings`; goes to: `#settings/offline`.
+- **Widths:** phone.
+- **Drive it:** `tools/control flow tab-bar-contrast`; or `poetry run python run.py verify --flow tab-bar-contrast`.
 
 ## design (`design`)
 

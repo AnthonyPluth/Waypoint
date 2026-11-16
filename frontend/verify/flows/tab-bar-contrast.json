@@ -1,0 +1,11 @@
+{
+  "name": "tab-bar-contrast",
+  "page": "settings",
+  "viewports": ["phone"],
+  "steps": [
+    { "goto": "#settings/offline" },
+    { "wait_for": "button:has-text('Make my calendar') >> visible=true" },
+    { "scroll_under_bar": "button:has-text('Make my calendar') >> visible=true" },
+    { "audit": true }
+  ]
+}
