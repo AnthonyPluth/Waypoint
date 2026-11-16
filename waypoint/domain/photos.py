@@ -13,7 +13,8 @@ from datetime import UTC, datetime, time as clock
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing import Literal, NotRequired, TypedDict, cast
 
-from sqlalchemy import ColumnElement, and_, delete, false, or_, select
+from sqlalchemy import ColumnElement, and_, case, delete, false, or_, select
+from sqlalchemy.orm import aliased
 
 from ..storage import db, geocode, photo_sources
 from ..storage.models import Airport, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, Segment, Trip, TripPerson
@@ -294,26 +295,13 @@ def lock_grants(conn: db.Connection, person_id: int, trip_ids: Iterable[int]) ->
     return {r.trip_id: r for r in rows}
 
 
-def canonical_ids(conn: db.Connection, keys: Iterable[tuple[int, str]]) -> set[int]:
-    wanted = set(keys)
-    if not wanted:
-        return set()
-    q = select(Photo.id, Photo.source_id, Photo.asset_id, PhotoSource.person_id, PhotoSource.status).join(PhotoSource, PhotoSource.id == Photo.source_id) \
-        .where(PhotoSource.person_id.in_(sorted({p for p, _ in wanted})), Photo.asset_id.in_(sorted({a for _, a in wanted})))
-    best: dict[tuple[int, str], tuple[tuple[bool, int, int], int]] = {}
-    for photo_id, source_id, asset_id, person, status in conn.execute(q).fetchall():
-        key = (person, asset_id)
-        if key not in wanted:
-            continue
-        rank = (status != "ok", source_id, photo_id)
-        if key not in best or rank < best[key][0]:
-            best[key] = (rank, photo_id)
-    return {photo_id for _, photo_id in best.values()}
-
-
-def _canonical(conn: db.Connection, rows: Sequence[Found]) -> list[Found]:
-    keep = canonical_ids(conn, {(person, photo.asset_id) for photo, person in rows})
-    return [(photo, person) for photo, person in rows if photo.id in keep]
+def _canonical_row() -> ColumnElement[bool]:
+    twin = aliased(Photo)
+    twin_source = aliased(PhotoSource)
+    twin_flag = case((twin_source.status == "ok", 0), else_=1)
+    my_flag = case((PhotoSource.status == "ok", 0), else_=1)
+    outranks = or_(twin_flag < my_flag, and_(twin_flag == my_flag, or_(twin.source_id < Photo.source_id, and_(twin.source_id == Photo.source_id, twin.id < Photo.id))))
+    return ~select(twin.id).join(twin_source, twin_source.id == twin.source_id).where(twin_source.person_id == PhotoSource.person_id, twin.asset_id == Photo.asset_id, outranks).exists()
 
 
 def _home_zone(conn: db.Connection) -> ZoneInfo:
@@ -383,8 +371,8 @@ def visible(conn: db.Connection, viewer: Viewer) -> ColumnElement[bool]:
 
 def _query(conn: db.Connection, viewer: Viewer, *where: ColumnElement[bool]) -> list[Found]:
     q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).join(Trip, Trip.id == Photo.trip_id) \
-        .where(visible(conn, viewer), *where)
-    return _canonical(conn, sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
+        .where(visible(conn, viewer), _canonical_row(), *where)
+    return sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id))
 
 
 def visible_rows(conn: db.Connection, viewer: Viewer, trip_id: int | None = None) -> list[Found]:
@@ -500,8 +488,8 @@ def photo_out(photo: Photo, person_id: int, placed: Mapping[int, Sequence[Segmen
 
 
 def _rows(conn: db.Connection, *where: ColumnElement[bool]) -> list[Found]:
-    q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).where(*where)
-    return _canonical(conn, sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id)))
+    q = select(Photo, PhotoSource.person_id).join(PhotoSource, PhotoSource.id == Photo.source_id).where(_canonical_row(), *where)
+    return sorted(((photo, person) for photo, person in conn.orm.execute(q).all()), key=lambda found: (instant(found[0].taken_utc), found[0].id))
 
 
 def _wrapped(longitude: float) -> float:
@@ -676,37 +664,29 @@ def clusters(rows: Sequence[TripPhoto]) -> list[PhotoCluster]:
              "last": rows[c.last_at]["taken_local"], "cover": rows[c.first_at]["id"], "inferred": c.inferred} for c in found]
 
 
-def _unclustered_order(photo: TripPhoto) -> tuple[str, int]:
-    return photo["taken_local"], photo["id"]
-
-
-def _within_cluster(photo: TripPhoto) -> tuple[bool, str, int]:
-    return photo["latitude"] is None, photo["taken_local"], photo["id"]
-
-
 def best_photos(photos: Sequence[TripPhoto], found: Sequence[PhotoCluster], limit: int) -> list[int]:
-    members: dict[int, list[TripPhoto]] = {}
-    loose: list[TripPhoto] = []
-    for photo in photos:
+    members: dict[int, list[int]] = {}
+    loose: list[int] = []
+    for index, photo in enumerate(photos):
         if photo["kind"] != "image":
             continue
         number = photo["cluster"]
         if number is None or not 0 <= number < len(found):
-            loose.append(photo)
+            loose.append(index)
         else:
-            members.setdefault(number, []).append(photo)
-    queues: list[deque[TripPhoto]] = []
-    for number in sorted(range(len(found)), key=lambda n: (-found[n]["count"], found[n]["first"], n)):
-        pool = sorted(members.get(number, ()), key=_within_cluster)
-        pool.sort(key=lambda photo: photo["id"] != found[number]["cover"])
+            members.setdefault(number, []).append(index)
+    queues: list[deque[int]] = []
+    for number in sorted(range(len(found)), key=lambda n: (-found[n]["count"], n)):
+        pool = sorted(members.get(number, ()), key=lambda index: (photos[index]["latitude"] is None, index))
+        pool.sort(key=lambda index: photos[index]["id"] != found[number]["cover"])
         queues.append(deque(pool))
     chosen: list[int] = []
     while len(chosen) < limit and any(queues):
         for queue in queues:
             if queue and len(chosen) < limit:
-                chosen.append(queue.popleft()["id"])
+                chosen.append(queue.popleft())
     room = max(limit - len(chosen), 0)
-    return chosen + [photo["id"] for photo in sorted(loose, key=_unclustered_order)[:room]]
+    return [photos[index]["id"] for index in chosen + loose[:room]]
 
 
 def for_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripPhotos | None:

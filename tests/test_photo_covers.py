@@ -47,7 +47,7 @@ class BestPhotosTests(unittest.TestCase):
         self.assertEqual(best(rows, 1), [2])
 
     def test_clusters_of_one_size_go_by_which_began_first(self):
-        rows = [shot(1, "2026-06-03T09:00", SOHO), shot(2, "2026-06-01T09:00", ROME), shot(3, "2026-06-02T09:00", TOKYO)]
+        rows = [shot(2, "2026-06-01T09:00", ROME), shot(3, "2026-06-02T09:00", TOKYO), shot(1, "2026-06-03T09:00", SOHO)]
         self.assertEqual(best(rows, 3), [2, 3, 1])
 
     def test_fewer_clusters_than_the_limit_take_more_photos_one_per_cluster_per_round(self):
@@ -57,12 +57,12 @@ class BestPhotosTests(unittest.TestCase):
         self.assertEqual(best(rows, 7), [1, 4, 2, 5, 3])
 
     def test_photos_in_no_cluster_come_last_oldest_first(self):
-        rows = [shot(1, "2026-06-03T09:00"), shot(2, "2026-06-01T09:00"), shot(3, "2026-06-02T09:00", ROME), shot(4, "2026-06-02T10:00")]
+        rows = [shot(2, "2026-06-01T09:00"), shot(3, "2026-06-02T09:00", ROME), shot(4, "2026-06-02T10:00"), shot(1, "2026-06-03T09:00")]
         self.assertEqual(best(rows, 7), [3, 2, 4, 1])
         self.assertEqual(best(rows, 2), [3, 2])
 
     def test_a_trip_with_no_clusters_takes_its_photos_oldest_first(self):
-        rows = [shot(3, "2026-06-03T09:00"), shot(1, "2026-06-01T09:00"), shot(2, "2026-06-02T09:00")]
+        rows = [shot(1, "2026-06-01T09:00"), shot(2, "2026-06-02T09:00"), shot(3, "2026-06-03T09:00")]
         self.assertEqual(best(rows, 2), [1, 2])
 
     def test_videos_are_never_chosen(self):
@@ -76,11 +76,28 @@ class BestPhotosTests(unittest.TestCase):
         self.assertEqual(best(rows, 2), [2, 3])
 
     def test_the_first_few_never_change_with_the_limit(self):
-        rows = [shot(n, f"2026-06-0{1 + n % 5}T{9 + n % 7:02d}:00", (ROME, SOHO, TOKYO, None)[n % 4]) for n in range(1, 30)]
+        rows = sorted((shot(n, f"2026-06-0{1 + n % 5}T{9 + n % 7:02d}:00", (ROME, SOHO, TOKYO, None)[n % 4]) for n in range(1, 30)), key=lambda row: (row["taken_local"], row["id"]))
         everything = best(rows, 29)
         self.assertEqual(len(set(everything)), len(everything))
         for limit in range(1, 10):
             self.assertEqual(best(rows, limit), everything[:limit])
+
+    def test_unplaced_photos_follow_the_instant_order_not_the_wall_clock_across_zones(self):
+        rows = [shot(1, "2026-06-02T07:00"), shot(2, "2026-06-02T01:00")]
+        self.assertGreater(rows[0]["taken_local"], rows[1]["taken_local"])
+        self.assertEqual(best(rows, 7), [1, 2])
+        self.assertEqual(best(rows, 1), [1])
+
+    def test_clusters_of_one_size_go_by_the_instant_they_began_not_the_wall_clock_across_zones(self):
+        rows = [shot(1, "2026-06-02T07:00", TOKYO), shot(2, "2026-06-02T01:00", ROME)]
+        self.assertGreater(rows[0]["taken_local"], rows[1]["taken_local"])
+        self.assertEqual(best(rows, 2), [1, 2])
+        self.assertEqual(best(rows, 1), [1])
+
+    def test_photos_inside_a_cluster_follow_the_instant_order_not_the_wall_clock_across_zones(self):
+        rows = [shot(1, "2026-06-02T07:00", ROME), shot(2, "2026-06-02T07:05", ROME), shot(3, "2026-06-02T01:00", ROME)]
+        rows[0]["zone"], rows[1]["zone"], rows[2]["zone"] = "+09:00", "+09:00", "+02:00"
+        self.assertEqual(best(rows, 3), [1, 2, 3])
 
     def test_a_photo_naming_a_cluster_that_is_not_there_counts_as_in_none(self):
         rows = [shot(1, "2026-06-01T09:00")]
@@ -273,12 +290,15 @@ class CoverQueryTests(CoverCase):
                 for n in range(4):
                     conn.orm.add(photo_row(self.sources["ben"], trip.id, f"2025-01-0{1 + n}T10:00", where=(SOHO, ROME)[n % 2]))
 
+    widest = 0
+
     def statements(self, who):
         seen: list[str] = []
         engine = db.engine()
 
-        def count(conn, cursor, statement, *rest):
+        def count(conn, cursor, statement, parameters, *rest):
             seen.append(statement)
+            self.widest = max(self.widest, len(parameters))
 
         event.listen(engine, "before_cursor_execute", count)
         try:
@@ -299,6 +319,11 @@ class CoverQueryTests(CoverCase):
         self.assertEqual(len([t for t in large["trips"] if t["count"]]), 30)
         self.assertTrue(all(len(t["covers"]) == 3 and t["count"] == 4 for t in large["trips"] if t["count"]))
         self.assertEqual(few, many)
+
+    def test_no_statement_binds_a_parameter_for_each_photo_or_asset(self):
+        self.trips_of(30)
+        self.statements("ana")
+        self.assertLess(self.widest, 100)
 
 
 class CoverHouseholdTests(Household):
