@@ -26,6 +26,7 @@ from waypoint.domain.visibility import Viewer
 from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
+from waypoint.server.api import driving_routes as driving_routes_api
 from waypoint.server.api import home as home_api
 from waypoint.server.api import mcp as mcp_api
 from waypoint.server.api import review as review_api
@@ -434,6 +435,12 @@ class Replies(DbCase):
         self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
         self.check("GET /api/trips/{id}/places", trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"])))
         self.check("GET /api/trips/{id}/summary", trips_api.api_trip_summary(self.c, {}, {}, str(seg["trip_id"])))
+        first, second = trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"]))["airports"][:2]
+        start, end = ({"latitude": p["latitude"], "longitude": p["longitude"]} for p in (first, second))
+        self.check("PUT /api/trips/{id}/driving-routes", driving_routes_api.api_driving_route_store(
+            self.c, {}, {"start": start, "end": end, "path": [[start["latitude"], start["longitude"]], [end["latitude"], end["longitude"]]]}, str(seg["trip_id"])))
+        self.check("GET /api/trips/{id}/driving-routes", driving_routes_api.api_driving_routes(
+            self.c, {"drive": [f"{start['latitude']},{start['longitude']},{end['latitude']},{end['longitude']}"]}, {}, str(seg["trip_id"])))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u9", address="jane@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m9", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
@@ -599,7 +606,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/summary", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/trips/{id}/summary", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

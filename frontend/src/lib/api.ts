@@ -10,7 +10,7 @@ export class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly data: Record<string, unknown> = {}) { super(message); }
 }
 
-export type Options = { method?: "GET" | "POST" | "DELETE"; body?: unknown; keep?: boolean; background?: boolean; failed?: string };
+export type Options = { method?: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown; keep?: boolean; background?: boolean; failed?: string };
 
 declare global {
   interface WindowEventMap { "waypoint:signed-out": CustomEvent<{ background: boolean }> }

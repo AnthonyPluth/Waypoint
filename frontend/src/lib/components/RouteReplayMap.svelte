@@ -15,7 +15,7 @@
   import X from "@lucide/svelte/icons/x";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, infos = [], unlocated = 0, onshow }: { stops: Stop[]; year: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; infos?: ClusterInfo[]; unlocated?: number; onshow?: (cluster: number) => void } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, infos = [], unlocated = 0, onshow, tripId }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; infos?: ClusterInfo[]; unlocated?: number; onshow?: (cluster: number) => void } = $props();
   const replayable = $derived(stops.length >= 2);
   const clusters = $derived(infos.map((i) => i.cluster));
   const away = $derived(new Set(infos.filter((i) => i.far > 0).map((i) => i.index)));
@@ -182,7 +182,7 @@
 <div class="space-y-3" role="presentation" onkeydown={dismiss}>
   <div bind:this={mapBox} bind:clientWidth={mapWidth} bind:clientHeight={mapHeight} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
     {#if onMapkit && maps}
-      <RouteReplayMapKit {maps} {stops} {roads} {boundaries} {width} {height} {progress} {playing} {calm} more={clusters} onview={showView} label={mapLabel} onfailure={() => { fellBack = true; }} />
+      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {boundaries} {width} {height} {progress} {playing} {calm} more={clusters} onview={showView} label={mapLabel} onfailure={() => { fellBack = true; }} />
     {:else}
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role="img" aria-label={mapLabel} class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />

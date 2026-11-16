@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, fakeMk, windingPath } from "../test/fake-mapkit";
-import { clearRouteCache, drivingRoute, parseRoute, ROUTE_PARALLEL } from "./driving-routes";
+import { apiCall } from "./contract";
+import { clearRouteCache, drivingRoute, drivingRoutes, parseRoute, ROUTE_PARALLEL, SERVER_MAX_DRIVES, SERVER_MAX_POINTS, thin } from "./driving-routes";
+
+vi.mock("./contract", () => ({ apiCall: vi.fn() }));
+const server = vi.mocked(apiCall);
 
 const from = { latitude: 39.74, longitude: -104.99 };
 const to = (n: number) => ({ latitude: 40 + n / 10, longitude: -111.89 });
@@ -10,6 +14,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   fake.reset();
   clearRouteCache();
+  server.mockReset();
+  server.mockResolvedValue({ routes: [] });
 });
 afterEach(() => { vi.useRealTimers(); });
 
@@ -73,5 +79,139 @@ describe("reading the answer", () => {
     const found = drivingRoute(fakeMk, from, to(0));
     await vi.advanceTimersByTimeAsync(20);
     expect(await found).toBeNull();
+  });
+});
+
+describe("the household's stored routes", () => {
+  const trip = 7;
+  const drive = (n: number) => ({ from, to: to(n) });
+  const stored = (n: number, path = road.map((c) => [c.latitude, c.longitude])) => ({ start: from, end: to(n), path });
+  const settle = () => vi.advanceTimersByTimeAsync(50);
+  const gets = () => server.mock.calls.filter(([, options]) => options?.method !== "PUT");
+  const puts = () => server.mock.calls.filter(([, options]) => options?.method === "PUT");
+
+  it("asks the server once for every drive, takes its paths, and asks MapKit for none", async () => {
+    server.mockResolvedValue({ routes: [stored(0), stored(1), stored(2)] });
+    const answers = drivingRoutes(fakeMk, trip, [drive(0), drive(1), drive(2)]);
+    await settle();
+    expect((await Promise.all(answers)).every((r) => r?.length === road.length)).toBe(true);
+    expect(gets()).toHaveLength(1);
+    expect(gets()[0][0]).toBe(`/api/trips/7/driving-routes?drive=39.7400,-104.9900,40.0000,-111.8900&drive=39.7400,-104.9900,40.1000,-111.8900&drive=39.7400,-104.9900,40.2000,-111.8900`);
+    expect(fake.directions.calls).toHaveLength(0);
+    expect(puts()).toHaveLength(0);
+  });
+
+  it("asks MapKit for a drive the server has not stored, then sends that path to the server once", async () => {
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    await settle();
+    const path = await answers[0];
+    expect(path).toEqual(road.map((c) => [c.latitude, c.longitude]));
+    expect(fake.directions.calls).toHaveLength(1);
+    expect(puts()).toHaveLength(1);
+    expect(puts()[0][0]).toBe("/api/trips/7/driving-routes");
+    expect(puts()[0][1]).toMatchObject({ method: "PUT", body: { start: { latitude: 39.74, longitude: -104.99 }, end: { latitude: 40, longitude: -111.89 }, path } });
+    const again = drivingRoutes(fakeMk, trip, [drive(0)])[0];
+    await settle();
+    await again;
+    expect(fake.directions.calls).toHaveLength(1);
+    expect(gets()).toHaveLength(1);
+    expect(puts()).toHaveLength(1);
+  });
+
+  it("only asks the server about what is missing, and only once per replay", async () => {
+    server.mockResolvedValue({ routes: [stored(0)] });
+    const first = Promise.all(drivingRoutes(fakeMk, trip, [drive(0), drive(1)]));
+    await settle();
+    await first;
+    expect(gets()).toHaveLength(1);
+    server.mockClear();
+    const again = Promise.all(drivingRoutes(fakeMk, trip, [drive(0), drive(1)]));
+    await settle();
+    await again;
+    expect(server).not.toHaveBeenCalled();
+    const more = Promise.all(drivingRoutes(fakeMk, trip, [drive(0), drive(1), drive(2)]));
+    await settle();
+    await more;
+    expect(gets()).toHaveLength(1);
+    expect(gets()[0][0]).toBe("/api/trips/7/driving-routes?drive=39.7400,-104.9900,40.2000,-111.8900");
+  });
+
+  it("does not ask the server when it has no trip to ask about", async () => {
+    const answers = drivingRoutes(fakeMk, null, [drive(0)]);
+    await settle();
+    expect(await answers[0]).not.toBeNull();
+    expect(server).not.toHaveBeenCalled();
+    expect(fake.directions.calls).toHaveLength(1);
+  });
+
+  it("asks MapKit exactly as before when the server cannot be reached", async () => {
+    server.mockRejectedValue(new Error("offline"));
+    const answers = drivingRoutes(fakeMk, trip, [drive(0), drive(1)]);
+    await settle();
+    expect((await Promise.all(answers)).every((r) => r !== null)).toBe(true);
+    expect(fake.directions.calls).toHaveLength(2);
+  });
+
+  it.each([
+    ["nothing", undefined], ["a string", { routes: "x" }], ["no routes", {}], ["a short path", { routes: [{ start: from, end: to(0), path: [[1, 2]] }] }],
+    ["a path of text", { routes: [{ start: from, end: to(0), path: [["a", "b"], ["c", "d"]] }] }], ["a path with a gap", { routes: [{ start: from, end: to(0), path: [[1, 2], [Number.NaN, 4]] }] }],
+    ["no places", { routes: [{ path: [[1, 2], [3, 4]] }] }],
+  ])("asks MapKit when the server answers with %s", async (_name, reply) => {
+    server.mockResolvedValue(reply as never);
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    await settle();
+    expect(await answers[0]).not.toBeNull();
+    expect(fake.directions.calls).toHaveLength(1);
+  });
+
+  it("keeps the road when sending it to the server fails", async () => {
+    server.mockImplementation(((_path: string, options?: { method?: string }) => options?.method === "PUT" ? Promise.reject(new Error("refused")) : Promise.resolve({ routes: [] })) as never);
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    await settle();
+    expect(await answers[0]).not.toBeNull();
+    expect(puts()).toHaveLength(1);
+  });
+
+  it("sends nothing when MapKit has no road either", async () => {
+    fake.directions.mode = "error";
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    await settle();
+    expect(await answers[0]).toBeNull();
+    expect(puts()).toHaveLength(0);
+  });
+
+  it("asks the server about no more drives than it takes, and MapKit about the rest", async () => {
+    const many = Array.from({ length: SERVER_MAX_DRIVES + 2 }, (_, n) => drive(n));
+    drivingRoutes(fakeMk, trip, many);
+    await settle();
+    expect(String(gets()[0][0]).split("drive=")).toHaveLength(SERVER_MAX_DRIVES + 1);
+  });
+
+  it("drops what the server says once the cache has been cleared", async () => {
+    let reply: (value: unknown) => void = () => {};
+    server.mockImplementation((() => new Promise((resolve) => { reply = resolve; })) as never);
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    clearRouteCache();
+    reply({ routes: [stored(0)] });
+    await settle();
+    expect(await answers[0]).toBeNull();
+  });
+
+  it("thins a path over the server's limit to the limit, keeping both ends", () => {
+    const long = Array.from({ length: SERVER_MAX_POINTS * 3 + 1 }, (_, n) => [n, -n]);
+    const short = thin(long);
+    expect(short).toHaveLength(SERVER_MAX_POINTS);
+    expect(short[0]).toEqual(long[0]);
+    expect(short.at(-1)).toEqual(long.at(-1));
+    expect(thin(long.slice(0, 5))).toHaveLength(5);
+  });
+
+  it("sends a thinned copy of a very long road", async () => {
+    const long = Array.from({ length: SERVER_MAX_POINTS * 2 }, (_, n) => ({ latitude: 39.74 + n / 1e6, longitude: -104.99 }));
+    const mk = { ...fakeMk, Directions: Object.assign(class { route(_r: unknown, done: (e: unknown, r: unknown) => void) { done(null, { routes: [{ path: long }] }); return 1; } }, { Transport: { Automobile: "automobile" } }) };
+    const answer = drivingRoutes(mk as never, trip, [drive(0)])[0];
+    await settle();
+    await answer;
+    expect((puts()[0][1] as { body: { path: unknown[] } }).body.path).toHaveLength(SERVER_MAX_POINTS);
   });
 });

@@ -294,9 +294,42 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_home.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_roads.py",
         "tests/test_trip_states.py",
         "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/trips/{id}/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_routes",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/trips/{id}/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_route_store",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py"
       ],
       "docs": [
         "start/trips"
@@ -336,6 +369,7 @@
         "tests/test_photo_access.py",
         "tests/test_photo_covers.py",
         "tests/test_photos_api.py",
+        "tests/test_route_cache.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",

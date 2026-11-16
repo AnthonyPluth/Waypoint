@@ -25,7 +25,7 @@ AREA_DOCS = {
 
 CALL = re.compile(r"\b(?:apiCall|api|fetch|EventSource)\s*(?:<[^>(]*>)?\(\s*([`\"'])(/api/[^`\"']*)\1")
 TEST_PATH = re.compile(r"""["'`](/api/[^"'`\s?#]*)""")
-VERBS = re.compile(r"\b(GET|POST|DELETE|get|post|delete)\b")
+VERBS = re.compile(r"\b(GET|POST|PUT|DELETE|get|post|put|delete)\b")
 
 
 def routes() -> list[dict]:

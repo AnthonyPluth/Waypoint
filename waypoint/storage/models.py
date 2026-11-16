@@ -485,3 +485,13 @@ class PhotoSharingPrefs(Base):
     set_by: Mapped[str | None]
     share_all_since: Mapped[float | None]
     steward_sub: Mapped[str | None]
+
+
+class DrivingRoute(Base):
+    __table__ = schema.driving_routes
+    from_lat: Mapped[int]
+    from_lon: Mapped[int]
+    to_lat: Mapped[int]
+    to_lon: Mapped[int]
+    path: Mapped[str]
+    stored: Mapped[float]
