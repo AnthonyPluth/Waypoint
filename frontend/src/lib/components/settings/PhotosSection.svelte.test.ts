@@ -355,6 +355,99 @@ describe("Settings → Photos, the source cards", () => {
     expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1);
   });
 
+  it("closes the question and keeps the reason on the card when the check after a 409 is refused, so there is nothing to retry forever", async () => {
+    let refused = false;
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") { if (refused) throw new Refusal("That library is gone", 404); return asks("b".repeat(32)); }
+      if (path === "/api/photo-grants") return GRANTS;
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") { refused = true; throw new Refusal("Your trips changed meanwhile; try again", 409); }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    await userEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("nothing was resumed.");
+    expect(alert).toHaveTextContent("That library is gone");
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    expect(calls("POST", "/api/photo-sources/7")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Resume, Ada Brook’s library" })).toBeEnabled();
+  });
+
+  describe("announces the action that is running, in every phase", () => {
+    const hold = () => {
+      let release: (v: unknown) => void = () => {};
+      const held = new Promise((resolve) => (release = resolve));
+      return { held, release };
+    };
+    const status = () => screen.queryAllByRole("status").map((el) => el.textContent ?? "").filter((t) => /^(Checking|Pausing|Resuming)/.test(t));
+
+    it("Pause says Pausing during the request, and still during the reload after the list says off", async () => {
+      const post = hold();
+      const reload = hold();
+      let state: PhotoSource["status"] = "ok";
+      let listed = 0;
+      serve([], async (path, opts) => {
+        if (path === "/api/photo-sources" && opts === undefined) { listed += 1; if (listed > 1) state = "off"; return { sources: [source({ status: state })], permissions: PERMISSIONS }; }
+        if (path === "/api/photos/review" && listed > 1) { await reload.held; return { photos: [] }; }
+        if (path === "/api/photo-sources/7" && opts?.method === "POST") { await post.held; return {}; }
+      });
+      render(PhotosSection);
+      await userEvent.click(await screen.findByRole("button", { name: "Pause, Ada Brook’s library" }));
+      await waitFor(() => expect(status()).toEqual(["Pausing Ada Brook’s library…"]));
+      post.release({});
+      await screen.findByText("Paused");
+      expect(status()).toEqual(["Pausing Ada Brook’s library…"]);
+      reload.release({});
+      await waitFor(() => expect(status()).toEqual([]));
+    });
+
+    it("Resume says Checking while the count is fetched, then Resuming during the request and the reload", async () => {
+      const count = hold();
+      const post = hold();
+      const reload = hold();
+      let state: PhotoSource["status"] = "off";
+      let listed = 0;
+      serve([], async (path, opts) => {
+        if (path === "/api/photo-sources" && opts === undefined) { listed += 1; if (listed > 1) state = "ok"; return { sources: [source({ status: state })], permissions: PERMISSIONS }; }
+        if (path === "/api/photos/review" && listed > 1) { await reload.held; return { photos: [] }; }
+        if (path === "/api/photo-sources/7/resume") { await count.held; return asks("b".repeat(32)); }
+        if (path === "/api/photo-grants") return GRANTS;
+        if (path === "/api/photo-sources/7" && opts?.method === "POST") { await post.held; return {}; }
+      });
+      render(PhotosSection);
+      await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+      await waitFor(() => expect(status()).toEqual(["Checking what resuming Ada Brook’s library would show…"]));
+      count.release({});
+      const dialog = await screen.findByRole("alertdialog");
+      await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+      await waitFor(() => expect(status()).toEqual(["Resuming Ada Brook’s library…"]));
+      post.release({});
+      await screen.findByRole("button", { name: "Pause, Ada Brook’s library" });
+      expect(status()).toEqual(["Resuming Ada Brook’s library…"]);
+      reload.release({});
+      await waitFor(() => expect(status()).toEqual([]));
+    });
+
+    it("Resume with nothing to confirm says Checking, then Resuming, never Pausing", async () => {
+      const count = hold();
+      const post = hold();
+      let state: PhotoSource["status"] = "off";
+      serve([], async (path, opts) => {
+        if (path === "/api/photo-sources" && opts === undefined) return { sources: [source({ status: state })], permissions: PERMISSIONS };
+        if (path === "/api/photo-sources/7/resume") { await count.held; return { asks: false, count: 0, grants: [], snapshot: "a".repeat(32) }; }
+        if (path === "/api/photo-sources/7" && opts?.method === "POST") { await post.held; state = "ok"; return {}; }
+      });
+      render(PhotosSection);
+      await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+      await waitFor(() => expect(status()).toEqual(["Checking what resuming Ada Brook’s library would show…"]));
+      count.release({});
+      await waitFor(() => expect(status()).toEqual(["Resuming Ada Brook’s library…"]));
+      post.release({});
+      await waitFor(() => expect(status()).toEqual([]));
+    });
+  });
+
   it("keeps the question open and says why when the resume itself fails", async () => {
     resuming([asks("b".repeat(32))], () => { throw new Refusal(KEY_LOST, 400); });
     render(PhotosSection);

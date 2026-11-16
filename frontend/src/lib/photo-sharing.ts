@@ -72,6 +72,8 @@ export const resumeStale = "Your trips changed meanwhile, so what’s below is n
 
 export const resumeUnchecked = "Your trips changed meanwhile, and Waypoint couldn’t check them again, so what’s below may be out of date.";
 
+export const resumeGaveUp = "Your trips changed meanwhile, and Waypoint couldn’t check them again, so nothing was resumed.";
+
 export const resumeSettled = "Your trips changed meanwhile and nothing needs confirming now, so nothing was resumed. Press Resume again.";
 
 export const stopTitle = (who: Who): string => `Stop sharing ${who.own} photos on this trip?`;

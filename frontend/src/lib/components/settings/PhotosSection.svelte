@@ -49,7 +49,7 @@
   import { apiCall } from "$lib/contract";
   import { draftGuard } from "$lib/drafts.svelte";
   import { initials } from "$lib/nav";
-  import { isStale, resumeSettled, resumeStale, resumeText, resumeTitle, resumeUnchecked, whoIs, type ResumeKind } from "$lib/photo-sharing";
+  import { isStale, resumeGaveUp, resumeSettled, resumeStale, resumeText, resumeTitle, resumeUnchecked, whoIs, type ResumeKind } from "$lib/photo-sharing";
   import PhotosNeedsLook from "./PhotosNeedsLook.svelte";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import KeyRound from "@lucide/svelte/icons/key-round";
@@ -201,7 +201,11 @@
     else toast("This library is already syncing, or has nothing to sync.");
   }, { busy: (on) => (starting = on ? s.id : null) });
 
-  let pausing = $state<number | null>(null);
+  type Doing = "check" | "pause" | "resume";
+  let working = $state<{ id: number; doing: Doing } | null>(null);
+  const holding = (id: number, doing: Doing) => (on: boolean) => { working = on ? { id, doing } : null; };
+  const progress = (doing: Doing, library: string) =>
+    doing === "check" ? `Checking what resuming ${library} would show…` : doing === "resume" ? `Resuming ${library}…` : `Pausing ${library}…`;
   let notices = $state<Record<number, Outcome | undefined>>({});
   const clearNotice = (id: number) => { notices = { ...notices, [id]: undefined }; };
   type Ask = { source: PhotoSource; kind: ResumeKind; check: PhotoSourceResume; trips: { id: number; name: string }[]; note: string; stale: boolean };
@@ -226,6 +230,7 @@
   }
 
   async function resumeNow(s: PhotoSource, snapshot: string) {
+    working = { id: s.id, doing: "resume" };
     await apiCall<"POST /api/photo-sources/{id}">(`/api/photo-sources/${s.id}`, { method: "POST", body: { paused: false, snapshot }, failed: "Couldn’t resume it" });
     toast.success("Resumed");
     await refresh();
@@ -244,6 +249,7 @@
 
   async function renew(a: Ask, note: string) {
     const mineTicket = ++askTicket;
+    working = { id: a.source.id, doing: "check" };
     try {
       const check = await apiCall<"GET /api/photo-sources/{id}/resume">(`/api/photo-sources/${a.source.id}/resume`);
       if (mineTicket !== askTicket) return;
@@ -255,8 +261,12 @@
       const trips = await tripNames(check, a.source.person_id);
       if (mineTicket !== askTicket) return;
       asking = { ...a, check, trips, note, stale: false };
-    } catch {
-      if (mineTicket === askTicket) asking = { ...a, note: resumeUnchecked, stale: true };
+    } catch (err) {
+      if (mineTicket !== askTicket) return;
+      if (typeof (err as { status?: unknown } | null)?.status !== "number") { asking = { ...a, note: resumeUnchecked, stale: true }; return; }
+      askOpen = false;
+      const why = outcome(err, errMsg(err));
+      notices = { ...notices, [a.source.id]: { ...why, text: `${resumeGaveUp} ${why.text}` } };
     }
   }
 
@@ -273,7 +283,7 @@
         if (!isStale(err)) throw err;
         await renew(a, resumeStale);
       }
-    }, { busy: (on) => (pausing = on ? a.source.id : null), onError: (message) => { if (asking) asking = { ...asking, note: message }; } });
+    }, { busy: holding(a.source.id, a.stale ? "check" : "resume"), onError: (message) => { if (asking) asking = { ...asking, note: message }; } });
     return resumed;
   }
 
@@ -284,7 +294,7 @@
     toast.success("Paused");
     await refresh();
     onchange();
-  }, { busy: (on) => (pausing = on ? s.id : null), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
+  }, { busy: holding(s.id, paused ? "pause" : "check"), onError: (message, err) => (notices = { ...notices, [s.id]: outcome(err, message) }) });
 
   let rekeying = $state<number | null>(null);
   let newKey = $state("");
@@ -401,7 +411,7 @@
       await refresh();
       onchange();
       if (added.status === "off") {
-        await act(() => askFirst(added, "connect"), { busy: (on) => (pausing = on ? added.id : null), onError: (message, err) => (notices = { ...notices, [added.id]: outcome(err, message) }) });
+        await act(() => askFirst(added, "connect"), { busy: holding(added.id, "check"), onError: (message, err) => (notices = { ...notices, [added.id]: outcome(err, message) }) });
       }
     }, { busy: (on) => (saving = on), onError: (message, err) => { tested = null; result = outcome(err, message); } });
   };
@@ -437,14 +447,14 @@
           {#if s.mine}
             {@const library = libraryOf(s)}
             {#if syncing.includes(s.id)}<p class="text-sm text-muted-foreground" role="status">Sync started for {library}. This card updates when it finishes.</p>{/if}
-            {#if pausing === s.id}<p class="text-sm text-muted-foreground" role="status">{s.status === "off" ? `Checking what resuming ${library} would show…` : `Pausing ${library}…`}</p>{/if}
+            {#if working?.id === s.id}<p class="text-sm text-muted-foreground" role="status">{progress(working.doing, library)}</p>{/if}
             <div class="flex flex-wrap gap-2">
               {#if s.status === "refused"}
                 <Button size="sm" aria-label={`Change key, ${library}`} aria-expanded={rekeying === s.id} onclick={() => openRekey(s)}><KeyRound aria-hidden="true" />Change key</Button>
               {:else}
                 <Button variant="outline" size="sm" aria-label={`Sync now, ${library}`} disabled={starting === s.id || syncing.includes(s.id) || s.status === "off"} onclick={() => syncNow(s)}><RefreshCw aria-hidden="true" />{starting === s.id || syncing.includes(s.id) ? "Syncing…" : "Sync now"}</Button>
                 <Button variant="outline" size="sm" aria-label={`Change key, ${library}`} aria-expanded={rekeying === s.id} onclick={() => openRekey(s)}>Change key</Button>
-                <Button id={`photo-pause-${s.id}`} variant="outline" size="sm" aria-label={`${s.status === "off" ? "Resume" : "Pause"}, ${library}`} disabled={pausing === s.id} onclick={() => setPaused(s, s.status !== "off")}>{s.status === "off" ? "Resume" : "Pause"}</Button>
+                <Button id={`photo-pause-${s.id}`} variant="outline" size="sm" aria-label={`${s.status === "off" ? "Resume" : "Pause"}, ${library}`} disabled={working?.id === s.id} onclick={() => setPaused(s, s.status !== "off")}>{s.status === "off" ? "Resume" : "Pause"}</Button>
               {/if}
               <Button variant="outline" size="sm" class="text-status-bad-ink" aria-label={`Remove ${library}`} onclick={(e: MouseEvent) => askRemove(s, e)}>Remove</Button>
             </div>
