@@ -5,7 +5,7 @@ private final class FakePages: PageFetching, @unchecked Sendable {
     var files: [String: PageReply] = [:]
     var failing: Set<String> = []
     var onGet: ((String) async -> Void)?
-    private(set) var requested: [String] = []
+    var requested: [String] = []
 
     func serve(_ path: String, _ text: String, status: Int = 200, finalPath: String? = nil, host: String = "waypoint.example.com") {
         files[path] = PageReply(data: Data(text.utf8), status: status, url: URL(string: "https://\(host)\(finalPath ?? path)"))
