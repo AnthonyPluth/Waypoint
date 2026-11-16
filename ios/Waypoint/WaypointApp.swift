@@ -19,7 +19,7 @@ struct WaypointApp: App {
                 content
             }
             .onChange(of: scenePhase) { newPhase in
-                if newPhase == .active { Task { await renewWebSession() } }
+                if newPhase == .active { Task { await returnToForeground() } }
             }
             .onReceive(NotificationCenter.default.publisher(for: .webViewUnauthorized)) { _ in
                 Task { await endSession() }
@@ -57,12 +57,14 @@ struct WaypointApp: App {
     private func open() async {
         Task { await ServerSession.shared.retryPendingRevocations() }
         guard await ServerSession.shared.isConnected else {
+            await OfflineSync.shared.purge()
             phase = .connect
             return
         }
         do {
             ShellViewController.serverURL = try await ServerSession.shared.prepareWebView()
             phase = .shell
+            Task { await OfflineSync.shared.sync() }
         } catch ServerError.signedOut {
             await ServerSession.shared.signOut()
             phase = .connect
@@ -76,6 +78,13 @@ struct WaypointApp: App {
         guard phase == .shell else { return }
         phase = .signedOut
         await ServerSession.shared.signOut()
+    }
+
+    @MainActor
+    private func returnToForeground() async {
+        await renewWebSession()
+        guard phase == .shell else { return }
+        await OfflineSync.shared.sync()
     }
 
     @MainActor

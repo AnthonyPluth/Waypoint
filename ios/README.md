@@ -60,10 +60,12 @@ One-time setup:
 | `UnauthorizedReport.swift` | Script injected into the web view that reports a same-origin `/api/` answer of 401 to the shell, and the checks on that report. |
 | `SignedOutView.swift` | The screen shown after sign-out; its button goes back to the connect screen. |
 | `ShellViewController.swift` | `CAPBridgeViewController` that loads the person's server instead of bundled files. The web view runs under the status bar and home indicator (`ignoresSafeArea()`, and `ios.contentInset` is `never` in `capacitor.config.json`); the web app pads itself once with `env(safe-area-inset-*)`. |
-| `OfflineStore.swift` | The protected store for saved trips: the `GET /api/offline` reply as files in Application Support, one folder per server address, `.complete` file protection, no encryption of its own. Each save replaces the whole set (staged, then swapped in); a trip is dropped 3 days after its end date, checked on load; purge for one server or all. Nothing calls it yet (offline epic #734). |
+| `OfflineStore.swift` | The protected store for saved trips: the `GET /api/offline` reply as files in Application Support, one folder per server address, `.complete` file protection, no encryption of its own. Each save replaces the whole set (staged, then swapped in); a trip is dropped 3 days after its end date, checked on load; purge for one server or all. `OfflineSync` is what calls it. |
+| `OfflineSync.swift` | Fills and clears the store (offline epic #734, issue 3). When saving is on (`OfflineSettings`, a per-phone `UserDefaults` flag named `offlineSaving`, default off; the settings card that sets it comes later, so until then set it in a simulator with `xcrun simctl spawn booted defaults write <bundle id> offlineSaving -bool YES`) it fetches `GET /api/offline` with the app's token after the web view is ready and each time the app becomes active, saves the reply only when `version` is 1, and keeps the old copy on a network error, a server error or an unknown version. A 401 or 403, a sign-in that ended, saving turned off, Remove, a changed server address, `ServerSession.signOut()` and launching with no server purge it. A purge during a fetch stops that fetch's save. No trip contents are logged. |
 | `Keychain.swift`, `PKCE.swift` | Helpers. |
 | `Tests/WaypointTests.swift` | PKCE (RFC 7636 vector), address normalising, sign-in reply checks. |
 | `Tests/OfflineStoreTests.swift` | Save and load, replace not merge, per-server separation, expiry, purge, file protection. |
+| `Tests/OfflineSyncTests.swift` | Sync with a fake network: saves, unknown version keeps the copy, 401 and 403 purge, network error keeps, sign-out and a changed server purge. |
 
 ## How sign-in works
 
@@ -75,7 +77,7 @@ One-time setup:
 
 ## Not built yet
 
-- Offline encrypted store behind the web app's trip data, local reminders, Face ID lock.
+- The offline page and bridge that show saved trips, the settings card that turns saving on, local reminders, Face ID lock. The app saves trips today (when the internal saving flag is on) but nothing shows them yet.
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.
 - A sign-out button in Settings or the web UI. `ServerSession.signOut` is called by the error screen's **Use another Waypoint**, when the server says the sign-in is no longer valid and when the web view reports a 401 in the foreground; each then shows the signed-out screen.
