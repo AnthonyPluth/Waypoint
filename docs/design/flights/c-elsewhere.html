@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Flight cards and live status: Elsewhere</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f; --action: #3563e0;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8; --accent: #1a1e29; --destructive: #ff7b72;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-bad-soft: #3a1512; --status-bad-ink: #ff9d96;
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --surface-2: var(--popover); --surface-3: #1f2433;
+  --chart-1: #4f9dff; --chart-2: #f6b73c; --chart-3: #4fd1b0; --chart-4: #c79bff; --chart-5: #ff8fab; --chart-6: #9be15d;
+  --kind-flight: var(--primary); --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --kind-train: var(--chart-4); --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
+  --kind-car: var(--signal); --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
+  --kind-cruise: var(--chart-5); --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
+  --kind-parking: var(--chart-6); --kind-parking-soft: color-mix(in srgb, var(--kind-parking) 15%, transparent);
+  --kind-quiet: var(--muted-foreground); --kind-quiet-soft: var(--surface-3);
+  --avatar-1: #1d3a63; --avatar-1-ink: #d6e6ff; --avatar-2: #14463c; --avatar-2-ink: #c9f3e6;
+  --map-sea: #0b0e15; --map-land: #1c2230; --map-border: #343c52; --map-visited: #3d7bc7;
+  --map-route: #8fc2ff; --map-airport: #f6b73c; --map-stay: #4fd1b0; --map-photo: var(--foreground);
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--doc-bg); }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a, .lede a { color: var(--status-info-ink); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; background: color-mix(in srgb, var(--doc-bg) 88%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--doc-line); border-radius: 16px; }
+.segc { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--secondary); border: 1px solid var(--input); }
+.segc button { border: 0; background: transparent; border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; }
+.segc button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.bar .toc { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.bar .toc a { color: var(--muted-foreground); padding: 4px 0; }
+.bar .toc a:hover, .bar .toc a[aria-current] { color: var(--foreground); }
+.checks { border: 1px solid var(--doc-line); border-radius: 16px; padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
+.checks h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal-ink); }
+.checks ol { list-style: decimal; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.checks li::marker { color: var(--muted-foreground); }
+.sec { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.stage { overflow-x: auto; padding-bottom: 6px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
+body.desk [data-w="phone"] { display: none; }
+body:not(.desk) [data-w="desk"] { display: none; }
+.fig { display: flex; flex-direction: column; gap: 8px; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec li { overflow-wrap: anywhere; }
+.spec code, .checks code, .lede code, .dochead code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "\201C" "\201D"; }
+
+.dev { position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
+body.desk .dev { width: 1280px; border-radius: 14px; }
+body.desk .dev.frag { width: 960px; }
+body.desk .dev.col { width: 400px; }
+.dev.tall { height: 844px; }
+.dev.taller { height: 900px; }
+.dev.sheetdev { height: 760px; background: var(--popover); border-radius: 26px; }
+body.desk .dev.panel { height: 800px; }
+
+.ic{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.meta{color:var(--muted-foreground);font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.board{padding:16px;background:var(--background);display:flex;flex-direction:column;gap:14px}
+.legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;font-size:12px;color:var(--muted-foreground)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.fc{display:flex;flex-direction:column;gap:14px;background:var(--card);border:1px solid var(--border);border-radius:22px;box-shadow:var(--shadow);padding:16px}
+.fc-top{display:flex;align-items:center;gap:10px}
+.mark{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#1d3a63;color:#d6e6ff;font-size:11px;font-weight:700;letter-spacing:.02em;flex:none}
+.num{font-family:var(--mono);font-size:14px;font-weight:600}
+.dur{margin-left:auto;display:inline-flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:13px;font-family:var(--mono)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:start}
+.ap{display:flex;flex-direction:column;gap:2px;min-width:78px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:38px;line-height:1;font-weight:650;letter-spacing:-0.03em}
+.city{font-size:12px;color:var(--muted-foreground)}
+.time{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:6px;white-space:nowrap}
+.time s{display:block;color:var(--muted-foreground);font-weight:500;font-size:12px;line-height:1.2}
+.time.late{color:var(--signal-ink)}
+.time.gone{color:var(--muted-foreground);text-decoration:line-through;font-weight:500}
+.tz{font-family:var(--mono);font-size:11px;color:var(--muted-foreground)}
+.arc{position:relative;height:60px;margin-top:6px}
+.arc svg{position:absolute;inset:0;width:100%;height:46px}
+.plane{position:absolute;width:22px;height:22px;display:grid;place-items:center;color:#8fc2ff}
+.upd{position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:11px;color:var(--muted-foreground)}
+.status{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.status p{font-size:14px;min-width:0;flex:1 1 180px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;flex:none}
+.pill::before{content:"";width:6px;height:6px;border-radius:99px;background:currentColor}
+.t-ok{background:#0f2a1b;color:#7ee0a5}.t-warn{background:#34270c;color:#ffd58a}.t-bad{background:#3a1512;color:#ff9d96}.t-info{background:#11233d;color:#8fc2ff}.t-quiet{background:#1a1e29;color:#9aa4b8}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.facts dt{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-foreground);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:650;letter-spacing:-0.02em;margin-top:2px;white-space:nowrap}
+.facts dd.na{color:var(--muted-foreground);font-weight:500}
+.src{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none}
+.src.live{background:#4f9dff}.src.book{border:1.5px solid #9aa4b8}
+.note{font-size:12px;color:var(--muted-foreground)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;font-size:14px;font-weight:600;min-height:44px;padding:0 14px;border:1px solid var(--input);background:var(--secondary);color:var(--foreground)}
+.btn.ghost{background:transparent;border-color:transparent}.btn.icon{width:44px;padding:0}.btn.sm{min-height:36px;padding:0 12px;font-size:13px;border-radius:10px}
+.back{display:inline-flex;align-items:center;gap:6px;color:var(--muted-foreground);font-size:14px;min-height:44px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.list{border:1px solid var(--border);border-radius:18px;background:var(--card);overflow:hidden}
+.rowb{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.rowb:last-child{border-bottom:0}
+.rowb .t{min-width:0;flex:1 1 0}
+.rowb .t b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kind{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;flex:none;background:rgba(79,157,255,.15);color:#4f9dff}
+.sech{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sech h2{font-size:17px;font-weight:650;letter-spacing:-0.015em}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}
+.step{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:0}
+.step b{display:block;font-size:14px;font-weight:600}
+.step .when{margin-left:auto;text-align:right;font-family:var(--mono);font-size:15px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;margin-top:6px;flex:none}
+.dot.done{background:#7ee0a5}.dot.now{background:#8fc2ff;box-shadow:0 0 0 4px rgba(143,194,255,.2)}.dot.next{border:2px solid #9aa4b8}
+.mini{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.mini .c{font-size:24px;font-weight:650;letter-spacing:-0.025em;line-height:1}
+.mini .l{position:relative;height:16px}
+.mini .l::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:2px dotted #343c52}
+.mini .l i{position:absolute;top:50%;width:18px;height:18px;display:grid;place-items:center;color:#8fc2ff;transform:translate(-50%,-50%)}
+.mini .tm{font-family:var(--mono);font-size:13px;font-weight:600}
+.wide .code{font-size:44px}.wide .time{font-size:19px}
+
+
+.fc .src,.facts .src{margin-right:1px}
+.stage .board{border-radius:0}
+.dev .board{min-height:100%}
+.top .btn{cursor:pointer}
+
+.frames{display:flex;gap:28px}
+</style>
+</head>
+<body>
+<div class="doc">
+  <header class="dochead">
+    <p class="eyebrow">Waypoint · issue <a href="https://github.com/AnthonyPluth/Waypoint/issues/666">#666</a> · approved by the owner in chat, formal sign-off pending</p>
+    <h1>Where else a flight appears</h1>
+    <p>Mockups for the places a flight shows besides its own card: the next flight on Home, flight rows in the trip list, and the booking on the trip page. Drawn with Waypoint's own tokens (<code>frontend/src/app.css</code>), dark only, at phone width (390 px); on desktop the same blocks keep this layout inside their columns. Every flight, name and airport here is made up.</p>
+  </header>
+
+  <div class="bar">
+    
+    <nav class="toc" aria-label="Screens"><a href="a-flight-card.html">a Flight card</a><a href="b-live-status.html">b Live status</a><a href="c-elsewhere.html" aria-current="page">c Elsewhere</a></nav>
+  </div>
+
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>Home next flight: a small route card with the status pill, the amber times when delayed, the gate and when it was last updated.</li><li>Trip list rows: a kind tile, <q>DEN to GJT · EA 214</q>, the time and a status chip. Today's flight shows the time of departure; later flights the date.</li><li>The booking on the trip page: the booking card with a progress bar while the flight is in the air.</li><li>Tapping any of them opens the live status view (b).</li></ol>
+  </section>
+
+  <section class="sec" id="c" aria-labelledby="c-title">
+    <div class="sechead"><span class="letter">c</span><h2 id="c-title">Home, list rows and the booking</h2></div>
+    <p class="lede">Three small versions of the card for the places where a full card would crowd the page. They show the same wording, tones and times as a, and all lead to b.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="all"><figcaption>c1 · Home next flight, trip list rows and the booking on the trip page (phone column)</figcaption><div class="dev"><div class="board" style="gap:18px">
+  <div style="display:flex;flex-direction:column;gap:8px"><div class="sech"><h2>Home · next flight</h2></div>
+    <a class="fc" href="#" aria-label="EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am" style="gap:10px">
+      <div class="fc-top"><span class="mark" aria-hidden="true">EA</span><span><b class="num">EA 214</b><span class="meta" style="display:block;line-height:1.1">Thu Jun 12 · Four Corners loop</span></span><span class="pill t-warn" style="margin-left:auto">Delayed 35 min</span></div>
+      <div class="mini"><div><b class="c">DEN</b><div class="tm" style="color:#ffd58a;margin-top:6px">10:15 am</div></div><div class="l"><i style="left:6%"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;stroke:none;transform:rotate(90deg)"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"></path></svg></i></div><div style="text-align:right"><b class="c">GJT</b><div class="tm" style="color:#ffd58a;margin-top:6px">11:27 am</div></div></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--border);padding-top:10px"><span class="meta">Terminal B · Gate B14</span><span class="meta">Updated 4 min ago</span></div>
+    </a></div>
+  <div style="display:flex;flex-direction:column;gap:8px"><div class="sech"><h2>Trip list · today</h2></div>
+    <div class="list" role="list" aria-label="Flights today">
+      <a class="rowb" href="#" aria-label="EA 214, Denver to Grand Junction, on time, departs 9:40 am" style="padding:12px 14px"><span class="kind"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"></path></svg></span><span class="t"><b>DEN to GJT · EA 214</b><span class="meta">Departs 9:40 am</span></span><span class="pill t-ok">On time</span></a>
+      <a class="rowb" href="#" aria-label="EA 301, Grand Junction to Denver, scheduled, Thu Jun 19 at 6:15 pm" style="padding:12px 14px"><span class="kind"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"></path></svg></span><span class="t"><b>GJT to DEN · EA 301</b><span class="meta">Thu Jun 19 · 6:15 pm</span></span><span class="pill t-quiet">Scheduled</span></a>
+    </div></div>
+  <div style="display:flex;flex-direction:column;gap:8px"><div class="sech"><h2>Booking on the trip page</h2><span class="meta">in the air</span></div>
+    <a class="list" href="#" aria-label="EA 214, Denver to Grand Junction, in the air, lands 10:52 am" style="display:block;padding:14px">
+      <div class="fc-top" style="margin-bottom:10px"><span class="mark" aria-hidden="true">EA</span><span><b class="num">EA 214</b><span class="meta" style="display:block;line-height:1.1">DEN to GJT</span></span><span class="pill t-info" style="margin-left:auto">In the air</span></div>
+      <div role="progressbar" aria-label="Flight progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="55" style="height:6px;border-radius:6px;background:#1f2433;overflow:hidden"><div style="width:55%;height:100%;background:#8fc2ff"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px"><span class="meta">Departed 9:46 am</span><b style="font-size:14px">Lands 10:52 am</b></div>
+    </a><p class="note">Tapping any of these opens the live status view.</p></div>
+</div></div></figure></div></div>
+    <div class="spec"><div><h3>Accessible names</h3><ul><li>Each card or row is one link named with the flight, route, state and the next time: <q>EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am</q>. Its destination is the live status view (b).</li><li>The progress bar on the trip-page booking is a <code>progressbar</code> named <q>Flight progress</q>. The kind tile, plane glyph and mini arc are decorative.</li><li>The row list is named <q>Flights today</q>. The pill is text; amber times also say <q>delayed</q> in the link name.</li></ul></div><div><h3>Tokens and components</h3><ul><li>Home card: the flight card at mini scale (codes <code>24px</code>, times <code>13px</code> Geist Mono, a dotted line with the plane at its progress), a footer with <q>Terminal B · Gate B14</q> and <q>Updated 4 min ago</q>. Shown for the next flight within a day of departure, and while in the air.</li><li>Row: <code>KindTile</code> (flight, <code>--kind-flight</code>), name <q>DEN to GJT · EA 214</q>, one meta line, a <code>StatusChip</code>. Today's flight shows its departure time; later ones the date and time.</li><li>Trip-page booking: the booking card with a one-line progress bar, <q>Departed 9:46 am</q> and <q>Lands 10:52 am</q>.</li><li>No new token.</li></ul></div><div><h3>Replaces</h3><ul><li>The next-flight line and the <code>FlightStatus</code> block on Home (<code>frontend/src/pages/Upcoming.svelte</code>), the flight rows in the trip list and the flight booking card in <code>Trip.svelte</code>.</li><li>On desktop these blocks keep this layout: the Home card in the page column, the rows in the trips list, the booking in the 400 px column. The times are wall-clock times at their airports; the zone is added only when it differs from the other end's or the viewer's own.</li></ul></div></div>
+  </section>
+</div>
+
+</body>
+</html>
