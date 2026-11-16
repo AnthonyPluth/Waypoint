@@ -96,9 +96,9 @@ Which page goes where is `TABS` and `MORE` in `frontend/src/lib/nav.ts`.
   - The Settings avatar link in `TopBar.svelte` stays at every width.
 - **From `lg` up**, `SideNav.svelte` lists all six pages.
 
-The phone tab bar is a frosted glass bar: a 4% white tint over a 28px backdrop blur with `saturate(2)` and `brightness(1.1)`, no outline (the border is transparent) and a faint inner top highlight for the edge. Content scrolling behind it shows through blurred and slightly lightened. Browsers without `backdrop-filter` get the solid `surface-2` background.
+The phone tab bar is a frosted glass bar: the page background at 75% over a 28px backdrop blur with `saturate(2)` and `brightness(1.1)`, no outline (the border is transparent) and a faint inner top highlight for the edge. Content scrolling behind it shows through blurred and slightly lightened. Browsers without `backdrop-filter` get the solid `surface-2` background.
 
-Over this dark UI the labels measure about 4.4:1 or better at the brightest blurred spot. Bright content scrolling behind the bar (an expanded email preview is white) lowers that. To guarantee the labels readable over any content, raise the tint and drop the brightness, at the cost of the glass look.
+The labels keep their contrast over bright content too (an expanded email preview is white, a primary button is bright): the `tab-bar-contrast` verify flow scrolls a primary button under the bar and fails if the audit finds a label below 4.5:1.
 
 ## Sheet
 

@@ -319,7 +319,7 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
   } else if ("scroll_to" in step) {
     await page.locator(step.scroll_to).first().evaluate((el) => el.scrollIntoView({ block: "start" }), undefined, { timeout });
   } else if ("audit" in step) {
-    if (!audit) throw new Error("the audit step runs under make verify only");
+    if (!audit) throw new Error("no audit is available to run the audit step");
     const found = await audit();
     if (found.length) throw new Error(`a11y ${found.join(" | ")}`);
   } else if ("scroll_under_bar" in step) {

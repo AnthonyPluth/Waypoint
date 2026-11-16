@@ -41,7 +41,7 @@ A step has one action and an optional `timeout` in milliseconds (default 10000).
 - `{"upload": {"selector": "input[type=file]", "file": "tests/fixtures/flight_import/flighty.csv"}}` chooses a file of the repository (made-up data) in a file input.
 - `{"scroll_to": selector}` scrolls it to the top of the screen. An image is always the whole page, taken from the top, so this only matters to a later step.
 - `{"scroll_under_bar": selector}` scrolls the page until the element’s centre sits behind the floating tab bar (phone width), so the audit at the end of the flow checks the bar’s labels over whatever bright content is there. It fails when the page can’t scroll far enough.
-- `{"audit": true}` runs the accessibility audit (axe, tap targets, focus rings) on the page as it is now, without the scroll back to the top that a screenshot makes, and fails the flow with what it finds. The audit at the end of every flow runs after that scroll, so use this step for what only shows partway down the page. `make verify` only: `tools/control` can’t run it.
+- `{"audit": true}` runs the accessibility audit (axe, tap targets, focus rings) on the page as it is now, without the scroll back to the top that a screenshot makes, and fails the flow with what it finds. The audit at the end of every flow runs after that scroll, so use this step for what only shows partway down the page.
 
 **Checking and capturing**
 

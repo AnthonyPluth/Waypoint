@@ -6,6 +6,7 @@ import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ACTING_COMMANDS, ARTIFACTS, UNREACHABLE_ARGS, ControlError, allowedRequest, isGuardedPath, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
+import { auditPage } from "./a11y.mjs";
 import { startServer } from "./control-server.mjs";
 import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage } from "./verify.mjs";
 
@@ -412,7 +413,7 @@ async function main() {
     for (const [i, step] of flow.steps.entries()) {
       const started = Date.now();
       try {
-        await runStep(page, step, (n) => shotAs(`flow-${flow.name}-${n}`), saveDownload);
+        await runStep(page, step, (n) => shotAs(`flow-${flow.name}-${n}`), saveDownload, () => auditPage(page, vp));
         checks = checksAfter(checks, step);
         steps.push({ n: i + 1, step: JSON.stringify(step), ok: true, ms: Date.now() - started });
       } catch (e) {
