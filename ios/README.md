@@ -80,3 +80,11 @@ One-time setup:
 - Servers behind a forward-auth proxy, and self-signed certificates (App Transport Security only relaxes local-network addresses).
 - File picker, downloads and `webcal://` handling in the web view.
 - Running the app on a simulator or device in CI (the iOS workflow builds it and runs the unit tests only).
+
+## Export compliance (encryption)
+
+`Waypoint/Info.plist` sets `ITSAppUsesNonExemptEncryption` to `false` (added in #541). That key answers App Store Connect's export-compliance question once, so it does not ask on every build. It says the app uses only the encryption built into the phone: HTTPS, the Keychain and the system sign-in sheet.
+
+The web app the shell loads has an offline vault (`frontend/src/lib/offline-vault.ts`: Web Crypto AES-256-GCM, ECDH, HKDF and a passkey-derived key). It is not built for the iPhone yet (see "Not built yet") and would run through the phone's own browser engine. The owner judged `false` appropriate on that basis. This is not legal advice, and it is a judgment, not a ruling.
+
+Revisit the declaration before the offline vault ships on the iPhone. If it does, answer Apple's export-compliance questions for that build and consider the annual self-classification report.
