@@ -40,6 +40,7 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 - With no live status yet, the card keeps the departure date ("Departs Thu Jun 12.") before the sentence about when live status starts.
 - The live-status window is one day before departure.
 - The card never repeats itself (owner, 2026-11-16): there is no line beside the pill for Boarding, Scheduled or Delayed (the pill, the gate and the times say it). The short lines that stay, each decided by the owner: In the air says "Lands in 38 minutes."; Landed says "3 minutes early.", "N minutes late." or "On time."; Cancelled says "Contact <airline> about rebooking."; Diverted says "Was headed to Grand Junction." (or "Where it lands isn't known yet." when no other airport is known); a flight with no live status says when live status starts. The date goes after the Departure or Arrival label (for example "Departure · Denver · Thu Jun 12") when it isn't today. The accessible name of the article still says the whole state in words.
+- Cabin and arc, kept as built (owner, 2026-11-16, after seeing the frames and the build side by side at 330 and 358 px): the cabin reads "Economy" in full at the frames' value size, in columns that are equal where there is room and otherwise as wide as their content; the route is one continuous traveled line ending at the plane, and the frames' two-piece line and small apex dot are not used because the dot and the plane don't coincide in the frames' In the air panel.
 
 ## Fonts
 
