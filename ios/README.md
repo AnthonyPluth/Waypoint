@@ -59,7 +59,7 @@ One-time setup:
 | `ServerSession.swift` | Keeps the server and tokens in the Keychain, refreshes tokens one at a time (refresh tokens rotate; reuse revokes the grant), hands the web view its session cookie. |
 | `UnauthorizedReport.swift` | Script injected into the web view that reports a same-origin `/api/` answer of 401 to the shell, and the checks on that report. |
 | `SignedOutView.swift` | The screen shown after sign-out; its button goes back to the connect screen. |
-| `ShellViewController.swift` | `CAPBridgeViewController` that loads the person's server instead of bundled files. |
+| `ShellViewController.swift` | `CAPBridgeViewController` that loads the person's server instead of bundled files. The web view runs under the status bar and home indicator (`ignoresSafeArea()`, and `ios.contentInset` is `never` in `capacitor.config.json`); the web app pads itself once with `env(safe-area-inset-*)`. |
 | `OfflineStore.swift` | The protected store for saved trips: the `GET /api/offline` reply as files in Application Support, one folder per server address, `.complete` file protection, no encryption of its own. Each save replaces the whole set (staged, then swapped in); a trip is dropped 3 days after its end date, checked on load; purge for one server or all. Nothing calls it yet (offline epic #734). |
 | `Keychain.swift`, `PKCE.swift` | Helpers. |
 | `Tests/WaypointTests.swift` | PKCE (RFC 7636 vector), address normalising, sign-in reply checks. |
