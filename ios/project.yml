@@ -3,7 +3,7 @@ configFiles:
   Debug: Config.xcconfig
   Release: Config.xcconfig
 options:
-  # The app icon is committed once, under waypoint/static/ (the only place a raster image may live); this copies it
+  # The app icon is committed once, under waypoint/static/ (one of the places `fleet checks` allows raster images, image-homes in pyproject.toml); this copies it
   # into the asset catalog, where it is not committed (ios/.gitignore).
   preGenCommand: cp ../waypoint/static/ios-icon-1024.png Waypoint/Assets.xcassets/AppIcon.appiconset/icon-1024.png
   bundleIdPrefix: com.anthonypluth
