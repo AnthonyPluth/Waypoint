@@ -12,7 +12,7 @@ from tests.test_mail_newer import BODY_CANARY, revised
 from tests.test_mail_scan import NOW
 from waypoint import tls
 from waypoint.domain import trips
-from waypoint.domain.mail import ai, extract, newer, nothing_new, review, scan
+from waypoint.domain.mail import ai, extract, newer, nothing_new, query, review, scan
 from waypoint.storage import db, stored_mail
 from waypoint.storage.models import ReviewItem, Segment, StoredMessage
 
@@ -48,6 +48,9 @@ def mail(body: str, subject: str = SUBJECT, date: str = SAME_DAY, ident: str = "
 class NothingNewCase(ScanAiCase):
     def setUp(self):
         super().setUp()
+        patch = mock.patch.object(query, "SENDERS", (*query.SENDERS, "example-air.example", "agent-travel.example"))
+        patch.start()
+        self.addCleanup(patch.stop)
         self.put("flight_jsonld")
         self.assertEqual(self.scan().bookings, 1)
         [self.known] = self.segments()
@@ -741,8 +744,8 @@ class WhoMayAttachTests(NothingNewCase):
         self.forwarded(f"{REMINDER} Booking reference QX7M2K.", "Jane Doe <jane@gmail.example>")
         self.assertEqual((self.kept(), self.scanned()["reminder"]), ([], "follow-up"))
 
-    def only_kept_from(self, domain: str) -> None:
-        seg = self.add_flight(self.jane, "EX 202", "ZT4P8Q")
+    def only_kept_from(self, domain: str, seg: dict | None = None) -> None:
+        seg = seg or self.add_flight(self.jane, "EX 202", "ZT4P8Q")
         content = {"subject": "Booked", "sender_domain": domain, "received": "2026-10-12", "text": "Booked.", "html": None,
                    "truncated": False, "original": True, "images": 0}
         def link(conn):
@@ -759,12 +762,45 @@ class WhoMayAttachTests(NothingNewCase):
         self.assertIsNone(self.assess(said, sender="other.example-air.example"))
         self.assertIsNone(self.assess(said, sender="badalerts.example-air.example"))
 
-    def test_a_shared_mail_service_never_vouches_for_its_users(self):
-        self.only_kept_from("gmail.com")
+    def refuses_users_of(self, domain: str) -> None:
+        self.only_kept_from(domain)
         said = {**SAME, "flight_number": "EX 202"}
-        self.assertIsNone(self.assess(said, sender="gmail.com"))
-        self.assertIsNone(self.assess(said, sender="mail.gmail.com"))
-        self.assertEqual(self.assess(said, sender=None, sign=nothing_new.signals("EX 202 JFK to LHR. Booking reference ZT4P8Q.")), "already_known")
+        coded = nothing_new.signals("EX 202 JFK to LHR. Booking reference ZT4P8Q.")
+        self.assertEqual(self.assess(said, sender=None, sign=coded), "already_known")
+        self.assertEqual(self.assess(said, sender=domain, sign=coded), "already_known")
+        self.assertIsNone(self.assess(said, sender=domain))
+        self.assertIsNone(self.assess(said, sender=f"news.{domain}"))
+
+    def test_a_shared_mail_service_never_vouches_for_its_users(self):
+        self.refuses_users_of("gmail.com")
+
+    def test_a_regional_shared_mail_service_never_vouches_for_its_users(self):
+        self.refuses_users_of("hotmail.fr")
+
+    def test_an_isp_mail_domain_never_vouches_for_its_users(self):
+        self.refuses_users_of("orange.fr")
+
+    def test_a_made_up_non_travel_domain_never_vouches_for_its_users(self):
+        self.refuses_users_of("mail.made-up-isp.example")
+
+    def test_a_reminder_from_a_non_travel_domain_kept_with_the_booking_stays_in_review(self):
+        self.only_kept_from("hotmail.fr", self.known)
+        self.read_mail(REMINDER, SAME, sender="Someone <someone@hotmail.fr>")
+        self.assertEqual((len(self.kept()), self.counted()), (1, (0, 0)))
+        self.assertNotIn("reminder", [a["message_id"] for a in self.attached()])
+
+    def test_a_reminder_with_the_code_from_a_non_travel_domain_kept_with_the_booking_still_attaches(self):
+        self.only_kept_from("hotmail.fr", self.known)
+        self.read_mail(f"{REMINDER} Booking reference QX7M2K.", SAME, sender="Someone <someone@hotmail.fr>")
+        self.assertEqual((self.kept(), self.scanned()["reminder"]), ([], "follow-up"))
+
+    def test_a_known_travel_sender_kept_with_the_booking_vouches_at_the_same_domain_and_below(self):
+        with mock.patch.object(query, "SENDERS", (*query.SENDERS, "known-air.example")):
+            self.only_kept_from("known-air.example")
+            said = {**SAME, "flight_number": "EX 202"}
+            self.assertEqual(self.assess(said, sender="known-air.example"), "already_known")
+            self.assertEqual(self.assess(said, sender="news.known-air.example"), "already_known")
+            self.assertIsNone(self.assess(said, sender="other-air.example"))
 
     def test_assess_needs_the_code_in_the_text_or_a_kept_sender(self):
         self.assertEqual(self.assess(SAME), "already_known")
