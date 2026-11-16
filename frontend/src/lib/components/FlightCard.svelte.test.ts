@@ -8,7 +8,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 import { api } from "$lib/api";
 import { forgetAirportZones } from "$lib/airport-zones";
 import type { FlightStatus, Segment } from "$lib/api-types";
-import { BOARDING_MINUTES, LIVE_STATUS_STARTS_DAYS } from "$lib/flightcard";
+import { arcPoint, arcTravelled, BOARDING_MINUTES, LIVE_STATUS_STARTS_DAYS } from "$lib/flightcard";
 import { instant } from "$lib/trips";
 import { segment } from "../../test/fixtures";
 import FlightCard from "./FlightCard.svelte";
@@ -42,14 +42,14 @@ const NOW = {
 const CASES: Case[] = [
   { name: "scheduled", now: NOW.scheduled, status: mk(NOW.scheduled, 4, { dep_terminal: "B" }), label: "EA 214, Denver to Grand Junction, scheduled, departs Thu Jun 12 at 9:40 am",
     pill: "Scheduled", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 4 min ago",
-    facts: [["Terminal", "B"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
+    facts: [["Terminal", "B"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
   { name: "boarding", now: NOW.boarding, status: mk(NOW.boarding, 2, { dep_terminal: "B", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, boarding at gate B14, departs 9:40 am",
     pill: "Boarding", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 2 min ago",
-    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
+    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "Economy"]] },
   { name: "delayed", now: NOW.delayed, label: "EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am",
     status: mk(NOW.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", dep_terminal: "B", dep_gate: "B14", delay_minutes: 35 }),
     pill: "Delayed 35 min", sentence: "", times: ["Originally 9:40 am 10:15 am", "Originally 10:52 am 11:27 am"], updated: "Updated 4 min ago",
-    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
+    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "Economy"]] },
   { name: "in the air", now: NOW.air, label: "EA 214, Denver to Grand Junction, in the air, lands 10:52 am in 38 minutes",
     status: mk(NOW.air, 1, { state: "departed", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:52", arr_terminal: "1", arr_gate: "A3" }),
     pill: "In the air", sentence: "Lands in 38 minutes.", times: ["9:46 am", "10:52 am"], updated: "Updated 1 min ago",
@@ -60,14 +60,14 @@ const CASES: Case[] = [
     facts: [["Terminal", "1"], ["Gate", "A3"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "cancelled", now: NOW.cancelled, status: mk(NOW.cancelled, 12, { state: "cancelled", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, cancelled",
     pill: "Cancelled", sentence: "Contact Example Air about rebooking.", times: ["9:40 am", "10:52 am"], updated: "Updated 12 min ago",
-    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
+    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
   { name: "diverted", now: NOW.diverted, label: "EA 214, Denver to Montrose, diverted, expected to land 10:41 am",
     status: mk(NOW.diverted, 3, { state: "diverted", destination: "MTJ", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:41", arr_gate: "C2" }),
     pill: "Diverted", sentence: "Was headed to Grand Junction.", times: ["9:46 am", "10:41 am"], updated: "Updated 3 min ago",
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "scheduled with no live data", now: NOW.none, label: "EA 214, Denver to Grand Junction, scheduled, no live status yet", pill: null,
     sentence: "Live status starts 1 day before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
-    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
+    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
 ];
 
 const draw = (c: { segment?: Segment; now: number; status?: FlightStatus }, extra: Record<string, unknown> = {}) =>
@@ -210,10 +210,11 @@ describe("the four facts", () => {
     expect(within(card.querySelector("[data-facts] > div") as HTMLElement).getByRole("img", { name: "From live status" })).toBeInTheDocument();
   });
 
-  it("spells the cabin out in full and abbreviated, for the card’s width to choose", async () => {
+  it("spells the cabin out in full at every width", async () => {
     draw(CASES[0]);
-    const cabin = (await screen.findByRole("article")).querySelectorAll("[data-facts] > div")[3].querySelectorAll("dd span");
-    expect([...cabin].map((span) => span.textContent)).toEqual(["Econ", "Economy"]);
+    const card = await screen.findByRole("article");
+    expect(facts(card)[3]).toEqual(["Cabin", "Economy"]);
+    expect(card.querySelector("[data-facts]")).toHaveClass("grid-cols-[repeat(4,minmax(min-content,1fr))]");
   });
 
   it("lists every traveller’s seat in order", async () => {
@@ -316,6 +317,37 @@ describe("a delay past midnight", () => {
     const card = await screen.findByRole("article");
     expect(times(card)[0]).toBe("Originally 11:40 pm 12:30 am MDT · +1 day, 1 day later on the calendar than departure");
     await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent("Departure · Denver · Fri Jun 13"));
+  });
+});
+
+describe("the traveled line", () => {
+  it("ends where the plane is, for any progress", async () => {
+    for (const progress of [0.55, 1]) {
+      const [x, y] = arcTravelled(progress).split(" ").slice(-2).map(Number);
+      const point = arcPoint(progress);
+      expect(x).toBeCloseTo(point.left, 1);
+      expect(y * (46 / 40)).toBeCloseTo(point.top, 0);
+    }
+  });
+
+  it("is drawn to the plane on the card", async () => {
+    draw(CASES[3]);
+    const card = await screen.findByRole("article");
+    const [x] = (card.querySelector("[data-travelled]")?.getAttribute("d") ?? "").split(" ").slice(-2).map(Number);
+    expect(`${x.toFixed(1)}%`).toBe(`${arcPoint(Number(card.getAttribute("data-progress"))).left.toFixed(1)}%`);
+  });
+});
+
+describe("the eyebrow and a diversion with no airport", () => {
+  it("says only the side and the city when the flight is today", async () => {
+    draw(CASES[1]);
+    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")?.textContent?.trim()).toBe("Departure · Denver"));
+  });
+
+  it("says where it lands is not known when a diverted status names no other airport", async () => {
+    draw({ now: NOW.diverted, status: mk(NOW.diverted, 3, { state: "diverted", destination: "GJT", dep_actual: "2025-06-12T09:46" }) });
+    const card = await screen.findByRole("article");
+    expect(within(card).getByText("Where it lands isn’t known yet.")).toBeInTheDocument();
   });
 });
 

@@ -5,7 +5,7 @@
   import { airportInfo } from "$lib/airport-zones";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { headline } from "$lib/trips";
-  import { arcDash, arcHeading, arcPoint, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
+  import { arcHeading, arcPoint, arcTravelled, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
 
   type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; paused?: FlightStatusPause | null; footer?: Snippet };
   let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, paused = null, footer }: Props = $props();
@@ -62,7 +62,7 @@
     <div class="relative mt-1.5 h-[60px]" bind:clientWidth={arcWidth} aria-hidden="true" data-arc>
       <svg class="absolute inset-x-0 top-0 h-[46px] w-full" viewBox="0 0 100 40" preserveAspectRatio="none">
         <path d="M2 38 Q50 -16 98 38" fill="none" class="stroke-map-border" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 5" vector-effect="non-scaling-stroke" />
-        <path d="M2 38 Q50 -16 98 38" pathLength="100" fill="none" class="stroke-map-route" stroke-width="2.5" stroke-linecap="round" stroke-dasharray={`${arcDash(view.progress ?? 0)} 100`} vector-effect="non-scaling-stroke" />
+        <path d={arcTravelled(view.progress ?? 0)} fill="none" class="stroke-map-route" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" data-travelled />
       </svg>
       {#if point}
         <span class="absolute grid size-[22px] place-items-center text-map-route" style={`left: ${point.left}%; top: ${point.top}px; transform: translate(-50%, -50%) rotate(${90 + heading}deg)`} data-plane><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d={PLANE} /></svg></span>
@@ -85,14 +85,12 @@
 
   <div class="flex flex-col gap-2 border-t border-border pt-3">
     <span class="eyebrow">{view.side}{sideCity ? ` · ${sideCity}` : ""}{view.sideDay ? ` · ${view.sideDay}` : ""}</span>
-    <dl class="grid grid-cols-4 gap-2" data-facts>
+    <dl class="grid grid-cols-[repeat(4,minmax(min-content,1fr))] gap-2" data-facts>
       {#each view.facts as fact (fact.label)}
         <div class="min-w-0">
           <dt class="flex items-center gap-[5px] whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{@render source(fact.source)}{fact.label}</dt>
           {#if fact.value}
-            <dd class="mt-0.5 break-words text-[22px] font-[650] tracking-[-0.02em]">
-              {#if fact.abbreviated && fact.abbreviated !== fact.value}<span class="@[25.5rem]:hidden">{fact.abbreviated}</span><span class="hidden @[25.5rem]:inline">{fact.value}</span>{:else}{fact.value}{/if}
-            </dd>
+            <dd class="mt-0.5 text-[22px] font-[650] tracking-[-0.02em]" class:whitespace-nowrap={!fact.label.startsWith("Seat")} class:break-words={fact.label.startsWith("Seat")}>{fact.value}</dd>
           {:else}
             <dd class="mt-0.5 text-[22px] font-medium tracking-[-0.02em] text-muted-foreground"><span aria-hidden="true">—</span><span class="sr-only">Not known yet</span></dd>
           {/if}

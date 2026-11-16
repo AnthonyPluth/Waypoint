@@ -28,7 +28,7 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 
 1. Which gate, terminal and belt data exists (see [flight-gates.md](../flight-gates.md), #635 and #638)? Until the data source lands, some facts stay dashes, and the dash is a designed state, not a bug.
 2. Live status starts "1 day before departure" in the no-live-data card. Decided by the owner on 2026-11-16: the window is one day (`LIVE_STATUS_STARTS_DAYS` in `frontend/src/lib/flightcard.ts`).
-3. "Econ" on phone versus "Economy": the phone card abbreviates so four facts fit across. Decided by the owner on 2026-11-16: keep it as the frames show (the build follows the card's width).
+3. "Econ" on phone versus "Economy": decided by the owner on 2026-11-16: the cabin always reads "Economy" in full. The four fact columns are equal where there is room and otherwise each takes at least the width of its label or value, so "Economy" fits at the frames' own value size on a card about 330 px wide.
 4. The arc and plane geometry on very short flights (under an hour, the plane sits close to the codes) and very long ones (the arc is a drawing, not a route): is a straight dotted line better for either?
 5. Does a landed flight keep showing the card on the trip page after it lands, or fall back to the plain booking once the trip is over (the completed-trip designs hide gate and live status)?
 
@@ -39,7 +39,7 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 - The trip page's card has no Refresh button; Refresh moves to the live status view (#715). A small quiet line, "Live updates paused until <time>" with the reason, stays on the card while updates are paused (monthly limit, rate limit or a refused key), whether or not a status is stored. The frames don't show it.
 - With no live status yet, the card keeps the departure date ("Departs Thu Jun 12.") before the sentence about when live status starts.
 - The live-status window is one day before departure.
-- The card never repeats itself: no sentence beside the pill unless it adds something the card doesn't show. Boarding, Scheduled and Delayed have none (the pill, the gate and the times say it); In the air says how long until landing; Landed says how early or late; Cancelled says whom to contact; Diverted says where it was headed; a flight with no live status says when live status starts. The date goes after the Departure or Arrival label (for example "Departure · Denver · Thu Jun 12") when it isn't today. The accessible name of the article still says the whole state in words.
+- The card never repeats itself (owner, 2026-11-16): there is no line beside the pill for Boarding, Scheduled or Delayed (the pill, the gate and the times say it). The short lines that stay, each decided by the owner: In the air says "Lands in 38 minutes."; Landed says "3 minutes early.", "N minutes late." or "On time."; Cancelled says "Contact <airline> about rebooking."; Diverted says "Was headed to Grand Junction." (or "Where it lands isn't known yet." when no other airport is known); a flight with no live status says when live status starts. The date goes after the Departure or Arrival label (for example "Departure · Denver · Thu Jun 12") when it isn't today. The accessible name of the article still says the whole state in words.
 
 ## Fonts
 

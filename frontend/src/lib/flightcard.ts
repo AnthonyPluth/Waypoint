@@ -10,7 +10,7 @@ const MINUTE_MS = 60_000;
 
 export type CardState = "scheduled" | "boarding" | "delayed" | "in-the-air" | "landed" | "cancelled" | "diverted";
 export type Source = "live" | "booking";
-export type Fact = { label: string; value: string | null; abbreviated: string | null; source: Source };
+export type Fact = { label: string; value: string | null; source: Source };
 export type Stamp = { local: string; zone: string; time: string; zoneName: string; original: string | null; tone: "plain" | "late" | "gone"; later: string; laterWords: string };
 
 export type FlightCardView = {
@@ -89,9 +89,6 @@ export function flightNumber(raw: string | undefined): string {
   return found ? `${found[1]} ${found[2]}` : text;
 }
 
-const CABIN_ON_PHONE: Record<string, string> = { economy: "Econ", "premium economy": "Prem Econ" };
-export const cabinOnPhone = (cabin: string): string => CABIN_ON_PHONE[cabin.trim().toLowerCase()] ?? cabin;
-
 const stamp = (local: string, zone: string, tone: Stamp["tone"] = "plain", original: string | null = null, from: string | null = null): Stamp => {
   const days = from ? daysBetween(from, local) : 0;
   return {
@@ -165,7 +162,6 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const duration = gone ? "" : lengthOf(Number.isNaN(flown) ? bookedArr - bookedDep : flown);
 
   const updated = st ? updatedWords(st.fetched_at, now) || null : null;
-  const whereTo = city(destination);
   const lands = state === "in-the-air" ? arrAt - now : NaN;
   const landedOn = dayIn(now, arrZone) === arrLocal.slice(0, 10) ? "" : `${shortDay(arrLocal)} `;
   const early = st?.arr_actual ? lateWords(minutesBetween(instant(st.arr_actual, st.arr_zone), instant(st.arr_scheduled ?? s.end_local, st.arr_scheduled ? st.arr_zone : s.end_zone))) : "";
@@ -207,22 +203,22 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const cabin = s.details.cabin?.trim() || null;
   const lastKnown = state !== "cancelled" && state !== "diverted";
   const live = (value: string | null | undefined, on = lastKnown): Fact["value"] => (on && value ? value : null);
-  const seatFact: Fact = { label: seat.includes(",") ? "Seats" : "Seat", value: seat || null, abbreviated: null, source: "booking" };
+  const seatFact: Fact = { label: seat.includes(",") ? "Seats" : "Seat", value: seat || null, source: "booking" };
   const facts: Fact[] = arrivalSide
     ? [
-      { label: "Terminal", value: live(st?.arr_terminal, state !== "diverted"), abbreviated: null, source: "live" },
-      { label: "Gate", value: live(st?.arr_gate, state !== "diverted"), abbreviated: null, source: "live" },
-      { label: "Belt", value: null, abbreviated: null, source: "live" },
+      { label: "Terminal", value: live(st?.arr_terminal, state !== "diverted"), source: "live" },
+      { label: "Gate", value: live(st?.arr_gate, state !== "diverted"), source: "live" },
+      { label: "Belt", value: null, source: "live" },
       seatFact,
     ]
     : (() => {
       const liveTerminal = live(st?.dep_terminal);
       const bookedTerminal = state === "cancelled" ? null : s.details.terminal?.trim() || null;
       return [
-        { label: "Terminal", value: liveTerminal ?? bookedTerminal, abbreviated: null, source: liveTerminal || !bookedTerminal ? "live" : "booking" } satisfies Fact,
-        { label: "Gate", value: live(st?.dep_gate), abbreviated: null, source: "live" } satisfies Fact,
+        { label: "Terminal", value: liveTerminal ?? bookedTerminal, source: liveTerminal || !bookedTerminal ? "live" : "booking" } satisfies Fact,
+        { label: "Gate", value: live(st?.dep_gate), source: "live" } satisfies Fact,
         seatFact,
-        { label: "Cabin", value: cabin, abbreviated: cabin ? cabinOnPhone(cabin) : null, source: "booking" } satisfies Fact,
+        { label: "Cabin", value: cabin, source: "booking" } satisfies Fact,
       ];
     })();
 
@@ -266,7 +262,13 @@ export function arcHeading(progress: number, width: number): number {
   return Math.round((Math.atan2(dy * (ARC.pixels / ARC.height), dx * (width / 100)) * 180) / Math.PI);
 }
 
-export const arcDash = (progress: number): number => Math.round(Math.min(0.98, Math.max(0, progress)) * 100);
+export function arcTravelled(progress: number): string {
+  const t = along(progress);
+  const a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const end = { x: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, y: a * ARC.y0 + b * ARC.y1 + c * ARC.y2 };
+  return `M${ARC.x0} ${ARC.y0} Q${round(ARC.x0 + t * (ARC.x1 - ARC.x0))} ${round(ARC.y0 + t * (ARC.y1 - ARC.y0))} ${round(end.x)} ${round(end.y)}`;
+}
 
 export function pausedWords(p: FlightStatusPause): string {
   const until = new Date(p.until);
