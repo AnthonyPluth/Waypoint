@@ -141,13 +141,12 @@
     void resets;
     if (key) untrack(() => void loadDistances(key.split(",").map(Number), distanceGeneration));
   });
-  const openPage = (id: number) => { location.hash = `#trip/${id}`; };
   const reloaded = (movedTo?: number) => {
     if (!movedTo) { void load(); return; }
-    const known = trips?.find((t) => t.id === movedTo);
-    if (known && isPast(known, today())) { openPage(movedTo); return; }
-    setQuery(queryFor({ trip: movedTo }));
-    void load().then(() => { const found = trips?.find((t) => t.id === movedTo); if (found && isPast(found, today())) openPage(movedTo); });
+    void load().then(() => {
+      const found = trips?.find((t) => t.id === movedTo);
+      if (found && !isPast(found, today())) setQuery(queryFor({ trip: movedTo }));
+    });
   };
   const choose = (e: MouseEvent, t: Trip) => {
     if (!panes.two || isPast(t, today()) || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

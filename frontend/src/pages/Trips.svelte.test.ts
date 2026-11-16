@@ -386,7 +386,10 @@ describe("changing a trip in the pane", () => {
     expect(await within(pane).findByRole("heading", { level: 1, name: "Lisbon" })).toBeInTheDocument();
   });
 
-  it("opens a past trip's own page when a booking is moved into it, instead of showing another trip in the pane", async () => {
+  it("keeps the pane on the trip it was showing when a booking is moved into a past trip", async () => {
+    store = [trip([segment({ id: 6, trip_id: 6, start_local: "2026-10-12T09:00", end_local: "2026-10-14T09:00" })], { id: 6, name: "Trip to Rome" }), ...store];
+    location.hash = "#trips?trip=1";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
     render(Trips);
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
@@ -397,8 +400,10 @@ describe("changing a trip in the pane", () => {
     await waitFor(() => expect(within(choose).getByRole("option", { name: /Trip to Orlando/ })).toBeInTheDocument());
     await u.selectOptions(choose, "3");
     await u.click(within(dialog).getByRole("button", { name: "Move" }));
-    await waitFor(() => expect(location.hash).toBe("#trip/3"));
-    expect(route.query).not.toContain("trip=3");
+    await waitFor(() => expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getByRole("link", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(route.query).toBe("trip=1");
+    expect(within(screen.getByRole("region", { name: "Selected trip" })).getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
   });
 
   it("drops a removed booking from the pane and keeps the trip in the list", async () => {
