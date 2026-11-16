@@ -214,7 +214,16 @@ describe("the four facts", () => {
     draw(CASES[0]);
     const card = await screen.findByRole("article");
     expect(facts(card)[3]).toEqual(["Cabin", "Economy"]);
-    expect(card.querySelector("[data-facts]")).toHaveClass("grid-cols-[repeat(4,minmax(min-content,1fr))]");
+    expect(card.querySelector("[data-facts]")).toHaveClass("flex-wrap");
+  });
+
+  it("lets a cabin of several words wrap in its column instead of overflowing", async () => {
+    draw({ segment: { ...booked, details: { ...booked.details, cabin: "Premium Economy" } }, now: NOW.none });
+    const card = await screen.findByRole("article");
+    expect(facts(card)[3]).toEqual(["Cabin", "Premium Economy"]);
+    const value = card.querySelectorAll("[data-facts] dd")[3];
+    expect(value).toHaveClass("break-words");
+    expect(value).not.toHaveClass("whitespace-nowrap");
   });
 
   it("lists every traveller’s seat in order", async () => {

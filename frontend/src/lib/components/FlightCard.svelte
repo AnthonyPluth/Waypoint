@@ -85,12 +85,12 @@
 
   <div class="flex flex-col gap-2 border-t border-border pt-3">
     <span class="eyebrow">{view.side}{sideCity ? ` · ${sideCity}` : ""}{view.sideDay ? ` · ${view.sideDay}` : ""}</span>
-    <dl class="grid grid-cols-[repeat(4,minmax(min-content,1fr))] gap-2" data-facts>
+    <dl class="flex flex-wrap gap-x-2 gap-y-2" data-facts>
       {#each view.facts as fact (fact.label)}
-        <div class="min-w-0">
+        <div class="min-w-min flex-[1_1_0]">
           <dt class="flex items-center gap-[5px] whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{@render source(fact.source)}{fact.label}</dt>
           {#if fact.value}
-            <dd class="mt-0.5 text-[22px] font-[650] tracking-[-0.02em]" class:whitespace-nowrap={!fact.label.startsWith("Seat")} class:break-words={fact.label.startsWith("Seat")}>{fact.value}</dd>
+            <dd class="mt-0.5 break-words text-[22px] font-[650] tracking-[-0.02em]">{fact.value}</dd>
           {:else}
             <dd class="mt-0.5 text-[22px] font-medium tracking-[-0.02em] text-muted-foreground"><span aria-hidden="true">—</span><span class="sr-only">Not known yet</span></dd>
           {/if}

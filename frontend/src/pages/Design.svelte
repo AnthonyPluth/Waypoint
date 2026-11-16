@@ -51,6 +51,7 @@
     { name: "Cancelled", now: cardNow.cancelled, status: status(cardNow.cancelled, 12, { state: "cancelled" }), segment: flightEA },
     { name: "Diverted", now: cardNow.diverted, status: status(cardNow.diverted, 3, { state: "diverted", destination: "MTJ", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:41" }), segment: flightEA },
     { name: "Scheduled, no live status", now: cardNow.none, segment: flightEA },
+    { name: "Scheduled, Premium Economy", now: cardNow.scheduled, status: status(cardNow.scheduled, 4, { dep_terminal: "B" }), segment: { ...flightEA, details: { ...flightEA.details, cabin: "Premium Economy" } } },
   ];
 
   const tileKinds = ["flight", "hotel", "train", "car", "cruise", "parking", "visit"] as const;
