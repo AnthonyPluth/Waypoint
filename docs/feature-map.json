@@ -473,6 +473,7 @@
       "web": [],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
         "tests/test_photo_access.py",
         "tests/test_photo_covers.py",
         "tests/test_photo_proxy.py",
