@@ -18,7 +18,7 @@ export type Extent = { left: number; top: number; right: number; bottom: number 
 export type BoundaryShape = Extent & { d: string };
 export type Shield = { ref: string; x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
-type Visit = Stop & { exact?: boolean };
+type Visit = Stop & { exact?: boolean; rental?: boolean };
 type Point = { name: string; city?: string; code?: string | null; kind?: StopKind; latitude: number; longitude: number; exact?: boolean };
 
 export const MIN_SPAN_DEGREES = 10;
@@ -106,8 +106,8 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const live = liveOf(trip).filter((s) => s.kind !== "parking" && (s.kind !== "visit" || countries))
     .sort((a, b) => (countries ? dateOrder(a, b) : instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id));
   const out: Visit[] = [];
-  const add = (p: Point | null, from: string, to: string, via: Kind | null) => {
-    if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via });
+  const add = (p: Point | null, from: string, to: string, via: Kind | null, rental = false) => {
+    if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via, ...(rental ? { rental } : {}) });
   };
   for (const s of live) {
     if (s.kind === "flight") {
@@ -119,7 +119,7 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       const found = stay(s, s.destination) ?? city(s.destination);
       add(found && { ...found, kind: "stay", city: found.name, name: head(s.origin ?? "") || found.name }, s.start_local, s.end_local, null);
     } else if (s.kind === "car") {
-      add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null);
+      add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null, true);
     } else if (s.kind === "train") {
       add(city(s.origin), s.start_local, s.start_local, null);
       add(stay(s, s.destination) ?? city(s.destination), s.end_local, s.end_local, "train");
@@ -130,7 +130,9 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       add(returnsToEmbarkation ?? city(s.destination), s.end_local, s.end_local, "cruise");
     }
   }
-  return out;
+  // A rental car is how you get around, not somewhere you are: held over days it would stretch the airport it is
+  // collected at (or any stop it sits beside) to cover them all. It is a stop only at a place nothing else in the trip visits.
+  return out.filter((v) => !v.rental || !out.some((o) => !o.rental && samePlace(v, o)));
 }
 
 const samePlace = (a: Point, b: Point): boolean =>
