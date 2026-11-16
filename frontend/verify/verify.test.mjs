@@ -61,6 +61,16 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ upload: "x" }] })).toEqual(["step 1: upload takes a object"]);
   });
 
+  it("takes an element to scroll under the tab bar", () => {
+    expect(flowProblems({ ...ok, steps: [{ scroll_under_bar: "button" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ scroll_under_bar: true }] })).toEqual(["step 1: scroll_under_bar takes a string"]);
+  });
+
+  it("takes an audit of the page where the flow has scrolled to", () => {
+    expect(flowProblems({ ...ok, steps: [{ audit: true }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ audit: "yes" }] })).toEqual(["step 1: audit takes a boolean"]);
+  });
+
   it("takes a suffix for the names of a list, to check a long one's layout", () => {
     expect(flowProblems({ ...ok, steps: [{ long_names: ", a long name" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ long_names: 3 }] })).toEqual(["step 1: long_names takes a string"]);
@@ -243,6 +253,7 @@ describe("the assertions a screenshot must not undo", () => {
     checks = checksAfter(checks, { wait_for: "ul" });
     checks = checksAfter(checks, { screenshot: "a" });
     checks = checksAfter(checks, { scroll_to: "#x" });
+    checks = checksAfter(checks, { scroll_under_bar: "button" });
     checks = checksAfter(checks, { expect_text: { selector: "main", text: "Jane" }, timeout: 500 });
     expect(checks).toHaveLength(2);
     expect(checksAfter(checks, { click: "a" })).toEqual([]);
