@@ -156,6 +156,30 @@ class CoverRouteTests(CoverCase):
         self.assertEqual(listed["best"], made[:7])
         self.assertEqual(self.cover("ana"), {"trip_id": self.trip, "count": 9, "covers": made[:3]})
 
+    def test_best_and_covers_follow_the_instant_when_the_wall_clock_disagrees_across_zones(self):
+        later = self.at("ben", "2026-06-02T01:00", None, taken_utc="2026-06-01T23:00:00+00:00")
+        earlier = self.at("ben", "2026-06-02T07:00", None, taken_utc="2026-06-01T22:00:00+00:00")
+        self.assertLess(later, earlier)
+        self.assertEqual(self.listing("ana")["best"], [earlier, later])
+        self.assertEqual(self.cover("ana"), {"trip_id": self.trip, "count": 2, "covers": [earlier, later]})
+        placed_later = self.at("ben", "2026-06-03T01:00", SOHO, taken_utc="2026-06-02T23:00:00+00:00")
+        placed_earlier = self.at("ben", "2026-06-03T07:00", ROME, taken_utc="2026-06-02T22:00:00+00:00")
+        self.assertEqual(self.listing("ana")["best"], [placed_earlier, placed_later, earlier, later])
+        self.assertEqual(self.cover("ana")["covers"], [placed_earlier, placed_later, earlier])
+
+    def test_two_people_with_the_same_asset_id_each_keep_their_photo_on_the_trip_and_the_covers(self):
+        theirs = self.at("ana", "2026-06-02T10:00", SOHO, asset="canary-asset-shared-4k8m")
+        mine = self.at("ben", "2026-06-02T11:00", SOHO, asset="canary-asset-shared-4k8m")
+        self.assertNotEqual(self.sources["ana"], self.sources["ben"])
+        with no_leaks(self, *CANARIES):
+            for who in ("ana", "ben"):
+                listed = self.listing(who)
+                self.assertEqual(sorted(p["id"] for p in listed["photos"]), sorted([theirs, mine]), who)
+                self.assertEqual(listed["counts"]["total"], 2, who)
+                self.assertEqual(sorted(p["person_id"] for p in listed["people"]), sorted([self.person["ana"], self.person["ben"]]), who)
+                self.assertEqual(self.cover(who), {"trip_id": self.trip, "count": 2, "covers": [theirs, mine]}, who)
+                self.assertEqual(listed["best"], [theirs, mine], who)
+
     def test_a_trip_with_no_visible_photo_says_so_and_invents_nothing(self):
         self.assertEqual(self.cover("ana"), {"trip_id": self.trip, "count": 0, "covers": []})
         self.assertEqual(self.listing("ana")["best"], [])
