@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import date
 from collections.abc import Callable
 from typing import Any
 
@@ -13,7 +14,7 @@ from ...providers import immich
 from .. import jobs
 from ..common import IMAGE_CSP, NO_IMAGE, ApiError, Response, _current, image_response, keep_blank, request_header, row_id
 from ..contract import (Ok, PhotoBody, PhotoExclusionsBody, PhotoGrants, PhotoPrefs, PhotoPrefsBody, PhotoReview, PhotoSharing, PhotoSharingBody, PhotoSource,
-                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSourceResume, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, PhotoUndoBody, SyncStarted, TripPhoto,
+                        PhotoSourceBody, PhotoSourceEdit, PhotoSourceNewTestBody, PhotoSourceResume, PhotoSources, PhotoSourceTest, PhotoSourceTestBody, PhotoUndoBody, SyncStarted, TripCovers, TripPhoto,
                         TripPhotos)
 from .trips import NO_TRIP, _run, viewer
 
@@ -114,6 +115,10 @@ def _stamp(value: Any, label: str) -> float | None:
 def api_trip_photos(conn, _q, _b, trip_id) -> TripPhotos:
     who = _viewer(conn)
     return _run(lambda: photos.for_trip(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
+
+
+def api_photo_trip_covers(conn, _q, _b) -> TripCovers:
+    return photos.trip_covers(conn, _viewer(conn), date.today().isoformat())
 
 
 def api_photo_review(conn, _q, _b) -> PhotoReview:

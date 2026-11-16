@@ -1327,6 +1327,16 @@ export interface TripCosts {
   bookings: number;
 }
 
+export interface TripCover {
+  trip_id: number;
+  count: number;
+  covers: number[];
+}
+
+export interface TripCovers {
+  trips: TripCover[];
+}
+
 export interface TripHome {
   city: string;
   latitude: number;
@@ -1375,6 +1385,7 @@ export interface TripPhotos {
   clusters: PhotoCluster[];
   counts: PhotoCounts;
   people: PhotoPerson[];
+  best: number[];
 }
 
 export interface TripPlaces {
@@ -1474,6 +1485,7 @@ export interface Endpoints {
   "POST /api/trips/{id}/destination/suggest": { body: DestinationBody; reply: DestinationSuggestion };
   "GET /api/trips/{id}/photos": { body: never; reply: TripPhotos };
   "GET /api/photos/review": { body: never; reply: PhotoReview };
+  "GET /api/photos/trip-covers": { body: never; reply: TripCovers };
   "POST /api/photos/{id}": { body: PhotoBody; reply: TripPhoto };
   "POST /api/photos/{id}/undo": { body: PhotoUndoBody; reply: TripPhoto };
   "GET /api/photo-sources": { body: never; reply: PhotoSources };

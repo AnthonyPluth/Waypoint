@@ -5,13 +5,14 @@ import threading
 import time
 import unittest
 import urllib.parse
+from datetime import date
 from types import SimpleNamespace
 from unittest import mock
 
 from sqlalchemy import delete, update
 
 from tests.privacy import no_leaks
-from tests.shared import fetch
+from tests.shared import fetch, freeze_today
 from tests.test_every_route import NOT_JSON
 from tests.test_immich_provider import http_error
 from tests.test_photo_access import AccessCase
@@ -353,6 +354,20 @@ class RenditionTests(ProxyCase):
         self.revoke("ben")
         self.missing("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": fresh})
         self.assertEqual(self.immich.calls, [])
+
+    def test_a_cover_is_served_through_the_thumbnail_route_and_leaves_the_list_when_taken_back(self):
+        freeze_today(self, date(2026, 12, 1))
+        got = self.ok("ana", "GET", "/api/photos/trip-covers")
+        self.assertEqual(got, {"trips": [{"trip_id": self.trip, "count": 1, "covers": [self.mine]}]})
+        headers, raw = self.image("ana", f"/api/photos/{got['trips'][0]['covers'][0]}/thumbnail")
+        self.assertEqual((raw, headers["Cache-Control"]), (WEBP, "private, no-cache"))
+        tag = headers["ETag"]
+        self.assertEqual(self.get("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": tag})[0], 304)
+        self.assertEqual(self.ok("cy", "GET", "/api/photos/trip-covers"), {"trips": []})
+        self.missing("cy", f"/api/photos/{self.mine}/thumbnail")
+        self.exclude("ben", self.mine)
+        self.assertEqual(self.ok("ana", "GET", "/api/photos/trip-covers"), {"trips": [{"trip_id": self.trip, "count": 0, "covers": []}]})
+        self.missing("ana", f"/api/photos/{self.mine}/thumbnail", {"If-None-Match": tag})
 
     def test_a_removed_photo_has_a_thumbnail_for_its_person_alone_and_only_while_it_stays_removed(self):
         removed = self.photo("ben")

@@ -98,6 +98,8 @@ With no library connected, a trip that has started points you to **Connect a lib
 
 For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. The pins are drawn on the trip’s map, and **Show these photos** on a pin’s card opens the gallery at that cluster ([Photo pins on the map](/Waypoint/start/trips/#photo-pins-on-the-map)). A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
 
+A past trip's best photos, the ones its card in the Past trips list and the top of its page show, are chosen automatically from the photos you may see on it: the cover of each pin, the pin with the most photos first, then more photos from the biggest pins, then photos with no place, oldest first. Videos are never chosen, and a trip with no photos you can see shows none.
+
 ## Needs a look
 
 A photo Waypoint could not settle waits under **Needs a look** for the person whose library it came from: one taken during two overlapping trips they shared that distance could not tell apart, or one taken far from every booking of the trip it matched. Each is listed with the trips it could belong to, which are only trips its person shared and did not remove it from. The person picks the trip, accepts the match as it is, removes it from its trip, or leaves an unsettled photo off every trip it could belong to; a photo they have placed by hand keeps that trip through every later sync. A photo can only be moved to a trip its person is on and has shared their photos on.

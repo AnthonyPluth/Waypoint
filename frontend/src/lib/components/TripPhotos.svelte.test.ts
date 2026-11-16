@@ -22,7 +22,7 @@ const photo = (id: number, extra: Partial<TripPhoto> = {}): TripPhoto => ({
   id, person_id: 1, trip_id: 7, kind: "image", taken_local: "2026-03-01T10:42", zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif",
   segment_id: 2, match: "place", distance_km: 3, cluster: 0, removed_at: null, ...extra,
 });
-const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [] });
+const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best: [] });
 const source = (extra: Partial<PhotoSource> = {}): PhotoSource => ({ id: 1, person_id: 1, url: "https://immich.example", label: null, status: "ok", mine: true, last_sync: "2026-03-05T06:00", last_error: null, photos: 0, trips: 0, ...extra });
 const many = (n: number, perDay = 20) => Array.from({ length: n }, (_, i) => photo(i + 1, { taken_local: `2026-03-${String(1 + Math.floor(i / perDay) % 28).padStart(2, "0")}T${String(8 + (i % 12)).padStart(2, "0")}:00` }));
 

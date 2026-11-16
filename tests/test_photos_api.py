@@ -22,7 +22,7 @@ LONDON = "Europe/London"
 NEW_YORK = "America/New_York"
 SOHO = (51.5136, -0.1365)
 HEATHROW = (51.4706, -0.4619)
-ROUTES = ("/api/trips/{id}/photos", "/api/photos/review", "/api/photos/{id}", "/api/photos/{id}/undo", "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions",
+ROUTES = ("/api/trips/{id}/photos", "/api/photos/review", "/api/photos/trip-covers", "/api/photos/{id}", "/api/photos/{id}/undo", "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions",
           "/api/trips/{id}/photo-exclusions/{id}", "/api/photo-grants", "/api/photo-sharing-prefs/{id}")
 ROME = (41.9028, 12.4964)
 PARIS = "Europe/Paris"
@@ -130,6 +130,7 @@ class PhotoRoutes(RouteCase):
             self.assertEqual(got["clusters"], [{"latitude": SOHO[0], "longitude": SOHO[1], "count": 1, "first": "2026-06-02T10:00", "last": "2026-06-02T10:00",
                                                 "cover": mine, "inferred": False}])
             self.assertEqual([p["cluster"] for p in got["photos"]], [None, 0])
+            self.assertEqual(got["best"], [mine, theirs])
         self.assertEqual(got["photos"][1], {"id": mine, "person_id": self.person["ana"], "trip_id": self.trip, "kind": "image", "taken_local": "2026-06-02T10:00", "zone": LONDON,
                                             "latitude": SOHO[0], "longitude": SOHO[1], "location_source": "exif", "segment_id": self.stay["id"],
                                             "match": "place", "distance_km": 1.2, "cluster": 0, "removed_at": None})

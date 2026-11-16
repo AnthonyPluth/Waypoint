@@ -291,8 +291,12 @@ A Semgrep rule, `waypoint-photo-access`, fails a `select(Photo…)`, a `select_f
 
 All need sign-in; `tests/test_every_route.py` holds that.
 
+`photos.best_photos(photos, clusters, limit)` picks the best photos from rows already filtered by `photos.visible(viewer)`, with no manual picking: the `cover` of each cluster, largest cluster first (ties: the cluster that began first); with fewer clusters than `limit`, further photos (by time) from the largest clusters, one per cluster per round; photos in no cluster last, oldest first. Videos are never chosen, so a cluster whose cover is a video is covered by its first photo. The hero's photos are the first of the trip's photos, and the trip page leaves them out of the per-day grids; a day's cover is its first photo with a place.
+
 | Route | Who | What |
 | --- | --- | --- |
+| `GET /api/trips/{id}/photos` | `photos.visible`, for a trip the viewer can see | The photos, `clusters`, `counts`, `people` and `best`: up to 7 photo ids for the trip page's hero (the phone shows the first 3), from `photos.best_photos` (below). Every id in `best` is one of the reply's `photos`. |
+| `GET /api/photos/trip-covers` | `photos.visible`, for each past trip the viewer can see | `{"trips": [{"trip_id", "count", "covers"}]}` for the Past trips list: every trip the viewer can see that ended before the server's today (`end_date` set and earlier, as `isPast` in `frontend/src/lib/trips.ts`), in trip id order. `count` is the number of photos the viewer may see (the trip photos reply's `counts.total`), `covers` up to 3 photo ids, the first 3 of that trip's `best`; a trip with no visible photo answers `count: 0, covers: []`. Computed with a fixed number of queries (`tests/test_photo_covers.py` counts them for 3 and for 30 trips). Local mode answers 404 like every photo route. The pictures come from the thumbnail route below, with its `private, no-cache` and ETag. |
 | `GET /api/photos/{id}/thumbnail` | `photos.visible` or `photos.unsettled` | Immich `thumbnail` (grid tile). |
 | `GET /api/photos/{id}/preview` | `photos.visible` or `photos.unsettled` | Immich `preview` (lightbox). |
 | `GET /api/photos/{id}/original` | `photos.visible` or `photos.unsettled` | Immich `original`, streamed (`Response.stream`), for the "Open original" action and videos. |

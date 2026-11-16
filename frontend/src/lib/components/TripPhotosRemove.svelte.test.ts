@@ -35,7 +35,7 @@ const shot = (id: number, who = 1, extra: Partial<TripPhoto> = {}): TripPhoto =>
   id, person_id: who, trip_id: 7, kind: "image", taken_local: `2026-03-01T${String(8 + id).padStart(2, "0")}:00`, zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif",
   segment_id: 2, match: "place", distance_km: 3, cluster: 0, removed_at: null, ...extra,
 });
-const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [] });
+const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best: [] });
 const source: PhotoSource = { id: 7, person_id: 1, url: "https://immich.brook.example", label: null, status: "ok", mine: true, last_sync: "2026-03-05T06:00", last_error: null, photos: 0, trips: 0 };
 
 let visible: TripPhoto[];
