@@ -8,7 +8,7 @@ vi.mock("svelte-sonner", () => ({ Toaster: vi.fn(), toast: Object.assign(vi.fn()
 
 import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
-import { forgetPreload, PRELOAD_MS } from "$lib/mapkit";
+import { forgetMapkit, forgetPreload, PRELOAD_MS } from "$lib/mapkit";
 import { state } from "./test/fixtures";
 import App from "./App.svelte";
 
@@ -124,6 +124,7 @@ describe("the shell", () => {
 describe("preloading MapKit", () => {
   const tokenCalls = () => vi.mocked(api).mock.calls.filter(([path]) => path === "/api/mapkit/token");
   beforeEach(() => {
+    forgetMapkit();
     forgetPreload();
     vi.useFakeTimers();
     vi.mocked(api).mockResolvedValue({ enabled: false } as never);

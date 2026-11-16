@@ -60,17 +60,18 @@ function scriptAt(src: string, timeoutMs: number): Promise<Mk | null> {
 async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const silent = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), LOAD_MS); });
-  const first = await Promise.race([apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true }).catch(() => null), silent]);
+  const first = await Promise.race([apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true, background: true }).catch(() => null), silent]);
   clearTimeout(timer);
   if (first?.enabled !== true || !first.script) return { maps: null, remember: first?.enabled === false };
   const mk = window.mapkit ?? (await scriptAt(first.script, LOAD_MS));
   if (!mk) return { maps: null, remember: false };
   const listeners = new Set<() => void>();
-  const fail = () => { for (const l of [...listeners]) l(); };
+  let failed = false;
+  const fail = () => { failed = true; for (const l of [...listeners]) l(); };
   try {
     mk.init({
       authorizationCallback: (done) => {
-        apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true }).then(
+        apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true, background: true }).then(
           (next) => { if (next?.enabled === true && next.token) done(next.token); else fail(); },
           fail,
         );
@@ -81,7 +82,11 @@ async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
   } catch {
     return { maps: null, remember: false };
   }
-  return { maps: { mk, onFailure: (l) => { listeners.add(l); return () => { listeners.delete(l); }; } }, remember: true };
+  return { maps: { mk, onFailure: (l) => {
+    listeners.add(l);
+    if (failed) queueMicrotask(() => { if (listeners.has(l)) l(); });
+    return () => { listeners.delete(l); };
+  } }, remember: true };
 }
 
 export function loadMapkit(): Promise<Maps | null> {

@@ -30,7 +30,7 @@ describe("loading MapKit", () => {
     expect(await loadMapkit()).toBeNull();
     expect(await loadMapkit()).toBeNull();
     expect(api).toHaveBeenCalledTimes(1);
-    expect(api).toHaveBeenCalledWith("/api/mapkit/token", { keep: true });
+    expect(api).toHaveBeenCalledWith("/api/mapkit/token", { keep: true, background: true });
     expect(scripts).toHaveLength(0);
     expect(fake.inits).toHaveLength(0);
   });
@@ -182,7 +182,36 @@ describe("preloading MapKit", () => {
   it("asks for the token in a way that moving to another page does not cancel", async () => {
     vi.mocked(api).mockResolvedValue({ enabled: false } as never);
     await loadMapkit();
-    expect(vi.mocked(api).mock.calls[0][1]).toMatchObject({ keep: true });
+    expect(vi.mocked(api).mock.calls[0][1]).toMatchObject({ keep: true, background: true });
+  });
+
+  it("also asks for the refresh the same way, so a lapsed session shows the banner and does not redirect", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    await pending;
+    const done = vi.fn();
+    fake.inits[0].authorizationCallback(done);
+    await flush();
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]).toMatchObject({ keep: true, background: true });
+  });
+
+  it("tells a replay that opens after MapKit already failed, at once", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = await pending;
+    fake.emit("error", { status: "Unauthorized" });
+    const lost = vi.fn();
+    maps?.onFailure(lost);
+    await flush();
+    expect(lost).toHaveBeenCalledOnce();
+    const cancelled = vi.fn();
+    maps?.onFailure(cancelled)();
+    await flush();
+    expect(cancelled).not.toHaveBeenCalled();
   });
 
   it("does not strand later replays when the token request never settles, as when a page change cancelled it", async () => {
