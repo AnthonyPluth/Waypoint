@@ -288,6 +288,7 @@
       "handler": "waypoint/server/api/trips.py:api_trip_places",
       "web": [
         "frontend/src/lib/components/RouteReplay.svelte",
+        "frontend/src/lib/components/RouteTile.svelte",
         "frontend/src/pages/Upcoming.svelte"
       ],
       "tests": [
@@ -306,7 +307,8 @@
       "path": "/api/trips/{id}/summary",
       "handler": "waypoint/server/api/trips.py:api_trip_summary",
       "web": [
-        "frontend/src/lib/components/TripSummary.svelte"
+        "frontend/src/lib/components/TripSummary.svelte",
+        "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -470,7 +472,9 @@
       "method": "GET",
       "path": "/api/photos/trip-covers",
       "handler": "waypoint/server/api/photos.py:api_photo_trip_covers",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trips.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -1093,7 +1097,8 @@
       "handler": "waypoint/server/api/stats.py:api_distance_unit",
       "web": [
         "frontend/src/lib/components/TripSummary.svelte",
-        "frontend/src/lib/components/settings/DistanceSection.svelte"
+        "frontend/src/lib/components/settings/DistanceSection.svelte",
+        "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
