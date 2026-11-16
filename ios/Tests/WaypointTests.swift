@@ -1,4 +1,5 @@
 import AuthenticationServices
+import WebKit
 import XCTest
 @testable import Waypoint
 
