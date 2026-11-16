@@ -145,8 +145,8 @@
     loadingYear = pastGroups[revealed].year;
     revealed += 1;
   }
-  function settleYear() {
-    if (loadingYear === null) return;
+  function settleYear(year: number | null) {
+    if (year === null || loadingYear !== year) return;
     const group = pastGroups.find((g) => g.year === loadingYear);
     loadedNote = group ? `Loaded ${group.year}, ${count(group.trips.length)}` : "";
     loadingYear = null;
@@ -154,7 +154,10 @@
   $effect(() => {
     const key = visibleKey;
     void resets;
-    if (key) untrack(() => void loadDistances(key.split(",").map(Number), distanceGeneration).then(settleYear));
+    if (key) untrack(() => {
+      const year = loadingYear;
+      void loadDistances(key.split(",").map(Number), distanceGeneration).then(() => settleYear(year));
+    });
   });
   $effect(() => {
     const watched = sentinel;

@@ -1003,6 +1003,30 @@ describe("past trips by year", () => {
       await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
     });
 
+    it("does not let the first year's slower lookups finish the next year's loading", async () => {
+      viewport.phone = true;
+      serve(history());
+      const held: Record<string, (v: unknown) => void> = {};
+      const base = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation((path, opts) => (/\/api\/trips\/[1-3]\/summary/.test(String(path)) ? new Promise((r) => { held[String(path)] = r; }) : base(path, opts)) as never);
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
+      await waitFor(() => expect(Object.keys(held).sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary", "/api/trips/3/summary"]));
+      held["/api/trips/1/summary"](nothingToCount);
+      held["/api/trips/2/summary"](nothingToCount);
+      await tick();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(screen.getByText("Loading 2025…")).toBeInTheDocument();
+      expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("");
+      expect(watching.some((w) => w.live)).toBe(false);
+      held["/api/trips/3/summary"](nothingToCount);
+      await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
+      expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2025, 1 trip");
+    });
+
     it("does not move focus when a year loads", async () => {
       viewport.phone = true;
       serve(history());
