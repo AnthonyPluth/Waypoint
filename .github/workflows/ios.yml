@@ -6,10 +6,10 @@ name: iOS
 on:
   push:
     branches: [main]
-    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   pull_request:
     branches: [main]
-    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   workflow_dispatch:
 
 permissions:

@@ -1,16 +1,21 @@
 name: iOS TestFlight
 
-# Builds a signed release of the iPhone app (ios/) and uploads it to TestFlight. Started by hand only (never by a pull
-# request or a push): the job runs in the protected "testflight" environment, which holds the signing secrets, and only
-# from main. Setup is in ios/README.md. The unsigned build and tests are the "iOS" workflow.
+# Builds a signed release of the iPhone app (ios/) and uploads it to TestFlight. Started by hand, or by a push to main
+# that changes the app (never by a pull request): the job runs in the protected "testflight" environment, which holds the
+# signing secrets and waits for the owner's approval before each run, and only from main. A change to the web app alone
+# does not start it: the app loads the person's own server and bundles no web files. Setup is in ios/README.md. The
+# unsigned build and tests are the "iOS" workflow.
 on:
+  push:
+    branches: [main]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios-testflight.yml]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-testflight
+  group: ios-testflight-${{ github.ref }}
   cancel-in-progress: false
 
 defaults:
