@@ -19,6 +19,14 @@ The token has the `app` scope and is for `<WAYPOINT_PUBLIC_URL>/app` only. The s
 
 The app's web view is given a normal web session by `POST /auth/app-session`, which needs a valid app token and the `X-Waypoint: 1` header.
 
+## Saved trips
+
+The app can keep your trips on the phone. Saving is off by default and is per phone. The switch for it, the offline page that opens the saved trips and the settings card come in later changes, so today saving is turned on only by an internal setting.
+
+With saving on, the app reads `GET /api/offline` with its own token when the web app opens and each time you return to the app, and replaces the saved set with the reply. Only the trips you are on are in it, and it never holds loyalty or Known Traveler numbers (see [Offline access](/Waypoint/start/offline/)). The reply carries a `version`; the app saves only a version it knows and otherwise keeps the copy it has. If the phone can't reach the server, the copy it has stays and the app tries again the next time, with nothing shown to you.
+
+The saved trips are files in the app's private storage, protected so they are readable only while the phone is unlocked. The app deletes them when you sign out (**Use another Waypoint** and a 401 from the server included), when the server answers the app's request with 401 or 403, when saving is turned off or removed, and when the server address changes.
+
 ## Ending it
 
 The app's access ends when you can no longer sign in to Waypoint (you are taken off `OIDC_ALLOWED_EMAILS`, or, with groups, your last sign-in is older than `WAYPOINT_SESSION_DAYS`), or when the app drops the connection: it does so by itself when the server says the sign-in is no longer valid or when Waypoint answers 401 while you are using the app, and **Use another Waypoint** on its error screen signs out too. Each of these shows a "You are signed out of Waypoint" screen, and **Sign in** on it asks for the address again. There is no sign-out button in Settings yet. Unlike an assistant, the app does not appear under **Settings → Assistants**.
