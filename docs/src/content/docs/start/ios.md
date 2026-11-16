@@ -37,3 +37,11 @@ Setup happens once:
 6. Add these secrets to it: `IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` and `APP_STORE_CONNECT_KEY_P8_BASE64`. Add these variables: `DEVELOPMENT_TEAM` and `WAYPOINT_BUNDLE_ID`.
 
 Until they exist, the workflow stops at its first step and names what is missing. The signing and upload path has not been run yet, so expect to fix the first run. The full checklist, with what each secret holds, is in the [iPhone app README](https://github.com/AnthonyPluth/Waypoint/blob/main/ios/README.md).
+
+## Export compliance (encryption)
+
+The app declares `ITSAppUsesNonExemptEncryption` as `false` in its `Info.plist`. This is the answer to Apple's export-compliance question, given once so App Store Connect does not ask on every build. It says the app uses only the encryption built into the phone: HTTPS, the Keychain and the system sign-in sheet.
+
+The Waypoint web app has an offline vault that encrypts saved trips with Web Crypto (AES-256-GCM, ECDH, HKDF and a key derived from a passkey). The iPhone app does not offer it yet, and it would run through the phone's own browser engine. The owner judged the declaration appropriate on that basis. This is not legal advice.
+
+The declaration must be revisited before the offline vault ships on the iPhone. If it does, the export-compliance questions are answered again for that build, and the annual self-classification report is worth considering.
