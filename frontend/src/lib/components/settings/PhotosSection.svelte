@@ -263,7 +263,8 @@
       asking = { ...a, check, trips, note, stale: false };
     } catch (err) {
       if (mineTicket !== askTicket) return;
-      if (typeof (err as { status?: unknown } | null)?.status !== "number") { asking = { ...a, note: resumeUnchecked, stale: true }; return; }
+      const status = (err as { status?: unknown } | null)?.status;
+      if (typeof status !== "number" || status === 0) { asking = { ...a, note: resumeUnchecked, stale: true }; return; }
       askOpen = false;
       const why = outcome(err, errMsg(err));
       notices = { ...notices, [a.source.id]: { ...why, text: `${resumeGaveUp} ${why.text}` } };

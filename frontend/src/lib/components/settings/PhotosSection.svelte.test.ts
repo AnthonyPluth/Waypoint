@@ -374,6 +374,23 @@ describe("Settings → Photos, the source cards", () => {
     expect(screen.getByRole("button", { name: "Resume, Ada Brook’s library" })).toBeEnabled();
   });
 
+  it("treats a dropped connection on the re-check as retryable, with the real ApiError, not as a refusal", async () => {
+    const { ApiError } = await vi.importActual<typeof import("$lib/api")>("$lib/api");
+    let dropped = false;
+    serve([source({ status: "off" })], (path, opts) => {
+      if (path === "/api/photo-sources/7/resume") { if (dropped) throw new ApiError("Can’t reach Waypoint. Check your connection and try again.", 0); return asks("b".repeat(32)); }
+      if (path === "/api/photo-grants") return GRANTS;
+      if (path === "/api/photo-sources/7" && opts?.method === "POST") { dropped = true; throw new ApiError("Your trips changed meanwhile; try again", 409); }
+    });
+    render(PhotosSection);
+    await userEvent.click(await screen.findByRole("button", { name: "Resume, Ada Brook’s library" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Resume" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("may be out of date"));
+    expect(screen.getByRole("alertdialog")).toBe(dialog);
+    expect(within(dialog).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
   describe("announces the action that is running, in every phase", () => {
     const hold = () => {
       let release: (v: unknown) => void = () => {};
