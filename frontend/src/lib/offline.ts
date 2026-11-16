@@ -1,5 +1,6 @@
 import type { OfflineTrip } from "./api-types";
 import { apiCall } from "./contract";
+import { inShell, shellRemove } from "./offline-shell";
 import { clearTrip, dropTrips, isSavingOff, isSetUp, saveAll, savedInfos, setSavingOff, type SavedInfo } from "./offline-vault";
 
 export const KEEP_DAYS_AFTER_TRIP = 3;
@@ -62,6 +63,7 @@ let inFlight: Promise<SavedNow | null> | null = null;
 let clears = 0;
 
 export async function clearSaved(): Promise<void> {
+  if (inShell()) { await shellRemove(); return; }
   watchExpiry([]);
   clears++;
   await inFlight?.catch(() => null);
