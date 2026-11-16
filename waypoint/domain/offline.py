@@ -9,6 +9,7 @@ from . import trips, visibility
 from .visibility import Viewer
 
 LOOKAHEAD_DAYS = 7
+VERSION = 1
 
 
 class SegmentMessages(TypedDict):

@@ -333,6 +333,7 @@ class OfflineTrip(TypedDict):
 
 
 class Offline(TypedDict):
+    version: int
     trips: list[OfflineTrip]
 
 

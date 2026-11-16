@@ -1999,6 +1999,7 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_offline.py"
       ],
       "docs": [

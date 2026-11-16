@@ -185,7 +185,7 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(only["trip"]["id"], seg["trip_id"])
         self.assertEqual([s["confirmation"] for s in only["trip"]["segments"]], ["QX7R2M"])
         self.assertEqual(self.ok("cy")["trips"][0]["trip"]["segments"][0]["confirmation"], "CY0000")
-        self.assertEqual(self.ok("ben"), {"trips": []})
+        self.assertEqual(self.ok("ben"), {"version": 1, "trips": []})
 
     def test_adding_a_traveller_shares_the_trip_and_taking_them_off_the_trip_takes_it_back(self):
         seg = self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
@@ -297,6 +297,11 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual([c["trip"]["id"] for c in got["trips"]], [far["trip_id"]])
         self.assertEqual([e["text"] for e in got["trips"][0]["messages"][0]["emails"]], [MESSAGE_CANARY])
         self.assertNotIn("FARTHER", json.dumps(got))
+
+    def test_the_reply_carries_the_shape_version_with_and_without_trips(self):
+        self.assertEqual(self.ok("ana")["version"], offline.VERSION)
+        self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        self.assertEqual(self.ok("ana")["version"], 1)
 
     def test_the_route_is_a_get_and_the_only_one(self):
         self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])
