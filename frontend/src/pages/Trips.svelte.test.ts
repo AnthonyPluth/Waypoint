@@ -935,12 +935,94 @@ describe("past trips by year", () => {
     await screen.findByRole("list", { name: "Past trips in 2026" });
     expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
     expect(screen.getByText("Aug 8–15")).toBeInTheDocument();
-    await user().click(screen.getByRole("button", { name: "Show 2025" }));
+    expect(screen.queryByRole("button", { name: /^Show 20/ })).toBeNull();
+    await user().click(screen.getByRole("button", { name: "Show more" }));
     expect(screen.getByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
-    await user().click(screen.getByRole("button", { name: "Show 2024" }));
+    await user().click(screen.getByRole("button", { name: "Show more" }));
     expect(screen.getByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+  });
+
+  describe("with an observer", () => {
+    type Watch = { cb: IntersectionObserverCallback; el: Element; live: boolean };
+    let watching: Watch[] = [];
+    beforeEach(() => {
+      watching = [];
+      vi.stubGlobal("IntersectionObserver", class {
+        private mine: Watch[] = [];
+        constructor(private cb: IntersectionObserverCallback) {}
+        observe(el: Element) { const w = { cb: this.cb, el, live: true }; this.mine.push(w); watching.push(w); }
+        disconnect() { for (const w of this.mine) w.live = false; }
+        unobserve() {}
+        takeRecords() { return []; }
+      });
+    });
+    afterEach(() => vi.unstubAllGlobals());
+    const near = () => {
+      const w = watching.filter((x) => x.live).at(-1)!;
+      w.cb([{ isIntersecting: true, target: w.el } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+    };
+    const summaryCalls = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => p.endsWith("/summary"));
+
+    it("loads one year each time the end of the list comes near, with no button", async () => {
+      viewport.phone = true;
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      expect(screen.queryByRole("button", { name: /Show/ })).toBeNull();
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+      await waitFor(() => expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2025, 1 trip"));
+      await waitFor(() => expect(watching.filter((w) => w.live)).toHaveLength(1));
+      near();
+      expect(await screen.findByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2024, 1 trip"));
+      expect(screen.queryByTestId("past-more")).toBeNull();
+      expect(watching.some((w) => w.live)).toBe(false);
+    });
+
+    it("looks up the distances of a year only once it is loaded, and shows a quiet line while it loads", async () => {
+      viewport.phone = true;
+      serve(history());
+      let release: (v: unknown) => void = () => {};
+      const base = vi.mocked(api).getMockImplementation()!;
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      await waitFor(() => expect(summaryCalls().sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary"]));
+      vi.mocked(api).mockImplementation((path, opts) => (path === "/api/trips/3/summary" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
+      expect(summaryCalls()).not.toContain("/api/trips/4/summary");
+      expect(watching.some((w) => w.live)).toBe(false);
+      expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+      release(nothingToCount);
+      await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
+    });
+
+    it("does not move focus when a year loads", async () => {
+      viewport.phone = true;
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      const search = screen.getByRole("searchbox");
+      search.focus();
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      await screen.findByRole("list", { name: "Past trips in 2025" });
+      expect(document.activeElement).toBe(search);
+    });
+
+    it("keeps every year on a wide window and watches nothing", async () => {
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2024" });
+      expect(watching).toHaveLength(0);
+      expect(screen.queryByRole("button", { name: /Show/ })).toBeNull();
+    });
   });
 });
 
