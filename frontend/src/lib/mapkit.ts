@@ -92,3 +92,22 @@ export function loadMapkit(): Promise<Maps | null> {
 }
 
 export const forgetMapkit = (): void => { session = null; };
+
+export const PRELOAD_MS = 4000;
+let preloaded = false;
+
+export function preloadMapkit(): () => void {
+  let idle: number | undefined;
+  const run = () => {
+    if (preloaded) return;
+    preloaded = true;
+    void loadMapkit();
+  };
+  const timer = setTimeout(() => {
+    if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(run, { timeout: 5000 });
+    else run();
+  }, PRELOAD_MS);
+  return () => { clearTimeout(timer); if (idle !== undefined) window.cancelIdleCallback(idle); };
+}
+
+export const forgetPreload = (): void => { preloaded = false; };

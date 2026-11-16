@@ -35,11 +35,12 @@ beforeEach(() => {
 afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("RouteReplay when it is not shown", () => {
-  it("reports how many stops it can place and draws nothing, and loads no Apple script", async () => {
+  it("reports how many stops it can place and draws nothing, and asks for no Apple script itself", async () => {
     const onstops = vi.fn();
     render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
     await waitFor(() => expect(Math.max(...onstops.mock.calls.map(([n]) => n))).toBeGreaterThanOrEqual(2));
     expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.queryByRole("application")).toBeNull();
     expect(loadMapkit).not.toHaveBeenCalled();
   });
 

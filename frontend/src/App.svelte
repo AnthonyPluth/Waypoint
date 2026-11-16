@@ -10,6 +10,7 @@
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
   import { anyDirty } from "$lib/drafts.svelte";
+  import { preloadMapkit } from "$lib/mapkit";
   import { pageFor } from "$lib/nav";
   import Upcoming from "./pages/Upcoming.svelte";
   import { Toaster } from "svelte-sonner";
@@ -42,6 +43,12 @@
     const handle = window.setTimeout(run, 2000);
     return () => window.clearTimeout(handle);
   }
+
+  const mapkitOn = $derived(!!app.state?.user && app.state.mapkit === true && !app.offline);
+  $effect(() => {
+    if (!mapkitOn) return;
+    return preloadMapkit();
+  });
 
   $effect(() => {
     if (!app.state) return;
