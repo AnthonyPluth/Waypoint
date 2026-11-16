@@ -109,4 +109,22 @@ describe("PastTripCard", () => {
     render(PastTripCard, { trip: visit, today: TODAY });
     expect(api).not.toHaveBeenCalled();
   });
+
+  it("shares one limit of four /places requests across every card on the page", async () => {
+    let inFlight = 0, peak = 0, asked = 0;
+    const waiting: (() => void)[] = [];
+    vi.mocked(api).mockImplementation((path) => {
+      if (!String(path).endsWith("/places")) return Promise.reject(new Error("down"));
+      asked++; inFlight++; peak = Math.max(peak, inFlight);
+      return new Promise((resolve) => { waiting.push(() => { inFlight--; resolve({ home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } as never); }); });
+    });
+    const many = Array.from({ length: 10 }, (_, i) => trip([segment({ id: 100 + i, trip_id: 100 + i, start_local: "2026-09-03T09:00", end_local: "2026-09-10T10:00" })], { id: 100 + i, name: `Trip ${i}`, start_date: "2026-09-03", end_date: "2026-09-10" }));
+    for (const t of many) render(PastTripCard, { trip: t, today: TODAY });
+    await vi.waitFor(() => expect(asked).toBe(4));
+    expect(peak).toBe(4);
+    while (waiting.length) { waiting.shift()!(); await new Promise((r) => setTimeout(r, 0)); }
+    await vi.waitFor(() => expect(asked).toBe(10));
+    while (waiting.length) { waiting.shift()!(); await new Promise((r) => setTimeout(r, 0)); }
+    expect(peak).toBe(4);
+  });
 });

@@ -1,15 +1,18 @@
+<script module lang="ts">
+  import { limited } from "$lib/limit";
+
+  const lookup = limited(4);
+</script>
+
 <script lang="ts">
   import { untrack } from "svelte";
   import type { Trip, TripPlaces } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
-  import { limited } from "$lib/limit";
   import { stopsOf } from "$lib/route-replay";
   import RouteTileMap from "./RouteTileMap.svelte";
   import TripKinds from "./TripKinds.svelte";
 
   let { trip, locate }: { trip: Trip; locate: boolean } = $props();
-
-  const lookup = limited(4);
 
   let places = $state<TripPlaces | null>(null);
   const stops = $derived(places ? stopsOf(trip, places) : []);
