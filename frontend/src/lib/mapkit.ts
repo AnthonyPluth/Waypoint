@@ -58,7 +58,10 @@ function scriptAt(src: string, timeoutMs: number): Promise<Mk | null> {
 }
 
 async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
-  const first = await apiCall<"GET /api/mapkit/token">("/api/mapkit/token").catch(() => null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const silent = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), LOAD_MS); });
+  const first = await Promise.race([apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true }).catch(() => null), silent]);
+  clearTimeout(timer);
   if (first?.enabled !== true || !first.script) return { maps: null, remember: first?.enabled === false };
   const mk = window.mapkit ?? (await scriptAt(first.script, LOAD_MS));
   if (!mk) return { maps: null, remember: false };
@@ -67,7 +70,7 @@ async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
   try {
     mk.init({
       authorizationCallback: (done) => {
-        apiCall<"GET /api/mapkit/token">("/api/mapkit/token").then(
+        apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true }).then(
           (next) => { if (next?.enabled === true && next.token) done(next.token); else fail(); },
           fail,
         );

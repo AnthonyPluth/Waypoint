@@ -30,7 +30,7 @@ describe("loading MapKit", () => {
     expect(await loadMapkit()).toBeNull();
     expect(await loadMapkit()).toBeNull();
     expect(api).toHaveBeenCalledTimes(1);
-    expect(api).toHaveBeenCalledWith("/api/mapkit/token");
+    expect(api).toHaveBeenCalledWith("/api/mapkit/token", { keep: true });
     expect(scripts).toHaveLength(0);
     expect(fake.inits).toHaveLength(0);
   });
@@ -179,6 +179,23 @@ describe("loading MapKit", () => {
 });
 
 describe("preloading MapKit", () => {
+  it("asks for the token in a way that moving to another page does not cancel", async () => {
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+    await loadMapkit();
+    expect(vi.mocked(api).mock.calls[0][1]).toMatchObject({ keep: true });
+  });
+
+  it("does not strand later replays when the token request never settles, as when a page change cancelled it", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockReturnValueOnce(new Promise(() => {}) as never);
+    const first = loadMapkit();
+    await vi.advanceTimersByTimeAsync(LOAD_MS);
+    expect(await first).toBeNull();
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+    expect(await loadMapkit()).toBeNull();
+    expect(api).toHaveBeenCalledTimes(2);
+  });
+
   it("asks once, a few seconds in, when the browser is idle, and not before", async () => {
     vi.useFakeTimers();
     const idle = vi.fn((run: () => void) => { run(); return 1; });
