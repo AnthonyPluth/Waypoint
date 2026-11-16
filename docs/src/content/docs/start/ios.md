@@ -25,7 +25,7 @@ The app's access ends when you can no longer sign in to Waypoint (you are taken 
 
 ## Distribution (TestFlight)
 
-You can put the app on your own iPhone through TestFlight with the "iOS TestFlight" workflow. It starts only by hand (Actions, **iOS TestFlight**, **Run workflow**, on `main`), never for a pull request, and runs in a protected `testflight` environment that holds the signing secrets and waits for a required reviewer. It builds on a macOS 26 runner with Xcode 26 (Apple only accepts uploads built with the iOS 26 SDK), archives a signed release, exports an `.ipa` and uploads it with an App Store Connect API key.
+You can put the app on your own iPhone through TestFlight with the "iOS TestFlight" workflow. It starts when a change to the iPhone app (`ios/` or its icon) is pushed to `main`, or by hand (Actions, **iOS TestFlight**, **Run workflow**, on `main`); never for a pull request. Changes to the web app alone do not start it, because the app loads your server and bundles no web files. It runs in a protected `testflight` environment that holds the signing secrets, and every run, automatic or by hand, waits there until the required reviewer clicks **Approve**. Only one upload runs at a time. The build number is the workflow's run number, so it rises with each new run; re-running a run keeps its number, and App Store Connect refuses a number it already has. It builds on a macOS 26 runner with Xcode 26 (Apple only accepts uploads built with the iOS 26 SDK), archives a signed release, exports an `.ipa` and uploads it with an App Store Connect API key.
 
 Setup happens once:
 
