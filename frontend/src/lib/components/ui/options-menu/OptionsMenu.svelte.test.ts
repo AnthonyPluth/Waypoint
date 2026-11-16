@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import Harness from "./OptionsMenuHarness.test.svelte";
+import PopupHarness from "./OptionsMenuPopupHarness.test.svelte";
 
 describe("OptionsMenu", () => {
   it("keeps its choices out of the way until it is opened, and says whether it is open", async () => {
@@ -58,5 +59,22 @@ describe("OptionsMenu", () => {
     expect(screen.queryByRole("button", { name: "Delete trip" })).toBeNull();
     expect(onmerge).not.toHaveBeenCalled();
     expect(ondelete).not.toHaveBeenCalled();
+  });
+
+  it("is a menu of menu items, with its icons and a divider, when it is told it is a popup", async () => {
+    render(PopupHarness, { onmerge: vi.fn(), ondelete: vi.fn() });
+    const trigger = screen.getByRole("button", { name: "Trip options" });
+    expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+    await userEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: "Trip options" });
+    expect(trigger).toHaveAttribute("aria-controls", menu.id);
+    expect(screen.queryByRole("group", { name: "Trip options" })).toBeNull();
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.map((i) => i.textContent?.trim())).toEqual(["Merge another trip", "Delete trip"]);
+    expect(items.every((i) => i.querySelector("svg"))).toBe(true);
+    expect(within(menu).getByRole("separator")).toBeInTheDocument();
+    await userEvent.click(items[1]);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger).toHaveFocus();
   });
 });

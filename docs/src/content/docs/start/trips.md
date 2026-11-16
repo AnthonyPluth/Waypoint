@@ -120,7 +120,13 @@ When a newer email for a booking changes its times or places, the booking says *
 
 ## Past trips
 
-Once a trip has ended, its page shows condensed cards: the kind, provider, dates and times, place, confirmation number and travellers stay, and what only helps while you travel (the manage link, Directions, Call, View email, live status, loyalty numbers) goes. Edit, Move and Remove stay until the trip is marked [Done](#done-with-a-trip).
+Once a trip has ended, its page leads with its photos. At the top, **Past trips** takes you back to the list, and **Trip options** holds **Add a booking**, **Merge another trip** and **Delete trip**; a pencil beside it edits the trip’s name, destination and notes. Under them:
+
+- **The hero.** A small mosaic of the trip’s three best photos with the trip’s name over it. Waypoint chooses them for you: the photo most worth showing from each place you spent time, the busiest places first (see [Photos](/Waypoint/start/photos/)). Only photos you are allowed to see are used. When you can see fewer than three, or no library is connected, the route map takes the hero’s place, with its Play and Replay controls, and a quiet line says **No photos yet** when there are none at all. With one or two photos the map is the hero and the photos stay in the days below.
+- **One line of facts.** Days, nights away, distance and photos (see [A trip’s numbers](#a-trips-numbers)), who travelled, the total when costs are shown (**Settings → Travel preferences → Trip costs**), a **photos need a look** link to Settings, Photos, when a photo of yours or one you manage is far from every booking, and **Replay trip**, which opens the route replay under the line.
+- **Day by day.** Each day with photos is a dot on a rail with its date, the place most of its photos were taken and how many photos it has, and six photos with a **+N** tile for the rest. A day’s first photo is the first one taken with its own location, or the first of the day when none has one; the others follow in time order. A photo in the hero is not shown again in its day, so a day’s count is the photos left in it. The first three days show, then **Show all** the days. Tapping a photo opens it full size, where you can take it off the trip.
+
+The booking cards of a past trip are not on its page; its bookings return in a Bookings sheet in a coming change, and until then a past trip’s bookings aren’t listed there. A trip that is still to come or under way keeps its page as it was, and [Done](#done-with-a-trip) still removes the saved emails.
 
 ## Replaying a past trip's route
 

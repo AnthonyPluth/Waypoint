@@ -28,6 +28,7 @@
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
+  import PastTrip from "$lib/components/PastTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import RouteReplay from "$lib/components/RouteReplay.svelte";
@@ -40,7 +41,9 @@
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
   import { appWord, bookingCards, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import GitMerge from "@lucide/svelte/icons/git-merge";
   import Plus from "@lucide/svelte/icons/plus";
+  import Trash2 from "@lucide/svelte/icons/trash-2";
   import { toast } from "svelte-sonner";
 
   const staticDemo = import.meta.env.MODE === "demo";
@@ -155,6 +158,7 @@
   const done = $derived(trip?.done_at != null);
   const costsShown = $derived(app.state?.show_costs !== false);
   const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
+  const completedPage = $derived(over && !staticDemo);
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
@@ -165,6 +169,11 @@
     return showBookingTravellers(s, everyone) && named.size > 0 && shown.every((x) => named.has(x));
   };
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
+  const pastOptions = $derived(!trip || form ? [] : [
+    { label: "Add a booking", icon: Plus, onselect: () => { focus = ""; form = blankFor(people, app.state?.person_id, trip!.id, trip!.costs.totals[0]?.currency); } },
+    { label: "Merge another trip", icon: GitMerge, onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
+    { label: "Delete trip", icon: Trash2, destructive: true, divided: true, onselect: () => { deleting = true; } },
+  ]);
   const dates = (t: Trip) => t.start_date && t.end_date ? (t.start_date === t.end_date ? dateLabel(t.start_date) : `${dateLabel(t.start_date)} – ${dateLabel(t.end_date)}`) : "No dates yet";
 
   function reveal(node: HTMLElement) {
@@ -251,7 +260,7 @@
   });
 </script>
 
-{#if tripId === null}
+{#if tripId === null && !(trip && completedPage)}
   <a class="mb-4 inline-flex items-center gap-1.5 phone:min-h-11 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 {/if}
 
@@ -293,6 +302,12 @@
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {@const t = trip}
+  {#if completedPage}
+    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }} />
+    {#if form && form.id === null}
+      <div class="mt-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
+    {/if}
+  {:else}
   <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       {#key id}
@@ -395,6 +410,7 @@
       {/if}
     {/each}
   </ul>
+  {/if}
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 

@@ -47,6 +47,8 @@ function serve() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.UTC(2026, 0, 15, 12));
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
   summary = { days: 7, nights: 6, distance_km: 5570.2, flight_km: 5570.2, road_km: 0, road_estimated: false, states: [], countries: ["United Kingdom", "United States"], photos: { total: 0, inferred: 0 }, kinds: { flight: 1, hotel: 1, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
@@ -486,7 +488,7 @@ describe("Trip", () => {
     held = trip([
       segment({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, start_local: "2026-03-08T00:00", end_local: "2026-03-10T00:00", details: { time_unknown: "yes" } }),
       segment({ id: 2, kind: "visit", provider: null, origin: null, destination: "JP", start_local: "2005-03-10T00:00", end_local: "2005-03-29T00:00", details: { time_unknown: "yes" } }),
-    ]);
+    ], { start_date: "2005-03-10", end_date: "2026-03-10" });
     render(TripPage);
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
     expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
@@ -1207,81 +1209,38 @@ describe("Trip", () => {
     const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#segment-${s.id}`) as HTMLElement;
     const past = (extra: Partial<TripT> = {}) => trip([hotel], { start_date: "2020-03-01", end_date: "2020-03-04", ...extra });
 
-    it("keeps the essentials and drops the actions and loyalty numbers", async () => {
-      loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
-      held = past();
-      render(TripPage);
-      const card = await cardOf(hotel);
-      expect(card).toHaveTextContent("H88231");
-      expect(card).toHaveTextContent("1 Quay Street, London");
-      expect(within(card).queryByRole("link", { name: "Directions" })).toBeNull();
-      expect(within(card).queryByRole("link", { name: "Call" })).toBeNull();
-      expect(within(card).queryByRole("button", { name: /email/i })).toBeNull();
-      expect(card.querySelector("[data-membership]")).toBeNull();
-      expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
-    });
-
-    it("keeps Edit, Move and Remove on a trip that was never marked Done", async () => {
+    it("shows the completed trip page in place of the header, gallery and booking cards", async () => {
       held = past({ done_at: null });
       render(TripPage);
-      const card = await cardOf(hotel);
-      expect(within(card).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
-      await userEvent.click(within(card).getByRole("button", { name: "More options for Harbour Hotel" }));
-      for (const verb of ["Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
+      expect(await screen.findByTestId("past-trip")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Bookings" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeNull();
+      expect(screen.queryByRole("button", { name: "Add a booking" })).toBeNull();
+      expect(screen.getAllByRole("link", { name: "Past trips" })).toHaveLength(1);
+      expect(screen.queryByRole("link", { name: "Trips" })).toBeNull();
     });
 
-    it("hides Edit, Move and Remove once the trip is Done, and keeps the booking's details", async () => {
-      held = past({ done_at: 1700000000 });
+    it("keeps Add a booking, Merge another trip and Delete trip in the Trip options menu", async () => {
+      held = past();
       render(TripPage);
-      const card = await cardOf(hotel);
-      expect(card).toHaveTextContent("H88231");
-      for (const verb of ["Edit", "Move", "Remove", "More options"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
+      const u = userEvent.setup();
+      const trigger = await screen.findByRole("button", { name: "Trip options" });
+      expect(trigger).toHaveAttribute("aria-haspopup", "menu");
+      await u.click(trigger);
+      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Add a booking", "Merge another trip", "Delete trip"]);
+      await u.click(screen.getByRole("menuitem", { name: "Add a booking" }));
+      await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
+      expect(screen.queryByRole("button", { name: "Trip options" })).toBeNull();
     });
 
-    it("hides them on each booking of a combined flight card once the trip is Done", async () => {
-      const first = segment({ id: 1, confirmation: "KQ7M2X", start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10", details: { flight_number: "AA0101" } });
-      const second = segment({ id: 2, confirmation: "BBBBBB", start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
-      held = trip([first, second], { start_date: "2020-03-01", end_date: "2020-03-02", done_at: 1700000000 });
+    it("asks before deleting from the menu", async () => {
+      held = past();
       render(TripPage);
-      const blocks = await screen.findAllByRole("listitem").then((all) => all.filter((li) => li.hasAttribute("data-booking")));
-      expect(blocks).toHaveLength(2);
-      for (const block of blocks) expect(within(block).queryByRole("button", { name: /^(Edit|Move|Remove)/ })).toBeNull();
-    });
-
-    describe("live flight status", () => {
-      const sams = segment({ id: 5, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
-      const gone = { start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10" };
-      const withStatus = () => {
-        const answer = vi.mocked(api).getMockImplementation()!;
-        vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
-      };
-      const flightCard = async () => within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"))[0];
-
-      it("shows none on a past flight, and still shows it on a future one", async () => {
-        held = trip([{ ...flight, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
-        withStatus();
-        const view = render(TripPage);
-        const card = await flightCard();
-        await waitFor(() => expect(card).toHaveTextContent("JFK"));
-        expect(within(card).queryByTestId("flight-status")).toBeNull();
-        view.unmount();
-        held = trip([flight]);
-        render(TripPage);
-        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
-      });
-
-      it("shows none on a past flight with two bookings, and still shows it on a future one", async () => {
-        held = trip([{ ...flight, ...gone }, { ...sams, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
-        withStatus();
-        const view = render(TripPage);
-        const card = await flightCard();
-        await waitFor(() => expect(card).toHaveTextContent("BBBBBB"));
-        expect(within(card).queryByTestId("flight-status")).toBeNull();
-        view.unmount();
-        held = trip([flight, sams]);
-        render(TripPage);
-        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
-      });
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: "Trip options" }));
+      await u.click(screen.getByRole("menuitem", { name: "Delete trip" }));
+      expect(await screen.findByRole("dialog", { name: "Delete Trip to London?" })).toBeInTheDocument();
     });
 
     it("leaves a trip still to come as it was", async () => {
@@ -1621,7 +1580,7 @@ describe("on its own page", () => {
     });
 
     it("shows nothing once the booking’s exit time has passed", async () => {
-      held = trip([{ ...lot, start_local: "2020-01-10T05:15", end_local: "2020-01-13T03:00", gate_code: { state: "ready", day: "2019-12-20" } }]);
+      held = trip([{ ...lot, start_local: "2020-01-10T05:15", end_local: "2020-01-13T03:00", gate_code: { state: "ready", day: "2019-12-20" } }], { start_date: "2020-01-10", end_date: "2099-01-13" });
       render(TripPage);
       await screen.findByRole("list", { name: "Bookings" });
       expect(screen.queryByRole("button", { name: /QR code/ })).toBeNull();

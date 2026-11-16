@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -842,5 +842,24 @@ describe("trip card wording", () => {
   it("groups past trips under the year they started", () => {
     const groups = pastByYear([trip([segment({ start_local: "2026-01-04T09:00", end_local: "2026-01-06T09:00" })], { id: 1 }), trip([segment({ id: 2, kind: "hotel", start_local: "2025-12-30T09:00", end_local: "2026-01-02T09:00" })], { id: 2 })]);
     expect(groups.map((g) => [g.year, g.totals])).toEqual([[2026, "1 trip · 2 nights · 1 flight"], [2025, "1 trip · 3 nights"]]);
+  });
+});
+
+describe("bookingCounts", () => {
+  it("counts the live bookings by kind, in the kinds' order, and says each in the singular or plural", () => {
+    const stay = (id: number, status: "confirmed" | "cancelled" = "confirmed") => segment({ id, kind: "hotel", status });
+    const found = bookingCounts(trip([segment({ id: 1 }), segment({ id: 2 }), stay(3), stay(4), stay(5), segment({ id: 6, kind: "car" }), stay(7, "cancelled")]));
+    expect(found.total).toBe(6);
+    expect(found.kinds).toEqual(["flight", "hotel", "car"]);
+    expect(found.words).toBe("2 flights · 3 stays · 1 car");
+  });
+
+  it("counts a trip whose every booking is cancelled by all of them", () => {
+    const found = bookingCounts(trip([segment({ id: 1, status: "cancelled" })]));
+    expect(found).toEqual({ total: 1, kinds: ["flight"], words: "1 flight" });
+  });
+
+  it("is empty for a trip with no bookings", () => {
+    expect(bookingCounts(trip([]))).toEqual({ total: 0, kinds: [], words: "" });
   });
 });

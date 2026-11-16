@@ -533,3 +533,15 @@ export function pastByYear(past: Trip[]): YearGroup[] {
     return { year, trips, totals: parts.filter(Boolean).join(" · ") };
   });
 }
+
+const KIND_COUNT_WORDS: Record<Segment["kind"], [string, string]> = {
+  flight: ["flight", "flights"], hotel: ["stay", "stays"], car: ["car", "cars"], train: ["train", "trains"], cruise: ["cruise", "cruises"], parking: ["parking", "parking"], visit: ["visit", "visits"],
+};
+
+export function bookingCounts(trip: Pick<Trip, "segments">): { total: number; kinds: Segment["kind"][]; words: string } {
+  const live = trip.segments.filter((s) => s.status !== "cancelled");
+  const held = live.length ? live : trip.segments;
+  const kinds = KIND_ORDER.filter((k) => held.some((s) => s.kind === k));
+  const words = kinds.map((k) => { const n = held.filter((s) => s.kind === k).length; return `${n} ${KIND_COUNT_WORDS[k][n === 1 ? 0 : 1]}`; }).join(" · ");
+  return { total: held.length, kinds, words };
+}
