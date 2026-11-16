@@ -195,10 +195,10 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 #### `flight-card`
 
-- **Starts at:** `#trips`.
+- **Starts at:** `#trips`; goes to: `#design`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`.
-- **Expects to see:** `Trips`, `Heathrow`, `+1 day`.
+- **Expects to see:** `Trips`, `Landed`, `+1 day`, `50 minutes late`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 3 days before departure`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
 
 #### `hotel-address`

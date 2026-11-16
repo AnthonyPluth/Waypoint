@@ -4,11 +4,27 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
-    { "wait_for": "[data-kind='flight'] [data-airport-name]" },
-    { "expect_text": { "selector": "[data-kind='flight']", "text": "Heathrow" } },
-    { "expect_text": { "selector": "[data-kind='flight']", "text": "+1 day" } },
-    { "wait_for": "[data-kind='flight'] [role='img'][data-progress]" },
-    { "scroll_to": "[data-kind='flight'] >> nth=0" },
-    { "screenshot": "trip-flight" }
+    { "wait_for": "article[data-kind='flight'] [data-code='origin']" },
+    { "expect_text": { "selector": "article[data-state='landed']", "text": "Landed" } },
+    { "expect_text": { "selector": "article[data-state='landed']", "text": "+1 day" } },
+    { "expect_text": { "selector": "article[data-state='delayed']", "text": "50 minutes late" } },
+    { "expect_text": { "selector": "article[data-state='delayed']", "text": "Originally" } },
+    { "expect_text": { "selector": "article[data-state='delayed'] [data-facts]", "text": "Not known yet" } },
+    { "wait_for": "article[data-state='delayed'] [data-facts] [role='img'][aria-label='From live status']" },
+    { "wait_for": "article[data-state='delayed'] [data-facts] [role='img'][aria-label='From the booking']" },
+    { "scroll_to": "article[data-state='delayed']" },
+    { "screenshot": "trip-flight" },
+    { "goto": "#design" },
+    { "expect_text": { "selector": "#design-flight-card", "text": "Flight card" } },
+    { "wait_for": "article[data-state='scheduled']" },
+    { "wait_for": "article[data-state='boarding']" },
+    { "wait_for": "article[data-state='delayed']" },
+    { "wait_for": "article[data-state='in-the-air']" },
+    { "wait_for": "article[data-state='landed']" },
+    { "wait_for": "article[data-state='cancelled']" },
+    { "wait_for": "article[data-state='diverted']" },
+    { "expect_text": { "selector": "article[aria-label$='no live status yet']", "text": "Live status starts 3 days before departure" } },
+    { "scroll_to": "#design-flight-card" },
+    { "screenshot": "eight-states" }
   ]
 }
