@@ -5,11 +5,12 @@
   import { airportInfo } from "$lib/airport-zones";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { headline } from "$lib/trips";
-  import { arcHeading, arcPoint, arcTravelled, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
+  import { arcDash, arcHeading, arcPoint, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
 
   type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; paused?: FlightStatusPause | null; footer?: Snippet };
   let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, paused = null, footer }: Props = $props();
 
+  const PLANE = "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z";
   let cities = $state<Record<string, string>>({});
   $effect(() => {
     const codes = [segment.origin, segment.destination, status?.destination].filter((c): c is string => !!c);
@@ -28,15 +29,15 @@
 </script>
 
 {#snippet when(t: Stamp)}
-  <span class="mt-1.5 whitespace-nowrap font-mono text-[17px] font-semibold desktop:text-[19px]" class:text-signal-ink={t.tone === "late"} class:text-muted-foreground={t.tone === "gone"} class:line-through={t.tone === "gone"} class:font-medium={t.tone === "gone"}>
-    {#if t.original}<s class="block text-xs font-medium leading-tight text-muted-foreground"><span class="sr-only">Originally{" "}</span>{t.original}</s>{/if}<time datetime={t.local}>{t.time}</time>
+  <span class="mt-1.5 whitespace-nowrap font-mono text-[17px] font-semibold @[24rem]:text-[19px]" class:text-signal-ink={t.tone === "late"} class:text-muted-foreground={t.tone === "gone"} class:line-through={t.tone === "gone"} class:font-medium={t.tone === "gone"}>
+    {#if t.original}<s class="block text-xs font-medium leading-[1.2] text-muted-foreground"><span class="sr-only">Originally{" "}</span>{t.original}</s>{/if}<time datetime={t.local}>{t.time}</time>
   </span>
   <span class="font-mono text-[11px] text-muted-foreground">{t.zoneName}{#if t.later}<span>{" · "}{t.later}<span class="sr-only">, {t.laterWords}</span></span>{/if}</span>
 {/snippet}
 
 {#snippet source(kind: "live" | "booking")}
-  {#if kind === "live"}<span role="img" aria-label="From live status" class="size-[7px] flex-none rounded-full bg-primary"></span>
-  {:else}<span role="img" aria-label="From the booking" class="size-[7px] flex-none rounded-full border-[1.5px] border-muted-foreground"></span>{/if}
+  {#if kind === "live"}<span role="img" aria-label="From live status" class="mr-px size-[7px] flex-none rounded-full bg-primary"></span>
+  {:else}<span role="img" aria-label="From the booking" class="mr-px size-[7px] flex-none rounded-full border-[1.5px] border-muted-foreground"></span>{/if}
 {/snippet}
 
 <article class="@container flex scroll-mt-20 flex-col gap-3.5 rounded-[22px] border border-border bg-card p-4 shadow-card" class:ring-2={highlight} class:ring-ring={highlight} aria-label={view.name} data-kind="flight" data-state={view.state} data-progress={view.progress ?? undefined}>
@@ -48,42 +49,42 @@
       {#if view.provider}<span class="block truncate text-[13px] leading-[1.1] text-muted-foreground">{view.provider}</span>{/if}
     </span>
     {#if view.duration}
-      <span class="ml-auto inline-flex items-center gap-1.5 font-mono text-[13px] text-muted-foreground"><Plane class="size-3.5" aria-hidden="true" />{view.duration}</span>
+      <span class="ml-auto inline-flex items-center gap-1.5 font-mono text-[13px] text-muted-foreground"><svg class="size-3.5 flex-none" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d={PLANE} style="transform: rotate(90deg); transform-origin: 12px 12px" /></svg>{view.duration}</span>
     {/if}
   </div>
 
   <div class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5">
     <div class="flex min-w-[78px] flex-col gap-0.5">
-      <b class="text-[38px] font-[650] leading-none tracking-[-0.03em] desktop:text-[44px]" data-code="origin">{view.origin}</b>
+      <b class="text-[38px] font-[650] leading-none tracking-[-0.03em] @[24rem]:text-[44px]" data-code="origin">{view.origin}</b>
       <span class="text-xs text-muted-foreground">{cities[view.origin] ?? ""}</span>
       {@render when(view.depart)}
     </div>
     <div class="relative mt-1.5 h-[60px]" bind:clientWidth={arcWidth} aria-hidden="true" data-arc>
       <svg class="absolute inset-x-0 top-0 h-[46px] w-full" viewBox="0 0 100 40" preserveAspectRatio="none">
         <path d="M2 38 Q50 -16 98 38" fill="none" class="stroke-map-border" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 5" vector-effect="non-scaling-stroke" />
-        {#if view.progress}<path d={arcTravelled(view.progress)} fill="none" class="stroke-map-route" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" />{/if}
+        <path d="M2 38 Q50 -16 98 38" pathLength="100" fill="none" class="stroke-map-route" stroke-width="2.5" stroke-linecap="round" stroke-dasharray={`${arcDash(view.progress ?? 0)} 100`} vector-effect="non-scaling-stroke" />
       </svg>
       {#if point}
-        <span class="absolute grid size-[22px] place-items-center text-map-route" style={`left: ${point.left}%; top: ${point.top}px; transform: translate(-50%, -50%) rotate(${45 + heading}deg)`} data-plane><Plane class="size-5 fill-current" /></span>
+        <span class="absolute grid size-[22px] place-items-center text-map-route" style={`left: ${point.left}%; top: ${point.top}px; transform: translate(-50%, -50%) rotate(${90 + heading}deg)`} data-plane><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d={PLANE} /></svg></span>
       {/if}
       {#if view.updated}<span class="absolute inset-x-0 bottom-0 text-center text-[11px] text-muted-foreground" data-updated>{view.updated}</span>{/if}
     </div>
     <div class="flex min-w-[78px] flex-col items-end gap-0.5 text-right">
-      <b class="text-[38px] font-[650] leading-none tracking-[-0.03em] desktop:text-[44px]" data-code="destination">{view.destination}</b>
+      <b class="text-[38px] font-[650] leading-none tracking-[-0.03em] @[24rem]:text-[44px]" data-code="destination">{view.destination}</b>
       <span class="text-xs text-muted-foreground">{cities[view.destination] ?? ""}</span>
       {@render when(view.arrive)}
     </div>
   </div>
 
   <div class="flex flex-wrap items-center gap-2.5">
-    {#if view.pill}<StatusChip chip={view.pill} class="uppercase tracking-[0.04em]" />{/if}
-    <p class="min-w-0 flex-[1_1_180px] text-sm" data-sentence>{view.sentence}</p>
+    {#if view.pill}<StatusChip chip={view.pill} class="py-[3px]! font-bold! uppercase tracking-[0.04em]" />{/if}
+    {#if view.sentence}<p class="min-w-0 flex-[1_1_180px] text-sm" data-sentence>{view.sentence}</p>{/if}
   </div>
 
   {#if paused}<p class="text-xs text-muted-foreground" role="status" data-paused>{pausedWords(paused)}</p>{/if}
 
   <div class="flex flex-col gap-2 border-t border-border pt-3">
-    <span class="eyebrow">{view.side}{sideCity ? ` · ${sideCity}` : ""}</span>
+    <span class="eyebrow">{view.side}{sideCity ? ` · ${sideCity}` : ""}{view.sideDay ? ` · ${view.sideDay}` : ""}</span>
     <dl class="grid grid-cols-4 gap-2" data-facts>
       {#each view.facts as fact (fact.label)}
         <div class="min-w-0">

@@ -29,6 +29,7 @@ export type FlightCardView = {
   sentence: string;
   side: "Departure" | "Arrival";
   sideCode: string;
+  sideDay: string;
   facts: Fact[];
   progress: number | null;
   name: string;
@@ -143,7 +144,6 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const origin = s.origin ?? "—";
   const divertedTo = state === "diverted" && st?.destination && st.destination !== s.destination ? st.destination : null;
   const destination = divertedTo ?? s.destination ?? "—";
-  const isToday = dayIn(now, s.start_zone) === s.start_local.slice(0, 10);
   const lateBy = st?.delay_minutes ?? null;
 
   let depart = stamp(depLocal, depZone);
@@ -151,7 +151,7 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   if (state === "delayed") {
     const moved = depLocal !== s.start_local;
     const arrMoved = !!liveArr && arrLocal !== s.end_local;
-    depart = stamp(depLocal, depZone, "late", moved ? wallClock(s.start_local) : null);
+    depart = stamp(depLocal, depZone, "late", moved ? wallClock(s.start_local) : null, dayStart);
     arrive = stamp(arrLocal, arrZone, "late", arrMoved ? wallClock(s.end_local) : null, dayStart);
   } else if (state === "cancelled") {
     depart = stamp(s.start_local, s.start_zone, "gone");
@@ -165,27 +165,30 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const duration = gone ? "" : lengthOf(Number.isNaN(flown) ? bookedArr - bookedDep : flown);
 
   const updated = st ? updatedWords(st.fetched_at, now) || null : null;
-  const when = isToday ? `at ${depart.time}` : `${shortDay(depLocal)} at ${depart.time}`;
   const whereTo = city(destination);
   const lands = state === "in-the-air" ? arrAt - now : NaN;
-  const landing = `${arrive.time}${lands >= MINUTE_MS ? `, in ${inWords(lands)}` : ""}`;
   const landedOn = dayIn(now, arrZone) === arrLocal.slice(0, 10) ? "" : `${shortDay(arrLocal)} `;
   const early = st?.arr_actual ? lateWords(minutesBetween(instant(st.arr_actual, st.arr_zone), instant(st.arr_scheduled ?? s.end_local, st.arr_scheduled ? st.arr_zone : s.end_zone))) : "";
   const carrierWord = provider || "the airline";
-  const delayWords = lateBy ? `, ${plural(lateBy, "minute")} late` : "";
 
+  const originalCity = city(s.destination ?? "");
   const sentence = (() => {
-    if (noLive) return `Departs ${shortDay(depLocal)}. Live status starts ${plural(LIVE_STATUS_STARTS_DAYS, "day")} before departure. Until then these are the times on your booking.`;
+    if (noLive) return `Live status starts ${plural(LIVE_STATUS_STARTS_DAYS, "day")} before departure. Until then these are the times on your booking.`;
     switch (state) {
-      case "scheduled": return `Your flight to ${whereTo} departs ${shortDay(depLocal)} at ${depart.time}.`;
-      case "boarding": return `Boarding now at gate ${gate}. Your flight departs at ${depart.time}.`;
-      case "delayed": return `Your flight now departs ${when}${delayWords}.`;
-      case "in-the-air": return `Landing in ${whereTo} at ${landing}.`;
-      case "landed": return `Landed ${landedOn}at ${arrive.time}${early ? `, ${early}` : ""}.`;
-      case "cancelled": return `This flight${isToday ? "" : ` on ${shortDay(s.start_local)}`} was cancelled. Contact ${carrierWord} about rebooking.`;
-      case "diverted": return divertedTo ? `Diverted to ${whereTo} (${divertedTo}), expected to land at ${arrive.time}.` : `This flight was diverted, expected to land at ${arrive.time}.`;
+      case "scheduled":
+      case "boarding":
+      case "delayed": return "";
+      case "in-the-air": return lands >= MINUTE_MS ? `Lands in ${inWords(lands)}.` : "";
+      case "landed": return early ? `${early[0].toUpperCase()}${early.slice(1)}.` : "";
+      case "cancelled": return `Contact ${carrierWord} about rebooking.`;
+      case "diverted": return divertedTo ? `Was headed to ${originalCity}.` : "Where it lands isn’t known yet.";
     }
   })();
+
+  const arrivalSide = state === "in-the-air" || state === "landed" || state === "diverted";
+  const sideLocal = arrivalSide ? arrLocal : depLocal;
+  const sideZone = arrivalSide ? arrZone : depZone;
+  const sideDay = dayIn(now, sideZone) === sideLocal.slice(0, 10) ? "" : shortDay(sideLocal);
 
   const pill: Chip | null = (() => {
     if (noLive) return null;
@@ -202,7 +205,6 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
 
   const seat = seatsInOrder(s.details.seat || s.travelers.map((t) => t.seat).filter(Boolean).join(", "));
   const cabin = s.details.cabin?.trim() || null;
-  const arrivalSide = state === "in-the-air" || state === "landed" || state === "diverted";
   const lastKnown = state !== "cancelled" && state !== "diverted";
   const live = (value: string | null | undefined, on = lastKnown): Fact["value"] => (on && value ? value : null);
   const seatFact: Fact = { label: seat.includes(",") ? "Seats" : "Seat", value: seat || null, abbreviated: null, source: "booking" };
@@ -243,32 +245,28 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
 
   return {
     state, noLive, pill, number, carrier: number.slice(0, 2), provider, duration, origin, destination, depart, arrive, updated, sentence,
-    side: arrivalSide ? "Arrival" : "Departure", sideCode: arrivalSide ? destination : origin, facts, progress, name: [...lead, tail].join(", "),
+    side: arrivalSide ? "Arrival" : "Departure", sideCode: arrivalSide ? destination : origin, sideDay, facts, progress, name: [...lead, tail].join(", "),
   };
 }
 
 const ARC = { x0: 2, x1: 50, x2: 98, y0: 38, y1: -16, y2: 38, height: 40, pixels: 46 };
 
+const along = (progress: number): number => Math.min(0.98, Math.max(0.02, progress));
+
 export function arcPoint(progress: number): { left: number; top: number } {
-  const t = Math.min(1, Math.max(0, progress));
+  const t = along(progress);
   const a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
   return { left: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, top: (a * ARC.y0 + b * ARC.y1 + c * ARC.y2) * (ARC.pixels / ARC.height) };
 }
 
 export function arcHeading(progress: number, width: number): number {
-  const t = Math.min(1, Math.max(0, progress));
+  const t = along(progress);
   const dx = 2 * (1 - t) * (ARC.x1 - ARC.x0) + 2 * t * (ARC.x2 - ARC.x1);
   const dy = 2 * (1 - t) * (ARC.y1 - ARC.y0) + 2 * t * (ARC.y2 - ARC.y1);
   return Math.round((Math.atan2(dy * (ARC.pixels / ARC.height), dx * (width / 100)) * 180) / Math.PI);
 }
 
-export function arcTravelled(progress: number): string {
-  const t = Math.min(1, Math.max(0, progress));
-  const a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
-  const round = (n: number) => Math.round(n * 100) / 100;
-  const end = { x: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, y: a * ARC.y0 + b * ARC.y1 + c * ARC.y2 };
-  return `M${ARC.x0} ${ARC.y0} Q${round(ARC.x0 + t * (ARC.x1 - ARC.x0))} ${round(ARC.y0 + t * (ARC.y1 - ARC.y0))} ${round(end.x)} ${round(end.y)}`;
-}
+export const arcDash = (progress: number): number => Math.round(Math.min(0.98, Math.max(0, progress)) * 100);
 
 export function pausedWords(p: FlightStatusPause): string {
   const until = new Date(p.until);

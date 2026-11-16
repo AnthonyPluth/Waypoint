@@ -39,6 +39,7 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 - The trip page's card has no Refresh button; Refresh moves to the live status view (#715). A small quiet line, "Live updates paused until <time>" with the reason, stays on the card while updates are paused (monthly limit, rate limit or a refused key), whether or not a status is stored. The frames don't show it.
 - With no live status yet, the card keeps the departure date ("Departs Thu Jun 12.") before the sentence about when live status starts.
 - The live-status window is one day before departure.
+- The card never repeats itself: no sentence beside the pill unless it adds something the card doesn't show. Boarding, Scheduled and Delayed have none (the pill, the gate and the times say it); In the air says how long until landing; Landed says how early or late; Cancelled says whom to contact; Diverted says where it was headed; a flight with no live status says when live status starts. The date goes after the Departure or Arrival label (for example "Departure · Denver · Thu Jun 12") when it isn't today. The accessible name of the article still says the whole state in words.
 
 ## Fonts
 

@@ -28,6 +28,8 @@
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
+  import StatusChip from "$lib/components/StatusChip.svelte";
+  import { bookingChip } from "$lib/status";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import RouteReplay from "$lib/components/RouteReplay.svelte";
@@ -433,9 +435,10 @@
 
 {#snippet flightBooking(s: Segment)}
   {@const cost = costsShown && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : ""}
-  {#if s.confirmation || cost}
-    <div class="flex flex-wrap gap-x-8 gap-y-3">
+  {#if s.confirmation || cost || s.status !== "confirmed"}
+    <div class="flex flex-wrap items-start gap-x-8 gap-y-3">
       {#if s.confirmation}<div class="min-w-0"><p class="eyebrow">Confirmation</p><CopyCode code={s.confirmation} class="mono mt-1 min-h-11 max-w-full break-all text-left text-heading font-semibold" /></div>{/if}
+      {#if s.status !== "confirmed"}<StatusChip chip={bookingChip(s.status)} class="mt-5" />{/if}
       {#if cost}<div class="min-w-0"><p class="eyebrow">Cost</p><p class="mt-1 text-base font-medium" data-cost>{cost}</p></div>{/if}
     </div>
   {/if}

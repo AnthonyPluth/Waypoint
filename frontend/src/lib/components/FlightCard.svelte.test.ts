@@ -41,32 +41,32 @@ const NOW = {
 };
 const CASES: Case[] = [
   { name: "scheduled", now: NOW.scheduled, status: mk(NOW.scheduled, 4, { dep_terminal: "B" }), label: "EA 214, Denver to Grand Junction, scheduled, departs Thu Jun 12 at 9:40 am",
-    pill: "Scheduled", sentence: "Your flight to Grand Junction departs Thu Jun 12 at 9:40 am.", times: ["9:40 am", "10:52 am"], updated: "Updated 4 min ago",
+    pill: "Scheduled", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 4 min ago",
     facts: [["Terminal", "B"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
   { name: "boarding", now: NOW.boarding, status: mk(NOW.boarding, 2, { dep_terminal: "B", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, boarding at gate B14, departs 9:40 am",
-    pill: "Boarding", sentence: "Boarding now at gate B14. Your flight departs at 9:40 am.", times: ["9:40 am", "10:52 am"], updated: "Updated 2 min ago",
+    pill: "Boarding", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 2 min ago",
     facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
   { name: "delayed", now: NOW.delayed, label: "EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am",
     status: mk(NOW.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", dep_terminal: "B", dep_gate: "B14", delay_minutes: 35 }),
-    pill: "Delayed 35 min", sentence: "Your flight now departs at 10:15 am, 35 minutes late.", times: ["Originally 9:40 am 10:15 am", "Originally 10:52 am 11:27 am"], updated: "Updated 4 min ago",
+    pill: "Delayed 35 min", sentence: "", times: ["Originally 9:40 am 10:15 am", "Originally 10:52 am 11:27 am"], updated: "Updated 4 min ago",
     facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
   { name: "in the air", now: NOW.air, label: "EA 214, Denver to Grand Junction, in the air, lands 10:52 am in 38 minutes",
     status: mk(NOW.air, 1, { state: "departed", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:52", arr_terminal: "1", arr_gate: "A3" }),
-    pill: "In the air", sentence: "Landing in Grand Junction at 10:52 am, in 38 minutes.", times: ["9:46 am", "10:52 am"], updated: "Updated 1 min ago",
+    pill: "In the air", sentence: "Lands in 38 minutes.", times: ["9:46 am", "10:52 am"], updated: "Updated 1 min ago",
     facts: [["Terminal", "1"], ["Gate", "A3"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "landed", now: NOW.landed, label: "EA 214, Denver to Grand Junction, landed 10:49 am, 3 minutes early",
     status: mk(NOW.landed, 1, { state: "landed", dep_actual: "2025-06-12T09:46", arr_actual: "2025-06-12T10:49", arr_terminal: "1", arr_gate: "A3" }),
-    pill: "Landed", sentence: "Landed at 10:49 am, 3 minutes early.", times: ["9:46 am", "10:49 am"], updated: "Updated 1 min ago",
+    pill: "Landed", sentence: "3 minutes early.", times: ["9:46 am", "10:49 am"], updated: "Updated 1 min ago",
     facts: [["Terminal", "1"], ["Gate", "A3"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "cancelled", now: NOW.cancelled, status: mk(NOW.cancelled, 12, { state: "cancelled", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, cancelled",
-    pill: "Cancelled", sentence: "This flight was cancelled. Contact Example Air about rebooking.", times: ["9:40 am", "10:52 am"], updated: "Updated 12 min ago",
+    pill: "Cancelled", sentence: "Contact Example Air about rebooking.", times: ["9:40 am", "10:52 am"], updated: "Updated 12 min ago",
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
   { name: "diverted", now: NOW.diverted, label: "EA 214, Denver to Montrose, diverted, expected to land 10:41 am",
     status: mk(NOW.diverted, 3, { state: "diverted", destination: "MTJ", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:41", arr_gate: "C2" }),
-    pill: "Diverted", sentence: "Diverted to Montrose (MTJ), expected to land at 10:41 am.", times: ["9:46 am", "10:41 am"], updated: "Updated 3 min ago",
+    pill: "Diverted", sentence: "Was headed to Grand Junction.", times: ["9:46 am", "10:41 am"], updated: "Updated 3 min ago",
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "scheduled with no live data", now: NOW.none, label: "EA 214, Denver to Grand Junction, scheduled, no live status yet", pill: null,
-    sentence: "Departs Thu Jun 12. Live status starts 1 day before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
+    sentence: "Live status starts 1 day before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
 ];
 
@@ -94,11 +94,25 @@ describe("the flight card in eight states", () => {
     expect(card).toBeInTheDocument();
     if (c.pill) expect(within(card).getByText(c.pill)).toBeInTheDocument();
     else expect(card.querySelector("[data-tone]")).toBeNull();
-    expect(within(card).getByText(c.sentence)).toBeInTheDocument();
+    if (c.sentence) expect(within(card).getByText(c.sentence)).toBeInTheDocument();
+    else expect(card.querySelector("[data-sentence]")).toBeNull();
     expect(times(card)).toEqual(c.times.map((t) => `${t} MDT`));
     expect(facts(card)).toEqual(c.facts.map(([label, value]) => [label, value]));
     if (c.updated) expect(within(card).getByText(c.updated)).toBeInTheDocument();
     else expect(card.textContent).not.toMatch(/Updated/);
+  });
+
+  it("never repeats the state, the time or the gate in a sentence", async () => {
+    for (const c of CASES.slice(0, 3)) {
+      const { unmount } = draw(c);
+      expect((await screen.findByRole("article")).querySelector("[data-sentence]")).toBeNull();
+      unmount();
+    }
+  });
+
+  it("puts the date of the side it shows in the eyebrow when that is not today, and nothing when it is", async () => {
+    draw(CASES[0]);
+    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")).toHaveTextContent("Departure · Denver · Thu Jun 12"));
   });
 
   it("uses the tones of the status chip: quiet, info, warn, ok and bad", () => {
@@ -216,7 +230,7 @@ describe("what the card says without live data", () => {
     const card = await screen.findByRole("article");
     expect(card.querySelector("[data-updated]")).toBeNull();
     expect(card.querySelector("[data-tone]")).toBeNull();
-    expect(within(card).getByText(/^Departs Thu Jun 12\. Live status starts 1 day before departure\./)).toBeInTheDocument();
+    expect(within(card).getByText(/^Live status starts 1 day before departure\./)).toBeInTheDocument();
   });
 
   it("says Scheduled instead once the flight is inside the window, with nothing invented", async () => {
@@ -230,7 +244,10 @@ describe("what the card says without live data", () => {
 
   it("says Scheduled and no window when live status is off", async () => {
     draw({ now: NOW.none }, { liveOn: false });
-    expect(within(await screen.findByRole("article")).getByText("Your flight to Grand Junction departs Thu Jun 12 at 9:40 am.")).toBeInTheDocument();
+    const card = await screen.findByRole("article");
+    expect(within(card).getByText("Scheduled")).toBeInTheDocument();
+    expect(card.querySelector("[data-sentence]")).toBeNull();
+    await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent("Thu Jun 12"));
   });
 
   it("falls back to the booked times for a flight in the air or landed, with no Updated line", async () => {
@@ -242,12 +259,12 @@ describe("what the card says without live data", () => {
     card.remove();
     draw({ now: NOW.landed });
     card = (await screen.findAllByRole("article")).at(-1) as HTMLElement;
-    expect(within(card).getByText("Landed at 10:52 am.")).toBeInTheDocument();
+    expect(within(card).getByText("Landed")).toBeInTheDocument();
   });
 
   it("puts the day on a landed flight from an earlier day", async () => {
     draw({ now: at("2025-06-14T09:00") });
-    expect(within(await screen.findByRole("article")).getByText("Landed Thu Jun 12 at 10:52 am.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")).toHaveTextContent("Arrival · Grand Junction · Thu Jun 12"));
   });
 });
 
@@ -256,7 +273,7 @@ describe("a stored status that is too old to trust", () => {
     const old = status(at("2025-06-12T11:00"), 300, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", delay_minutes: 35 });
     draw({ now: at("2025-06-12T11:00"), status: old });
     const card = await screen.findByRole("article");
-    expect(within(card).getByText("Landed at 10:52 am.")).toBeInTheDocument();
+    expect(within(card).getByText("Landed")).toBeInTheDocument();
     expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
     expect(card.textContent).not.toContain("11:27");
     expect(within(card).getByText("Updated 5 h ago")).toBeInTheDocument();
@@ -286,6 +303,17 @@ describe("when live updates are paused", () => {
   it("shows no line when nothing is paused", async () => {
     draw(CASES[0]);
     expect((await screen.findByRole("article")).querySelector("[data-paused]")).toBeNull();
+  });
+});
+
+describe("a delay past midnight", () => {
+  it("marks the new departure as a later day and names the day in the eyebrow", async () => {
+    const late = { ...booked, start_local: "2025-06-12T23:40", end_local: "2025-06-13T00:52" };
+    const now = at("2025-06-12T22:00");
+    draw({ segment: late, now, status: status(now, 2, { state: "delayed", dep_scheduled: "2025-06-12T23:40", dep_estimated: "2025-06-13T00:30", arr_scheduled: "2025-06-13T00:52", arr_estimated: "2025-06-13T01:42", delay_minutes: 50 }) });
+    const card = await screen.findByRole("article");
+    expect(times(card)[0]).toBe("Originally 11:40 pm 12:30 am MDT · +1 day, 1 day later on the calendar than departure");
+    await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent("Departure · Denver · Fri Jun 13"));
   });
 });
 

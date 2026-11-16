@@ -49,6 +49,8 @@ function serve() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(Date.UTC(2026, 10, 16, 12));
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
   summary = { days: 7, nights: 6, distance_km: 5570.2, flight_km: 5570.2, road_km: 0, road_estimated: false, states: [], countries: ["United Kingdom", "United States"], photos: { total: 0, inferred: 0 }, kinds: { flight: 1, hotel: 1, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
@@ -71,6 +73,13 @@ describe("Trip", () => {
     expect(within(cards[0]).getByText(/^Updated /)).toBeInTheDocument();
     expect(within(cards[1]).queryByRole("article")).toBeNull();
     expect(within(cards[1]).queryByText(/Updated /)).toBeNull();
+  });
+
+  it("shows a changed single booking’s Changed chip on its flight card", async () => {
+    held = trip([{ ...flight, status: "changed" }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(within(cards[0]).getByText("Changed")).toBeInTheDocument();
   });
 
   it("says when live updates are paused on the flight card, with no status stored for it", async () => {
