@@ -27,6 +27,12 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
         return try await ServerClient.exchange(code: code, verifier: verifier, endpoints: endpoints)
     }
 
+    static func makeSession(url: URL, completion: @escaping ASWebAuthenticationSession.CompletionHandler) -> ASWebAuthenticationSession {
+        let session = ASWebAuthenticationSession(url: url, callbackURLScheme: AppClient.callbackScheme, completionHandler: completion)
+        session.prefersEphemeralWebBrowserSession = true
+        return session
+    }
+
     nonisolated static func code(from callback: URL, state: String, issuer: String) throws -> String {
         let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
         func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
@@ -41,7 +47,7 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
 
     private func open(_ url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: AppClient.callbackScheme) { callback, error in
+            let session = SignIn.makeSession(url: url) { callback, error in
                 if let callback {
                     continuation.resume(returning: callback)
                 } else if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
@@ -51,7 +57,6 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
                 }
             }
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
             self.session = session
             if !session.start() {
                 continuation.resume(throwing: ServerError.signInFailed("the sign-in sheet couldn't open"))
