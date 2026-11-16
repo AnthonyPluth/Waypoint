@@ -134,6 +134,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **What usually breaks:**
   - The list loads after the heading renders (a Loading indicator first): `wait-settle`, then `snapshot`.
   - A trip's link is `#trip/<id>`; at desktop width the page shows the trip beside the list (the route becomes `#trips?trip=<id>`), so click the link and read the route in the answer.
+  - Past cards: the demo's Past list shows photo mosaics only on a signed-in session (`--signed-in jane`; local mode has no photos and draws the route-map tile). Distances and the route maps load after the cards, so `wait-settle` and then wait a few seconds before a screenshot. A past trip never opens the side pane: the pane (desktop width) shows only for a trip still to come, so filter to a year with none (`#trips?year=2025`) to see the Past cards two across.
 
 ### Flows on Trips
 
@@ -247,6 +248,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Add`, `Add a past trip`, `First day`, `Last day`, `Add another country`, `Last day 2`, `Last day 3`.
 - **Expects to see:** `Trips`, `Stats`.
 - **Drive it:** `tools/control flow past-trip-countries`; or `poetry run python run.py verify --flow past-trip-countries`.
+
+#### `past-trips-list`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`, `#trips?year=2026&q=Orlando`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`, `8`, `May 5–10`, `Oct 8–15`.
+- **Drive it:** `tools/control flow past-trips-list`; or `poetry run python run.py verify --flow past-trips-list`.
 
 #### `photos-remove`
 

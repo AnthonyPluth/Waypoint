@@ -518,18 +518,30 @@ export function nightsWords(trip: Pick<Trip, "start_date" | "end_date">): string
 export const tripPeople = (trip: Trip): { id: number | null; name: string }[] =>
   tripTravellers(trip.segments).map((who) => ({ id: who.key.startsWith("person:") ? Number(who.key.slice(7)) : null, name: who.name }));
 
-export type YearGroup = { year: number; trips: Trip[]; totals: string };
+export type YearGroup = { year: number; trips: Trip[]; photos: number; totals: string };
 
-export function pastByYear(past: Trip[]): YearGroup[] {
+export function pastByYear(past: Trip[], photoCounts: ReadonlyMap<number, number> = new Map()): YearGroup[] {
   const groups = new Map<number, Trip[]>();
   for (const t of past) {
     const year = Number((t.start_date ?? t.end_date ?? "0000").slice(0, 4));
     groups.set(year, [...(groups.get(year) ?? []), t]);
   }
   return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([year, trips]) => {
-    const nights = trips.reduce((sum, t) => sum + (t.start_date && t.end_date ? Math.max(0, dayCount(t.start_date, t.end_date)) : 0), 0);
-    const flights = trips.reduce((sum, t) => sum + t.segments.filter((s) => s.kind === "flight" && s.status !== "cancelled").length, 0);
-    const parts = [plural(trips.length, "trip"), nights ? plural(nights, "night") : "", flights ? plural(flights, "flight") : ""];
-    return { year, trips, totals: parts.filter(Boolean).join(" · ") };
+    const photos = trips.reduce((sum, t) => sum + (photoCounts.get(t.id) ?? 0), 0);
+    return { year, trips, photos, totals: [plural(trips.length, "trip"), photos ? photoWords(photos) : ""].filter(Boolean).join(" · ") };
   });
+}
+
+export const photoWords = (n: number): string => `${n.toLocaleString(locale())} photo${n === 1 ? "" : "s"}`;
+
+export const cardRange = (trip: Pick<Trip, "start_date" | "end_date">): string => tripRangeLabel(trip).replace(" – ", "–");
+
+export function nameList(names: string[]): string {
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+export function cardLabel(trip: Trip, photos: number, distance: string): string {
+  const people = nameList(tripPeople(trip).map((p) => p.name).filter(Boolean));
+  return [trip.name, cardRange(trip), nightsWords(trip), distance, photos > 0 ? photoWords(photos) : "", people].filter(Boolean).join(", ");
 }

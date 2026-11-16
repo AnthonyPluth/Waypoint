@@ -120,6 +120,8 @@ When a newer email for a booking changes its times or places, the booking says *
 
 ## Past trips
 
+On the Trips page, trips that have ended are cards grouped by year, each year with its trip count and, when you are signed in and have [photos](/Waypoint/start/photos/) on those trips, its photo count. A card leads with one large photo and two small ones from the trip, with the trip’s name over the large one and a pill with the number of photos you can see; below it are the dates, the nights, the distance in your unit and the people on the trip. A trip with no photos you can see keeps its card and shows a small map of its route instead (or a plain tile when its route can’t be placed). Cards run one column on a phone and two across on a wide screen; on a phone only the newest year shows, with a button for the next. A past trip always opens on its own page, never in the side pane that shows a trip still to come.
+
 Once a trip has ended, its page shows condensed cards: the kind, provider, dates and times, place, confirmation number and travellers stay, and what only helps while you travel (the manage link, Directions, Call, View email, live status, loyalty numbers) goes. Edit, Move and Remove stay until the trip is marked [Done](#done-with-a-trip).
 
 ## Replaying a past trip's route
