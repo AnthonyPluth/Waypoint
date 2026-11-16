@@ -6,12 +6,18 @@
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import { clearSaved, expiryOf, isSavedCopy, WHEN_SAVED, type SavedCopy } from "$lib/offline";
   import { offline, refreshOffline } from "$lib/offline.svelte";
+  import { inShell, shellLoad } from "$lib/offline-shell";
   import { onLock } from "$lib/offline-vault";
   import { onMount } from "svelte";
 
   let copies = $state<SavedCopy[]>([]);
   let chosen = $state<number | null>(null);
-  onMount(refreshOffline);
+  const shell = inShell();
+  let loading = $state(shell);
+  onMount(async () => {
+    await refreshOffline();
+    if (shell) await openFromShell();
+  });
   $effect(() => onLock(() => { copies = []; chosen = null; }));
 
   const savedTripPage = $derived(route.page === "upcoming" || route.page === "trip");
@@ -30,9 +36,20 @@
     copies = kept;
     chosen = null;
   }
+
+  async function openFromShell() {
+    loading = true;
+    try {
+      if (offline.hasCopy) await opened(await shellLoad());
+    } catch {
+      copies = [];
+    } finally {
+      loading = false;
+    }
+  }
 </script>
 
-{#if !offline.checked}
+{#if !offline.checked || loading}
   <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else if !savedTripPage}
   <Card.Root class="mx-auto mt-10 max-w-md" data-testid="needs-connection">
@@ -60,6 +77,17 @@
       {#each copies as c (c.trip.id)}
         <Button variant="outline" class="h-auto justify-start whitespace-normal text-left" href={wanted === null ? undefined : `#trip/${c.trip.id}`} onclick={() => (chosen = c.trip.id)}>{c.trip.name}</Button>
       {/each}
+    </Card.Content>
+  </Card.Root>
+{:else if shell && offline.hasCopy}
+  <Card.Root class="mx-auto mt-10 max-w-md" data-testid="shell-unreadable">
+    <Card.Header>
+      <Card.Title>The saved trips can’t be opened</Card.Title>
+      <Card.Description>Something went wrong reading them from this device.</Card.Description>
+    </Card.Header>
+    <Card.Content class="flex gap-2">
+      <Button onclick={openFromShell}>Try again</Button>
+      <Button variant="outline" onclick={boot}>Reconnect</Button>
     </Card.Content>
   </Card.Root>
 {:else if offline.hasCopy}

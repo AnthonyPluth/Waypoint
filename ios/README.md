@@ -67,6 +67,29 @@ One-time setup:
 | `Tests/OfflineStoreTests.swift` | Save and load, replace not merge, per-server separation, expiry, purge, file protection. |
 | `Tests/OfflineSyncTests.swift` | Sync with a fake network: saves, unknown version keeps the copy, 401 and 403 purge, network error keeps, sign-out and a changed server purge. |
 
+## Offline bridge
+
+How the web app reads saved trips from the shell (offline epic #734; the web side is `frontend/src/lib/offline-shell.ts`, the Swift side is issue #739). This is the one place the contract is written down.
+
+**Marker.** The shell registers one `WKScriptMessageHandlerWithReply` named `waypointOffline` on the web view's user content controller (the same way `waypointUnauthorized` is added in `ShellViewController.webView(with:configuration:)`), for the main frame only. The web app is "in the shell" exactly when `window.webkit.messageHandlers.waypointOffline.postMessage` is a function; with no handler it behaves as in a browser (passkey vault, service worker) and never calls the bridge. Register the handler only for the person's own server origin.
+
+**Calls.** The page calls `window.webkit.messageHandlers.waypointOffline.postMessage(request)` and awaits the promise WebKit returns; the reply handler answers with a JSON object. A request is an object with a `type`:
+
+| Request | Does | Reply |
+| --- | --- | --- |
+| `{ "type": "status" }` | Reads the saving flag and what is saved. | Status. |
+| `{ "type": "load" }` | Reads the saved trips from `OfflineStore` (expired trips already dropped). | Load. |
+| `{ "type": "setSaving", "on": true \| false }` | Sets the `offlineSaving` flag. Turning it off purges the saved copy, as Remove does. Turning it on lets sync fill the store at the next opportunity. | Status after the change. |
+| `{ "type": "remove" }` | Purges the saved copy for the current server. Leaves the saving flag alone. | Status after the purge. |
+
+**Status reply:** `{ "version": 1, "saving": Bool, "savedAt": Number | null, "trips": [{ "id": Number, "name": String }] }`. `savedAt` is milliseconds since the epoch of the last save (`null` when nothing is saved); `trips` lists the saved trips' ids and names in the order the server sent them (empty when nothing is saved).
+
+**Load reply:** `{ "version": 1, "trips": [Trip] }`, each `Trip` being one element of the `GET /api/offline` reply's `trips` (`{ "trip": ..., "messages": [...] }`, exactly as saved) plus `"savedAt"`, the same milliseconds since the epoch. Nothing else is added or changed, and the shell never decrypts anything (there is no app-level encryption; see the epic's owner decisions).
+
+**Errors and versions.** A reply with a `version` other than 1, or one that does not match the shapes above, is treated by the web app as an unreadable copy: it shows the offline screen's "can't be opened" state and never invents trips. Reject a request the handler does not know by failing the promise (reply with an error). The web app does not retry on its own. `version` is the same 1 as in `GET /api/offline`; change it only together with the web app.
+
+**Privacy.** The handler answers only the main frame of the person's own server, only while a session exists, and never logs trip contents. The web app calls `status` when the offline screen or Settings opens, `load` only when the server cannot be reached, and `remove` when the web app is told 401 or 403 (the shell purges on those itself too).
+
 ## How sign-in works
 
 1. `GET <server>/api/trips` with no credentials. `200` means the server has no sign-in of its own: the app just opens it.
@@ -77,7 +100,7 @@ One-time setup:
 
 ## Not built yet
 
-- The offline page and bridge that show saved trips, the settings card that turns saving on, local reminders, Face ID lock. The app saves trips today (when the internal saving flag is on) but nothing shows them yet.
+- The Swift side of the offline bridge (issue #739; the web side and the contract are in "Offline bridge" above), the settings card that turns saving on, local reminders, Face ID lock. The app saves trips today (when the internal saving flag is on) but nothing shows them yet.
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.
 - A sign-out button in Settings or the web UI. `ServerSession.signOut` is called by the error screen's **Use another Waypoint**, when the server says the sign-in is no longer valid and when the web view reports a 401 in the foreground; each then shows the signed-out screen.
