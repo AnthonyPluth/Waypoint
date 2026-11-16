@@ -3,6 +3,6 @@
   "appName": "Waypoint",
   "webDir": "Waypoint/public",
   "ios": {
-    "contentInset": "always"
+    "contentInset": "never"
   }
 }

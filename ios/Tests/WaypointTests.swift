@@ -250,3 +250,16 @@ final class UnauthorizedReportTests: XCTestCase {
         XCTAssertFalse(ended(["status": 401]))
     }
 }
+
+final class WebViewInsetTests: XCTestCase {
+    // The shell lets the web view run under the status bar and home indicator (`Shell().ignoresSafeArea()`) and the web
+    // page pads itself once with env(safe-area-inset-*). Capacitor's "always" would inset the scroll view by the safe
+    // area as well, and the page would pad again: a band under the status bar and a doubled gap above the home indicator.
+    func testTheWebViewIsNotInsetByTheSafeAreaBecauseThePagePadsItself() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("capacitor.config.json")
+        let config = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        let ios = try XCTUnwrap(config["ios"] as? [String: Any])
+        XCTAssertEqual(ios["contentInset"] as? String, "never")
+    }
+}
