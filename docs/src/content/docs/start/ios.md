@@ -9,7 +9,7 @@ The Waypoint iPhone app is a native shell around your own Waypoint. It signs in 
 
 ## Signing in
 
-The app opens a system sign-in sheet to your server's `/oauth/authorize` page. If you aren't signed in, Waypoint sends you through your OpenID Connect provider first, then shows **Waypoint for iPhone wants to connect to Waypoint** with **Allow** and **Deny**. Allowing sends you back to the app with a one-time code, which the app swaps for a token using PKCE.
+The app opens a system sign-in sheet to your server's `/oauth/authorize` page. The sheet is private: iOS shows no consent prompt of its own, but it doesn't share Safari's logins, so you sign in to your OpenID Connect provider each time you sign in to the app. Waypoint sends you through your OpenID Connect provider first if you aren't signed in, then shows **Waypoint for iPhone wants to connect to Waypoint** with **Allow** and **Deny**. Allowing sends you back to the app with a one-time code, which the app swaps for a token using PKCE.
 
 This needs `WAYPOINT_PUBLIC_URL` set, the same as [connecting an assistant](/Waypoint/start/mcp/). A Waypoint with no sign-in of its own (`OIDC_ISSUER` unset) needs no sign-in at all; the app just opens it.
 

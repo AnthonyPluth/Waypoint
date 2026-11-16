@@ -66,7 +66,7 @@ One-time setup:
 ## How sign-in works
 
 1. `GET <server>/api/trips` with no credentials. `200` means the server has no sign-in of its own: the app just opens it.
-2. Otherwise read `/.well-known/oauth-authorization-server` (needs `WAYPOINT_PUBLIC_URL` on the server) and open `/oauth/authorize` for the built-in client `wpc_waypoint_ios`, scope `app`, resource `<issuer>/app`, in the system sheet. The person signs in through their provider and taps Allow.
+2. Otherwise read `/.well-known/oauth-authorization-server` (needs `WAYPOINT_PUBLIC_URL` on the server) and open `/oauth/authorize` for the built-in client `wpc_waypoint_ios`, scope `app`, resource `<issuer>/app`, in the system sheet. The sheet is ephemeral (`prefersEphemeralWebBrowserSession`): iOS shows no "wants to use <server> to Sign In" prompt, but the sheet does not share Safari's cookies, so the person signs in to their provider each time they sign in, then taps Allow.
 3. The sheet returns `waypoint://auth?code=…`; the app swaps the code for tokens (`wpa_` access, `wpr_` refresh), stored in the Keychain.
 4. While the web app is showing, a `401` from its own `/api/` ends the session: the shell signs out (revoking the refresh token) and shows "You are signed out of Waypoint." with a **Sign in** button back to the connect screen. It does not try to renew, so there is no renewal loop.
 5. Each launch, `POST /auth/app-session` with the access token gives the web view its normal session cookie.

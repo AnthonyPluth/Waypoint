@@ -21,10 +21,14 @@ targets:
       - path: Waypoint
         excludes:
           - public
-    resources:
+      # Capacitor's CAPBridgeViewController exits the app at launch (even with a remote serverURL) unless the bundle holds
+      # public/ and capacitor.config.json. XcodeGen's target spec has no `resources:` key (it would be ignored), so both
+      # go here as resources; the ios workflow checks they land in the built app.
       - path: Waypoint/public
         type: folder
+        buildPhase: resources
       - path: capacitor.config.json
+        buildPhase: resources
     dependencies:
       - package: Capacitor
         product: Capacitor

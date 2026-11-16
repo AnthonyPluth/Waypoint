@@ -51,7 +51,7 @@ final class SignIn: NSObject, ASWebAuthenticationPresentationContextProviding {
                 }
             }
             session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
+            session.prefersEphemeralWebBrowserSession = true
             self.session = session
             if !session.start() {
                 continuation.resume(throwing: ServerError.signInFailed("the sign-in sheet couldn't open"))
