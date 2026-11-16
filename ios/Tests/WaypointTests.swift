@@ -262,4 +262,10 @@ final class WebViewInsetTests: XCTestCase {
         let ios = try XCTUnwrap(config["ios"] as? [String: Any])
         XCTAssertEqual(ios["contentInset"] as? String, "never")
     }
+
+    // A swipe from the screen edge goes back or forward through the pages, as in Safari.
+    func testTheWebViewGoesBackAndForwardWithAnEdgeSwipe() {
+        let webView = ShellViewController().webView(with: .zero, configuration: WKWebViewConfiguration())
+        XCTAssertTrue(webView.allowsBackForwardNavigationGestures)
+    }
 }
