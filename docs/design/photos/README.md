@@ -19,6 +19,7 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 | k | [k-remove-photos.html](k-remove-photos.html) | Remove from this trip from the viewer and the gallery, and Put back |
 | l | [l-others-view.html](l-others-view.html) | What everyone else sees (no trace of unshared photos), and the viewer when a photo is taken back |
 | m | [m-sharing-settings.html](m-sharing-settings.html) | Settings, Photo sharing: default scope, Share on all my trips, per-trip list |
+| n | [trip-photo-sharing.html](trip-photo-sharing.html) | The trip page's Photos header with a Sharing button (beside Select and See all) that opens the sharing controls: a popover on desktop, a bottom sheet on phone; today's page and the closed state beside it |
 
 ## Decisions the designs fix
 
@@ -35,6 +36,19 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 - A library for someone without a login is shared by whoever connected it.
 
 The rules behind these screens (grants, scope, removal, caching) are in `docs/PHOTOS.md` as rewritten by [#536](https://github.com/AnthonyPluth/Waypoint/pull/536); until #536 merges, the copy on main still describes the earlier design. The user-facing page `docs/src/content/docs/start/photos.md` describes what the code does today and is rewritten with the code that implements these rules.
+
+## Sharing button on the trip page
+
+The owner signed off on moving the trip page's photo-sharing block behind a button in the Photos header, in chat on 2026-11-16 (variant A, then the owner changed the trigger from a cog icon to a text button). The build issue is [#744](https://github.com/AnthonyPluth/Waypoint/issues/744). The page [trip-photo-sharing.html](trip-photo-sharing.html) shows today's page, the closed state and the open panel at both widths.
+
+- Variant A: a non-modal popover under the button on desktop, the app's existing bottom sheet on phone. The centred dialog (variant B) was dropped.
+- The trigger is a text button labelled `Sharing`, in the style of `Select` and `See all`, first in the header's button row: `Sharing`, `Select`, `See all`. Its visible text is its accessible name; there is no icon-only button. The panel's title is `Photo sharing for this trip`.
+- The button shows only while there is a sharing card to manage. The first-visit `ask` prompt and the `declined` reminder row stay inline with no button.
+- People who cannot change anything see no button (not a disabled one).
+- A steward managing a person without a sign-in gets one section per person in the panel, the viewer's own first and the others collapsed.
+- The desktop popover is non-modal and closes on Escape, an outside click or Tab leaving it. Focus returns to the button on Escape. The sheet is modal.
+- Nothing about who can see what changes.
+- `docs/PHOTOS.md` mentions a one-line row with `Manage` that the code does not have; the build issue corrects it.
 
 ## Fonts
 
