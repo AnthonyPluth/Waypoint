@@ -22,6 +22,17 @@ Each page says what it replaces: the Past list in `frontend/src/pages/Trips.svel
 - Distance is shown in the household's unit, one unit throughout the app.
 - Past trips list (a), decided by the owner on 2026-11-16 and built in #708: each year is an `h2` (it was an `h3`) with `N trips · N photos` beside it, the photo total counting only photos the viewer may see; on desktop the caption under the name shows the trip's destination (the frames draw a country; the owner chose the trip's destination); a Past card's footer is hidden from the reader, because the link's name already says its dates, nights, distance, photos and people (accepted by the owner).
 
+## Owner decisions on the build (2026-11-16, PR #748)
+
+The phone frames do not draw these; the owner settled them when reviewing the build of the completed trip page (#709).
+
+1. Editing a trip's name, destination and notes: a pencil button beside Trip options.
+2. The map hero (fewer than three photos to show): the title and dates, then the replay map with its controls and stops, then the quiet line "No photos yet", then the facts.
+3. Replay trip in the facts line opens the replay inline under the line; a trip's notes show as a paragraph under the facts.
+4. The gallery's Select is not on this page; a photo is removed from the viewer.
+
+Until the Bookings sheet (#711) and the booking detail sheet (#712) land, a past trip keeps its existing booking cards below the days, with Edit, Move and Remove; they go away when those land.
+
 ## Open questions for the owner
 
 1. Six photos per day, or three on phone?

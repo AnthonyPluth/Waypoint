@@ -3,14 +3,15 @@
   "page": "trips",
   "signed_in": true,
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "a[href^='#trip/']:has-text('Denver') >> visible=true" },
-    { "wait_for": "[data-testid='photo-pins'] button", "timeout": 30000 },
-    { "wait_for": "[data-testid='photo-strip'] img" },
-    { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
-    { "wait_for": "[data-testid='photo-pins'] button[data-far='true']" },
-    { "click": "[data-testid='photo-pins'] button[aria-label^='5 photos near Denver']" },
-    { "expect_text": { "selector": "[data-testid='pin-card']", "text": "5 photos" } },
-    { "screenshot": "pin-card-open" }
+    {"expect_text": {"selector": "h1", "text": "Trips"}},
+    {"click": "a[href^='#trip/']:has-text('Denver') >> visible=true"},
+    {"wait_for": "[data-testid='photo-days'] [data-photo] img"},
+    {"click": "button[aria-label='Replay trip']"},
+    {"wait_for": "[data-testid='photo-pins'] button", "timeout": 30000},
+    {"press": {"selector": "input[aria-label='Position along the route']", "key": "End"}},
+    {"wait_for": "[data-testid='photo-pins'] button[data-far='true']"},
+    {"click": "[data-testid='photo-pins'] button[aria-label^='5 photos near Denver']"},
+    {"expect_text": {"selector": "[data-testid='pin-card']", "text": "5 photos"}},
+    {"screenshot": "pin-card-open"}
   ]
 }

@@ -4,7 +4,7 @@
   import { apiCall } from "$lib/contract";
   import { distance } from "$lib/stats";
 
-  let { tripId, revision = "" }: { tripId: number; revision?: string } = $props();
+  let { tripId, revision = "", facts = false }: { tripId: number; revision?: string; facts?: boolean } = $props();
 
   type Loaded = { summary: TripSummary; unit: Stats["distance_unit"] | null } | null;
   let loaded = $state<Loaded>(null);
@@ -41,18 +41,27 @@
   const items = $derived.by(() => {
     if (!loaded) return [];
     const { summary: s, unit } = loaded;
-    const out: { term: string; text: string; note?: string }[] = [];
-    if (s.days > 0) out.push({ term: "Days", text: plural(s.days, "day") });
+    const out: { term: string; text: string; note?: string; lead?: boolean }[] = [];
+    if (s.days > 0) out.push({ term: "Days", text: plural(s.days, "day"), lead: true });
     if (s.nights > 0) out.push({ term: "Nights away", text: plural(s.nights, "night") });
     if (s.distance_km > 0 && unit) out.push({ term: "Distance", text: `${s.road_estimated ? "about " : ""}${distance(s.distance_km, unit)}` });
     const places = [...s.states, ...s.countries.filter((c) => s.states.length === 0 || c !== US)];
-    if (places.length) out.push({ term: "Places", text: places.join(", ") });
-    if (s.photos.total > 0) out.push({ term: "Photos", text: plural(s.photos.total, "photo"), note: s.photos.inferred > 0 ? `(${s.photos.inferred.toLocaleString()} placed from the itinerary)` : undefined });
+    if (places.length && !facts) out.push({ term: "Places", text: places.join(", ") });
+    if (s.photos.total > 0) out.push({ term: "Photos", text: plural(s.photos.total, "photo"), note: s.photos.inferred > 0 && !facts ? `(${s.photos.inferred.toLocaleString()} placed from the itinerary)` : undefined });
     return out;
   });
 </script>
 
-{#if items.length}
+{#if items.length && facts}
+  <dl class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-sm text-muted-foreground" aria-label="Trip summary" data-testid="trip-summary">
+    {#each items as item (item.term)}
+      <div class="contents" data-summary-item>
+        <dt class="sr-only">{item.term}</dt>
+        <dd class={item.lead ? "font-semibold text-foreground" : ""}>{item.text}</dd>
+      </div>
+    {/each}
+  </dl>
+{:else if items.length}
   <dl class="-ml-[1.25em] mt-1 flex flex-wrap items-baseline gap-y-0.5 text-sm [clip-path:inset(0_0_0_1.25em)]" aria-label="Trip summary" data-testid="trip-summary">
     {#each items as item (item.term)}
       <div class="relative min-w-0 pl-[1.25em] before:absolute before:left-0 before:w-[1.25em] before:text-center before:text-muted-foreground before:[content:'·'_/_'']" data-summary-item>

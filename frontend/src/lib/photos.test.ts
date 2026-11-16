@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TripPhoto } from "./api-types";
 import { segment } from "../test/fixtures";
-import { byDay, clusterAway, clusterCaption, clusterCount, clusterInfos, clusterName, clusterTitle, firstOfCluster, unlocated, clusterOf, dayCaption, daysFor, FAR_FROM_BOOKINGS, FROM_ITINERARY, isFar, isInferred, kilometres, originalUrl, personName, placeOf, previewUrl, thumbnailUrl, tileLabel, zoneCity } from "./photos";
+import { byDay, dayCover, dayPlace, dayTileName, dayWords, heroOf, hasGps, leadWithCover, pastDays, clusterAway, clusterCaption, clusterCount, clusterInfos, clusterName, clusterTitle, firstOfCluster, unlocated, clusterOf, dayCaption, daysFor, FAR_FROM_BOOKINGS, FROM_ITINERARY, isFar, isInferred, kilometres, originalUrl, personName, placeOf, previewUrl, thumbnailUrl, tileLabel, zoneCity } from "./photos";
 
 const photo = (extra: Partial<TripPhoto> = {}): TripPhoto => ({
   id: 1, person_id: 1, trip_id: 1, kind: "image", taken_local: "2026-03-01T10:42", zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif",
@@ -158,5 +158,85 @@ describe("clusterInfos and the names built from them", () => {
     expect(firstOfCluster(photos, 0)?.id).toBe(1);
     expect(firstOfCluster(photos, 9)).toBeNull();
     expect(unlocated(photos)).toBe(1);
+  });
+});
+
+describe("the completed trip's hero and days", () => {
+  const shot = (id: number, extra: Partial<TripPhoto> = {}) => photo({ id, taken_local: `2026-03-01T${String(8 + id).padStart(2, "0")}:00`, ...extra });
+
+  it("takes the hero from the first three of best, and none when fewer than three can be shown", () => {
+    const photos = [1, 2, 3, 4, 5].map((id) => shot(id));
+    expect(heroOf({ photos, best: [4, 2, 5, 1] })).toEqual([4, 2, 5]);
+    expect(heroOf({ photos, best: [4, 2] })).toEqual([]);
+    expect(heroOf({ photos: [shot(1), shot(2)], best: [1, 2] })).toEqual([]);
+    expect(heroOf({ photos, best: [] })).toEqual([]);
+    expect(heroOf(null)).toEqual([]);
+  });
+
+  it("never takes a hero photo the viewer's reply does not hold", () => {
+    expect(heroOf({ photos: [shot(1), shot(2), shot(3)], best: [9, 1, 2, 3] })).toEqual([1, 2, 3]);
+    expect(heroOf({ photos: [shot(1), shot(2)], best: [9, 1, 2] })).toEqual([]);
+  });
+
+  it("counts a photo as having GPS only when its place came from the photo", () => {
+    expect(hasGps(shot(1))).toBe(true);
+    expect(hasGps(shot(1, { latitude: null, longitude: null, location_source: null }))).toBe(false);
+    expect(hasGps(shot(1, { location_source: "inferred" }))).toBe(false);
+  });
+
+  it("leads a day with its first photo with GPS, the others in time order", () => {
+    const day = [shot(1, { latitude: null, longitude: null, location_source: null }), shot(2, { location_source: "inferred" }), shot(3), shot(4)];
+    expect(dayCover(day)?.id).toBe(3);
+    expect(leadWithCover(day).map((p) => p.id)).toEqual([3, 1, 2, 4]);
+  });
+
+  it("leads a day with no GPS with its first photo", () => {
+    const day = [shot(2, { latitude: null, longitude: null, location_source: null }), shot(1, { latitude: null, longitude: null, location_source: null })];
+    expect(dayCover(day)?.id).toBe(1);
+    expect(leadWithCover(day).map((p) => p.id)).toEqual([1, 2]);
+    expect(dayCover([])).toBeNull();
+    expect(leadWithCover([])).toEqual([]);
+  });
+
+  it("leaves the hero's photos out of the days, so each photo appears once and the counts are what is left", () => {
+    const photos = [1, 2, 3, 4].map((id) => shot(id)).concat([5, 6].map((id) => photo({ id, taken_local: `2026-03-02T0${id}:00` })));
+    const days = pastDays(photos, new Set([1, 2, 3]), new Map([[2, stay]]));
+    expect(days.map((d) => [d.day, d.photos.map((p) => p.id)])).toEqual([["2026-03-01", [4]], ["2026-03-02", [5, 6]]]);
+    expect(days.flatMap((d) => d.photos.map((p) => p.id))).toEqual([4, 5, 6]);
+    expect(days.every((d) => d.more === 0)).toBe(true);
+  });
+
+  it("drops a day whose photos are all in the hero", () => {
+    const photos = [shot(1), shot(2), photo({ id: 3, taken_local: "2026-03-02T09:00" })];
+    expect(pastDays(photos, new Set([1, 2]), new Map()).map((d) => d.day)).toEqual(["2026-03-02"]);
+  });
+
+  it("shows six photos and counts the rest as more", () => {
+    const photos = Array.from({ length: 38 }, (_, i) => shot(i + 1, { taken_local: `2026-03-01T${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}` }));
+    const [day] = pastDays(photos, new Set(), new Map([[2, stay]]));
+    expect(day.shown).toHaveLength(6);
+    expect(day.photos).toHaveLength(38);
+    expect(day.more).toBe(32);
+    expect(day.place).toBe("Marlow Springs");
+  });
+
+  it("names the day's photos and its last tile as the design does", () => {
+    const day = { label: "Thu Jun 12", place: "Moab, UT", more: 32 };
+    expect(dayTileName(day, 3, false)).toBe("Photo 3, Thu Jun 12, Moab, UT");
+    expect(dayTileName(day, 6, true)).toBe("Photo 6 and 32 more, Thu Jun 12, Moab, UT");
+    expect(dayTileName({ ...day, more: 0 }, 6, true)).toBe("Photo 6, Thu Jun 12, Moab, UT");
+    expect(dayTileName({ ...day, place: "" }, 1, false)).toBe("Photo 1, Thu Jun 12");
+    expect(dayTileName(day, 2, false, shot(1, { kind: "video", match: "far", location_source: "inferred" }))).toBe("Video 2, Thu Jun 12, Moab, UT, far from every booking, place from the itinerary");
+  });
+
+  it("words a day without a comma after the weekday and never converts it", () => {
+    expect(dayWords("2025-06-12")).toBe("Thu Jun 12");
+  });
+
+  it("names a day for the place most of its photos are at, leaving out far ones", () => {
+    const flightPhoto = photo({ id: 9, segment_id: 3, taken_local: "2026-03-04T09:30" });
+    const photos = [shot(1), shot(2), flightPhoto, shot(4, { match: "far", segment_id: 3 })];
+    expect(dayPlace(photos, new Map([[2, stay], [3, flight]]))).toBe("Marlow Springs");
+    expect(dayPlace([photo({ segment_id: null })], new Map())).toBe("");
   });
 });

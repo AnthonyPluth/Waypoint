@@ -19,7 +19,7 @@ export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"];
 export const OWN_PAGES = ["oauth-approve"];
 export const SIGNED_PAGES = ["trip"];
-export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["section[aria-label='Route replay'] [data-testid='replay-map']", "[data-testid='photo-strip'] img", "[data-testid='trip-summary']", "[data-testid='photo-pins'] button", "[data-testid='your-photos']"], still: "input[aria-label='Position along the route']" } };
+export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='trip-hero'] img", "[data-testid='trip-summary']", "[data-testid='photo-days'] [data-photo] img", "[data-testid='your-photos']"] } };
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -42,7 +42,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -241,6 +241,21 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
       const t = made.get(id);
       if (!t || route.request().method() !== "GET") return route.fallback();
       return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
+    });
+  } else if ("fake_photo_limit" in step) {
+    const limit = step.fake_photo_limit;
+    await page.route(/\/api\/trips\/\d+\/photos$/, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const data = await response.json();
+      const photos = data.photos.slice(0, limit);
+      const kept = new Set(photos.map((p) => p.id));
+      await route.fulfill({ response, json: { ...data, photos, best: data.best.filter((id) => kept.has(id)), counts: { ...data.counts, total: photos.length } } });
+    });
+    await page.route(/\/api\/trips\/\d+\/summary$/, async (route) => {
+      const response = await route.fetch();
+      const data = await response.json();
+      await route.fulfill({ response, json: { ...data, photos: { total: Math.min(data.photos.total, limit), inferred: Math.min(data.photos.inferred, limit) } } });
     });
   } else if ("fake_merge_warning" in step) {
     const [first, second] = step.fake_merge_warning.split("|").map((part) => part.split(",").map((n) => n.trim()).filter(Boolean));
@@ -452,7 +467,7 @@ async function openPage(page, base, name) {
   if (!opened) return;
   await page.locator(opened.open).first().click();
   for (const ready of opened.ready) await page.locator(ready).first().waitFor({ timeout: 30000 });
-  await page.locator(opened.still).first().press("End");
+  if (opened.still) await page.locator(opened.still).first().press("End");
   await page.evaluate("document.activeElement?.blur?.()");
   await page.waitForFunction(() => [...globalThis.document.images].every((img) => { const r = img.getBoundingClientRect(); return r.right <= 0 || r.left >= globalThis.innerWidth || r.bottom <= 0 || (img.complete && img.naturalWidth > 0); }), undefined, { timeout: 10000 });
   await page.waitForLoadState("networkidle");

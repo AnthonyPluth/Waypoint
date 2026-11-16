@@ -296,3 +296,17 @@ describe("TripPhotos", () => {
     });
   });
 });
+
+describe("TripPhotos in days, Show these photos", () => {
+  it("opens the viewer at the photo of a cluster that is past the six shown for its day", async () => {
+    photos = many(8, 8).map((p, i) => ({ ...p, cluster: i === 7 ? 0 : null }));
+    const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after, timeline: true });
+    await section();
+    await waitFor(() => expect(document.querySelectorAll("[data-photo]")).toHaveLength(6));
+    expect(document.querySelector('[data-photo="8"]')).toBeNull();
+    await (view.component as unknown as { showCluster: (n: number) => Promise<void> }).showCluster(0);
+    const viewer = await screen.findByRole("dialog");
+    expect(within(viewer).getByText("Photo 8 of 8")).toBeTruthy();
+  });
+});
+

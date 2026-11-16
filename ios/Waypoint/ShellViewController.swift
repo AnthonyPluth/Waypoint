@@ -36,7 +36,9 @@ final class ShellViewController: CAPBridgeViewController {
                 OfflineBridgeHandler(server: server, onSavingOn: { [weak self] webView in self?.refreshPages(from: webView, syncTrips: true) }),
                 contentWorld: .page, name: OfflineBridgeHandler.name)
         }
-        return super.webView(with: frame, configuration: configuration)
+        let webView = super.webView(with: frame, configuration: configuration)
+        webView.allowsBackForwardNavigationGestures = true
+        return webView
     }
 
     override func capacitorDidLoad() {
