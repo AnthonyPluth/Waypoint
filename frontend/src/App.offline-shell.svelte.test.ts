@@ -69,3 +69,45 @@ describe("opening the iPhone app with no connection", () => {
     await waitFor(() => expect(screen.getByText("QX7R2M")).toBeInTheDocument());
   });
 });
+
+describe("when the app's status or a trip's end date changes under the open screen", () => {
+  it("shows the can't-be-opened state, not 'nothing saved', when status fails, and Try again retries status and load over the bridge", async () => {
+    shell = installShell({ trips: [copy(1, "Trip to London", Date.now())], savedAt: Date.now() });
+    shell.replies.set("status", Promise.reject(new Error("gone")));
+    render(App);
+    expect(await screen.findByTestId("shell-unreadable")).toBeInTheDocument();
+    expect(screen.queryByText("You’re offline, and no trip is saved on this device")).not.toBeInTheDocument();
+    shell.replies.delete("status");
+    shell.posts.length = 0;
+    await userEvent.setup().click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("QX7R2M")).toBeInTheDocument());
+    expect(shell.posts.map((p) => p.type)).toEqual(["status", "load"]);
+  });
+
+  it("drops a trip that expires while the app is suspended when it comes back to the foreground, and asks the app to remove the copy", async () => {
+    shell = installShell({ trips: [copy(1, "Trip to London", Date.now())], savedAt: Date.now() });
+    render(App);
+    expect(await screen.findByText("QX7R2M")).toBeInTheDocument();
+    shell.posts.length = 0;
+    vi.setSystemTime(new Date(2026, 10, 29, 12, 0));
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(await screen.findByText("You’re offline, and no trip is saved on this device")).toBeInTheDocument();
+    expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
+    expect(shell.posts.map((p) => p.type)).toContain("remove");
+    expect(shell.trips).toEqual([]);
+  });
+
+  it("drops it at the nearest expiry time while the app stays open", async () => {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] });
+    vi.setSystemTime(new Date(2026, 10, 27, 12, 0));
+    shell = installShell({ trips: [copy(1, "Trip to London", Date.now())], savedAt: Date.now() });
+    render(App);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(screen.getByText("QX7R2M")).toBeInTheDocument();
+    await vi.advanceTimersByTimeAsync(2 * 86_400_000);
+    expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
+    expect(screen.getByText("You’re offline, and no trip is saved on this device")).toBeInTheDocument();
+    expect(shell.posts.map((p) => p.type)).toContain("remove");
+  });
+});

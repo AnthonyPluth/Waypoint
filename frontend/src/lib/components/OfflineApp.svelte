@@ -4,6 +4,7 @@
   import { Button } from "$lib/components/ui/button";
   import OfflineTrip from "$lib/components/OfflineTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
+  import { ignoreFailure } from "$lib/act";
   import { clearSaved, expiryOf, isSavedCopy, WHEN_SAVED, type SavedCopy } from "$lib/offline";
   import { offline, refreshOffline } from "$lib/offline.svelte";
   import { inShell, shellLoad } from "$lib/offline-shell";
@@ -14,10 +15,7 @@
   let chosen = $state<number | null>(null);
   const shell = inShell();
   let loading = $state(shell);
-  onMount(async () => {
-    await refreshOffline();
-    if (shell) await openFromShell();
-  });
+  onMount(() => (shell ? void openFromShell() : void refreshOffline()));
   $effect(() => onLock(() => { copies = []; chosen = null; }));
 
   const savedTripPage = $derived(route.page === "upcoming" || route.page === "trip");
@@ -40,13 +38,45 @@
   async function openFromShell() {
     loading = true;
     try {
+      await refreshOffline();
       if (offline.hasCopy) await opened(await shellLoad());
     } catch {
       copies = [];
+      offline.damaged = true;
     } finally {
       loading = false;
     }
   }
+
+  async function recheckShellCopies() {
+    if (!shell || copies.length === 0) return;
+    const live = copies.filter((c) => { const expires = expiryOf(c); return expires === null || Date.now() < expires; });
+    if (live.length === copies.length) return;
+    if (live.length === 0) {
+      await clearSaved().catch(ignoreFailure);
+      await refreshOffline();
+      copies = [];
+      chosen = null;
+      return;
+    }
+    copies = live;
+    chosen = null;
+    try { await opened(await shellLoad()); } catch { copies = live; }
+  }
+
+  $effect(() => {
+    if (!shell || copies.length === 0) return;
+    const expiries = copies.map(expiryOf).filter((at): at is number => at !== null);
+    const timer = expiries.length ? setTimeout(() => void recheckShellCopies(), Math.min(Math.max(0, Math.min(...expiries) - Date.now()), 2 ** 31 - 1)) : null;
+    const foreground = () => { if (document.visibilityState !== "hidden") void recheckShellCopies(); };
+    document.addEventListener("visibilitychange", foreground);
+    window.addEventListener("focus", foreground);
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", foreground);
+      window.removeEventListener("focus", foreground);
+    };
+  });
 </script>
 
 {#if !offline.checked || loading}
@@ -79,7 +109,7 @@
       {/each}
     </Card.Content>
   </Card.Root>
-{:else if shell && offline.hasCopy}
+{:else if shell && (offline.hasCopy || offline.damaged)}
   <Card.Root class="mx-auto mt-10 max-w-md" data-testid="shell-unreadable">
     <Card.Header>
       <Card.Title>The saved trips can’t be opened</Card.Title>
