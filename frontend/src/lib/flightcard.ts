@@ -1,8 +1,8 @@
-import type { FlightStatus, Segment } from "./api-types";
+import type { FlightStatus, FlightStatusPause, Segment } from "./api-types";
 import { liveChip, type Chip } from "./status";
-import { clock, dayIn, dayLabel, daysBetween, dayShiftWords, flightEvidence, flightProgress, instant, seatsInOrder } from "./trips";
+import { clock, dayIn, dayLabel, daysBetween, dayShiftWords, flightEvidence, flightProgress, instant, LIVE_STALE_HOURS, seatsInOrder } from "./trips";
 
-export const LIVE_STATUS_STARTS_DAYS = 3;
+export const LIVE_STATUS_STARTS_DAYS = 1;
 export const BOARDING_MINUTES = 40;
 
 const DAY_MS = 86_400_000;
@@ -111,16 +111,20 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const bookedDep = instant(s.start_local, s.start_zone);
   const bookedArr = instant(s.end_local, s.end_zone);
   const evidence = s.status === "cancelled" ? "cancelled" : flightEvidence(st, now, online);
-  const liveDep = st ? st.dep_actual ?? st.dep_estimated : null;
-  const liveArr = st ? st.arr_actual ?? st.arr_estimated : null;
+  const FINAL = ["landed", "cancelled", "diverted"];
+  const fetched = st ? Date.parse(st.fetched_at) : NaN;
+  const stale = !!st && !FINAL.includes(st.state) && (!online || Number.isNaN(fetched) || now - fetched > LIVE_STALE_HOURS * 3_600_000);
+  const fresh = stale ? undefined : st;
+  const liveDep = fresh ? fresh.dep_actual ?? fresh.dep_estimated : null;
+  const liveArr = fresh ? fresh.arr_actual ?? fresh.arr_estimated : null;
   const depLocal = liveDep ?? s.start_local;
-  const depZone = liveDep && st ? st.dep_zone : s.start_zone;
+  const depZone = liveDep && fresh ? fresh.dep_zone : s.start_zone;
   const arrLocal = liveArr ?? s.end_local;
-  const arrZone = liveArr && st ? st.arr_zone : s.end_zone;
+  const arrZone = liveArr && fresh ? fresh.arr_zone : s.end_zone;
   const depAt = instant(depLocal, depZone);
   const arrAt = instant(arrLocal, arrZone);
 
-  const gate = st?.dep_gate ?? null;
+  const gate = fresh?.dep_gate ?? null;
   const state: CardState = (() => {
     if (evidence === "cancelled") return "cancelled";
     if (evidence === "diverted") return "diverted";
@@ -129,7 +133,7 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
     if (evidence === "delayed") return "delayed";
     if (now >= bookedArr) return "landed";
     if (now >= bookedDep) return "in-the-air";
-    if (st && gate && now >= depAt - BOARDING_MINUTES * MINUTE_MS && now < depAt) return "boarding";
+    if (fresh && gate && now >= depAt - BOARDING_MINUTES * MINUTE_MS && now < depAt) return "boarding";
     return "scheduled";
   })();
 
@@ -171,7 +175,7 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   const delayWords = lateBy ? `, ${plural(lateBy, "minute")} late` : "";
 
   const sentence = (() => {
-    if (noLive) return `Live status starts ${plural(LIVE_STATUS_STARTS_DAYS, "day")} before departure. Until then these are the times on your booking.`;
+    if (noLive) return `Departs ${shortDay(depLocal)}. Live status starts ${plural(LIVE_STATUS_STARTS_DAYS, "day")} before departure. Until then these are the times on your booking.`;
     switch (state) {
       case "scheduled": return `Your flight to ${whereTo} departs ${shortDay(depLocal)} at ${depart.time}.`;
       case "boarding": return `Boarding now at gate ${gate}. Your flight departs at ${depart.time}.`;
@@ -264,4 +268,12 @@ export function arcTravelled(progress: number): string {
   const round = (n: number) => Math.round(n * 100) / 100;
   const end = { x: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, y: a * ARC.y0 + b * ARC.y1 + c * ARC.y2 };
   return `M${ARC.x0} ${ARC.y0} Q${round(ARC.x0 + t * (ARC.x1 - ARC.x0))} ${round(ARC.y0 + t * (ARC.y1 - ARC.y0))} ${round(end.x)} ${round(end.y)}`;
+}
+
+export function pausedWords(p: FlightStatusPause): string {
+  const until = new Date(p.until);
+  if (Number.isNaN(until.getTime())) return "Live updates paused";
+  if (p.reason === "limit") return `Live updates paused until ${until.toLocaleDateString(undefined, { month: "short", day: "numeric" })} (monthly limit)`;
+  const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(until);
+  return `Live updates paused until ${time} (${p.reason === "rate" ? "rate limit" : "the status service didn’t accept the key"})`;
 }

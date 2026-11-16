@@ -337,7 +337,7 @@
       {@const s = card.lead}
       {#if flightCard(card)}
         <li id={`segment-${s.id}`} class="scroll-mt-20" data-flight-card>
-          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)}>
+          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null}>
             {#snippet footer()}
               {#if card.segments.length === 1}
                 {@render flightBooking(s)}
@@ -354,6 +354,7 @@
         <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={omitted(s)}>
           {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
           {#snippet details()}{@render ports(s)}{@render links(s)}{/snippet}
+          {#snippet live()}{/snippet}
           {#snippet footer()}
             {@render singleFooter(s)}
           {/snippet}
@@ -368,6 +369,7 @@
               <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>
             {/if}
           {/snippet}
+          {#snippet live()}{/snippet}
           {#snippet footer()}
             {@render multiFooter(card)}
           {/snippet}

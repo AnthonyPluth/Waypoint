@@ -73,6 +73,18 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByText(/Updated /)).toBeNull();
   });
 
+  it("says when live updates are paused on the flight card, with no status stored for it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 20, 14, 30));
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const paused = { ...delayed, statuses: [], paused: { until: "2026-12-01T00:00:00+00:00", reason: "limit" } };
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? paused : answer(path, opts)) as never);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(await within(cards[0]).findByRole("status")).toHaveTextContent(/^Live updates paused until (Nov|Dec) \d+ \(monthly limit\)$/);
+    expect(within(cards[1]).queryByRole("status")).toBeNull();
+  });
+
   it("updates a flight’s card from the stored status on its own, without a reload", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.setSystemTime(Date.UTC(2026, 10, 20, 23, 30));

@@ -66,7 +66,7 @@ const CASES: Case[] = [
     pill: "Diverted", sentence: "Diverted to Montrose (MTJ), expected to land at 10:41 am.", times: ["9:46 am", "10:41 am"], updated: "Updated 3 min ago",
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
   { name: "scheduled with no live data", now: NOW.none, label: "EA 214, Denver to Grand Junction, scheduled, no live status yet", pill: null,
-    sentence: "Live status starts 3 days before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
+    sentence: "Departs Thu Jun 12. Live status starts 1 day before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
     facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "EconEconomy"]] },
 ];
 
@@ -211,16 +211,16 @@ describe("the four facts", () => {
 
 describe("what the card says without live data", () => {
   it("has no Updated line and no pill, and names the window as a constant", async () => {
-    expect(LIVE_STATUS_STARTS_DAYS).toBe(3);
+    expect(LIVE_STATUS_STARTS_DAYS).toBe(1);
     draw(CASES[7]);
     const card = await screen.findByRole("article");
     expect(card.querySelector("[data-updated]")).toBeNull();
     expect(card.querySelector("[data-tone]")).toBeNull();
-    expect(within(card).getByText(/^Live status starts 3 days before departure\./)).toBeInTheDocument();
+    expect(within(card).getByText(/^Departs Thu Jun 12\. Live status starts 1 day before departure\./)).toBeInTheDocument();
   });
 
   it("says Scheduled instead once the flight is inside the window, with nothing invented", async () => {
-    draw({ now: at("2025-06-10T09:40") });
+    draw({ now: at("2025-06-11T12:00") });
     const card = await screen.findByRole("article");
     expect(within(card).getByText("Scheduled")).toBeInTheDocument();
     expect(card.querySelector("[data-updated]")).toBeNull();
@@ -248,6 +248,44 @@ describe("what the card says without live data", () => {
   it("puts the day on a landed flight from an earlier day", async () => {
     draw({ now: at("2025-06-14T09:00") });
     expect(within(await screen.findByRole("article")).getByText("Landed Thu Jun 12 at 10:52 am.")).toBeInTheDocument();
+  });
+});
+
+describe("a stored status that is too old to trust", () => {
+  it("shows the booked times and sentence, not the old estimate, when it is over three hours old", async () => {
+    const old = status(at("2025-06-12T11:00"), 300, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", delay_minutes: 35 });
+    draw({ now: at("2025-06-12T11:00"), status: old });
+    const card = await screen.findByRole("article");
+    expect(within(card).getByText("Landed at 10:52 am.")).toBeInTheDocument();
+    expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
+    expect(card.textContent).not.toContain("11:27");
+    expect(within(card).getByText("Updated 5 h ago")).toBeInTheDocument();
+  });
+
+  it("does the same when the device is offline", async () => {
+    draw({ now: NOW.delayed, status: CASES[2].status }, { online: false });
+    const card = await screen.findByRole("article");
+    expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
+    expect(card.textContent).not.toMatch(/Originally|Delayed/);
+  });
+});
+
+describe("when live updates are paused", () => {
+  it("says so in one quiet line, with or without a stored status, and says nothing otherwise", async () => {
+    const until = new Date(Date.UTC(2025, 5, 13, 15, 30)).toISOString();
+    const first = draw(CASES[0], { paused: { until, reason: "rate" } });
+    let card = await screen.findByRole("article");
+    expect(card.querySelector("[data-paused]")).toHaveAttribute("role", "status");
+    expect(card.querySelector("[data-paused]")).toHaveTextContent(/^Live updates paused until .+ \(rate limit\)$/);
+    first.unmount();
+    draw(CASES[7], { paused: { until, reason: "limit" } });
+    card = await screen.findByRole("article");
+    expect(card.querySelector("[data-paused]")).toHaveTextContent(/\(monthly limit\)$/);
+  });
+
+  it("shows no line when nothing is paused", async () => {
+    draw(CASES[0]);
+    expect((await screen.findByRole("article")).querySelector("[data-paused]")).toBeNull();
   });
 });
 

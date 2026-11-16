@@ -18,7 +18,7 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 - "Updated N min ago" sits between the times, and is omitted when there is no live data.
 - A status pill and one plain sentence give the state (Scheduled, Boarding, Delayed 35 min, In the air, Landed, Cancelled, Diverted).
 - Four facts in big type with small-caps labels: before departure Terminal, Gate, Seat, Cabin; in the air and landed Terminal, Gate, Belt, Seat (the arrival side). Each is marked as from live status (a filled blue dot) or from the booking (a hollow grey ring). An unknown value shows a dash; the row is never left out.
-- Eight states: scheduled, boarding, delayed, in the air, landed, cancelled, diverted, and scheduled with no live data. With no live data the card says live status starts 3 days before departure (the number of days is a placeholder to confirm against the data source) and shows the times on the booking.
+- Eight states: scheduled, boarding, delayed, in the air, landed, cancelled, diverted, and scheduled with no live data. With no live data the card says live status starts 1 day before departure (decided by the owner on 2026-11-16, down from the 3 the frames first showed) and shows the times on the booking.
 - The live status view: a big route, the headline "Landing in 38 minutes", a progress bar, a departed / in the air / lands timeline, big arrival facts (Terminal, Gate, Belt), seats per traveller from the booking, and Refresh with when the data was last updated.
 - Where else a flight appears: a Home next-flight card, flight rows in the trip list (kind tile, "DEN to GJT · EA 214", time, status chip) and the booking on the trip page with a one-line progress bar. Each opens the live status view.
 - Seat and cabin come from the booking. Terminal, gate, belt, delay, and the actual times come from live status.
@@ -27,10 +27,18 @@ Each page says what it replaces: the flight view of `frontend/src/lib/components
 ## Open questions for the owner
 
 1. Which gate, terminal and belt data exists (see [flight-gates.md](../flight-gates.md), #635 and #638)? Until the data source lands, some facts stay dashes, and the dash is a designed state, not a bug.
-2. Live status starts "3 days before departure" in the no-live-data card: confirm the window against what the status source and its monthly request limit allow.
-3. "Econ" on phone versus "Economy": the phone card abbreviates so four facts fit across; confirm, or use a shorter fact for cabin.
+2. Live status starts "1 day before departure" in the no-live-data card. Decided by the owner on 2026-11-16: the window is one day (`LIVE_STATUS_STARTS_DAYS` in `frontend/src/lib/flightcard.ts`).
+3. "Econ" on phone versus "Economy": the phone card abbreviates so four facts fit across. Decided by the owner on 2026-11-16: keep it as the frames show (the build follows the card's width).
 4. The arc and plane geometry on very short flights (under an hour, the plane sits close to the codes) and very long ones (the arc is a drawing, not a route): is a straight dotted line better for either?
 5. Does a landed flight keep showing the card on the trip page after it lands, or fall back to the plain booking once the trip is over (the completed-trip designs hide gate and live status)?
+
+## Owner decisions on the build (#714, 2026-11-16)
+
+- Boarding, which the status source does not report, is derived: a live status with a gate and departure within 40 minutes.
+- The parts the frames don't draw are accepted as built: "+1 day" after an overnight arrival, the day in the sentence when the flight is not today, booked times for a flight with no live status, the booking's terminal (with the ring) when live status has none, and the confirmation code, travellers and Edit, Move and Remove under the facts.
+- The trip page's card has no Refresh button; Refresh moves to the live status view (#715). A small quiet line, "Live updates paused until <time>" with the reason, stays on the card while updates are paused (monthly limit, rate limit or a refused key), whether or not a status is stored. The frames don't show it.
+- With no live status yet, the card keeps the departure date ("Departs Thu Jun 12.") before the sentence about when live status starts.
+- The live-status window is one day before departure.
 
 ## Fonts
 

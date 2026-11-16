@@ -1,14 +1,14 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import Plane from "@lucide/svelte/icons/plane";
-  import type { FlightStatus, Segment } from "$lib/api-types";
+  import type { FlightStatus, FlightStatusPause, Segment } from "$lib/api-types";
   import { airportInfo } from "$lib/airport-zones";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { headline } from "$lib/trips";
-  import { arcHeading, arcPoint, arcTravelled, flightCardView, type Stamp } from "$lib/flightcard";
+  import { arcHeading, arcPoint, arcTravelled, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
 
-  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; footer?: Snippet };
-  let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, footer }: Props = $props();
+  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; paused?: FlightStatusPause | null; footer?: Snippet };
+  let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, paused = null, footer }: Props = $props();
 
   let cities = $state<Record<string, string>>({});
   $effect(() => {
@@ -79,6 +79,8 @@
     {#if view.pill}<StatusChip chip={view.pill} class="uppercase tracking-[0.04em]" />{/if}
     <p class="min-w-0 flex-[1_1_180px] text-sm" data-sentence>{view.sentence}</p>
   </div>
+
+  {#if paused}<p class="text-xs text-muted-foreground" role="status" data-paused>{pausedWords(paused)}</p>{/if}
 
   <div class="flex flex-col gap-2 border-t border-border pt-3">
     <span class="eyebrow">{view.side}{sideCity ? ` · ${sideCity}` : ""}</span>

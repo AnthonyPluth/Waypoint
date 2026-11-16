@@ -23,7 +23,7 @@
     { "wait_for": "article[data-state='landed']" },
     { "wait_for": "article[data-state='cancelled']" },
     { "wait_for": "article[data-state='diverted']" },
-    { "expect_text": { "selector": "article[aria-label$='no live status yet']", "text": "Live status starts 3 days before departure" } },
+    { "expect_text": { "selector": "article[aria-label$='no live status yet']", "text": "Live status starts 1 day before departure" } },
     { "scroll_to": "#design-flight-card" },
     { "screenshot": "eight-states" }
   ]
