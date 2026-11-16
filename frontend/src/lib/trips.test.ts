@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, cardRange, cardLabel, nameList, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler, cardRange, cardLabel, nameList } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -865,5 +865,24 @@ describe("trip card wording", () => {
     expect(cardLabel(lisbon, 168, "534 mi")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, 534 mi, 168 photos, Ada Brook and June Brook");
     expect(cardLabel(lisbon, 1, "")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, 1 photo, Ada Brook and June Brook");
     expect(cardLabel(lisbon, 0, "")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, Ada Brook and June Brook");
+  });
+});
+
+describe("bookingCounts", () => {
+  it("counts the live bookings by kind, in the kinds' order, and says each in the singular or plural", () => {
+    const stay = (id: number, status: "confirmed" | "cancelled" = "confirmed") => segment({ id, kind: "hotel", status });
+    const found = bookingCounts(trip([segment({ id: 1 }), segment({ id: 2 }), stay(3), stay(4), stay(5), segment({ id: 6, kind: "car" }), stay(7, "cancelled")]));
+    expect(found.total).toBe(6);
+    expect(found.kinds).toEqual(["flight", "hotel", "car"]);
+    expect(found.words).toBe("2 flights · 3 stays · 1 car");
+  });
+
+  it("counts a trip whose every booking is cancelled by all of them", () => {
+    const found = bookingCounts(trip([segment({ id: 1, status: "cancelled" })]));
+    expect(found).toEqual({ total: 1, kinds: ["flight"], words: "1 flight" });
+  });
+
+  it("is empty for a trip with no bookings", () => {
+    expect(bookingCounts(trip([]))).toEqual({ total: 0, kinds: [], words: "" });
   });
 });
