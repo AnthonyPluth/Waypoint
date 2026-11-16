@@ -1,4 +1,5 @@
 import AuthenticationServices
+import WebKit
 import XCTest
 @testable import Waypoint
 
@@ -261,5 +262,11 @@ final class WebViewInsetTests: XCTestCase {
         let config = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
         let ios = try XCTUnwrap(config["ios"] as? [String: Any])
         XCTAssertEqual(ios["contentInset"] as? String, "never")
+    }
+
+    // A swipe from the screen edge goes back or forward through the pages, as in Safari.
+    func testTheWebViewGoesBackAndForwardWithAnEdgeSwipe() {
+        let webView = ShellViewController().webView(with: .zero, configuration: WKWebViewConfiguration())
+        XCTAssertTrue(webView.allowsBackForwardNavigationGestures)
     }
 }
