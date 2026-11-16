@@ -8,7 +8,7 @@ name: iOS TestFlight
 on:
   push:
     branches: [main]
-    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, waypoint/static/ios-icon.svg, .github/workflows/ios-testflight.yml]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios-testflight.yml]
   workflow_dispatch:
 
 permissions:
