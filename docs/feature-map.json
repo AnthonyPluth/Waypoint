@@ -2003,6 +2003,7 @@
         "tests/test_offline.py"
       ],
       "docs": [
+        "start/ios",
         "start/offline"
       ]
     }
