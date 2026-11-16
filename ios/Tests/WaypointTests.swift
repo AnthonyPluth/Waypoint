@@ -1,3 +1,4 @@
+import AuthenticationServices
 import XCTest
 @testable import Waypoint
 
@@ -32,6 +33,14 @@ final class ServerAddressTests: XCTestCase {
         for bad in ["", "   ", "ftp://example.com", "https://user:pw@example.com", "https://"] {
             XCTAssertThrowsError(try ServerClient.normalize(bad), bad)
         }
+    }
+}
+
+@MainActor
+final class SignInSessionTests: XCTestCase {
+    func testTheSheetIsEphemeralSoIOSAsksNoConsent() {
+        let session = SignIn.makeSession(url: URL(string: "https://waypoint.example.com/oauth/authorize")!) { _, _ in }
+        XCTAssertTrue(session.prefersEphemeralWebBrowserSession)
     }
 }
 
