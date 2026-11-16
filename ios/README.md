@@ -6,7 +6,7 @@ A native shell around the Waypoint web app. The person types the address of thei
 
 ## Build
 
-Needs a Mac with Xcode 16+, Node 22+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+Needs a Mac with Xcode 26+ (Apple only accepts uploads built with the iOS 26 SDK), Node 22+ and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 cd ios
@@ -17,9 +17,13 @@ open Waypoint.xcodeproj
 
 Set `WAYPOINT_BUNDLE_ID` and `DEVELOPMENT_TEAM` in `Config.xcconfig` (placeholders: `com.anthonypluth.waypoint`, empty). The bundle identifier must match the one registered in the Apple developer account.
 
+## App icon
+
+The icon is one 1024x1024 PNG with no transparency (`AppIcon` in `Waypoint/Assets.xcassets`, the single-size format; iOS rounds the corners). It is the Waypoint logo (`waypoint/static/logo.svg`) on its dark tile, full bleed. The PNG is committed once as `waypoint/static/ios-icon-1024.png`, the only place a raster image may live (its vector source is `waypoint/static/ios-icon.svg`); `xcodegen` copies it into the asset catalog (`preGenCommand` in `project.yml`, the copy is not committed), and `ASSETCATALOG_COMPILER_APPICON_NAME` / `CFBundleIconName` name it. App Store Connect refuses a build without it. The owner's sign-off on the icon is pending.
+
 ## TestFlight
 
-The "iOS TestFlight" workflow (`.github/workflows/ios-testflight.yml`) archives a signed release, exports an `.ipa` and uploads it to TestFlight. It starts only by hand (Actions, "iOS TestFlight", Run workflow, on `main`), never for a pull request. The build number is the run number (`CURRENT_PROJECT_VERSION`); the version is `MARKETING_VERSION` in `Config.xcconfig`. It uploads with `xcrun altool --upload-app` and an App Store Connect API key: altool is still Apple's supported command-line upload for an `.ipa` (its notarization mode is gone, and `notarytool` is for macOS apps only). Until the secrets below exist, the workflow stops at its first step and says which are missing.
+The "iOS TestFlight" workflow (`.github/workflows/ios-testflight.yml`) archives a signed release, exports an `.ipa` and uploads it to TestFlight. Both iOS workflows run on `macos-26` and fail early if Xcode is older than 26. It starts only by hand (Actions, "iOS TestFlight", Run workflow, on `main`), never for a pull request. The build number is the run number (`CURRENT_PROJECT_VERSION`); the version is `MARKETING_VERSION` in `Config.xcconfig`. It uploads with `xcrun altool --upload-app` and an App Store Connect API key: altool is still Apple's supported command-line upload for an `.ipa` (its notarization mode is gone, and `notarytool` is for macOS apps only). Until the secrets below exist, the workflow stops at its first step and says which are missing.
 
 One-time setup:
 
