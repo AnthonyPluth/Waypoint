@@ -103,11 +103,14 @@ final class OfflineStore: @unchecked Sendable {
         }
     }
 
-    private func folder(for server: URL) -> URL {
+    static func folderName(for server: URL) -> String {
         var key = server.absoluteString.lowercased()
         while key.hasSuffix("/") { key.removeLast() }
-        let name = SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
-        return root.appendingPathComponent(name, isDirectory: true)
+        return SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func folder(for server: URL) -> URL {
+        root.appendingPathComponent(Self.folderName(for: server), isDirectory: true)
     }
 
     private func write(trips: Data, meta: Data, to folder: URL) throws {
