@@ -1675,8 +1675,11 @@ describe("on its own page", () => {
   });
 });
 
+const afterStart = () => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(Date.UTC(2026, 10, 23, 12)); };
+
 describe("Trip photos", () => {
   it("shows the trip’s photos above the bookings once signed in, asking for them once per trip", async () => {
+    afterStart();
     app.state = state();
     const answer = vi.mocked(api).getMockImplementation()!;
     const shot = { id: 5, person_id: 1, trip_id: 1, kind: "image", taken_local: "2026-11-21T16:20", zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null };
@@ -1690,6 +1693,7 @@ describe("Trip photos", () => {
   });
 
   it("draws the photo clusters as pins on the trip’s map and takes Show these photos to the first photo of that cluster in the gallery", async () => {
+    afterStart();
     app.state = state();
     const answer = vi.mocked(api).getMockImplementation()!;
     const shot = (id: number, taken_local: string) => ({ id, person_id: 1, trip_id: 1, kind: "image", taken_local, zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null });
@@ -1774,6 +1778,7 @@ describe("Trip summary", () => {
   });
 
   it("asks for the numbers again, and for the photos, after the person shares their photos on the trip", async () => {
+    afterStart();
     app.state = state({ person_id: 1 });
     let asked = true;
     const answer = vi.mocked(api).getMockImplementation()!;

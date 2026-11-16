@@ -73,7 +73,7 @@
   });
   const asking = $derived(acting.some((a) => a.mode === "prompt" || a.mode === "reminder"));
   const sharingShown = $derived(actingProblem || acting.some((a) => a.visible));
-  const shows = $derived(loaded.state === "error" || total > 0 || empty !== null || sharingShown);
+  const shows = $derived(started && (loaded.state === "error" || total > 0 || empty !== null || sharingShown));
   const mineOf = (p: Pick<TripPhoto, "person_id">): PersonSharing | undefined => acting.find((a) => a.personId === p.person_id);
   const ownCount = $derived(photos.filter((p) => mineOf(p)).length);
   $effect(() => {
