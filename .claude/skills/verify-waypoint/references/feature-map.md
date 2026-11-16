@@ -522,7 +522,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Drive it:** `tools/control start --signed-in jane`, `tools/control goto trips`, `click` an item, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in frontend/verify/verify.mjs names).
 - **What usually breaks:**
   - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the page then has no hero photos and no days, and shows the route map and its replay in the hero's place.
-  - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. A past trip's booking cards are not on it.
+  - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. Its booking cards sit below the days until the Bookings sheet lands.
   - The route replay plays on its own once it is on the page (the hero when there are no photos, or the replay that Replay trip opens); press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
 
 ## Stats (`stats`)
