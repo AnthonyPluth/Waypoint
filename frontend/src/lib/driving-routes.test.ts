@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, fakeMk, windingPath } from "../test/fake-mapkit";
 import { apiCall } from "./contract";
-import { clearRouteCache, drivingRoute, drivingRoutes, parseRoute, ROUTE_PARALLEL, SERVER_MAX_DRIVES, SERVER_MAX_POINTS, thin } from "./driving-routes";
+import { clearRouteCache, drivingRoute, drivingRoutes, parseRoute, LOOKUP_TIMEOUT_MS, ROUTE_PARALLEL, SERVER_MAX_DRIVES, SERVER_MAX_POINTS, thin } from "./driving-routes";
 
 vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 const server = vi.mocked(apiCall);
@@ -195,6 +195,16 @@ describe("the household's stored routes", () => {
     reply({ routes: [stored(0)] });
     await settle();
     expect(await answers[0]).toBeNull();
+  });
+
+  it("goes on to ask MapKit when the server lookup never settles", async () => {
+    server.mockImplementation((() => new Promise(() => {})) as never);
+    const answers = drivingRoutes(fakeMk, trip, [drive(0)]);
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS - 1);
+    expect(fake.directions.calls).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(LOOKUP_TIMEOUT_MS);
+    expect(await answers[0]).not.toBeNull();
+    expect(fake.directions.calls).toHaveLength(1);
   });
 
   it("thins a path over the server's limit to the limit, keeping both ends", () => {

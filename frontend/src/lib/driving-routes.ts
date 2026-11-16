@@ -6,6 +6,7 @@ export type LatLon = { latitude: number; longitude: number };
 export type RoutePath = number[][];
 
 export const ROUTE_TIMEOUT_MS = 6000;
+export const LOOKUP_TIMEOUT_MS = 3000;
 export const ROUTE_PARALLEL = 4;
 const PRECISION = 4;
 export const SERVER_MAX_POINTS = 10000;
@@ -147,10 +148,17 @@ function share(trip: number, from: LatLon, to: LatLon, path: RoutePath, key: str
   );
 }
 
+function withinTime(job: Promise<void>, ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    void job.then(() => { clearTimeout(timer); resolve(); });
+  });
+}
+
 export function drivingRoutes(mk: Mk, trip: number | null, drives: Drive[], timeoutMs = ROUTE_TIMEOUT_MS): Promise<RoutePath | null>[] {
   const missing = drives.filter((d) => { const key = keyOf(d.from, d.to); return !found.has(key) && !pending.has(key); });
   const born = generation;
-  const lookup = trip === null || missing.length === 0 ? Promise.resolve() : fromServer(trip, missing, born);
+  const lookup = trip === null || missing.length === 0 ? Promise.resolve() : withinTime(fromServer(trip, missing, born), LOOKUP_TIMEOUT_MS);
   return drives.map((d) => lookup.then(() => (born === generation ? drivingRoute(mk, d.from, d.to, timeoutMs, trip) : null)));
 }
 
