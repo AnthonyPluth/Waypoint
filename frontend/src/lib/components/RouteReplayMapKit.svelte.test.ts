@@ -264,7 +264,7 @@ describe("RouteReplayMap on MapKit", () => {
 
 const cluster: PhotoCluster = { latitude: 37.8, longitude: -122.4, count: 2, first: "2025-12-07T10:00", last: "2025-12-07T12:00", cover: 1, inferred: false };
 const shot = (id: number): TripPhoto => ({ id, person_id: 1, trip_id: 1, kind: "image", taken_local: "2025-12-07T10:00", zone: "America/Los_Angeles", latitude: 37.8, longitude: -122.4, location_source: "exif", segment_id: null, match: "place", distance_km: 2, cluster: 0, removed_at: null });
-const photos: TripPhotos = { photos: [shot(1), shot(2)], clusters: [cluster], counts: { total: 2, located: 2, inferred: 0, far: 0 }, people: [] };
+const photos: TripPhotos = { photos: [shot(1), shot(2)], clusters: [cluster], counts: { total: 2, located: 2, inferred: 0, far: 0 }, people: [], best: [] };
 const during = Date.parse("2025-12-08T12:00:00Z");
 
 describe("photo pins and Apple's map", () => {

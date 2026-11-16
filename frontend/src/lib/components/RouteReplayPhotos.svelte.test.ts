@@ -31,7 +31,7 @@ const shot = (id: number, extra: Partial<TripPhoto> = {}): TripPhoto => ({
   id, person_id: 1, trip_id: 1, kind: "image", taken_local: "2025-12-07T10:00", zone: "America/Los_Angeles", latitude: 37.8, longitude: -122.4, location_source: "exif",
   segment_id: 2, match: "place", distance_km: 2, cluster: 0, removed_at: null, ...extra,
 });
-const reply = (clusters: PhotoCluster[], photos: TripPhoto[] = [shot(1), shot(2)]): TripPhotos => ({ photos, clusters, counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [] });
+const reply = (clusters: PhotoCluster[], photos: TripPhoto[] = [shot(1), shot(2)]): TripPhotos => ({ photos, clusters, counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best: [] });
 const pin = () => screen.queryByRole("button", { name: /^2 photos/ });
 
 beforeEach(() => {

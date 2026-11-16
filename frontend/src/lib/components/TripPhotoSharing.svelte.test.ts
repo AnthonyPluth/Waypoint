@@ -36,7 +36,7 @@ const shared = (extra: Partial<PhotoSharing> = {}): PhotoSharing => sharing({ st
 const photo = (id: number): TripPhoto => ({
   id, person_id: 2, trip_id: 7, kind: "image", taken_local: "2026-03-01T10:42", zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif", segment_id: 2, match: "place", distance_km: 3, cluster: 0, removed_at: null,
 });
-const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [] });
+const reply = (photos: TripPhoto[]): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best: [] });
 const source = (): PhotoSource => ({ id: 7, person_id: 1, url: "https://immich.brook.example", label: null, status: "ok", mine: true, last_sync: "2026-03-05T06:00", last_error: null, photos: 0, trips: 0 });
 const grants = (extra: Partial<PhotoGrantPerson> = {}): PhotoGrantPerson => ({
   person_id: 1, prefs: { default_scope: "only_me", share_all: false }, count_token: "g".repeat(32), sources: [{ id: 7, status: "ok" }], eligible: [], trips: [], ...extra,
