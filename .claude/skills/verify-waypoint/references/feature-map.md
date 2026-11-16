@@ -817,6 +817,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `2 photos`, `from every booking`, `Waypoint won’t move it again by itself.`.
 - **Drive it:** `tools/control flow photos-needs-a-look`; or `poetry run python run.py verify --flow photos-needs-a-look`.
 
+#### `photos-resume-confirm`
+
+- **Starts at:** `#settings`; goes to: `#settings/photos`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Resuming it shows 12 photos from it to everyone on those trips`, `Your trips changed meanwhile, so what’s below is new.`, `Resuming it shows 15 photos from it to everyone on those trips`, `Up to date`.
+- **Fakes (the demo server can't):** `fake_resume`.
+- **Console errors it expects:** `the server responded with a status of 409`.
+- **Drive it:** `tools/control flow photos-resume-confirm`; or `poetry run python run.py verify --flow photos-resume-confirm`.
+
 #### `photos-sharing`
 
 - **Starts at:** `#settings`; goes to: `#settings/photos`.

@@ -105,7 +105,8 @@
     if (busy === null) release();
   });
 
-  onDestroy(release);
+  let refocus: ReturnType<typeof setTimeout> | undefined;
+  onDestroy(() => { release(); clearTimeout(refocus); });
 
   async function idle(): Promise<void> {
     while (busy !== null) await new Promise<void>((wake) => waiting.push(wake));
@@ -152,7 +153,8 @@
     announce = count ? `Saved. ${plural(count, "photo", "photos")} still ${count === 1 ? "needs" : "need"} a look.` : "Saved. Nothing else needs a look.";
     const target = () => (count ? summary : emptyLine);
     target()?.focus();
-    setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) target()?.focus(); }, 50);
+    clearTimeout(refocus);
+    refocus = setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) target()?.focus(); }, 50);
   }
 
   const post = (p: ReviewPhoto, body: { trip_id?: number; excluded?: boolean }) =>

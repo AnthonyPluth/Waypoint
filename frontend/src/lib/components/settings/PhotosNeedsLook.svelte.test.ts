@@ -332,6 +332,22 @@ describe("Needs a look, deciding", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Saved. Nothing else needs a look.");
   });
 
+  it("clears the pending refocus timer when the list is destroyed, so nothing fires after teardown", async () => {
+    const started: unknown[] = [];
+    const realSet = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) => {
+      const id = realSet(fn, ms);
+      if (ms === 50) started.push(id);
+      return id;
+    }) as never);
+    const cleared = vi.spyOn(globalThis, "clearTimeout");
+    const view = show([ambiguous, far()], ADA);
+    await userEvent.setup().click(screen.getByRole("button", { name: /^Leave off, the photo/ }));
+    await waitFor(() => expect(started).toHaveLength(1));
+    view.unmount();
+    expect(cleared).toHaveBeenCalledWith(started[0]);
+  });
+
   it("leaves no trip chosen and the confirm button off when a refused Pick removed the chosen trip", async () => {
     vi.mocked(api).mockRejectedValue(new Refusal("The photo’s trips changed", 409));
     const view: { rerender?: (p: { photos: ReviewPhoto[] }) => Promise<void> } = {};

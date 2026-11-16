@@ -15,6 +15,29 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
+const assetPath = (value) => {
+  if (typeof value !== "string") return null;
+  let url;
+  try { url = new URL(value, location.origin); } catch { return null; }
+  return url.origin === location.origin && url.pathname.startsWith("/assets/") ? url.pathname : null;
+};
+
+const keepLoaded = async (paths) => {
+  const cache = await caches.open(CACHE);
+  for (const path of new Set(paths.map(assetPath).filter(Boolean))) {
+    if (await cache.match(path)) continue;
+    try {
+      const res = await fetch(path);
+      if (res.ok && !res.redirected) await cache.put(path, res);
+    } catch { continue; }
+  }
+};
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "keep-loaded" || !Array.isArray(event.data.paths)) return;
+  event.waitUntil(keepLoaded(event.data.paths.slice(0, 300)));
+});
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (event.request.method !== "GET" || url.origin !== location.origin) return;

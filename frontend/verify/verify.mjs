@@ -42,7 +42,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -64,6 +64,12 @@ export function fakeImmichTest(mode) {
 export function fakeImmichSource(body, id) {
   return { id, person_id: body?.person_id ?? null, url: String(body?.url ?? "").replace(/\/+$/, ""), label: null, status: "ok", mine: true,
     last_sync: null, last_error: null, photos: 0, trips: 0 };
+}
+
+export const RESUME_CHANGED = "Your trips changed meanwhile; try again";
+
+export function fakeResumeCheck(count, round, tripIds) {
+  return { asks: true, count: count + 3 * round, grants: tripIds.map((trip_id) => ({ trip_id, changed: 1, window: null })), snapshot: `fake-snapshot-${round}`.padEnd(32, "0") };
 }
 
 export function fakeArchive(trips, count) {
@@ -257,6 +263,31 @@ export async function runStep(page, step, shot, saveDownload) {
       const response = await route.fetch();
       const body = await response.json();
       await route.fulfill({ response, json: { ...body, sources: [...(body.sources ?? []), ...made] } });
+    });
+  } else if ("fake_resume" in step) {
+    let round = 0;
+    let paused = true;
+    const tripIds = async () => {
+      const found = await page.request.get(new URL("/api/photo-grants", page.url()).href).then((r) => r.json(), () => ({ people: [] }));
+      return (found.people?.[0]?.trips ?? []).slice(0, 2).map((t) => t.trip_id);
+    };
+    await page.route("**/api/photo-sources", async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const body = await response.json();
+      const first = (body.sources ?? []).findIndex((s) => s.mine);
+      const sources = (body.sources ?? []).map((s, i) => (i === first && paused ? { ...s, status: "off", last_error: null } : s));
+      await route.fulfill({ response, json: { ...body, sources } });
+    });
+    await page.route("**/api/photo-sources/*/resume", async (route) => route.fulfill({ json: fakeResumeCheck(step.fake_resume, round, await tripIds()) }));
+    await page.route(/\/api\/photo-sources\/\d+$/, async (route) => {
+      if (route.request().method() !== "POST" || route.request().postDataJSON()?.paused !== false) return route.fallback();
+      if (route.request().postDataJSON().snapshot !== fakeResumeCheck(step.fake_resume, round, []).snapshot) return route.fulfill({ status: 400, json: { error: "That confirmation doesn’t match." } });
+      if (round === 0) { round = 1; return route.fulfill({ status: 409, json: { error: RESUME_CHANGED } }); }
+      paused = false;
+      const response = await page.request.get(new URL("/api/photo-sources", page.url()).href);
+      const body = await response.json();
+      return route.fulfill({ json: body.sources.find((s) => s.mine) });
     });
   } else if ("long_names" in step) {
     await page.route("**/api/stats**", async (route) => {

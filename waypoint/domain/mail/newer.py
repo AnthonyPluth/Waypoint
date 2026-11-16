@@ -16,11 +16,12 @@ class Decision:
     segment_id: int
 
 
-def decide(conn: db.Connection, viewer: Viewer, fields: trips.SegmentIn, received: str | None, cancels: bool) -> Decision | None:
+def decide(conn: db.Connection, viewer: Viewer, fields: trips.SegmentIn, received: str | None, cancels: bool,
+           cancelled: bool = False) -> Decision | None:
     try:
         if trips.find_same_booking(conn, viewer, fields) is not None:
             return None
-        seg = trips.find_same_reservation(conn, viewer, fields, sure=True)
+        seg = trips.find_same_reservation(conn, viewer, fields, sure=True, cancelled=cancelled)
     except trips.Invalid:
         return None
     if seg is None:

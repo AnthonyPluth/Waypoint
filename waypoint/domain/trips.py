@@ -1185,12 +1185,13 @@ def find_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentIn) ->
     return next((s for s in visibility.visible_segments(conn, viewer) if same_booking(s, values, details)), None)
 
 
-def find_same_reservation(conn: db.Connection, viewer: Viewer, fields: SegmentIn, sure: bool = False) -> Segment | None:
+def find_same_reservation(conn: db.Connection, viewer: Viewer, fields: SegmentIn, sure: bool = False, cancelled: bool = False) -> Segment | None:
     values = check(conn, fields)
     details = fields.get("details") or {}
     wanted = ("same",) if sure else ("same", "unsure")
     found = [(verdict != "same", abs((_day(s.start_local) - _day(values["start_local"])).days), s.id, s)
-             for s in visibility.visible_segments(conn, viewer) if s.status != "cancelled" and (verdict := reservation(s, values, details)) in wanted]
+             for s in visibility.visible_segments(conn, viewer) if (cancelled or s.status != "cancelled")
+             and (verdict := reservation(s, values, details)) in wanted]
     return min(found, key=lambda f: f[:3])[3] if found else None
 
 

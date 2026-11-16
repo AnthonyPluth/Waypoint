@@ -177,7 +177,7 @@ def api_review_image(conn, _q, _b, item_id: str, index: str) -> Response:
 @own_session
 def api_review_suggest(_conn, _q, _b, item_id: str) -> Asked:
     try:
-        dismissed = scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
+        scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
     except KeyError:
         raise ApiError(NO_ITEM, 404) from None
     except (scan.NoAi, scan.NotAskable) as e:
@@ -186,4 +186,4 @@ def api_review_suggest(_conn, _q, _b, item_id: str) -> Asked:
         raise ApiError(GONE, 404) from None
     except gmail.GmailError as e:
         raise ApiError(str(e), 502) from e
-    return {"ok": True, "dismissed": dismissed}
+    return {"ok": True}

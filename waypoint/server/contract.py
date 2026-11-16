@@ -70,7 +70,8 @@ class ScanSummary(TypedDict):
     with_facts: int
     attached: int
     ai_asked: int
-    dismissed: int
+    dismissed_known: int
+    dismissed_older: int
 
 
 class Mailbox(TypedDict):
@@ -288,7 +289,6 @@ class Attached(TypedDict):
 
 class Asked(TypedDict):
     ok: bool
-    dismissed: str | None
 
 
 class Review(TypedDict):

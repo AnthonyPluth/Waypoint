@@ -69,4 +69,6 @@ It protects against a copy or backup of the device’s stored data (which holds 
 
 Copies live on the device you signed in on, in the browser’s Cache storage, as one encrypted entry per trip. Setting up makes an ECDH P-256 key pair in the browser. The private key is wrapped with AES-GCM under a key derived (HKDF) from the passkey’s PRF output; each online save encrypts to the public key, so saving never needs the authenticator. Unlocking asks the authenticator once and holds the unwrapped key in memory only. No key, PRF output or plaintext of a trip is stored. Beside the ciphertext sit a few small facts in the clear, because the app must read them without the device’s check: when the copies were saved, when each runs out, each saved trip’s number and whether saving is switched off.
 
+The app itself opens offline too. The service worker keeps the app’s files (its pages, scripts and styles) in the same Cache storage, and once it is active the page hands it the files it loaded before the worker took control, so the first reload after a first visit doesn’t depend on the browser’s own HTTP cache still holding them. They are public build files and hold no trip data.
+
 See also [Security](https://github.com/AnthonyPluth/Waypoint/blob/main/SECURITY.md).

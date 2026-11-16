@@ -10,7 +10,7 @@ import json
 import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field, replace
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any, Literal
 from urllib.parse import unquote, urlsplit
@@ -497,11 +497,21 @@ def _domain(header: Any) -> str | None:
     return domain if domain and "." in domain else None
 
 
-def _day(header: Any) -> str | None:
+def arrived(message: Mapping[str, Any]) -> datetime | None:
+    try:
+        return datetime.fromtimestamp(int(str(message.get("internalDate"))) / 1000, UTC)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def _day(header: Any, came: datetime | None = None) -> str | None:
     try:
         sent = email.utils.parsedate_to_datetime(str(header))
     except (TypeError, ValueError, IndexError):
         return None
+    zone = sent.tzinfo or UTC
+    if came is not None and sent.replace(tzinfo=zone) > came:
+        sent = came.astimezone(zone)
     return sent.date().isoformat()
 
 
@@ -521,7 +531,7 @@ def read(message: Mapping[str, Any]) -> Message:
         return Message(None, None, broken=True)
     try:
         parsed = email.message_from_bytes(data, policy=email.policy.default)
-        sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"))
+        sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"), arrived(message))
     except (ValueError, LookupError, TypeError):
         return Message(None, None, broken=True)
     nodes: list[dict[str, Any]] = []
@@ -783,6 +793,33 @@ SUBJECT_LIMIT = 300
 KEPT_LIMIT = 300_000
 
 
+def guard(message: Mapping[str, Any]) -> tuple[str, bool]:
+    parsed = _parsed(message)
+    subject = ""
+    if parsed is not None:
+        try:
+            subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT]
+        except (ValueError, LookupError, TypeError):
+            subject = ""
+    wrapped = unwrap(_plain(_bodies(message), MAX_PART))
+    if wrapped is not None and wrapped.subject:
+        subject = f"{subject} {wrapped.subject}"
+    return subject, read(message).revises
+
+
+def own_sender(message: Mapping[str, Any]) -> str | None:
+    parsed = _parsed(message)
+    if parsed is None:
+        return None
+    try:
+        sender, subject = _domain(parsed.get("From")), str(parsed.get("Subject") or "")
+    except (ValueError, LookupError, TypeError):
+        return None
+    if FORWARD_SUBJECT.match(subject) or unwrap(_plain(_bodies(message), MAX_PART)) is not None or read(message).forwarded_by is not None:
+        return None
+    return sender
+
+
 def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Content, list[Image]]:
     parsed = _parsed(message)
     subject: str | None = None
@@ -791,7 +828,7 @@ def keep(message: Mapping[str, Any], fetch: Fetch | None = None) -> tuple[Conten
     if parsed is not None:
         try:
             subject = " ".join(str(parsed.get("Subject") or "").split())[:SUBJECT_LIMIT] or None
-            sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"))
+            sender, received = _domain(parsed.get("From")), _day(parsed.get("Date"), arrived(message))
         except (ValueError, LookupError, TypeError):
             subject = None
     bodies = None if parsed is None else _split(parsed)
