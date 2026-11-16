@@ -98,7 +98,7 @@ With no library connected, a trip that has started points you to **Connect a lib
 
 For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one pin, with its count, its first and last time, and a cover photo. A pin whose every photo was placed from the itinerary is drawn hollow. The pins are drawn on the trip’s map, and **Show these photos** on a pin’s card opens the gallery at that cluster ([Photo pins on the map](/Waypoint/start/trips/#photo-pins-on-the-map)). A very long trip keeps at most 400 pins by merging the smallest into their nearest neighbours.
 
-A past trip's best photos, the ones its card in the Past trips list and the top of its page show, are chosen automatically from the photos you may see on it: the cover of each pin, the pin with the most photos first, then more photos from the biggest pins, then photos with no place, oldest first. Videos are never chosen, and a trip with no photos you can see shows none.
+Waypoint works out each past trip's best photos from the photos you may see on it, ready for the Past trips list and the top of a trip's page; the web app doesn't show them yet. They are chosen automatically: the cover of each pin, the pin with the most photos first, then more photos from the biggest pins, then photos with no place, oldest first. Videos are never chosen, and a trip with no photos you can see has none.
 
 ## Needs a look
 
