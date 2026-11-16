@@ -22,3 +22,18 @@ The app's web view is given a normal web session by `POST /auth/app-session`, wh
 ## Ending it
 
 The app's access ends when you can no longer sign in to Waypoint (you are taken off `OIDC_ALLOWED_EMAILS`, or, with groups, your last sign-in is older than `WAYPOINT_SESSION_DAYS`), or when the app drops the connection: it does so by itself when the server says the sign-in is no longer valid or when Waypoint answers 401 while you are using the app, and **Use another Waypoint** on its error screen signs out too. Each of these shows a "You are signed out of Waypoint" screen, and **Sign in** on it asks for the address again. There is no sign-out button in Settings yet. Unlike an assistant, the app does not appear under **Settings → Assistants**.
+
+## Distribution (TestFlight)
+
+You can put the app on your own iPhone through TestFlight with the "iOS TestFlight" workflow. It starts only by hand (Actions, **iOS TestFlight**, **Run workflow**, on `main`), never for a pull request, and runs in a protected `testflight` environment that holds the signing secrets and waits for a required reviewer. It archives a signed release, exports an `.ipa` and uploads it with an App Store Connect API key.
+
+Setup happens once:
+
+1. Join the Apple Developer Program and note your Team ID.
+2. Register the bundle identifier and create the app in App Store Connect.
+3. Create an Apple Distribution certificate and an App Store provisioning profile for that bundle identifier.
+4. Create an App Store Connect API key with the App Manager role.
+5. Create the `testflight` environment, restricted to `main` with required reviewers.
+6. Add these secrets to it: `IOS_DIST_CERT_P12_BASE64`, `IOS_DIST_CERT_PASSWORD`, `IOS_PROVISIONING_PROFILE_BASE64`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_ISSUER_ID` and `APP_STORE_CONNECT_KEY_P8_BASE64`. Add these variables: `DEVELOPMENT_TEAM` and `WAYPOINT_BUNDLE_ID`.
+
+Until they exist, the workflow stops at its first step and names what is missing. The signing and upload path has not been run yet, so expect to fix the first run. The full checklist, with what each secret holds, is in the [iPhone app README](https://github.com/AnthonyPluth/Waypoint/blob/main/ios/README.md).

@@ -111,21 +111,21 @@ jobs:
           DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM }}
           WAYPOINT_BUNDLE_ID: ${{ vars.WAYPOINT_BUNDLE_ID }}
         run: |
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>teamID</key><string>$DEVELOPMENT_TEAM</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>Apple Distribution</string>
-            <key>provisioningProfiles</key>
-            <dict><key>$WAYPOINT_BUNDLE_ID</key><string>$PROFILE_NAME</string></dict>
-            <key>uploadSymbols</key><true/>
-          </dict>
-          </plist>
-          PLIST
+          python3 - <<'PY'
+          import os
+          import plistlib
+
+          options = {
+              "method": "app-store-connect",
+              "teamID": os.environ["DEVELOPMENT_TEAM"],
+              "signingStyle": "manual",
+              "signingCertificate": "Apple Distribution",
+              "provisioningProfiles": {os.environ["WAYPOINT_BUNDLE_ID"]: os.environ["PROFILE_NAME"]},
+              "uploadSymbols": True,
+          }
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "ExportOptions.plist"), "wb") as out:
+              plistlib.dump(options, out)
+          PY
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/Waypoint.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
