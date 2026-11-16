@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler } from "./trips";
+import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler, cardRange, cardLabel, nameList } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -839,9 +839,32 @@ describe("trip card wording", () => {
   it("names the people on a trip once, keeping their ids", () => {
     expect(tripPeople(trip([segment({ id: 1 }), segment({ id: 2 })]))).toEqual([{ id: 1, name: "Jane Doe" }]);
   });
-  it("groups past trips under the year they started", () => {
-    const groups = pastByYear([trip([segment({ start_local: "2026-01-04T09:00", end_local: "2026-01-06T09:00" })], { id: 1 }), trip([segment({ id: 2, kind: "hotel", start_local: "2025-12-30T09:00", end_local: "2026-01-02T09:00" })], { id: 2 })]);
-    expect(groups.map((g) => [g.year, g.totals])).toEqual([[2026, "1 trip · 2 nights · 1 flight"], [2025, "1 trip · 3 nights"]]);
+  const twoYears = () => [trip([segment({ start_local: "2026-01-04T09:00", end_local: "2026-01-06T09:00" })], { id: 1 }), trip([segment({ id: 2, kind: "hotel", start_local: "2025-12-30T09:00", end_local: "2026-01-02T09:00" })], { id: 2 }), trip([segment({ id: 3, start_local: "2026-02-04T09:00", end_local: "2026-02-06T09:00" })], { id: 3 })];
+  it("groups past trips under the year they started, newest first", () => {
+    const groups = pastByYear(twoYears());
+    expect(groups.map((g) => [g.year, g.trips.map((t) => t.id), g.totals])).toEqual([[2026, [1, 3], "2 trips"], [2025, [2], "1 trip"]]);
+  });
+  it("adds each year's photo total from the counts it is given", () => {
+    const groups = pastByYear(twoYears(), new Map([[1, 100], [3, 68], [2, 1]]));
+    expect(groups.map((g) => [g.year, g.photos, g.totals])).toEqual([[2026, 168, "2 trips · 168 photos"], [2025, 1, "1 trip · 1 photo"]]);
+  });
+  it("leaves photos out of a year's totals when none are counted", () => {
+    expect(pastByYear(twoYears(), new Map([[1, 0]])).map((g) => g.totals)).toEqual(["2 trips", "1 trip"]);
+  });
+  it("writes a card's dates with no spaces round the dash, and lists the people with 'and'", () => {
+    expect(cardRange({ start_date: "2026-09-03", end_date: "2026-09-10" })).toBe("Sep 3–10");
+    expect(cardRange({ start_date: "2025-12-29", end_date: "2026-01-03" })).toBe("Dec 29–Jan 3");
+    expect(cardRange({ start_date: "2026-09-03", end_date: "2026-09-03" })).toBe("Sep 3");
+    expect(nameList([])).toBe("");
+    expect(nameList(["Ada Brook"])).toBe("Ada Brook");
+    expect(nameList(["Ada Brook", "June Brook"])).toBe("Ada Brook and June Brook");
+    expect(nameList(["Ada Brook", "June Brook", "Tom Brook"])).toBe("Ada Brook, June Brook and Tom Brook");
+  });
+  it("names a card by its parts, leaving out the ones it hasn't got", () => {
+    const lisbon = trip([segment({ start_local: "2026-09-03T09:00", end_local: "2026-09-10T10:00", travelers: [{ id: 1, person_id: 1, name: "Ada Brook", seat: null }, { id: 2, person_id: 2, name: "June Brook", seat: null }] })], { id: 9, name: "Lisbon + Alentejo", start_date: "2026-09-03", end_date: "2026-09-10" });
+    expect(cardLabel(lisbon, 168, "534 mi")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, 534 mi, 168 photos, Ada Brook and June Brook");
+    expect(cardLabel(lisbon, 1, "")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, 1 photo, Ada Brook and June Brook");
+    expect(cardLabel(lisbon, 0, "")).toBe("Lisbon + Alentejo, Sep 3–10, 7 nights, Ada Brook and June Brook");
   });
 });
 
