@@ -5,6 +5,7 @@ import WebKit
 final class ShellViewController: CAPBridgeViewController {
     static var serverURL: URL?
     static var gate = OfflineGate.shared
+    static var renewSession: @Sendable () async -> Bool = { await ServerSession.shared.renewForReturn() }
 
     private static let probeInterval: TimeInterval = 5
 
@@ -73,9 +74,14 @@ final class ShellViewController: CAPBridgeViewController {
         lastProbe = Date()
         Task { [weak self] in
             let reachable = await ServerReachability.check(server)
+            var ready = false
+            if reachable { ready = await Self.renewSession() }
             guard let self else { return }
             self.probing = false
-            if reachable, self.showingCachedPage { self.webView?.load(URLRequest(url: server)) }
+            if ready, self.showingCachedPage {
+                self.webView?.load(URLRequest(url: server))
+                await OfflineSync.shared.sync()
+            }
         }
     }
 }

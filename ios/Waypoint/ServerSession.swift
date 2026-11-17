@@ -1,6 +1,13 @@
 import Foundation
 import WebKit
 
+enum WebLaunch: Equatable {
+    case server(URL)
+    case cachedPage(URL)
+    case signedOut
+    case failed(String)
+}
+
 actor ServerSession {
     static let shared = ServerSession()
 
@@ -15,9 +22,21 @@ actor ServerSession {
     private var webSessionExpiresAt: Date?
     private let renewals = SingleFlight<String>()
     private let offline: OfflineSync
+    private let api: ServerAPI
+    private let installCookie: @Sendable (WebCookie, URL) async throws -> Void
 
-    init(offline: OfflineSync = .shared) {
+    init(offline: OfflineSync = .shared,
+         api: ServerAPI = LiveServerAPI(),
+         restoring: (server: URL, tokens: Tokens?)? = nil,
+         installCookie: @escaping @Sendable (WebCookie, URL) async throws -> Void = { try await ServerSession.install($0, for: $1) }) {
         self.offline = offline
+        self.api = api
+        self.installCookie = installCookie
+        if let restoring {
+            server = restoring.server
+            tokens = restoring.tokens
+            return
+        }
         if let data = Keychain.get(Self.serverKey), let text = String(data: data, encoding: .utf8) {
             server = URL(string: text)
         }
@@ -60,9 +79,9 @@ actor ServerSession {
     private func renewAccessToken() async throws -> String {
         guard let server, let current = tokens else { throw ServerError.signedOut }
         if current.expiresAt.timeIntervalSinceNow > 60 { return current.accessToken }
-        let endpoints = try await ServerClient.endpoints(server)
+        let endpoints = try await api.endpoints(server)
         do {
-            let renewed = try await ServerClient.refresh(current.refreshToken, endpoints: endpoints)
+            let renewed = try await api.refresh(current.refreshToken, endpoints: endpoints)
             guard self.server == server, tokens == current else { throw ServerError.signedOut }
             keep(server: server, tokens: renewed)
             return renewed.accessToken
@@ -75,10 +94,57 @@ actor ServerSession {
     func prepareWebView() async throws -> URL {
         guard let server else { throw ServerError.signedOut }
         if open { return server }
-        let cookie = try await ServerClient.webCookie(server, accessToken: try await accessToken())
-        try await Self.install(cookie, for: server)
+        let cookie = try await api.webCookie(server, accessToken: try await accessToken())
+        try await installCookie(cookie, server)
         webSessionExpiresAt = Date().addingTimeInterval(TimeInterval(cookie.maxAge))
         return server
+    }
+
+    func launchWebView(gate: OfflineGate = .shared, patience: UInt64 = 5_000_000_000) async -> WebLaunch {
+        let hasCachedPage = server.map { gate.canShowCachedPage(for: $0) } ?? false
+        do {
+            if let ready = try await prepareWebView(within: hasCachedPage ? patience : nil) { return .server(ready) }
+        } catch ServerError.signedOut {
+            await signOut()
+            return .signedOut
+        } catch ServerError.offline(let why) {
+            return cachedPage(gate: gate) ?? .failed(ServerError.offline(why).localizedDescription)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        return cachedPage(gate: gate) ?? .failed(ServerError.offline("the server did not answer").localizedDescription)
+    }
+
+    private func cachedPage(gate: OfflineGate) -> WebLaunch? {
+        guard let server, gate.canShowCachedPage(for: server) else { return nil }
+        return .cachedPage(server)
+    }
+
+    private func prepareWebView(within patience: UInt64?) async throws -> URL? {
+        guard let patience else { return try await prepareWebView() }
+        return try await withThrowingTaskGroup(of: URL?.self) { group in
+            group.addTask { try await self.prepareWebView() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: patience)
+                return nil
+            }
+            defer { group.cancelAll() }
+            guard let first = try await group.next() else { return nil }
+            return first
+        }
+    }
+
+    func renewForReturn() async -> Bool {
+        guard webSessionNeedsRenewal() else { return true }
+        do {
+            _ = try await prepareWebView()
+            return true
+        } catch ServerError.signedOut {
+            NotificationCenter.default.post(name: .webViewUnauthorized, object: nil)
+            return false
+        } catch {
+            return false
+        }
     }
 
     func webSessionNeedsRenewal(now: Date = Date()) -> Bool {
@@ -104,10 +170,10 @@ actor ServerSession {
 
     func retryPendingRevocations() async {
         for pending in pendingRevocations() {
-            guard let server = URL(string: pending.server), let endpoints = try? await ServerClient.endpoints(server) else {
+            guard let server = URL(string: pending.server), let endpoints = try? await api.endpoints(server) else {
                 continue
             }
-            if await ServerClient.revoke(pending.refreshToken, endpoints: endpoints) {
+            if await api.revoke(pending.refreshToken, endpoints: endpoints) {
                 savePending(PendingRevocation.removing(pending, from: pendingRevocations()))
             }
         }
@@ -141,7 +207,7 @@ actor ServerSession {
     }
 
     @MainActor
-    private static func install(_ cookie: WebCookie, for server: URL) async throws {
+    static func install(_ cookie: WebCookie, for server: URL) async throws {
         var properties: [HTTPCookiePropertyKey: Any] = [
             .domain: server.host ?? "", .path: "/", .name: cookie.name, .value: cookie.value,
             .expires: Date().addingTimeInterval(TimeInterval(cookie.maxAge)),

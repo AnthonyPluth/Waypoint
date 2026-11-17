@@ -61,15 +61,18 @@ struct WaypointApp: App {
             phase = .connect
             return
         }
-        do {
-            ShellViewController.serverURL = try await ServerSession.shared.prepareWebView()
+        switch await ServerSession.shared.launchWebView() {
+        case .server(let url):
+            ShellViewController.serverURL = url
             phase = .shell
             Task { await OfflineSync.shared.sync() }
-        } catch ServerError.signedOut {
-            await ServerSession.shared.signOut()
+        case .cachedPage(let url):
+            ShellViewController.serverURL = url
+            phase = .shell
+        case .signedOut:
             phase = .connect
-        } catch {
-            phase = .failed(error.localizedDescription)
+        case .failed(let why):
+            phase = .failed(why)
         }
     }
 
