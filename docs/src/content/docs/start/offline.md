@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you and never sent anywhere else. In a browser they are always encrypted on the device and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. The iPhone app keeps its own copy and works differently (see [In the iPhone app](#in-the-iphone-app)).
+Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you and never sent anywhere else. In a browser they are always encrypted on the device and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. The iPhone app keeps its own copy, in files protected by the phone, and works differently (see [In the iPhone app](#in-the-iphone-app)).
 
 ## Setting it up
 
@@ -17,9 +17,17 @@ The device must be able to make a passkey with the PRF extension from its built-
 
 ## In the iPhone app
 
-The [iPhone app](/Waypoint/start/ios/) saves trips itself, with no passkey, no setup sheet and no Face ID. **Save my upcoming trips** is on by default: after a new install, and also after the app on a phone that already had it is updated to a version with this switch, so an updated app starts saving your trips without you choosing it. The first save happens when you open Waypoint online after signing in. To change it, open **Settings → Offline & notifications → Offline access**: the card says **On for this device** or **Off on this device**, names the saved trips and when they were saved, and has the one switch. Switching it off deletes the saved trips at once, with no confirmation, and it is the only way to delete them: there is no **Remove** button. Signing in again turns saving back on. The card says **Saving your trips…** while the app is fetching, **Couldn’t save the trips** when a save failed (the older copy is kept, and saving is tried again each time you open Waypoint online), and, if the saved copy can’t be read, to switch saving off and on again to start afresh. An installed app too old to offer this shows no Offline access card.
+The [iPhone app](/Waypoint/start/ios/) saves trips itself, with no passkey, no setup sheet and no Face ID. **Save my upcoming trips** is on by default: after a new install, and also after the app on a phone that already had it is updated to a version with this switch, so an updated app starts saving your trips without you choosing it. The first save happens when you open Waypoint online after signing in. To change it, open **Settings → Offline & notifications → Offline access**: the card says **On for this device** or **Off on this device**, names the saved trips and when they were saved, and has the one switch. Switching it off deletes the saved trips at once, with no confirmation, and it is the only way to delete them: there is no **Remove** button. Signing in again turns saving back on. The card says **Saving your trips…** while the app is fetching, **Couldn’t save the trips** when a save failed for any reason, including a phone that can’t reach the server (the older copy is kept, and saving is tried again each time you open Waypoint online), and, if the saved copy can’t be read, to switch saving off and on again to start afresh. An installed app too old to offer this shows no Offline access card.
 
-Where the copy is kept: in the app’s own private storage on the phone (its sandbox), as files protected by iOS Data Protection, so they are readable only while the phone is unlocked. Other apps and websites can’t read them. Waypoint adds no encryption of its own, and opening saved trips needs no Face ID: the phone’s lock is the gate. The files are included in the phone’s iCloud and computer backups when those are on. They are deleted at the same moments as in a browser (below), and also when the server address changes.
+The app fetches the trips with its own sign-in token when you open Waypoint after signing in, each time you return to the app, and when you switch saving on. A Waypoint with no sign-in of its own needs no token.
+
+Where the copy is kept: in the app’s own private storage on the phone (its sandbox), as files protected by iOS Data Protection, so they are readable only while the phone is unlocked. Other apps and websites can’t read them. Waypoint adds no encryption of its own, and opening saved trips needs no Face ID: the phone’s lock is the gate. The files are included in the phone’s iCloud and computer backups when those are on, and the card says so. They are deleted at the moments listed under [When it is cleared](#when-it-is-cleared).
+
+To open with no connection, the app also keeps a copy of your server’s public web app files (its pages, scripts, styles and fonts: code only, with no trip data, no cookies and no sign-in token), taken after a page loads online while saving is on. Without that copy the app has nothing to show offline, so it is kept up to date the same way and deleted together with the saved trips.
+
+### With no connection, in the app
+
+When the app is already showing Waypoint’s pages and then can’t reach your server (no connection, airplane mode, no signal or data, a DNS failure, a timeout or a dropped connection) and a trip and the app files are saved, it shows the saved copy instead of an error. There is nothing to unlock. Under a banner with the age of the copy, every saved trip opens as in a browser: editing and adding are off, every other page says it needs a connection, and live flight status is not shown. While it shows the copy, the app checks whether your server answers again (at most every 5 seconds, when the page tries to reach it, and so when you choose **Try again**) and goes back to the live pages as soon as it does. A certificate error or an error answered by the server never shows the saved copy, and with no trip saved nothing is served from the phone at all. Starting the app with no connection is different today: on a server that needs sign-in, the app first asks the server for its web session, and when that fails it shows an error and not the saved trips. That works only when the app is already running, or when that step can finish. On a Waypoint with no sign-in of its own there is no such step. This is tracked in #786. The no-connection copy has been tried against a server that can’t be reached, in the app’s tests, and not yet in airplane mode on a phone, and an airplane-mode launch is not promised.
 
 ## What is saved
 
@@ -50,7 +58,7 @@ The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in toke
 
 Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again** in a browser. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
 
-## Using it with no connection
+## Using it with no connection, in a browser
 
 Open Waypoint offline and it shows **Saved trip is locked**. Unlock it once, with the device’s check, and every saved trip opens, read-only, under a banner with the age of the copy.
 
@@ -65,19 +73,20 @@ If the passkey is gone (a new device, or it was deleted), the saved trips can’
 
 Every saved copy is removed:
 
-- when you sign out;
+- when you sign out (in the iPhone app, also when its sign-in is no longer valid and when you choose **Use another Waypoint**);
 - when any request answers that you’re no longer signed in or allowed (401 or 403) while you’re online;
 - when you turn off **Save my upcoming trips on this device** or choose **Remove from this device** (in the iPhone app, only the switch **Save my upcoming trips** exists), in **Settings → Offline & notifications → Offline access**;
-- 3 days after its trip ends, on the device’s clock, even if you never open it again;
-- when the next online load no longer includes a trip, or finds you can’t see it.
+- 3 days after its trip ends, on the device’s clock. In a browser that happens even if you never open it again; in the iPhone app the trip is dropped the next time the app reads the copy (opening Waypoint, Settings or the saved trips) or saves a new one, so its files can stay on the phone until then;
+- when the next online load no longer includes a trip, or finds you can’t see it;
+- in the iPhone app, when the server address changes.
 
-The switch applies to that device only. Turning it off clears every copy; **Remove from this device** also removes the key, so offline access is set up again from scratch. Settings shows what is saved on this device and when.
+The switch applies to that device only. Turning it off clears every copy; **Remove from this device** also removes the key, so offline access is set up again from scratch. Settings shows what is saved on this device and when. In the iPhone app, the copy of the server’s web app files is deleted at the same moments as the trips, and also when no trip is left.
 
-## What the lock protects against
+## What the lock protects against, in a browser
 
 It protects against a copy or backup of the device’s stored data (which holds only ciphertext), other apps on the device, and other people using it who can’t pass its check. It doesn’t protect against whoever can pass the device’s own check (the screen lock code works in place of Face ID or a fingerprint), malware or a browser extension while the trip is unlocked, or someone watching the screen.
 
-## How it is stored
+## How it is stored, in a browser
 
 Copies live on the device you signed in on, in the browser’s Cache storage, as one encrypted entry per trip. Setting up makes an ECDH P-256 key pair in the browser. The private key is wrapped with AES-GCM under a key derived (HKDF) from the passkey’s PRF output; each online save encrypts to the public key, so saving never needs the authenticator. Unlocking asks the authenticator once and holds the unwrapped key in memory only. No key, PRF output or plaintext of a trip is stored. Beside the ciphertext sit a few small facts in the clear, because the app must read them without the device’s check: when the copies were saved, when each runs out, each saved trip’s number and whether saving is switched off.
 

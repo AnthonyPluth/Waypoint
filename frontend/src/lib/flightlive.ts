@@ -8,7 +8,7 @@ const DAY_MS = 86_400_000;
 
 export type Dot = "done" | "now" | "next";
 export type Step = { title: string; note: string; when: string; at: string; dot: Dot; later?: string; laterWords?: string };
-export type SeatRow = { name: string; first: string; seat: string; cabin: string };
+export type SeatRow = { id: number; name: string; first: string; seat: string; cabin: string };
 
 export type FlightLiveView = {
   card: FlightCardView;
@@ -46,7 +46,7 @@ function seatRows(s: Segment): SeatRow[] {
   const cabin = s.details.cabin?.trim() ?? "";
   const named = s.travelers.filter((t) => t.name);
   const booked = s.details.seat?.trim() ?? "";
-  return named.map((t) => ({ name: t.name, first: t.name.split(/\s+/)[0], seat: t.seat?.trim() || (named.length === 1 ? booked : ""), cabin }));
+  return named.map((t) => ({ id: t.id, name: t.name, first: t.name.split(/\s+/)[0], seat: t.seat?.trim() || (named.length === 1 ? booked : ""), cabin }));
 }
 
 export function flightLiveView(input: FlightCardInput): FlightLiveView {
