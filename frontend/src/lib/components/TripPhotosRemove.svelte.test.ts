@@ -15,6 +15,12 @@ import TripPhotos from "./TripPhotos.svelte";
 
 const user = userEvent.setup({ pointerEventsCheck: 0 });
 
+const shownCard = async () => {
+  const button = await screen.findByRole("button", { name: "Sharing" });
+  if (button.getAttribute("aria-expanded") !== "true") await user.click(button);
+  return screen.findByTestId("your-photos");
+};
+
 class Refusal extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
@@ -173,7 +179,7 @@ describe("Remove from this trip, in the viewer", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(within(screen.getByTestId("photo-strip")).getAllByRole("button", { name: /^Photo,/ })).toHaveLength(2);
     expect(screen.getByRole("heading", { level: 2, name: /^Photos/ }).textContent).toBe("Photos2");
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     expect(within(mine).getByText("2 photos from your library")).toBeTruthy();
     expect(within(mine).getByRole("button", { name: "Removed from this trip (1)" })).toHaveAttribute("aria-expanded", "false");
   });
@@ -212,8 +218,8 @@ describe("Remove from this trip, in the viewer", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.queryByTestId("photo-strip")).toBeNull();
     expect(screen.getByText("No photos on this trip.")).toBeTruthy();
-    expect(within(await screen.findByTestId("your-photos")).getByText("No photos from your library on this trip")).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { level: 2, name: /^Photos/ })));
+    expect(within(await shownCard()).getByText("No photos from your library on this trip")).toBeTruthy();
   });
 
   it("puts the photo back with Undo, sending the stamp the removal answered with, and shows it in its place again", async () => {
@@ -383,7 +389,7 @@ describe("The map’s photo data when the reload after a change fails", () => {
     visible = [shot(1), shot(2)];
     const onloaded = vi.fn();
     mount({ onloaded });
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     await waitFor(() => expect(onloaded.mock.calls.at(-1)?.[0]?.photos).toHaveLength(2));
     await user.click(within(mine).getByRole("button", { name: /^Removed from this trip/ }));
     onPutBack = failAfter(() => undefined) as never;
@@ -675,7 +681,7 @@ describe("Select, in the gallery", () => {
 
 describe("Removed from this trip, on the card", () => {
   const open = async () => {
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     await user.click(within(mine).getByRole("button", { name: /^Removed from this trip/ }));
     return mine;
   };
@@ -687,7 +693,7 @@ describe("Removed from this trip, on the card", () => {
 
   it("is a closed disclosure with the count, which lists what only you see, each with Put back", async () => {
     mount();
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     expect(within(mine).getByText("2 photos from your library")).toBeTruthy();
     const button = within(mine).getByRole("button", { name: "Removed from this trip (2)" });
     expect(button).toHaveAttribute("aria-expanded", "false");
@@ -706,7 +712,7 @@ describe("Removed from this trip, on the card", () => {
   it("has no disclosure when nothing is removed", async () => {
     gone = [];
     mount();
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     expect(within(mine).queryByRole("button", { name: /^Removed from this trip/ })).toBeNull();
   });
 
@@ -779,13 +785,16 @@ describe("Removed from this trip, on the card", () => {
     expect(within(mine).getByRole("button", { name: "Put back the video from Sun, Mar 1, 2:00 PM" })).toBeDisabled();
     failing = false;
     await user.click(screen.getByRole("button", { name: "Try again" }));
-    await waitFor(() => expect(within(mine).getByRole("button", { name: "Put back the video from Sun, Mar 1, 2:00 PM" })).toBeEnabled());
+    const reopened = await shownCard();
+    await waitFor(() => expect(within(reopened).getByRole("button", { name: "Put back the video from Sun, Mar 1, 2:00 PM" })).toBeEnabled());
   });
 
   it("names a managed person in the card, the list and the buttons", async () => {
     gone = [{ ...shot(5, 3), removed_at: 1700000100 }];
     visible = [shot(1, 3), shot(2)];
     mount({ people: [ada, theo, june] });
+    await user.click(await screen.findByRole("button", { name: "Sharing" }));
+    await user.click(await screen.findByRole("button", { name: "Show sharing for June’s photos" }));
     const mine = await screen.findByRole("region", { name: "June’s photos on this trip" });
     await user.click(within(mine).getByRole("button", { name: "Removed from this trip (1)" }));
     expect(within(mine).getByRole("list", { name: "June’s photos removed from this trip" })).toBeTruthy();
@@ -804,7 +813,7 @@ describe("Removed from this trip, on the card", () => {
     await user.click(removeButton());
     await waitFor(() => expect(screen.getByRole("dialog")).toHaveAccessibleName("Photo 1 of 2"));
     await user.click(screen.getByRole("button", { name: "Close" }));
-    const mine = await screen.findByTestId("your-photos");
+    const mine = await shownCard();
     await waitFor(() => expect(within(mine).getByText("2 photos from your library")).toBeTruthy());
     await user.click(within(mine).getByRole("radio", { name: /^Everyone on this trip/ }));
     const dialog = await screen.findByRole("dialog", { name: "Show your 2 photos to everyone on this trip?" });

@@ -549,6 +549,16 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
   - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. Its booking cards sit below the days until the Bookings sheet lands.
   - The route replay plays on its own once it is on the page (the hero when there are no photos, or the replay that Replay trip opens); press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
 
+### Flows on trip
+
+#### `photos-sharing-button`
+
+- **Starts at:** `#trip`; goes to: `#trip/7`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Sharing`, `Photo sharing for this trip`, `13 photos from your library`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-sharing-button`; or `poetry run python run.py verify --flow photos-sharing-button`.
+
 ## flight (`flight`)
 
 - **What exists:** No docs page of its own.

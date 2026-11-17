@@ -1,0 +1,23 @@
+{
+  "name": "photos-sharing-button",
+  "page": "trip",
+  "signed_in": true,
+  "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
+  "steps": [
+    {"clock": "2026-02-18T12:00:00Z"},
+    {"reload": true},
+    {"goto": "#trip/7"},
+    {"wait_for": "[data-testid=trip-photos]"},
+    {"wait_for": "[data-testid=photo-strip] img"},
+    {"wait_for": "role=button[name='Sharing']"},
+    {"expect_text": {"selector": "[data-testid=trip-photos]", "text": "Sharing"}},
+    {"screenshot": "closed"},
+    {"click": "role=button[name='Sharing']"},
+    {"wait_for": "[data-testid=your-photos]"},
+    {"expect_text": {"selector": "[role=dialog][aria-labelledby]", "text": "Photo sharing for this trip"}},
+    {"expect_text": {"selector": "[data-testid=your-photos]", "text": "13 photos from your library"}},
+    {"screenshot": "open"},
+    {"press": {"selector": "[role=dialog][aria-labelledby]", "key": "Escape"}},
+    {"wait_for": "role=button[name='Sharing'][expanded=false]"}
+  ]
+}
