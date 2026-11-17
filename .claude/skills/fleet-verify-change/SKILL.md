@@ -1,7 +1,7 @@
 ---
-# vendored from fleet v3.0.0 (plugins/fleet/skills/verify-change/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v4.0.0 (plugins/fleet/skills/verify-change/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-verify-change
-description: Use before marking a pull request ready for review, in a repository whose pyproject.toml sets [tool.fleet.verification]. Lists the change's dimensions (each user-visible behaviour, failure path, migration, permission and invariant), verifies each with the verification guides for the changed paths where the repository has them and the app's own tools and verify skills, and writes the Verification block into the pull request's description - every dimension verified with evidence from this session, or not verified with the reason.
+description: Use before a pull request is marked ready for review (the merge gate marks a passing draft ready by itself), in a repository whose pyproject.toml sets [tool.fleet.verification]. Lists the change's dimensions (each user-visible behaviour, failure path, migration, permission and invariant), verifies each with the verification guides for the changed paths where the repository has them and the app's own tools and verify skills, and writes the Verification block into the pull request's description - every dimension verified with evidence from this session, or not verified with the reason.
 ---
 
 # Verify the change and record it
@@ -10,7 +10,7 @@ The pull request's description says, one dimension at a time, what was verified,
 
 ## When this applies
 
-Before the pull request is marked ready for review, in a repository whose `pyproject.toml` has a `[tool.fleet.verification]` table. While the table has `required = false`, a missing or malformed block is a warning on the pull request; with `required = true` it fails `fleet checks` on a ready pull request. Write the block either way.
+Before the pull request is marked ready for review, in a repository whose `pyproject.toml` has a `[tool.fleet.verification]` table: write it while the pull request is a draft, since the merge gate marks a draft ready by itself once its checks pass. While the table has `required = false`, a missing or malformed block is a warning on the pull request; with `required = true` it fails `fleet checks` on a ready pull request, and the merge gate leaves a draft whose block would fail that way a draft. Write the block either way.
 
 ## List the dimensions
 
@@ -73,6 +73,6 @@ The rules the parser holds:
 
 Every gap goes in as `not verified` with its reason, never left out: a reviewer who sees the gap can judge it, and one who doesn't can't. Keep "Testing" for what was run. `fleet verification show --pr N` prints the block as the tools read it.
 
-## Before marking ready
+## Before the gate passes
 
 Run `fleet checks --pr-event <payload>` locally where you can, or read the "fleet checks" run on the pull request: a warning or error there names the line and the rule. Fix the description, which re-runs the check, rather than arguing with it in a comment.
