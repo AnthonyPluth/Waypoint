@@ -160,13 +160,19 @@ export function bookingName(s: Segment): string {
   return headline(s);
 }
 
-function spanOf(s: Segment): string {
+export function spanOf(s: Segment): string {
   const from = dayParts(startDay(s)), to = dayParts(s.end_local.slice(0, 10));
   const first = `${from.month} ${from.day}`;
   if (startDay(s) === s.end_local.slice(0, 10)) return first;
   return `${first}–${from.month === to.month ? "" : `${to.month} `}${to.day}`;
 }
 const timesOf = (s: Segment): string => (untimed(s) ? "time not recorded" : `${clock(s.start_local)} – ${clock(s.end_local)}${dayShift(s.start_local, s.end_local) ? ` ${dayShift(s.start_local, s.end_local)}` : ""}`);
+
+export function bookingSpan(s: Segment): string {
+  const days = daysBetween(`${startDay(s)}T00:00`, `${s.end_local.slice(0, 10)}T00:00`);
+  const length = s.kind === "parking" ? (days > 0 ? `${days} ${days === 1 ? "day" : "days"}` : "") : nightsLabel(startDay(s), s.end_local.slice(0, 10));
+  return [spanOf(s), length].filter(Boolean).join(" · ");
+}
 
 export function bookingDetail(card: Card, dated: boolean): string {
   const s = card.lead;

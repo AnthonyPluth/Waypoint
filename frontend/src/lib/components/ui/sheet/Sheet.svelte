@@ -6,8 +6,9 @@
   import { leave, sheetScope, type DraftGuard } from "$lib/drafts.svelte";
   import type { Snippet } from "svelte";
 
-  let { open = $bindable(false), title, description, wide = false, split = false, guard, onOpenAutoFocus, children }: {
-    open?: boolean; title: string; description?: string; wide?: boolean; split?: boolean; guard?: DraftGuard; onOpenAutoFocus?: (event: Event) => void; children: Snippet;
+  let { open = $bindable(false), title, description, wide = false, split = false, panel = false, guard, onOpenAutoFocus, onCloseAutoFocus, lead, actions, children }: {
+    open?: boolean; title: string; description?: string; wide?: boolean; split?: boolean; panel?: boolean; guard?: DraftGuard; onOpenAutoFocus?: (event: Event) => void; onCloseAutoFocus?: (event: Event) => void;
+    lead?: Snippet; actions?: Snippet; children: Snippet;
   } = $props();
 
   const scope = sheetScope();
@@ -37,17 +38,19 @@
 <Dialog.Root bind:open={() => open, (v) => { if (v) open = true; else dismiss(); }}>
   <Dialog.Portal>
     <Dialog.Overlay data-slot="sheet-overlay" class="sheet-overlay" />
-    <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} data-split={split ? "" : undefined} {onOpenAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
+    <Dialog.Content data-slot="sheet" data-side={side} data-wide={wide ? "" : undefined} data-split={split ? "" : undefined} data-panel={panel ? "" : undefined} {onOpenAutoFocus} {onCloseAutoFocus} class="sheet" style={drag ? `--sheet-drag: ${drag}px` : undefined} data-dragging={drag ? "" : undefined}>
       {#if side === "bottom"}
         <div class="sheet-handle" data-sheet-handle onpointerdown={grab} onpointermove={pull} onpointerup={release} onpointercancel={release} role="presentation">
           <span class="sheet-grip" aria-hidden="true"></span>
         </div>
       {/if}
-      <div class="flex items-start justify-between gap-3 px-5 pb-2 pt-3 md:px-6 md:pt-5">
-        <div class="min-w-0">
+      <div class={`flex justify-between gap-3 px-5 pb-2 pt-3 md:px-6 md:pt-5 ${lead ? "items-center" : "items-start"}`}>
+        {#if lead}{@render lead()}{/if}
+        <div class="min-w-0 flex-1">
           <Dialog.Title tabindex={-1} class="text-heading font-semibold break-words outline-none">{title}</Dialog.Title>
           {#if description}<Dialog.Description class="text-caption text-muted-foreground">{description}</Dialog.Description>{/if}
         </div>
+        {#if actions}<div class="flex shrink-0 items-center gap-1">{@render actions()}</div>{/if}
         <Dialog.Close>
           {#snippet child({ props })}
             <Button {...props} variant="ghost" size="icon" class="-mr-2 shrink-0" aria-label="Close"><X /></Button>

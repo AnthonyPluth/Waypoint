@@ -10,6 +10,9 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
+  import BookingDetail from "$lib/components/BookingDetail.svelte";
+  import PastBookings from "$lib/components/PastBookings.svelte";
+  import PastBookingsSheet from "$lib/components/PastBookingsSheet.svelte";
   import AddressLink from "$lib/components/AddressLink.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightCard from "$lib/components/FlightCard.svelte";
@@ -41,7 +44,7 @@
   import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, type Card, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
+  import { appWord, bookingCards, bookingCounts, type Card, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import GitMerge from "@lucide/svelte/icons/git-merge";
   import Plus from "@lucide/svelte/icons/plus";
@@ -65,6 +68,9 @@
   let editingTrip = $state(false);
   let focus = $state("");
   let inSheet = $state(false);
+  let bookingsOpen = $state(false);
+  let detailId = $state<number | null>(null);
+  let opener: HTMLElement | null = null;
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
   let askOffline = $state(false);
@@ -148,12 +154,19 @@
   }
   let seenRevision = untrack(() => revision);
   $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
-  $effect(() => { void id; form = null; editingTrip = false; savedCopy = null; savedTrips = []; void load(); });
+  $effect(() => { void id; form = null; editingTrip = false; detailId = null; bookingsOpen = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
+  let openedWanted = "";
   $effect(() => {
     if (!trip || !wanted) return;
     void cards;
+    if (completedPage) {
+      const key = `${id}:${wanted}`;
+      const found = cards.find((c) => c.segments.some((s) => String(s.id) === wanted));
+      if (found && openedWanted !== key) { openedWanted = key; opener = null; detailId = found.lead.id; }
+      return;
+    }
     tick().then(() => document.getElementById(`segment-${wanted}`)?.scrollIntoView({ block: "start" }));
   });
 
@@ -167,6 +180,16 @@
     return () => { layout.wide = false; };
   });
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
+  const detailCard = $derived(detailId === null ? null : (cards.find((c) => c.segments.some((s) => s.id === detailId)) ?? null));
+  const openDetail = (s: Segment, from: HTMLElement | null) => { opener = from; detailId = s.id; };
+  const afterDetail = (e: Event) => {
+    const back = opener;
+    opener = null;
+    if (back?.isConnected) { e.preventDefault(); back.focus(); }
+  };
+  const editFromDetail = (s: Segment) => { detailId = null; bookingsOpen = false; edit(s); };
+  const moveFromDetail = (s: Segment) => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); };
+  const removeFromDetail = (s: Segment) => { removing = s; asking = true; };
   const liveOn = $derived(flightStatus.list?.enabled === true);
   const flightCard = (card: Card) => !over && card.lead.kind === "flight" && !card.cancelled && card.lead.status !== "cancelled" && !untimed(card.lead);
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
@@ -193,7 +216,7 @@
   function edit(s: Segment, field = "") {
     leave(() => {
       focus = field;
-      inSheet = viewport.phone;
+      inSheet = viewport.phone || completedPage;
       form = draftOf(s, trip?.costs.totals[0]?.currency);
     });
   }
@@ -313,7 +336,8 @@
 {:else}
   {@const t = trip}
   {#if completedPage}
-    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }} />
+    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
+      onbookings={() => (bookingsOpen = true)} bookings={pastBookings} />
     {#if form && form.id === null}
       <div class="mt-6 mb-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
     {/if}
@@ -356,7 +380,8 @@
   {#if t.segments.length === 0}
     <p class="text-muted-foreground">Nothing booked on this trip yet.</p>
   {/if}
-  <ul class={`ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6 ${completedPage ? "mt-6" : ""}`} aria-label="Bookings">
+  {#if !completedPage}
+  <ul class="ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6" aria-label="Bookings">
     {#each cards as card (card.id)}
       {@const s = card.lead}
       {#if flightCard(card)}
@@ -404,9 +429,31 @@
       {/if}
     {/each}
   </ul>
+  {/if}
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 </div>
+
+<PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} onopen={openDetail} />
+
+{#if detailCard}
+  <BookingDetail card={detailCard} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail} />
+{/if}
+
+{#snippet pastBookings()}
+  {#if trip}
+    {@const counts = bookingCounts(trip)}
+    {#if counts.total > 0}
+      <section class="flex flex-col gap-2.5" aria-labelledby="past-bookings-title">
+        <div class="flex items-baseline justify-between gap-3">
+          <h2 id="past-bookings-title" class="text-[17px] leading-snug font-semibold tracking-tight">Bookings · {counts.total}</h2>
+          <span class="text-caption text-muted-foreground">{counts.words}</span>
+        </div>
+        <PastBookings segments={trip.segments} grouped={false} selected={detailCard?.lead.id ?? null} onopen={openDetail} />
+      </section>
+    {/if}
+  {/if}
+{/snippet}
 
 <OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />
 

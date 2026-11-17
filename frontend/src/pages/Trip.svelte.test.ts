@@ -520,7 +520,7 @@ describe("Trip", () => {
 
   it("shows a flight with no times by its day: “time not recorded” at both ends, and no live status", async () => {
     held = trip([segment({ id: 1, origin: "LAX", destination: "JFK", start_local: "2026-03-08T00:00", start_zone: "America/Los_Angeles",
-      end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })]);
+      end_local: "2026-03-08T03:00", end_zone: "America/New_York", details: { flight_number: "DL 1002", time_unknown: "yes" } })], { end_date: "2999-01-01" });
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
     render(TripPage);
@@ -535,7 +535,7 @@ describe("Trip", () => {
     held = trip([
       segment({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, start_local: "2026-03-08T00:00", end_local: "2026-03-10T00:00", details: { time_unknown: "yes" } }),
       segment({ id: 2, kind: "visit", provider: null, origin: null, destination: "JP", start_local: "2005-03-10T00:00", end_local: "2005-03-29T00:00", details: { time_unknown: "yes" } }),
-    ], { start_date: "2005-03-10", end_date: "2026-03-10" });
+    ], { start_date: "2005-03-10", end_date: "2999-01-01" });
     render(TripPage);
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
@@ -1208,14 +1208,14 @@ describe("Trip", () => {
     });
 
     it("shows no ports section for a cruise without any", async () => {
-      held = trip([{ ...ship, itinerary: [], days: [] }]);
+      held = trip([{ ...ship, itinerary: [], days: [] }], { end_date: "2999-01-01" });
       render(TripPage);
       await screen.findByRole("heading", { name: "Example Voyager · Miami" });
       expect(screen.queryByText("Itinerary")).toBeNull();
     });
 
     it("edits the ports: adds one in the last one’s zone, moves, removes, and sends them in order", async () => {
-      held = trip([ship]);
+      held = trip([ship], { end_date: "2999-01-01" });
       const u = userEvent.setup();
       render(TripPage);
       await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
@@ -1290,13 +1290,16 @@ describe("Trip", () => {
       expect(upcoming.container.firstElementChild?.className).toContain("mx-auto max-w-3xl");
     });
 
-    it("shows the completed trip page with the booking cards below it", async () => {
+    it("shows the completed trip page with its Bookings list in the column and no booking cards", async () => {
       held = past({ done_at: null });
       render(TripPage);
       expect(await screen.findByTestId("past-trip")).toBeInTheDocument();
       expect(screen.getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
-      expect(await screen.findByRole("list", { name: "Bookings" })).toBeInTheDocument();
-      expect(screen.getByTestId("past-trip").compareDocumentPosition(screen.getByRole("list", { name: "Bookings" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      const list = await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.getByTestId("trip-column")).toContainElement(list);
+      expect(screen.getByRole("heading", { level: 2, name: "Bookings · 1" })).toBeInTheDocument();
+      expect(document.querySelector(".pass")).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Edit Harbour Hotel/ })).toBeNull();
       expect(screen.getByRole("button", { name: "Edit trip details" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Add a booking" })).toBeNull();
       expect(screen.getAllByRole("link", { name: "Past trips" })).toHaveLength(1);
@@ -1325,35 +1328,41 @@ describe("Trip", () => {
       expect(await screen.findByRole("dialog", { name: "Delete Trip to London?" })).toBeInTheDocument();
     });
 
+    const openBooking = async (name: RegExp | string = /Harbour Hotel/) => {
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name }));
+      return { u, dialog: await screen.findByRole("dialog") };
+    };
+
     it("keeps the essentials and drops the actions and loyalty numbers", async () => {
       loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
       held = past();
       render(TripPage);
-      const card = await cardOf(hotel);
-      expect(card).toHaveTextContent("H88231");
-      expect(card).toHaveTextContent("1 Quay Street, London");
-      expect(within(card).queryByRole("link", { name: "Directions" })).toBeNull();
-      expect(within(card).queryByRole("link", { name: "Call" })).toBeNull();
-      expect(within(card).queryByRole("button", { name: /email/i })).toBeNull();
-      expect(card.querySelector("[data-membership]")).toBeNull();
-      expect(within(card).getByRole("button", { name: /^Edit/ })).toBeInTheDocument();
+      const { dialog } = await openBooking();
+      expect(dialog).toHaveTextContent("H88231");
+      expect(dialog).toHaveTextContent("1 Quay Street, London");
+      expect(within(dialog).queryByRole("link", { name: "Directions" })).toBeNull();
+      expect(within(dialog).queryByRole("link", { name: "Call" })).toBeNull();
+      expect(within(dialog).queryByRole("button", { name: /email/i })).toBeNull();
+      expect(dialog).not.toHaveTextContent(/Marriott Bonvoy|821L/);
+      expect(within(dialog).getByRole("button", { name: "Edit" })).toBeInTheDocument();
     });
 
     it("keeps Edit, Move and Remove on a trip that was never marked Done", async () => {
       held = past({ done_at: null });
       render(TripPage);
-      const card = await cardOf(hotel);
-      expect(within(card).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
-      await userEvent.click(within(card).getByRole("button", { name: "More options for Harbour Hotel" }));
-      for (const verb of ["Move", "Remove"]) expect(within(card).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
+      const { u, dialog } = await openBooking();
+      expect(within(dialog).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+      await u.click(within(dialog).getByRole("button", { name: "More options for Harbour Hotel" }));
+      for (const verb of ["Move", "Remove"]) expect(within(dialog).getByRole("button", { name: `${verb} Harbour Hotel` })).toBeInTheDocument();
     });
 
     it("hides Edit, Move and Remove once the trip is Done, and keeps the booking's details", async () => {
       held = past({ done_at: 1700000000 });
       render(TripPage);
-      const card = await cardOf(hotel);
-      expect(card).toHaveTextContent("H88231");
-      for (const verb of ["Edit", "Move", "Remove", "More options"]) expect(within(card).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
+      const { dialog } = await openBooking();
+      expect(dialog).toHaveTextContent("H88231");
+      for (const verb of ["Edit", "Move", "Remove", "More options"]) expect(within(dialog).queryByRole("button", { name: new RegExp(`^${verb}`) })).toBeNull();
     });
 
     it("hides them on each booking of a combined flight card once the trip is Done", async () => {
@@ -1361,9 +1370,55 @@ describe("Trip", () => {
       const second = segment({ id: 2, confirmation: "BBBBBB", start_local: "2020-03-01T19:00", end_local: "2020-03-02T07:10", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
       held = trip([first, second], { start_date: "2020-03-01", end_date: "2020-03-02", done_at: 1700000000 });
       render(TripPage);
-      const blocks = await screen.findAllByRole("listitem").then((all) => all.filter((li) => li.hasAttribute("data-booking")));
-      expect(blocks).toHaveLength(2);
-      for (const block of blocks) expect(within(block).queryByRole("button", { name: /^(Edit|Move|Remove)/ })).toBeNull();
+      const { dialog } = await openBooking(/JFK to LHR/);
+      expect(within(dialog).getAllByRole("button", { name: /^Copy confirmation code/ })).toHaveLength(2);
+      expect(within(dialog).queryByRole("button", { name: /^(Edit|Move|Remove|More)/ })).toBeNull();
+    });
+
+    it("opens the booking form from Edit in the detail, with the detail closed", async () => {
+      held = past();
+      render(TripPage);
+      const { u, dialog } = await openBooking();
+      await u.click(within(dialog).getByRole("button", { name: "Edit" }));
+      const form = await screen.findByRole("dialog", { name: "Edit this booking" });
+      expect(within(form).getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+      expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull();
+    });
+
+    it("moves a booking from More in the detail, through the same dialog the card had", async () => {
+      held = past();
+      render(TripPage);
+      const { u, dialog } = await openBooking();
+      await u.click(within(dialog).getByRole("button", { name: "More options for Harbour Hotel" }));
+      await u.click(within(dialog).getByRole("button", { name: "Move Harbour Hotel" }));
+      const asking = await screen.findByRole("dialog", { name: "Move Harbour Hotel" });
+      expect(within(asking).getByLabelText("Move it to")).toBeInTheDocument();
+    });
+
+    it("removes a booking from More in the detail after asking, and closes the detail", async () => {
+      held = trip([hotel, { ...hotel, id: 3, origin: "Camden Guesthouse" }], { start_date: "2020-03-01", end_date: "2020-03-04" });
+      render(TripPage);
+      const { u, dialog } = await openBooking();
+      await u.click(within(dialog).getByRole("button", { name: "More options for Harbour Hotel" }));
+      await u.click(within(dialog).getByRole("button", { name: "Remove Harbour Hotel" }));
+      await u.click(await screen.findByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2", { method: "DELETE" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull());
+    });
+
+    it("opens the booking a link names with ?segment=, as the highlighted card was", async () => {
+      held = past();
+      route.query = "segment=2";
+      render(TripPage);
+      expect(await screen.findByRole("dialog", { name: "Harbour Hotel" })).toBeInTheDocument();
+    });
+
+    it("opens nothing for a segment the trip does not have", async () => {
+      held = past();
+      route.query = "segment=99";
+      render(TripPage);
+      await screen.findByTestId("past-trip");
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     describe("live flight status", () => {
@@ -1379,10 +1434,10 @@ describe("Trip", () => {
         held = trip([{ ...flight, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
         withStatus();
         const view = render(TripPage);
-        const card = await flightCard();
-        await waitFor(() => expect(card).toHaveTextContent("JFK"));
-        expect(within(card).queryByText(/Updated /)).toBeNull();
-        expect(card.querySelector("article")).toBeNull();
+        const { dialog } = await openBooking(/JFK to LHR/);
+        expect(dialog).toHaveTextContent("JFK");
+        expect(within(dialog).queryByText(/Updated |Delayed|On time|Gate/)).toBeNull();
+        expect(document.querySelector("article")).toBeNull();
         view.unmount();
         held = trip([flight]);
         render(TripPage);
@@ -1393,10 +1448,10 @@ describe("Trip", () => {
         held = trip([{ ...flight, ...gone }, { ...sams, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
         withStatus();
         const view = render(TripPage);
-        const card = await flightCard();
-        await waitFor(() => expect(card).toHaveTextContent("BBBBBB"));
-        expect(within(card).queryByText(/Updated /)).toBeNull();
-        expect(card.querySelector("article")).toBeNull();
+        const { dialog } = await openBooking(/JFK to LHR/);
+        expect(dialog).toHaveTextContent("BBBBBB");
+        expect(within(dialog).queryByText(/Updated |Delayed|On time|Gate/)).toBeNull();
+        expect(document.querySelector("article")).toBeNull();
         view.unmount();
         held = trip([flight, sams]);
         render(TripPage);
@@ -1419,6 +1474,59 @@ describe("Trip", () => {
 describe("Trip on a phone", () => {
   beforeEach(() => { viewport.phone = true; });
   afterEach(() => { viewport.phone = false; });
+
+  describe("a trip that is over", () => {
+    const hotel = { ...stay, status: "confirmed" as const, start_local: "2020-03-01T15:00", end_local: "2020-03-04T10:00" };
+    const past = () => trip([hotel, segment({ id: 3, kind: "car", provider: "Example Rentals", origin: "Heathrow", start_local: "2020-03-01T11:00", end_local: "2020-03-04T11:00", confirmation: "CAR111" })], { start_date: "2020-03-01", end_date: "2020-03-04" });
+
+    it("shows a Bookings row for the sheet, in place of the booking cards", async () => {
+      held = past();
+      render(TripPage);
+      const row = await screen.findByRole("button", { name: /^Bookings · 2/ });
+      expect(row).toHaveAttribute("aria-haspopup", "dialog");
+      expect(document.querySelector(".pass")).toBeNull();
+      expect(screen.queryByRole("list", { name: "Bookings" })).toBeNull();
+    });
+
+    it("opens a booking's detail from the Bookings sheet, over it, and Close gives focus back to the row", async () => {
+      held = past();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: /^Bookings · 2/ }));
+      const sheet = await screen.findByRole("dialog", { name: "Bookings · 2" });
+      const row = within(sheet).getByRole("button", { name: /Harbour Hotel/ });
+      await u.click(row);
+      const detail = await screen.findByRole("dialog", { name: "Harbour Hotel" });
+      expect(detail).toHaveTextContent("H88231");
+      expect(sheet).not.toHaveTextContent("H88231");
+      await u.click(within(detail).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull());
+      await waitFor(() => expect(row).toHaveFocus());
+    });
+
+    it("leaves the Bookings sheet and a detail behind when another trip is opened", async () => {
+      held = past();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: /^Bookings · 2/ }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Bookings · 2" })).getByRole("button", { name: /Harbour Hotel/ }));
+      await screen.findByRole("dialog", { name: "Harbour Hotel" });
+      route.sub = "2";
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("closes both sheets and opens the booking form in a sheet when Edit is pressed", async () => {
+      held = past();
+      render(TripPage);
+      const u = userEvent.setup();
+      await u.click(await screen.findByRole("button", { name: /^Bookings · 2/ }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Bookings · 2" })).getByRole("button", { name: /Harbour Hotel/ }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Harbour Hotel" })).getByRole("button", { name: "Edit" }));
+      expect(await screen.findByRole("dialog", { name: "Edit this booking" })).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Bookings · 2" })).toBeNull());
+      expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull();
+    });
+  });
 
   it("opens Edit in a sheet, not under the booking, and Cancel closes it with focus back on Edit", async () => {
     render(TripPage);

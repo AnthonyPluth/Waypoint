@@ -136,7 +136,7 @@
 
       {#if onbookings && counts.total > 0}
         <div class="overflow-hidden rounded-[18px] border border-border bg-card">
-          <button type="button" class="flex w-full cursor-pointer items-center gap-3 px-3.5 py-[11px] text-left hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-haspopup="dialog" aria-label={`Bookings · ${counts.total}, ${counts.words}`} onclick={onbookings}>
+          <button type="button" class="flex w-full cursor-pointer items-center gap-3 px-3.5 py-[11px] text-left hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none" aria-haspopup="dialog" onclick={onbookings}>
             <span class="flex items-center gap-1" aria-hidden="true">{#each counts.kinds as kind (kind)}<KindTile {kind} decorative size={34} />{/each}</span>
             <span class="flex min-w-0 flex-1 flex-col"><b class="truncate text-sm font-semibold">Bookings · {counts.total}</b><span class="text-caption text-muted-foreground">{counts.words}</span></span>
             <ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

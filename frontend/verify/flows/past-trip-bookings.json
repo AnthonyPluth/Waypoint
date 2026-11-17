@@ -1,0 +1,89 @@
+{
+  "name": "past-trip-bookings",
+  "page": "trips",
+  "signed_in": true,
+  "allow_console": [
+    "Applying inline style violates the following Content Security Policy",
+    "Blocked script execution in"
+  ],
+  "steps": [
+    {
+      "goto": "#trip/1"
+    },
+    {
+      "wait_for": "[data-testid=past-trip]"
+    },
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Trip to Paris"
+      }
+    },
+    {
+      "screenshot": "trip-page"
+    },
+    {
+      "click_if_present": "button[aria-haspopup=dialog]:has-text('Bookings') >> visible=true"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=past-bookings]",
+        "text": "Hôtel du Parc"
+      }
+    },
+    {
+      "screenshot": "bookings"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+    },
+    {
+      "expect_text": {
+        "selector": "role=dialog[name=\"Hôtel du Parc\"]",
+        "text": "Edit"
+      }
+    },
+    {
+      "screenshot": "stay-detail"
+    },
+    {
+      "press": {
+        "selector": "role=dialog >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "goto": "#trip/2"
+    },
+    {
+      "wait_for": "[data-testid=past-trip]"
+    },
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Trip to San Francisco"
+      }
+    },
+    {
+      "click_if_present": "button[aria-haspopup=dialog]:has-text('Bookings') >> visible=true"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Bayview Inn\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Bayview Inn\"]"
+    },
+    {
+      "screenshot": "done-trip-detail"
+    }
+  ]
+}
