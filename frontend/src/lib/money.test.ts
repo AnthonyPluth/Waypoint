@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountText, countNote, formatMoney, formatTotals, toMinor } from "./money";
+import { amountChars, amountText, countNote, formatMoney, formatTotals, toMinor } from "./money";
 
 describe("showing money", () => {
   it("formats an amount in its own currency from the smallest unit", () => {
@@ -46,5 +46,14 @@ describe("reading an amount typed in the form", () => {
     expect(amountText(124050, "USD")).toBe("1240.50");
     expect(amountText(12300, "JPY")).toBe("12300");
     expect(toMinor(amountText(31000, "EUR"), "EUR")).toBe(31000);
+  });
+});
+
+describe("typing an amount", () => {
+  it("keeps digits, commas and points and drops everything else", () => {
+    expect(amountChars("USD $1,240.00")).toBe("1,240.00");
+    expect(amountChars("1 240,50 €")).toBe("1240,50");
+    expect(amountChars("abc")).toBe("");
+    expect(amountChars("-12")).toBe("12");
   });
 });

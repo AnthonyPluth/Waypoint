@@ -30,6 +30,8 @@ export const amountText = (minor: number, currency: string): string => {
   return (minor / 10 ** d).toFixed(d);
 };
 
+export const amountChars = (text: string): string => text.replace(/[^\d.,]/g, "");
+
 export function toMinor(text: string, currency: string): number | null {
   const d = places(currency);
   if (/[-−()]/.test(text)) return null;

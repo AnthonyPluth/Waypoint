@@ -10,6 +10,7 @@
   import FlightLength from "$lib/components/FlightLength.svelte";
   import AirportField from "$lib/components/AirportField.svelte";
   import ZoneSelect from "$lib/components/ZoneSelect.svelte";
+  import { amountChars } from "$lib/money";
   import { airportInfo } from "$lib/airport-zones";
   import { countryChoices, usStateChoices } from "$lib/countries";
   import { ADDRESS_LIMIT, body, DETAILS, hasMore, inMore, issues, KINDS, MAX_PORTS, MAX_VISITS, nextVisitRow, visitBodies, visitRows, type VisitRow, SEAT_LIMIT, SEATED, FOR_EVERYONE, SAME_AS_PICKUP, seatKey, type Draft } from "$lib/segment-form";
@@ -367,7 +368,7 @@
             <fieldset class="flex flex-col gap-1.5 text-sm" data-cost>
               <legend class="mb-1.5 font-medium">Cost</legend>
               <div class="flex gap-3">
-                <span data-field="cost" class="contents"><Input class="min-w-0 flex-1" bind:value={d.cost} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" {...aria("cost")} /></span>
+                <span data-field="cost" class="contents"><Input class="min-w-0 flex-1" bind:value={d.cost} oninput={(e) => { const clean = amountChars(e.currentTarget.value); if (clean !== e.currentTarget.value) e.currentTarget.value = clean; d.cost = clean; }} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" {...aria("cost")} /></span>
                 <span data-field="currency" class="contents"><Input class="w-24 uppercase" bind:value={d.currency} maxlength={3} autocomplete="off" spellcheck={false} placeholder="USD" aria-label="Cost currency" {...aria("currency")} /></span>
               </div>
               {@render fieldError("cost")}
