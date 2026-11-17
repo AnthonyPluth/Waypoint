@@ -154,18 +154,17 @@ describe("Upcoming", () => {
     expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull();
   });
 
-  it("leads with the next segment: countdown, flight, departure time, terminal, and a code to tap and copy", async () => {
+  it("leads with the next segment within a day of departure: the flight, its time at its airport, the terminal, and a code to tap and copy", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Next up")).toBeInTheDocument();
-    expect(within(card).getByText("Check-in is open, departs in 10 h")).toBeInTheDocument();
-    expect(within(card).getByText("American Airlines AA 101")).toBeInTheDocument();
-    expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
-    expect(within(card).getByText("Fri, Nov 20")).toBeInTheDocument();
-    expect(within(card).getByText("New York time")).toBeInTheDocument();
-    expect(within(card).getByText("8")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, scheduled, departs Fri Nov 20 at 7:00 pm" })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
+    expect(within(card).getByText("AA 101")).toBeInTheDocument();
+    expect(within(card).getByText("Fri Nov 20 · Trip to London")).toBeInTheDocument();
+    expect(within(card).getByText("7:00 pm")).toBeInTheDocument();
+    expect(within(card).getByText("Terminal 8")).toBeInTheDocument();
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
@@ -224,14 +223,15 @@ describe("Upcoming", () => {
     expect(within(card).getByText("Check-in opens in 1 day 10 h")).toBeInTheDocument();
   });
 
-  it("puts the plane on the route line from the booked times when the flight is under way", async () => {
+  it("puts the plane on the dotted line from the booked times when the flight is under way", async () => {
     at("2026-11-20T22:35:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Under way")).toBeInTheDocument();
-    expect(within(card).getByRole("img", { name: "Route" }).dataset.progress).toBe("0.5");
-    expect(within(card).getByText("Under way, arrives in 3 h 35 min")).toBeInTheDocument();
+    expect(card.querySelector("article")!.dataset.progress).toBe("0.5");
+    expect(card.querySelector<HTMLElement>("[data-plane]")!.style.left).toBe("50%");
+    expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, in the air, lands 7:10 am in 3 hours 35 minutes" })).toBeInTheDocument();
   });
 
   it("leads with the card’s code first, then the route and the times at each airport", async () => {
@@ -242,16 +242,15 @@ describe("Upcoming", () => {
     expect(within(card).getAllByRole("button")[0]).toHaveAccessibleName("Copy confirmation code KQ7M2X");
     expect(within(card).getByText("JFK")).toBeInTheDocument();
     expect(within(card).getByText("LHR")).toBeInTheDocument();
-    expect(within(card).getByText("Confirmed")).toBeInTheDocument();
   });
 
-  it("shows a booking’s brand logo on the Next up card and in the day-by-day list, and no image for one without", async () => {
+  it("shows a booking’s brand logo in the day-by-day list, and no airline logo on the flight card", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([trip([segment({ id: 1, logo: "/api/segments/1/logo" }), stay, home])]);
     const { container } = render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(card.querySelector("img")?.getAttribute("src")).toBe("/api/segments/1/logo");
-    expect([...container.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["/api/segments/1/logo", "/api/segments/1/logo"]);
+    expect(card.querySelector("img")).toBeNull();
+    expect([...container.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["/api/segments/1/logo"]);
   });
 
   it("shows the flight’s live status on the Next up card", async () => {
@@ -259,8 +258,9 @@ describe("Upcoming", () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [london] }) as never);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(await within(card).findByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
-    expect(within(card).getByTestId("flight-status")).toHaveTextContent("Terminal 7 · Gate B24");
+    expect(await within(card).findByText("Delayed 50 min")).toBeInTheDocument();
+    expect(within(card).getByText("Terminal 7 · Gate B24")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm" })).toBeInTheDocument();
   });
 
   it("shows a flight with no times by its day, with no countdown and no flight status", async () => {
@@ -275,11 +275,11 @@ describe("Upcoming", () => {
     expect(screen.queryByTestId("flight-status")).toBeNull();
   });
 
-  it("says it's departing now, not \"in now\", in the last minute", async () => {
+  it("names the flight on the card and in Flights today in the last minute before departure", async () => {
     at("2026-11-20T18:59:40-05:00");
     serve([london]);
     render(Upcoming);
-    expect(await screen.findByText("Check-in is open, departing now")).toBeInTheDocument();
+    expect(await screen.findAllByRole("link", { name: "AA 101, JFK to LHR, scheduled, departs Fri Nov 20 at 7:00 pm" })).toHaveLength(2);
   });
 
   it("calls a flight in the air under way, and counts down to landing", async () => {
@@ -288,7 +288,7 @@ describe("Upcoming", () => {
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Under way")).toBeInTheDocument();
-    expect(within(card).getByText("Under way, arrives in 10 min")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, in the air, lands 7:10 am in 10 minutes" })).toBeInTheDocument();
   });
 
   it("doesn’t call a flight under way once live status says it landed", async () => {
@@ -296,8 +296,7 @@ describe("Upcoming", () => {
     const landed = { ...delayed, statuses: [{ ...delayed.statuses[0], state: "landed", arr_actual: "2026-11-21T01:50" }] };
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? landed : { trips: [london] }) as never);
     render(Upcoming);
-    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(await within(card).findByText("Latest flight")).toBeInTheDocument();
+    const card = (await screen.findByText("Latest flight")).closest("section")!;
     expect(within(card).queryByText("Under way")).toBeNull();
     expect(within(card).getByText("Landed", { selector: "[data-headline]" })).toBeInTheDocument();
   });
@@ -308,9 +307,8 @@ describe("Upcoming", () => {
       const live = { ...delayed, statuses: [{ ...delayed.statuses[0], state, fetched_at: "2026-11-21T06:30:00+00:00" }] };
       vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? live : { trips: [london] }) as never);
       const { unmount } = render(Upcoming);
-      const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
+      const card = (await screen.findByText("Latest flight")).closest("section")!;
       await within(card).findByTestId("flight-status");
-      expect(within(card).getByText("Latest flight")).toBeInTheDocument();
       expect(within(card).queryByText("Under way")).toBeNull();
       unmount();
       flightStatus.list = null;
@@ -429,7 +427,8 @@ describe("Upcoming", () => {
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(within(card).getByText("7:10 AM")).toBeInTheDocument();
+    expect(within(card).getByText("7:10 am")).toBeInTheDocument();
+    expect(within(card).getByText("7:00 pm")).toBeInTheDocument();
     expect(card).not.toHaveTextContent("[");
   });
 
@@ -892,5 +891,178 @@ describe("Upcoming side column", () => {
     expect(screen.queryByTestId("trip-totals")).toBeNull();
     expect(placesCalls()).toEqual([]);
     viewport.phone = false;
+  });
+});
+
+describe("Upcoming flights: the Home card, Flights today and the booking sheet", () => {
+  const card = async () => (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+  const liveList = (extra: Record<string, unknown> = {}) => ({ ...delayed, statuses: [{ ...delayed.statuses[0], ...extra }] });
+  const serveLive = (list: unknown, trips: unknown[] = [london]) =>
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? list : { trips }) as never);
+
+  it("shows a delayed flight with its new times in amber, the pill, the gate and when it was updated", async () => {
+    at("2026-11-20T09:09:00-05:00");
+    serveLive(delayed);
+    render(Upcoming);
+    const home = await card();
+    expect(await within(home).findByText("Delayed 50 min")).toBeInTheDocument();
+    expect(within(home).getByText("Terminal 7 · Gate B24")).toBeInTheDocument();
+    expect(within(home).getByText("Updated 4 min ago")).toBeInTheDocument();
+    expect(within(home).getByText("7:50 pm").parentElement).toHaveClass("text-signal-ink");
+    expect(within(home).getByText("8:05 am").parentElement).toHaveClass("text-signal-ink");
+    expect(within(home).getByRole("link", { name: "AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm" })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
+    expect(within(home).getByText("Next up")).toBeInTheDocument();
+    expect(within(home).getByRole("link", { name: /^Open trip/ })).toHaveAttribute("href", `#trip/${london.id}?segment=1`);
+  });
+
+  it("shows the zone beside a time only where the ends differ from each other or from the viewer", async () => {
+    at("2026-11-20T09:09:00-05:00");
+    serve([london]);
+    const far = render(Upcoming);
+    const home = await card();
+    expect(within(home).getByText("EST")).toBeInTheDocument();
+    expect(within(home).getByText("GMT")).toBeInTheDocument();
+    far.unmount();
+    dropEarly();
+    const near = trip([segment({ id: 5, origin: "BOS", destination: "JFK", start_local: "2026-11-20T15:00", end_local: "2026-11-20T16:10", end_zone: NY, details: { flight_number: "AA 7" } })]);
+    serve([near]);
+    const { container } = render(Upcoming);
+    await waitFor(() => expect(container.querySelectorAll("[data-flight-home]")).toHaveLength(1));
+    const here = container.querySelector<HTMLElement>("[data-flight-home]")!;
+    expect(within(here).getByText("3:00 pm")).toBeInTheDocument();
+    expect(within(here).queryByText("EST")).toBeNull();
+  });
+
+  it("shows a flight in the air with the plane at its progress", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    serveLive(liveList({ state: "departed", dep_actual: "2026-11-20T19:05", fetched_at: "2026-11-21T06:58:00+00:00" }));
+    render(Upcoming);
+    await screen.findAllByText("In the air", { selector: "[data-tone]" });
+    const home = document.querySelector<HTMLElement>("[data-flight-home]")!;
+    await waitFor(() => expect(within(home).getByText("In the air", { selector: "[data-tone]" })).toBeInTheDocument());
+    expect(Number(home.querySelector("article")!.dataset.progress)).toBeGreaterThan(0.8);
+    expect(home.querySelector<HTMLElement>("[data-plane]")!.style.left).toMatch(/^8\d(\.\d+)?%$/);
+    expect(within(home).getByText("Updated 2 min ago")).toBeInTheDocument();
+    expect(within(home).getByRole("link", { name: /in the air, lands 8:05 am in 1 hour 5 minutes$/ })).toBeInTheDocument();
+  });
+
+  it("shows the booked times and no Updated line for a flight with no live status", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const home = await card();
+    expect(within(home).getByText("7:00 pm")).toBeInTheDocument();
+    expect(within(home).getByText("7:10 am")).toBeInTheDocument();
+    expect(within(home).getByText("Terminal 8")).toBeInTheDocument();
+    expect(home.querySelector("[data-updated]")).toBeNull();
+  });
+
+  it("shows two dashes only when neither the terminal nor the gate is known", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([trip([segment({ id: 1, details: { flight_number: "AA 101" } })])]);
+    render(Upcoming);
+    expect(within(await card()).getByText("Terminal — · Gate —")).toBeInTheDocument();
+  });
+
+  it("keeps the full card until a day before departure, and for a flight that already landed", async () => {
+    at("2026-11-18T09:00:00-05:00");
+    serve([london]);
+    const first = render(Upcoming);
+    expect(await screen.findByText("Check-in opens in 1 day 10 h")).toBeInTheDocument();
+    expect(first.container.querySelector("[data-flight-home]")).toBeNull();
+    first.unmount();
+    dropEarly();
+    at("2026-11-21T02:00:00-05:00");
+    serveLive(liveList({ state: "landed", arr_actual: "2026-11-21T01:50", fetched_at: "2026-11-21T06:30:00+00:00" }));
+    render(Upcoming);
+    expect(await screen.findByText("Latest flight")).toBeInTheDocument();
+    await waitFor(() => expect(document.querySelector("[data-flight-home]")).toBeNull());
+  });
+
+  it("lists today’s flights, flights only, above the day-by-day list, each one link with the flight’s name", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveLive(delayed);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: "Flights today" });
+    const rows = within(list).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    const link = within(rows[0]).getByRole("link");
+    await waitFor(() => expect(link).toHaveAccessibleName("AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm"));
+    expect(link).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
+    expect(within(rows[0]).getByText("JFK to LHR · AA 101")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Departs 7:50 pm EST")).toBeInTheDocument();
+    expect(rows[0].querySelector("[data-tile='flight']")).toHaveAttribute("aria-hidden", "true");
+    expect(within(rows[0]).getByText("Delayed 50 min")).toBeInTheDocument();
+    const days = screen.getByRole("list", { name: /day by day/ });
+    expect(list.compareDocumentPosition(days) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(days).getByRole("link", { name: "JFK → LHR" })).toBeInTheDocument();
+    expect(within(days).getByRole("link", { name: "Harbour Hotel" })).toBeInTheDocument();
+  });
+
+  it("leaves out later flights and cancelled bookings, and the list when nothing flies today", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const cancelled = segment({ id: 8, status: "cancelled", start_local: "2026-11-20T21:00", details: { flight_number: "AA 9" } });
+    serve([trip([outbound, cancelled, stay, home])]);
+    const first = render(Upcoming);
+    const list = await screen.findByRole("list", { name: "Flights today" });
+    expect(within(list).getAllByRole("link")).toHaveLength(1);
+    expect(within(list).queryByText(/LHR to JFK/)).toBeNull();
+    first.unmount();
+    dropEarly();
+    at("2026-11-23T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(screen.queryByRole("list", { name: "Flights today" })).toBeNull();
+  });
+
+  it("dates a flight in the air that left on another day by when it lands", async () => {
+    at("2026-11-21T02:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: "Flights today" });
+    expect(within(list).getByText("Lands 7:10 am GMT")).toBeInTheDocument();
+  });
+
+  it("opens a flight from the day-by-day list as a compact booking with a progress bar and a link to the live status", async () => {
+    viewport.phone = true;
+    at("2026-11-21T02:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const days = await screen.findByRole("list", { name: /day by day/ });
+    await u.click(within(days).getAllByRole("link", { name: "JFK → LHR" })[0]);
+    const sheet = await screen.findByRole("dialog", { name: "JFK → LHR" });
+    const bar = within(sheet).getByRole("progressbar", { name: "Flight progress" });
+    expect(Number(bar.getAttribute("aria-valuenow"))).toBeGreaterThan(90);
+    expect(within(sheet).getByText("Departed 7:00 pm EST")).toBeInTheDocument();
+    expect(within(sheet).getByText("Lands 7:10 am GMT")).toBeInTheDocument();
+    expect(within(sheet).getByRole("link", { name: /^AA 101, JFK to LHR, in the air, lands 7:10 am/ })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
+    expect(within(sheet).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+    expect(within(sheet).getByRole("link", { name: "Open trip" })).toBeInTheDocument();
+    expect(within(sheet).queryByTestId("flight-status")).toBeNull();
+    viewport.phone = false;
+  });
+
+  it("keeps the full card in the sheet for a booking that is cancelled", async () => {
+    viewport.phone = true;
+    at("2026-11-20T09:00:00-05:00");
+    serve([trip([segment({ id: 1, status: "cancelled" }), stay, home])]);
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const days = await screen.findByRole("list", { name: /day by day/ });
+    await u.click(within(days).getByRole("link", { name: "JFK → LHR" }));
+    const sheet = await screen.findByRole("dialog", { name: "JFK → LHR" });
+    expect(within(sheet).queryByRole("progressbar", { name: "Flight progress" })).toBeNull();
+    viewport.phone = false;
+  });
+
+  it("shows no flight card and no Flights today list when the trips request returns nothing", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([]);
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "Connect Gmail" });
+    expect(screen.queryByRole("list", { name: "Flights today" })).toBeNull();
+    expect(document.querySelector("[data-flight-home]")).toBeNull();
   });
 });

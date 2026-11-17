@@ -5,16 +5,23 @@
   import type { MailboxList, Person, Segment, Trip, TripPlaces } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
+  import { Badge } from "$lib/components/ui/badge";
+  import PlaceTime from "$lib/components/PlaceTime.svelte";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
+  import CopyCode from "$lib/components/CopyCode.svelte";
+  import FlightBooking from "$lib/components/FlightBooking.svelte";
+  import FlightHome from "$lib/components/FlightHome.svelte";
+  import FlightRow from "$lib/components/FlightRow.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
+  import { flightCardView, flightsToday, nextFlightShown } from "$lib/flightcard";
   import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
-  import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
@@ -116,6 +123,12 @@
       () => { if (mine === placesRequest) places = null; },
     );
   });
+  const liveOn = $derived(flightStatus.list?.enabled === true);
+  const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
+  const compactFlight = (s: Segment) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s);
+  const homeFlight = $derived(next !== null && compactFlight(next.segment)
+    && nextFlightShown(flightCardView({ segment: next.segment, status: liveOn ? statusFor(next.segment.id) : undefined, liveOn, now, online, city: (code) => code }), startAt(next.segment), now));
+  const todays = $derived(trips ? flightsToday(trips, now, viewerZone()) : []);
   const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
@@ -263,13 +276,30 @@
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
-    <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed boarding tripName={next.trip.name} showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
-      {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
-      {#snippet footer()}<span class="contents">
-        {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
-        {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
-        <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
-    </PassCard>
+    {#if homeFlight}
+      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} class="mb-6">
+        {#snippet footer()}
+          {#if next.bookings.length > 1 && timesDiffer(next.bookings)}
+            <div class="flex w-full flex-col gap-1 text-sm">
+              <span><Badge variant="secondary">Times differ between bookings</Badge></span>
+              {#each next.bookings as b (b.id)}
+                <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} /></span>
+              {/each}
+            </div>
+          {/if}
+          {#each next.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left font-semibold" />{/each}
+          <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button>
+        {/snippet}
+      </FlightHome>
+    {:else}
+      <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed boarding tripName={next.trip.name} showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
+        {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
+        {#snippet footer()}<span class="contents">
+          {#if s.status !== "cancelled" && s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
+          {#if s.status !== "cancelled" && s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
+          <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button></span>{/snippet}
+      </PassCard>
+    {/if}
     {#if next.alongside.length}
       <section class="-mt-2 mb-6" aria-label="Also under way">
         <p class="eyebrow mb-2">Also under way</p>
@@ -289,6 +319,12 @@
     {/if}
   {:else}
     <p class="mb-8 text-muted-foreground">Nothing coming up: every trip you can see is over. <a class="underline" href="#trips">See your trips</a>.</p>
+  {/if}
+
+  {#if todays.length}
+    <ul class="mb-6 divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1" aria-label="Flights today">
+      {#each todays as f (f.id)}<FlightRow segment={f} status={liveOn ? statusFor(f.id) : undefined} {liveOn} {now} {online} />{/each}
+    </ul>
   {/if}
 
   {#if featured}
@@ -373,10 +409,18 @@
 <Sheet bind:open={() => detail !== null, (v) => { if (!v) detail = null; }} title={detail ? headline(detail.segment) : "Booking"}>
   {#if detail}
     {@const d = detail}
-    <PassCard segment={d.segment} bookings={d.bookings} {now} level={3} class="mb-4">
-      {#snippet live()}{#if d.segment.kind === "flight" && d.segment.status !== "cancelled" && !untimed(d.segment)}<FlightStatus segment={d.segment} />{/if}{/snippet}
-      {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={d.segment} {now} onchanged={load} /><Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button></span>{/snippet}
-    </PassCard>
+    {#if compactFlight(d.segment)}
+      <div class="mb-4 flex flex-col gap-3">
+        <FlightBooking segment={d.segment} status={liveOn ? statusFor(d.segment.id) : undefined} {liveOn} {now} {online} onopen={() => (detail = null)} />
+        {#if d.bookings.some((b) => b.confirmation)}<p class="flex flex-wrap gap-x-4">{#each d.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left text-heading font-semibold" />{/each}</p>{/if}
+        <span class="flex flex-wrap gap-2"><GateCode segment={d.segment} {now} onchanged={load} /><Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button></span>
+      </div>
+    {:else}
+      <PassCard segment={d.segment} bookings={d.bookings} {now} level={3} class="mb-4">
+        {#snippet live()}{#if d.segment.kind === "flight" && d.segment.status !== "cancelled" && !untimed(d.segment)}<FlightStatus segment={d.segment} />{/if}{/snippet}
+        {#snippet footer()}<span class="flex flex-wrap gap-2"><GateCode segment={d.segment} {now} onchanged={load} /><Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button></span>{/snippet}
+      </PassCard>
+    {/if}
   {/if}
 </Sheet>
 
