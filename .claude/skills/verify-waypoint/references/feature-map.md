@@ -202,6 +202,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `LANDED`, `+1 day`, `DELAYED 50 MIN`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 1 day before departure`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
 
+#### `flight-status`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `London`, `Back to`.
+- **Expects to see:** `Trips`, `Landing in`, `Not known yet`, `Jane`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-status`; or `poetry run python run.py verify --flow flight-status`.
+
 #### `hotel-address`
 
 - **Starts at:** `#trips`.

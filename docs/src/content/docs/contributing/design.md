@@ -80,6 +80,15 @@ The headline, the plane and the Next up card follow set rules:
 - **Facts.** Four, each with a source: Terminal and Gate from live status (the booking’s own terminal when live status has none), Seat and Cabin from the booking; the arrival side (Terminal, Gate, Belt) in the air and once landed. The status has no belt, so Belt is a dash. An unknown value is a dash with the hidden text “Not known yet”, never a missing row.
 - **Times.** Wall-clock times at their airport with the zone, never converted; a delay shows the booked time struck through above the new one, read as “Originally …”. The accessible name of the article is built in the same function.
 
+## Live status view
+
+`pages/FlightStatus.svelte` is the page for one flight at `#trip/<trip id>/flight/<segment id>` (`route.rest` holds what follows the trip id, and `pageFor(route.page, route.rest)` in `frontend/src/lib/nav.ts` maps it to the page; `App.svelte` gives it the 960 px column). The design is `docs/design/flights/b-live-status.html`, signed off on #666. It loads the trip with `GET /api/trips/{id}` (a 404 for anyone who can’t see it, shown as the error) and finds the flight in it. `flightLiveView` in `frontend/src/lib/flightlive.ts` builds on `flightCardView`, so the state, pill, times, facts and progress are the card’s:
+
+- **Headline.** `Departs in …` (scheduled and delayed), `Boarding now at gate …`, `Landing in …`, `Landed … early`, `Landed … late` or `Landed on time`, `Cancelled`, `Diverted`; the page’s `h1` and a polite live region. The line under it is drawn for a flight in the air (phone: where it is expected and how it departed; desktop: how it departed and whether it is expected on time) and is the card’s sentence for the states the design doesn’t draw.
+- **Timeline.** A list named “Flight timeline” with the steps that apply to the state; each shows the scheduled and actual time at its airport, never converted.
+- **Refresh.** `refreshFlightStatus` from `flightstatus.svelte.ts`, shown only while live status is on, not paused and the flight is within 6 hours of landing (or has a status). A failed Refresh keeps the data on screen and says “Couldn’t refresh. Last updated <time>.”; the view never says “Updated just now”.
+- **Phone and desktop.** The page branches on `viewport.phone` where the design draws different things (the icon Refresh button, the seats on one line, the line under the headline) and on CSS where it only moves them.
+
 ## Kind tiles and avatar stacks
 
 `KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car`; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.

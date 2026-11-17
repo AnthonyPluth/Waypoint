@@ -2,29 +2,20 @@
   import type { Snippet } from "svelte";
   import Plane from "@lucide/svelte/icons/plane";
   import type { FlightStatus, FlightStatusPause, Segment } from "$lib/api-types";
-  import { airportInfo } from "$lib/airport-zones";
+  import { cityNames } from "$lib/cities.svelte";
+  import SourceDot from "$lib/components/SourceDot.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { headline } from "$lib/trips";
-  import { arcHeading, arcPoint, arcTravelled, flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
+  import FlightArc from "$lib/components/FlightArc.svelte";
+  import { flightCardView, pausedWords, type Stamp } from "$lib/flightcard";
 
-  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; paused?: FlightStatusPause | null; footer?: Snippet };
-  let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, paused = null, footer }: Props = $props();
+  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; highlight?: boolean; level?: 2 | 3; paused?: FlightStatusPause | null; href?: string; footer?: Snippet };
+  let { segment, status, liveOn = false, now = Date.now(), online = true, highlight = false, level = 2, paused = null, href, footer }: Props = $props();
 
   const PLANE = "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z";
-  let cities = $state<Record<string, string>>({});
-  $effect(() => {
-    const codes = [segment.origin, segment.destination, status?.destination].filter((c): c is string => !!c);
-    let current = true;
-    for (const code of codes) {
-      void airportInfo(code).then((airport) => { if (current && airport) cities[code] = airport.city || airport.name; });
-    }
-    return () => { current = false; };
-  });
+  const cities = cityNames(() => [segment.origin, segment.destination, status?.destination]);
 
   const view = $derived(flightCardView({ segment, status, liveOn, now, online, city: (code) => cities[code] || code }));
-  let arcWidth = $state(0);
-  const point = $derived(view.progress === null ? null : arcPoint(view.progress));
-  const heading = $derived(view.progress === null ? 0 : arcHeading(view.progress, arcWidth || 160));
   const sideCity = $derived(cities[view.sideCode] ?? "");
 </script>
 
@@ -35,13 +26,9 @@
   <span class="font-mono text-[11px] text-muted-foreground">{t.zoneName}{#if t.later}<span>{" · "}{t.later}<span class="sr-only">, {t.laterWords}</span></span>{/if}</span>
 {/snippet}
 
-{#snippet source(kind: "live" | "booking")}
-  {#if kind === "live"}<span role="img" aria-label="From live status" class="mr-px size-[7px] flex-none rounded-full bg-primary"></span>
-  {:else}<span role="img" aria-label="From the booking" class="mr-px size-[7px] flex-none rounded-full border-[1.5px] border-muted-foreground"></span>{/if}
-{/snippet}
-
-<article class="@container flex scroll-mt-20 flex-col gap-3.5 rounded-[22px] border border-border bg-card p-4 shadow-card" class:ring-2={highlight} class:ring-ring={highlight} aria-label={view.name} data-kind="flight" data-state={view.state} data-progress={view.progress ?? undefined}>
+<article class="@container relative flex scroll-mt-20 flex-col gap-3.5 rounded-[22px] border border-border bg-card p-4 shadow-card" class:ring-2={highlight} class:ring-ring={highlight} aria-label={view.name} data-kind="flight" data-state={view.state} data-progress={view.progress ?? undefined}>
   <svelte:element this={`h${level}`} class="sr-only">{headline(segment)}</svelte:element>
+  {#if href}<a {href} class="absolute inset-0 z-[1] rounded-[22px] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60" aria-label={`${view.name}, open live status`} data-live-link></a>{/if}
   <div class="flex items-center gap-2.5">
     <span class="grid size-[30px] flex-none place-items-center rounded-[9px] bg-avatar-1 text-[11px] font-bold tracking-[0.02em] text-avatar-1-ink" aria-hidden="true">{#if view.carrier}{view.carrier}{:else}<Plane class="size-4" />{/if}</span>
     <span class="min-w-0">
@@ -59,16 +46,9 @@
       <span class="text-xs text-muted-foreground">{cities[view.origin] ?? ""}</span>
       {@render when(view.depart)}
     </div>
-    <div class="relative mt-1.5 h-[60px]" bind:clientWidth={arcWidth} aria-hidden="true" data-arc>
-      <svg class="absolute inset-x-0 top-0 h-[46px] w-full" viewBox="0 0 100 40" preserveAspectRatio="none">
-        <path d="M2 38 Q50 -16 98 38" fill="none" class="stroke-map-border" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 5" vector-effect="non-scaling-stroke" />
-        <path d={arcTravelled(view.progress ?? 0)} fill="none" class="stroke-map-route" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" data-travelled />
-      </svg>
-      {#if point}
-        <span class="absolute grid size-[22px] place-items-center text-map-route" style={`left: ${point.left}%; top: ${point.top}px; transform: translate(-50%, -50%) rotate(${90 + heading}deg)`} data-plane><svg class="size-5" aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d={PLANE} /></svg></span>
-      {/if}
+    <FlightArc progress={view.progress} class="mt-1.5">
       {#if view.updated}<span class="absolute inset-x-0 bottom-0 text-center text-[11px] text-muted-foreground" data-updated>{view.updated}</span>{/if}
-    </div>
+    </FlightArc>
     <div class="flex min-w-[78px] flex-col items-end gap-0.5 text-right">
       <b class="text-[38px] font-[650] leading-none tracking-[-0.03em] @[24rem]:text-[44px]" data-code="destination">{view.destination}</b>
       <span class="text-xs text-muted-foreground">{cities[view.destination] ?? ""}</span>
@@ -88,7 +68,7 @@
     <dl class="flex flex-wrap gap-x-2 gap-y-2" data-facts>
       {#each view.facts as fact (fact.label)}
         <div class="min-w-min flex-[1_1_0]">
-          <dt class="flex items-center gap-[5px] whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{@render source(fact.source)}{fact.label}</dt>
+          <dt class="flex items-center gap-[5px] whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground"><SourceDot kind={fact.source} />{fact.label}</dt>
           {#if fact.value}
             <dd class="mt-0.5 break-words text-[22px] font-[650] tracking-[-0.02em]">{fact.value}</dd>
           {:else}
@@ -99,5 +79,5 @@
     </dl>
   </div>
 
-  {#if footer}<div class="flex flex-col gap-3 border-t border-border pt-3">{@render footer()}</div>{/if}
+  {#if footer}<div class="relative z-10 flex flex-col gap-3 border-t border-border pt-3">{@render footer()}</div>{/if}
 </article>

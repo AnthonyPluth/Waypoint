@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeAirborne, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -104,8 +104,18 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_immich: true }] })).toEqual(["step 1: fake_immich takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_flight_status: "in-the-air" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_flight_status: true }] })).toEqual(["step 1: fake_flight_status takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: 2 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: "2" }] })).toEqual(["step 1: fake_photo_limit takes a number"]);
+  });
+
+  it("makes a delayed flight status one of a flight six minutes late that is in the air, fetched a minute before now", () => {
+    const delayed = { segment_id: 4, state: "delayed", dep_scheduled: "2026-06-19T11:30", dep_estimated: "2026-06-19T12:20", dep_actual: null, arr_scheduled: "2026-06-19T14:35", arr_estimated: "2026-06-19T15:25", arr_actual: null, arr_gate: null, delay_minutes: 50, dep_gate: "A12" };
+    const now = Date.parse("2026-06-19T14:35:00Z");
+    expect(fakeAirborne(delayed, now)).toEqual({
+      ...delayed, state: "departed", dep_actual: "2026-06-19T11:36", dep_estimated: null, arr_estimated: "2026-06-19T14:35", arr_gate: "A3", delay_minutes: null, fetched_at: "2026-06-19T14:34:00.000Z",
+    });
   });
 
   it("makes a made-up archive of the asked size from a trip of the demo, with ids of their own", () => {

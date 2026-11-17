@@ -33,6 +33,10 @@ export type FlightCardView = {
   facts: Fact[];
   progress: number | null;
   name: string;
+  live: FlightStatus | null;
+  depAt: number;
+  arrAt: number;
+  divertedTo: string | null;
 };
 
 export type FlightCardInput = {
@@ -97,11 +101,11 @@ const stamp = (local: string, zone: string, tone: Stamp["tone"] = "plain", origi
   };
 };
 
-const shortDay = (local: string): string => dayLabel(local, false).replace(/,/g, "");
+export const shortDay = (local: string): string => dayLabel(local, false).replace(/,/g, "");
 
-const minutesBetween = (later: number, earlier: number): number => Math.round((later - earlier) / MINUTE_MS);
+export const minutesBetween = (later: number, earlier: number): number => Math.round((later - earlier) / MINUTE_MS);
 
-const lateWords = (minutes: number): string => (minutes === 0 ? "on time" : `${plural(Math.abs(minutes), "minute")} ${minutes < 0 ? "early" : "late"}`);
+export const lateWords = (minutes: number): string => (minutes === 0 ? "on time" : `${plural(Math.abs(minutes), "minute")} ${minutes < 0 ? "early" : "late"}`);
 
 export function flightCardView(input: FlightCardInput): FlightCardView {
   const { segment: s, status: st, liveOn, now, online, city } = input;
@@ -242,6 +246,7 @@ export function flightCardView(input: FlightCardInput): FlightCardView {
   return {
     state, noLive, pill, number, carrier: number.slice(0, 2), provider, duration, origin, destination, depart, arrive, updated, sentence,
     side: arrivalSide ? "Arrival" : "Departure", sideCode: arrivalSide ? destination : origin, sideDay, facts, progress, name: [...lead, tail].join(", "),
+    live: fresh ?? null, depAt, arrAt, divertedTo,
   };
 }
 
@@ -249,17 +254,17 @@ const ARC = { x0: 2, x1: 50, x2: 98, y0: 38, y1: -16, y2: 38, height: 40, pixels
 
 const along = (progress: number): number => Math.min(0.98, Math.max(0.02, progress));
 
-export function arcPoint(progress: number): { left: number; top: number } {
+export function arcPoint(progress: number, pixels = ARC.pixels): { left: number; top: number } {
   const t = along(progress);
   const a = (1 - t) * (1 - t), b = 2 * t * (1 - t), c = t * t;
-  return { left: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, top: (a * ARC.y0 + b * ARC.y1 + c * ARC.y2) * (ARC.pixels / ARC.height) };
+  return { left: a * ARC.x0 + b * ARC.x1 + c * ARC.x2, top: (a * ARC.y0 + b * ARC.y1 + c * ARC.y2) * (pixels / ARC.height) };
 }
 
-export function arcHeading(progress: number, width: number): number {
+export function arcHeading(progress: number, width: number, pixels = ARC.pixels): number {
   const t = along(progress);
   const dx = 2 * (1 - t) * (ARC.x1 - ARC.x0) + 2 * t * (ARC.x2 - ARC.x1);
   const dy = 2 * (1 - t) * (ARC.y1 - ARC.y0) + 2 * t * (ARC.y2 - ARC.y1);
-  return Math.round((Math.atan2(dy * (ARC.pixels / ARC.height), dx * (width / 100)) * 180) / Math.PI);
+  return Math.round((Math.atan2(dy * (pixels / ARC.height), dx * (width / 100)) * 180) / Math.PI);
 }
 
 export function arcTravelled(progress: number): string {

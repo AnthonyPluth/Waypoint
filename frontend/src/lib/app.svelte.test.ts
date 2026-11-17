@@ -26,6 +26,13 @@ describe("routing", () => {
     expect(route).toMatchObject({ page: "settings", sub: "data" });
   });
 
+  it("reads what comes after a trip's number, which is how a flight's live status view is addressed", async () => {
+    await go("#trip/7/flight/3?x=1");
+    expect(route).toMatchObject({ page: "trip", sub: "7", rest: "flight/3", query: "x=1" });
+    await go("#trip/7");
+    expect(route).toMatchObject({ page: "trip", sub: "7", rest: "" });
+  });
+
   it("ignores a query string, which belongs to the page's filters", async () => {
     await go("#upcoming?q=paris");
     expect(route).toMatchObject({ page: "upcoming", sub: "", query: "q=paris" });

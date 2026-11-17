@@ -32,7 +32,9 @@ export const inMore = (page: string): boolean => MORE_PAGES.includes(page);
 
 const INSIDE: Record<string, string> = { trip: "trips", design: "settings" };
 
-export const pageFor = (route: string): string => (route in INSIDE ? route : NAV.find((n) => n.page === route)?.page ?? NAV[0].page);
+export const flightRoute = (rest: string): number | null => { const found = /^flight\/(\d+)$/.exec(rest); return found ? Number(found[1]) : null; };
+
+export const pageFor = (route: string, rest = ""): string => (route === "trip" && flightRoute(rest) !== null ? "flight" : route in INSIDE ? route : NAV.find((n) => n.page === route)?.page ?? NAV[0].page);
 
 export const navFor = (route: string): string => INSIDE[pageFor(route)] ?? pageFor(route);
 

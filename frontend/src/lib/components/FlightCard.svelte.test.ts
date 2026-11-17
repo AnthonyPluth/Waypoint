@@ -421,4 +421,23 @@ describe("what a reader and a screen get", () => {
     draw(CASES[7], { footer });
     expect(within(await screen.findByRole("article")).getByText("under the facts")).toBeInTheDocument();
   });
+
+  it("opens the live status view from a link over the card when it is given an address, named with the flight and its state", async () => {
+    draw(CASES[3], { href: "#trip/7/flight/3" });
+    const link = await screen.findByRole("link", { name: `${CASES[3].label}, open live status` });
+    expect(link).toHaveAttribute("href", "#trip/7/flight/3");
+  });
+
+  it("keeps what the page puts under the facts above the link, so its buttons still work", async () => {
+    const footer = createRawSnippet(() => ({ render: () => "<button type='button'>Edit</button>" }));
+    draw(CASES[7], { href: "#trip/7/flight/3", footer });
+    const edit = await screen.findByRole("button", { name: "Edit" });
+    expect(edit.parentElement).toHaveClass("relative", "z-10");
+  });
+
+  it("has no link when it is not given an address", async () => {
+    draw(CASES[3]);
+    await screen.findByRole("article");
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });

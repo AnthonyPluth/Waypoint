@@ -42,7 +42,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_flight_status: "string", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -70,6 +70,17 @@ export const RESUME_CHANGED = "Your trips changed meanwhile; try again";
 
 export function fakeResumeCheck(count, round, tripIds) {
   return { asks: true, count: count + 3 * round, grants: tripIds.map((trip_id) => ({ trip_id, changed: 1, window: null })), snapshot: `fake-snapshot-${round}`.padEnd(32, "0") };
+}
+
+const LATE_MINUTES = 6;
+
+export function fakeAirborne(status, now) {
+  const left = new Date(`${status.dep_scheduled}Z`);
+  left.setUTCMinutes(left.getUTCMinutes() + LATE_MINUTES);
+  return {
+    ...status, state: "departed", dep_actual: left.toISOString().slice(0, 16), dep_estimated: null, arr_estimated: status.arr_scheduled, arr_actual: null,
+    arr_gate: "A3", delay_minutes: null, fetched_at: new Date(now - 60_000).toISOString(),
+  };
 }
 
 export function fakeArchive(trips, count) {
@@ -241,6 +252,14 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
       const t = made.get(id);
       if (!t || route.request().method() !== "GET") return route.fallback();
       return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
+    });
+  } else if ("fake_flight_status" in step) {
+    await page.route("**/api/flight-status", async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      const data = await response.json();
+      const now = await page.evaluate(() => Date.now());
+      await route.fulfill({ response, json: { ...data, statuses: data.statuses.map((st) => (st.state === "delayed" ? fakeAirborne(st, now) : st)) } });
     });
   } else if ("fake_photo_limit" in step) {
     const limit = step.fake_photo_limit;
