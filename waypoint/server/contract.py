@@ -581,6 +581,31 @@ class TripPlaces(TypedDict):
     boundaries: list[TripStateLine]
 
 
+class DrivingPlace(TypedDict):
+    latitude: float
+    longitude: float
+
+
+class DrivingRoute(TypedDict):
+    start: DrivingPlace
+    end: DrivingPlace
+    path: list[list[float]]
+
+
+class DrivingRoutes(TypedDict):
+    routes: list[DrivingRoute]
+
+
+class DrivingRouteBody(TypedDict):
+    start: DrivingPlace
+    end: DrivingPlace
+    path: list[list[float]]
+
+
+class DrivingRouteStored(TypedDict):
+    stored: bool
+
+
 class TripPhoto(TypedDict):
     id: int
     person_id: int

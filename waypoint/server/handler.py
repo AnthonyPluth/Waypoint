@@ -433,7 +433,7 @@ class Handler(BaseHTTPRequestHandler):
             if n is None:
                 return
             body = self._read_body(n) if n else b""
-        elif method in ("POST", "DELETE"):
+        elif method in ("POST", "PUT", "DELETE"):
             try:
                 body = self._read_json(MAX_JSON_BODY, {})
             except BadJson:
@@ -503,6 +503,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         self._dispatch("POST")
+
+    def do_PUT(self):
+        self._dispatch("PUT")
 
     def do_DELETE(self):
         self._dispatch("DELETE")

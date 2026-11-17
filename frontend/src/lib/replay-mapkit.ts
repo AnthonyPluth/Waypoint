@@ -1,5 +1,5 @@
 import { geoBounds, geoMercator, type GeoProjection } from "d3-geo";
-import { drivingRoute } from "./driving-routes";
+import { drivingRoutes, type Drive } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
   activeStop, boundariesShown, cameraAt, inView, legProgress, legsOf, moverAt, positions, reached, roadsShown, routeProjection, shieldsOf,
@@ -8,7 +8,7 @@ import {
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
 export type Palette = { route: string; stay: string; border: string };
-export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
+export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
 export const WORLD = 1;
@@ -154,7 +154,7 @@ function shieldElement(ref: string): HTMLElement {
 }
 
 export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOptions): ReplayMap {
-  const { stops, roads, boundaries, width, height, palette, scale, onFailure, more = [], onView } = options;
+  const { stops, roads, boundaries, width, height, palette, scale, onFailure, tripId = null, more = [], onView } = options;
   const projection = mercatorFor(stops, width, height, roads, more);
   const legs = legsOf(stops, projection, roads);
   const spots = positions(stops, projection);
@@ -309,11 +309,15 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       try { draw(lastFrame); } catch { onFailure(); }
     }
   };
+  const driven: { index: number; drive: Drive }[] = [];
   legs.forEach((leg, i) => {
     if (leg.vehicle !== "car" || stops[i + 1].via !== null) return;
     const [a, b] = [stops[i], stops[i + 1]];
     if (a.latitude === b.latitude && a.longitude === b.longitude) return;
-    void drivingRoute(mk, a, b).then((route) => { if (route) adopt(i, route); });
+    driven.push({ index: i, drive: { from: a, to: b } });
+  });
+  drivingRoutes(mk, tripId, driven.map((d) => d.drive)).forEach((answer, n) => {
+    void answer.then((route) => { if (route) adopt(driven[n].index, route); });
   });
 
   return {

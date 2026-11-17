@@ -275,6 +275,31 @@ export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
 }
 
+export interface DrivingPlace {
+  latitude: number;
+  longitude: number;
+}
+
+export interface DrivingRoute {
+  start: DrivingPlace;
+  end: DrivingPlace;
+  path: number[][];
+}
+
+export interface DrivingRouteBody {
+  start: DrivingPlace;
+  end: DrivingPlace;
+  path: number[][];
+}
+
+export interface DrivingRouteStored {
+  stored: boolean;
+}
+
+export interface DrivingRoutes {
+  routes: DrivingRoute[];
+}
+
 export interface EmailUpdate {
   at: number;
   updated: ("start_local" | "start_zone" | "end_local" | "end_zone" | "origin" | "destination")[];
@@ -1479,6 +1504,8 @@ export interface Endpoints {
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
   "GET /api/trips/{id}/places": { body: never; reply: TripPlaces };
+  "GET /api/trips/{id}/driving-routes": { body: never; reply: DrivingRoutes };
+  "PUT /api/trips/{id}/driving-routes": { body: DrivingRouteBody; reply: DrivingRouteStored };
   "GET /api/trips/{id}/summary": { body: never; reply: TripSummary };
   "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };

@@ -553,6 +553,18 @@ photo_exclusions = Table(
     info={'doc': "a photo its person took off a trip (Remove from this trip): never shown, counted or pinned there for anyone, whatever a sync brings back"},
 )
 
+driving_routes = Table(
+    'driving_routes', metadata,
+    Column('trip_id', Integer, refers('driving_routes', 'trip_id', 'trips.id', 'CASCADE'), primary_key=True),
+    Column('from_lat', Integer, primary_key=True, doc="the drive's start latitude in ten-thousandths of a degree (the 4-decimal rounding the web app keys a drive by)"),
+    Column('from_lon', Integer, primary_key=True),
+    Column('to_lat', Integer, primary_key=True),
+    Column('to_lon', Integer, primary_key=True),
+    Column('path', Text, nullable=False, doc='JSON list of [latitude, longitude] pairs, as the browser computed them'),
+    Column('stored', Float, nullable=False),
+    info={'doc': "the path MapKit drew for a drive (a car leg between two stops) of a trip, kept so any device of the people who can see that trip reuses it; only ever read or written through that trip, and removed with it"},
+)
+
 photo_sharing_prefs = Table(
     'photo_sharing_prefs', metadata,
     Column('person_id', Integer, refers('photo_sharing_prefs', 'person_id', 'people.id', 'CASCADE'), primary_key=True),

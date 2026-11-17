@@ -60,6 +60,6 @@
 
 {#if shown && (stops.length >= 2 || photoOnly)}
   <section class="mb-6" aria-label={stops.length >= 2 ? "Route replay" : "Trip photo map"}>
-    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={stops.length >= 2 ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={stops.length >= 2 ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
   </section>
 {/if}

@@ -523,6 +523,21 @@ class MigrationTests(unittest.TestCase):
         self.assertNotIn("decided_at", after)
         self.assertEqual([r[after.index("decided_by")] for r in rows_of(self.path, "photos")], ["owner"])
 
+    def test_0048_adds_the_driving_route_cache_and_downgrading_drops_it(self):
+        from alembic import command
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0047")
+        self.assertNotIn("driving_routes", shape(self.path))
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual([col[0] for col in shape(self.path)["driving_routes"]["columns"]], ["trip_id", "from_lat", "from_lon", "to_lat", "to_lon", "path", "stored"])
+        with db.engine(self.path).begin() as c:
+            c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            c.execute(insert(schema.driving_routes).values(trip_id=1, from_lat=397392, from_lon=-1049903, to_lat=407608, to_lon=-1118910, path="[[39.7392,-104.9903],[40.7608,-111.891]]", stored=1.0))
+            command.downgrade(db.alembic_config(c), "0047")
+        self.assertNotIn("driving_routes", shape(self.path))
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:
