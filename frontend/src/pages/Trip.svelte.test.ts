@@ -1844,9 +1844,11 @@ describe("Trip summary", () => {
     const summaries = () => vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/summary").length;
     const photoLoads = () => vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/photos").length;
     const before = [summaries(), photoLoads()];
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Share on this trip" }));
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Share on this trip" }));
     await waitFor(() => expect(summaries()).toBe(before[0] + 1));
     expect(photoLoads()).toBe(before[1] + 1);
+    await u.click(await screen.findByRole("button", { name: "Sharing" }));
     expect(await screen.findByRole("region", { name: "Your photos on this trip" })).toBeInTheDocument();
   });
 

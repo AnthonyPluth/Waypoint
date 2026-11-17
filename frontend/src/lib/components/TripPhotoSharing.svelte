@@ -4,12 +4,16 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { allTitle, COULDNT_CHECK, plural, putBackLabel, removedList, removedThumbnail, removedTitle, stopText, stopTitle, widenText, widenTitle } from "$lib/photo-sharing";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import ImageOff from "@lucide/svelte/icons/image-off";
   import { tick } from "svelte";
   import type { TripPhoto } from "$lib/api-types";
   import { NOT_LOADED_HERE, OUT_OF_DATE_HERE, type PersonSharing } from "$lib/trip-sharing.svelte";
 
-  let { sharing, tripName, part }: { sharing: PersonSharing; tripName: string; part: "prompt" | "reminder" | "card" | "problem" | "dialog" } = $props();
+  let { sharing, tripName, part, panel = false, expanded = true, ontoggle, returnTo }: {
+    sharing: PersonSharing; tripName: string; part: "prompt" | "reminder" | "card" | "problem" | "dialog"; panel?: boolean; expanded?: boolean; ontoggle?: () => void; returnTo?: () => HTMLElement | null | undefined;
+  } = $props();
 
   const who = $derived(sharing.who);
   const asking = $derived(sharing.asking);
@@ -63,21 +67,26 @@
     <Button variant="outline" size="sm" aria-label={`Share ${who.own} photos on this trip`} disabled={sharing.locked} onclick={sharing.reopen}>Share…</Button>
   </div>
 {:else if part === "card" && s && sharing.mode === "card"}
-  <section class="flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card" aria-labelledby={`photo-card-${id}`} data-testid="your-photos">
-    <div class="flex flex-wrap items-start gap-3">
-      <div class="flex min-w-0 flex-[1_1_200px] flex-col gap-0.5">
+  <section class={panel ? "flex min-w-0 flex-col gap-2.5 not-first-of-type:border-t not-first-of-type:border-border not-first-of-type:pt-3.5" : "flex flex-col gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-card"} aria-labelledby={`photo-card-${id}`} data-testid="your-photos">
+    <div class={panel ? "flex items-start gap-3" : "flex flex-wrap items-start gap-3"}>
+      <div class={panel ? "flex min-w-0 flex-1 flex-col gap-0.5" : "flex min-w-0 flex-[1_1_200px] flex-col gap-0.5"}>
         <h3 id={`photo-card-${id}`} class="text-heading" tabindex="-1" bind:this={heading}>{sharing.title}</h3>
         <p class="text-caption text-muted-foreground">{s.count ? `${plural(s.count, "photo", "photos")} from ${who.library}` : removedCount ? `No photos from ${who.library} on this trip` : `No photos from ${who.library} yet`}</p>
       </div>
       <StatusChip chip={s.scope === "trip" ? { label: "Everyone on this trip", tone: "info" } : { label: who.only, tone: "quiet" }} />
+      {#if ontoggle}
+        <Button variant="ghost" size="icon" class="-my-1 -mr-2 size-8" aria-label={`Show sharing for ${who.own} photos`} aria-expanded={expanded} aria-controls={`photo-card-body-${id}`} onclick={ontoggle}>{#if expanded}<ChevronUp />{:else}<ChevronDown />{/if}</Button>
+      {/if}
     </div>
-    <fieldset class="flex flex-col gap-2" disabled={sharing.locked}>
+    {#if expanded}
+    <div id={`photo-card-body-${id}`} class={panel ? "flex flex-col gap-2.5" : "flex flex-col gap-3.5"}>
+    <fieldset class={panel ? "flex flex-col gap-1.5" : "flex flex-col gap-2"} disabled={sharing.locked}>
       <legend class="eyebrow mb-1">Who can see {who.own} photos on this trip</legend>
-      <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm has-[:checked]:border-ring">
+      <label class={`flex cursor-pointer items-start gap-3 rounded-xl border has-[:checked]:border-ring ${panel ? "p-2.5 has-[:checked]:bg-primary/8" : "p-3"} text-sm`}>
         <input type="radio" name={`scope-${id}`} class="mt-1" checked={shown === "only_me"} onchange={(e) => sharing.choose("only_me", e)} />
         <span><span class="font-medium">{who.only}</span><span class="block text-muted-foreground">Nobody else on the trip can tell they’re there.</span></span>
       </label>
-      <label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm has-[:checked]:border-ring">
+      <label class={`flex cursor-pointer items-start gap-3 rounded-xl border has-[:checked]:border-ring ${panel ? "p-2.5 has-[:checked]:bg-primary/8" : "p-3"} text-sm`}>
         <input type="radio" name={`scope-${id}`} class="mt-1" checked={shown === "trip"} onchange={(e) => sharing.choose("trip", e)} />
         <span><span class="font-medium">Everyone on this trip</span><span class="block text-muted-foreground">Everyone else on the trip sees them, on the map and in the counts too.</span></span>
       </label>
@@ -85,13 +94,13 @@
     <div class="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" class="text-status-bad-ink" disabled={sharing.locked} onclick={sharing.askStop}>Stop sharing on this trip</Button>
       {#if removedCount > 0}
-        <Button variant="ghost" size="sm" bind:ref={disclosure} aria-expanded={sharing.removedOpen} aria-controls={listId} onclick={() => (sharing.removedOpen = !sharing.removedOpen)}>{removedTitle(removedCount)}</Button>
+        <Button variant="ghost" size="sm" bind:ref={disclosure} aria-expanded={sharing.removedOpen} aria-controls={listId} onclick={() => (sharing.removedOpen = !sharing.removedOpen)}>{removedTitle(removedCount)}{#if panel}{#if sharing.removedOpen}<ChevronUp />{:else}<ChevronDown />{/if}{/if}</Button>
       {/if}
     </div>
     {#if removedCount > 0 && sharing.removedOpen}
       <div id={listId} class="flex flex-col gap-2.5">
         <p class="text-caption text-muted-foreground">Only you see these. Nobody else on the trip can tell they were here.</p>
-        <ul class="grid grid-cols-4 gap-2 desktop:grid-cols-8" aria-label={removedList(who)}>
+        <ul class={panel ? "grid grid-cols-4 gap-2" : "grid grid-cols-4 gap-2 desktop:grid-cols-8"} aria-label={removedList(who)}>
           {#each removed as p (p.id)}
             <li class="flex flex-col gap-1">
               {#if lost.has(p.id)}
@@ -105,9 +114,11 @@
         </ul>
       </div>
     {/if}
+    </div>
+    {/if}
   </section>
 {:else if part === "dialog"}
-  <ConfirmDialog bind:open={() => sharing.dialog, sharing.setDialog} title={dialogTitle} returnFocus={() => sharing.opener}
+  <ConfirmDialog bind:open={() => sharing.dialog, sharing.setDialog} title={dialogTitle} returnFocus={() => (sharing.opener?.isConnected ? sharing.opener : returnTo?.())}
     confirmLabel={stopping ? "Stop sharing" : "Show them"} cancelLabel={stopping ? "Keep sharing" : "Cancel"} busyLabel={stopping ? "Stopping…" : "Saving…"} destructive={stopping}
     disabled={blocked} description={asking?.kind === "all" ? allText : asking?.kind === "widen" ? widenBody : stopBody}
     onconfirm={() => (asking?.kind === "all" ? sharing.confirmAll() : asking?.kind === "widen" ? sharing.confirmWiden() : sharing.confirmStop())} />

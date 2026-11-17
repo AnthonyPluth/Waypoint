@@ -83,7 +83,15 @@ function deferred<T>() {
 
 const mount = (extra: { onchanged?: () => void; onloaded?: (found: Reply | null) => void; people?: Person[]; trip?: typeof road } = {}) => render(TripPhotos, { trip: extra.trip ?? road, people: extra.people ?? [ada], now: after, onchanged: extra.onchanged, onloaded: extra.onloaded });
 const prompt = () => screen.findByRole("group", { name: /from this trip$|^Couldn’t check your libraries$/ });
-const card = () => screen.findByRole("region", { name: /photos on this trip$/ });
+const confirmation = { name: /^(?!Photo sharing for this trip$)/ };
+const openSharing = async () => {
+  const button = await screen.findByRole("button", { name: "Sharing" });
+  if (button.getAttribute("aria-expanded") !== "true") await user.click(button);
+};
+const card = async () => {
+  await openSharing();
+  return screen.findByRole("region", { name: /photos on this trip$/ });
+};
 
 beforeEach(() => {
   vi.mocked(api).mockReset();
@@ -483,7 +491,7 @@ describe("Share prompt: Share on all my trips", () => {
     });
     await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Waypoint is unreachable"));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog", confirmation)).toBeNull();
     expect(within(ask).getByRole("button", { name: "Share on all my trips" })).toBeEnabled();
   });
 });
@@ -510,7 +518,7 @@ describe("The map’s photo pins follow a sharing change", () => {
     await user.click(within(await card()).getByRole("button", { name: "Stop sharing on this trip" }));
     photos = [];
     onSharing = (call) => { if (call?.method === "DELETE") { current = sharing({ state: "declined" }); return current; } return undefined; };
-    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await user.click(within(await screen.findByRole("dialog", confirmation)).getByRole("button", { name: "Stop sharing" }));
     await waitFor(() => expect(loaded.mock.calls.at(-1)?.[0]?.photos).toEqual([]));
     expect(loaded.mock.calls.slice(1).every(([found]) => found !== null)).toBe(true);
   });
@@ -541,7 +549,7 @@ describe("Share on all my trips when the standing setting is already on", () => 
     current = shared();
     await user.click(within(ask).getByRole("button", { name: "Share on all my trips" }));
     await card();
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog", confirmation)).toBeNull();
     expect(sent("POST", "/photo-sharing-prefs/1")).toHaveLength(0);
     expect(sent("POST", "/photo-sharing")[0]).toMatchObject({ scope: "trip", count_token: "a".repeat(32) });
   });
@@ -735,7 +743,7 @@ describe("Your photos on this trip", () => {
     onSharing = (call) => { if (call?.method === "POST") { current = shared({ scope: "only_me", changed: 1700000002 }); return current; } return undefined; };
     await user.click(within(mine).getByRole("radio", { name: /^Only me/ }));
     await waitFor(() => expect(sent("POST", "/photo-sharing")).toEqual([{ person_id: 1, scope: "only_me" }]));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("dialog", confirmation)).toBeNull();
     expect(toast).toHaveBeenCalledWith("Now only you see your photos on this trip.", expect.objectContaining({ action: expect.objectContaining({ label: "Undo" }) }));
     await waitFor(() => expect(within(screen.getByTestId("your-photos")).getByText("Only me", { selector: "[data-tone]" })).toBeInTheDocument());
     expect(within(screen.getByTestId("your-photos")).getByRole("radio", { name: /^Only me/ })).toBeChecked();
@@ -796,8 +804,8 @@ describe("Your photos on this trip", () => {
     mount();
     const mine = await card();
     await user.click(within(mine).getByRole("radio", { name: /^Everyone on this trip/ }));
-    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await user.click(within(await screen.findByRole("dialog", confirmation)).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", confirmation)).toBeNull());
     expect(within(mine).getByRole("radio", { name: /^Only me/ })).toBeChecked();
     expect(sent("POST", "/photo-sharing")).toHaveLength(0);
   });
@@ -831,7 +839,7 @@ describe("Your photos on this trip", () => {
     expect(within(dialog).getByText("Your 169 photos leave Four Corners loop right away, for everyone: the gallery, the map, the replay and the trip’s counts. Nothing changes in Immich, and you can share them again later.")).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByRole("button", { name: "Keep sharing" })).toHaveFocus());
     await user.click(within(dialog).getByRole("button", { name: "Keep sharing" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("dialog", confirmation)).toBeNull());
     expect(calls("DELETE", "/photo-sharing")).toHaveLength(0);
     await waitFor(() => expect(within(mine).getByRole("button", { name: "Stop sharing on this trip" })).toHaveFocus());
   });
@@ -844,7 +852,7 @@ describe("Your photos on this trip", () => {
     await user.click(within(mine).getByRole("button", { name: "Stop sharing on this trip" }));
     const reload = calls("GET", "/api/trips/7/photos").length;
     onSharing = (call) => { if (call?.method === "DELETE") { current = sharing({ state: "declined" }); return current; } return undefined; };
-    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Stop sharing" }));
+    await user.click(within(await screen.findByRole("dialog", confirmation)).getByRole("button", { name: "Stop sharing" }));
     await waitFor(() => expect(calls("DELETE", "/photo-sharing")).toHaveLength(1));
     expect(vi.mocked(api)).toHaveBeenCalledWith("/api/trips/7/photo-sharing?person_id=1", expect.objectContaining({ method: "DELETE" }));
     await screen.findByTestId("photo-reminder");
@@ -858,10 +866,10 @@ describe("Your photos on this trip", () => {
     mount();
     await user.click(within(await card()).getByRole("button", { name: "Stop sharing on this trip" }));
     onSharing = (call) => { if (call?.method === "DELETE") throw new Refusal("Couldn’t stop sharing (500)", 500); return undefined; };
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", confirmation);
     await user.click(within(dialog).getByRole("button", { name: "Stop sharing" }));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn’t stop sharing (500)"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", confirmation)).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Stop sharing" })).toBeEnabled();
   });
 
@@ -869,6 +877,7 @@ describe("Your photos on this trip", () => {
     grantList = [grants(), grants({ person_id: 3 })];
     onSharing = (_call, path) => (path.includes("person_id=3") ? shared({ count: 12 }) : sharing({ state: "none", count: 0 }));
     mount({ people: [ada, june], trip: { ...road, people: [1, 3] } });
+    await openSharing();
     const mine = await screen.findByRole("region", { name: "June’s photos on this trip" });
     expect(within(mine).getByText("12 photos from June’s library")).toBeInTheDocument();
     await user.click(within(mine).getByRole("button", { name: "Stop sharing on this trip" }));

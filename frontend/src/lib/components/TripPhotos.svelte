@@ -6,6 +6,7 @@
   import { Button } from "$lib/components/ui/button";
   import PhotoViewer from "$lib/components/PhotoViewer.svelte";
   import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
+  import TripPhotoSharingMenu from "$lib/components/TripPhotoSharingMenu.svelte";
   import { actingPersons, PersonSharing } from "$lib/trip-sharing.svelte";
   import { byDay, dayCaption, DAY_PHOTOS, dayPhotoCount, daysFor, dayTileName, firstOfCluster, FIRST_DAYS, isFar, isInferred, localDay, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
   import { MAX_REMOVED, REMOVE, removeText, toggled } from "$lib/photo-sharing";
@@ -72,6 +73,7 @@
     return waiting ? "waiting" : "nothing";
   });
   const asking = $derived(acting.some((a) => a.mode === "prompt" || a.mode === "reminder"));
+  const hasCard = $derived(acting.some((a) => a.mode === "card"));
   const sharingShown = $derived(actingProblem || acting.some((a) => a.visible));
   const shows = $derived(started && (loaded.state === "error" || total > 0 || empty !== null || sharingShown));
   const mineOf = (p: Pick<TripPhoto, "person_id">): PersonSharing | undefined => acting.find((a) => a.personId === p.person_id);
@@ -418,12 +420,15 @@
     {:else}
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 id="trip-photos-title" class="flex items-baseline gap-2 text-heading" tabindex="-1" bind:this={heading}>Photos{#if total}<span class="text-caption text-muted-foreground">{total}</span>{/if}</h2>
-      {#if total}
+      {#if total || hasCard}
         <div class="flex flex-wrap items-center gap-2">
-          {#if ownCount > 0 && !selecting}
-            <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
+          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} />
+          {#if total}
+            {#if ownCount > 0 && !selecting}
+              <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
+            {/if}
+            <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : open(false))}>{expanded ? "Show fewer" : seeAll}</Button>
           {/if}
-          <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : open(false))}>{expanded ? "Show fewer" : seeAll}</Button>
         </div>
       {/if}
     </div>
@@ -513,13 +518,15 @@
     {#each acting as a (a.personId)}
       <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
     {/each}
-    {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="card" />
-    {/each}
+    {#if timeline}
+      {#each acting as a (a.personId)}
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="card" />
+      {/each}
+    {/if}
     <p class="sr-only" role="status">{announce}</p>
   </section>
   {#each acting as a (a.personId)}
-    <TripPhotoSharing sharing={a} tripName={trip.name} part="dialog" />
+    <TripPhotoSharing sharing={a} tripName={trip.name} part="dialog" returnTo={() => heading} />
   {/each}
   <PhotoViewer bind:this={viewer} bind:open={viewing} bind:index={at} bind:gone {photos} {people} {segments} returnTo={comeBack} notice={viewerNote} onfail={revalidate}>
     {#snippet actions(p)}
