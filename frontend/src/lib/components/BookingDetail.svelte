@@ -20,12 +20,12 @@
   };
   let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus }: Props = $props();
 
-  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; codes?: string[]; people?: { id: number | null; name: string }[] };
+  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; codes?: string[]; people?: { id: number | null; name: string; seat?: string | null }[] };
 
   const first = $derived(card.lead);
   const name = $derived(first.kind === "flight" || first.kind === "train" ? bookingName(first) : headline(first));
   const showCosts = $derived(app.state?.show_costs !== false);
-  const cancelled = $derived(card.segments.some((s) => s.status === "cancelled"));
+  const cancelled = $derived(card.cancelled);
   const span = $derived(spanOf(first));
   const subtitle = $derived.by(() => {
     const s = first;
@@ -40,7 +40,7 @@
 
   const at = (s: Segment, local: string, place: string | null | undefined, dated: boolean): string => {
     const time = untimed(s) ? "time not recorded" : clock(local);
-    const shift = local === s.end_local && s.kind === "flight" ? dayShift(s.start_local, s.end_local) : "";
+    const shift = local === s.end_local && (s.kind === "flight" || s.kind === "train") ? dayShift(s.start_local, s.end_local) : "";
     return [dated ? dayLabel(local) : "", time, shift, place].filter(Boolean).join(" · ");
   };
 
@@ -71,15 +71,18 @@
       const from = dayOf(s, s.start_local), to = dayOf(s, s.end_local);
       rows.push({ label: "Dates", value: from === to ? from : `${from} – ${to}`, strike: struck }, { label: "Place", value: headline(s) }, { label: "Notes", value: s.details.notes, lines: true });
     }
+    if (struck && !card.cancelled) rows.push({ label: "Status", value: "Cancelled, so not in the trip’s total" });
     return rows.filter((r) => r.value);
   }
 
   const codes = $derived([...new Set(card.segments.map((s) => s.confirmation).filter((c): c is string => !!c))]);
+  const seatOf = (p: { id: number | null; name: string }): string | null =>
+    card.segments.flatMap((s) => s.travelers).find((t) => t.seat && (p.id != null ? t.person_id === p.id : t.person_id == null && t.name.trim().toLowerCase() === p.name.trim().toLowerCase()))?.seat ?? null;
   const travellers = $derived(bookingTravellers(card.segments));
   const rows = $derived<Row[]>([
     ...card.segments.flatMap(rowsOf),
     ...(codes.length ? [{ label: codes.length > 1 ? "Confirmations" : "Confirmation", codes }] : []),
-    ...(travellers.people.length && showBookingTravellers(first, everyone) ? [{ label: "Travellers", people: travellers.people }] : []),
+    ...(travellers.people.length && showBookingTravellers(first, everyone) ? [{ label: "Travellers", people: travellers.people.map((p) => ({ ...p, seat: seatOf(p) })) }] : []),
     ...(showCosts ? card.segments.filter((s) => s.price).map((s): Row => ({ label: "Price", value: formatMoney(s.price!.amount_minor, s.price!.currency), strike: s.status === "cancelled" })) : []),
   ]);
 
@@ -123,7 +126,13 @@
             {#if row.codes}
               {#each row.codes as code (code)}<span class="flex items-center gap-2"><span class="mono text-[17px] tracking-[0.04em]">{code}</span><CopyButton text={code} name={`Copy confirmation code ${code}`} /></span>{/each}
             {:else if row.people}
-              <span class="flex items-center gap-2"><span aria-hidden="true"><AvatarStack people={row.people} /></span><span class="min-w-0 break-words">{row.people.map((p) => p.name).join(", ")}</span></span>
+              <span class="flex items-center gap-2"><span aria-hidden="true"><AvatarStack people={row.people} /></span>
+                {#if row.people.some((p) => p.seat)}
+                  <span class="flex min-w-0 flex-col items-end">{#each row.people as p, j (j)}<span class="break-words">{p.name}{#if p.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {p.seat}</span>{/if}</span>{/each}</span>
+                {:else}
+                  <span class="min-w-0 break-words">{row.people.map((p) => p.name).join(", ")}</span>
+                {/if}
+              </span>
             {:else}
               <span class={`min-w-0 break-words ${row.strike ? "text-muted-foreground line-through" : ""}`}>{row.value}</span>
               {#if row.address}<CopyButton text={row.address} name="Copy address" />{/if}

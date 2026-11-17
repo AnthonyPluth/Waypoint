@@ -406,6 +406,7 @@ describe("PastTrip bookings row", () => {
     show({ trip: flown, onbookings });
     const row = await screen.findByRole("button", { name: /^Bookings · 3/ });
     expect(row).toHaveAttribute("aria-haspopup", "dialog");
+    expect(row).toHaveTextContent("2 flights · 1 stay");
     await userEvent.click(row);
     expect(onbookings).toHaveBeenCalledOnce();
   });

@@ -177,6 +177,33 @@ describe("BookingDetail copy, costs and travellers", () => {
   });
 });
 
+describe("BookingDetail seats, overnight trains and combined cancellations", () => {
+  it("keeps each traveller's seat beside their name", async () => {
+    const seated = { ...flight, travelers: [{ ...ada, seat: "12B" }, { ...june, seat: "12A" }] };
+    const { dialog } = await open([seated], /DEN to GJT/);
+    const who = value(dialog, "Travellers");
+    expect(who).toHaveTextContent("Ada Brook · Seat 12B");
+    expect(who).toHaveTextContent("June Brook · Seat 12A");
+  });
+
+  it("keeps the arrival day of an overnight train", async () => {
+    const overnight = { ...train, start_local: "2025-08-05T21:30", end_local: "2025-08-06T07:15" };
+    const { dialog } = await open([overnight], /Portland to Seattle/);
+    expect(value(dialog, "Arrives")).toHaveTextContent("7:15 AM · +1 day · Seattle");
+  });
+
+  it("does not call a combined booking cancelled when only one leg is, and marks that leg", async () => {
+    const live = { ...flight, details: { ...flight.details, flight_number: "AA0101" } };
+    const dead = { ...flight, id: 9, status: "cancelled" as const, confirmation: "BBBBBB", details: { ...flight.details, flight_number: "AA0101" } };
+    const { dialog } = await open([live, dead], /DEN to GJT/);
+    expect(within(dialog).queryByText("Cancelled")).toBeNull();
+    expect(dialog).not.toHaveTextContent(/^Cancelled, so not in the trip’s total/);
+    expect(within(dialog).getAllByText("Cancelled, so not in the trip’s total")).toHaveLength(1);
+    expect(labels(dialog).filter((l) => l === "Status")).toHaveLength(1);
+    expect(dialog.querySelectorAll(".line-through").length).toBeGreaterThan(0);
+  });
+});
+
 describe("BookingDetail cancelled", () => {
   it("shows the red chip, strikes the dates and price and says it is not in the total", async () => {
     const { dialog } = await open([cancelled], /Canyon Rim Motel/);
