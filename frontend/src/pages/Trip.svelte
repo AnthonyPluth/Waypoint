@@ -1,6 +1,6 @@
 <script lang="ts">
   import { act, errMsg } from "$lib/act";
-  import { app, route } from "$lib/app.svelte";
+  import { app, layout, route } from "$lib/app.svelte";
   import { tick, untrack } from "svelte";
   import { apiCall } from "$lib/contract";
   import { emailNews } from "$lib/email-news";
@@ -161,6 +161,11 @@
   const costsShown = $derived(app.state?.show_costs !== false);
   const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
   const completedPage = $derived(over && !staticDemo);
+  $effect(() => {
+    if (!(completedPage && tripId === null)) return;
+    layout.wide = true;
+    return () => { layout.wide = false; };
+  });
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
   const liveOn = $derived(flightStatus.list?.enabled === true);
   const flightCard = (card: Card) => !over && card.lead.kind === "flight" && !card.cancelled && card.lead.status !== "cancelled" && !untimed(card.lead);
@@ -264,7 +269,7 @@
   });
 </script>
 
-<div class={completedPage ? "" : "mx-auto max-w-3xl"}>
+<div class={completedPage && tripId === null ? "" : "mx-auto max-w-3xl"}>
 {#if tripId === null && !(trip && completedPage)}
   <a class="mb-4 inline-flex items-center gap-1.5 phone:min-h-11 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 {/if}

@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { LoyaltyEntry, Person, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
-import { app, route } from "$lib/app.svelte";
+import { app, layout, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { membership, segment, state, trip } from "../test/fixtures";
@@ -1246,6 +1246,27 @@ describe("Trip", () => {
     const hotel = { ...stay, status: "confirmed" as const, has_email: true, start_local: "2020-03-01T15:00", end_local: "2020-03-04T10:00", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] };
     const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#segment-${s.id}`) as HTMLElement;
     const past = (extra: Partial<TripT> = {}) => trip([hotel], { start_date: "2020-03-01", end_date: "2020-03-04", ...extra });
+
+    it("asks the shell for the wide page while it is shown, and gives it back on leaving", async () => {
+      held = past({ done_at: null });
+      const { unmount } = render(TripPage);
+      await screen.findByTestId("past-trip");
+      expect(layout.wide).toBe(true);
+      unmount();
+      expect(layout.wide).toBe(false);
+    });
+
+    it("asks for no wide page for a trip that is not over, nor for one in a pane", async () => {
+      held = trip([flight, stay]);
+      const upcoming = render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(layout.wide).toBe(false);
+      upcoming.unmount();
+      held = past({ done_at: null });
+      render(TripPage, { tripId: 1 });
+      await screen.findByTestId("past-trip");
+      expect(layout.wide).toBe(false);
+    });
 
     it("is not held to 48 rem, which only a trip that is not over keeps", async () => {
       held = past({ done_at: null });

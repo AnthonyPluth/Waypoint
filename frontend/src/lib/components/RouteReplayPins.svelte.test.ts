@@ -104,6 +104,21 @@ describe("photo pins on the route map", () => {
     expect(onreplay).toHaveBeenCalledOnce();
   });
 
+  it("starts playing again each time a still map is let go, and reports when the replay reaches its end", async () => {
+    const onended = vi.fn();
+    const { rerender } = render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, autoplay: true, infos, onended });
+    for (let round = 0; round < 2; round++) {
+      await rerender({ stops, year: 2025, still: false, compact: false, autoplay: true, infos, onended });
+      expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+      await rerender({ stops, year: 2025, still: true, compact: true, autoplay: true, infos, onended });
+      expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+    }
+    expect(onended).not.toHaveBeenCalled();
+    await rerender({ stops, year: 2025, still: false, compact: false, autoplay: true, infos, onended });
+    slide(SCRUB_STEPS);
+    await vi.waitFor(() => expect(onended).toHaveBeenCalledOnce());
+  });
+
   it("has no Replay trip button without a handler", () => {
     render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, infos });
     expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
