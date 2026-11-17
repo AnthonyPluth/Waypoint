@@ -1112,8 +1112,30 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     serve([trip([priced, stay, home])]);
     render(Upcoming);
     const mini = await card();
-    expect(within(mini).getByText("Jane, Sam")).toBeInTheDocument();
+    expect(within(mini).getByText("Jane & Sam")).toBeInTheDocument();
     expect(within(mini).getByText("$450.00")).toBeInTheDocument();
+  });
+
+  it("keeps Directions and Call on the Next up card when the booking has them", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const linked = segment({ id: 1, links: { app: null, open: null, open_kind: null, directions: "https://maps.example/jfk", call: "tel:+18005551234" } });
+    serve([trip([linked, stay, home])]);
+    render(Upcoming);
+    const mini = await card();
+    expect(within(mini).getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.example/jfk");
+    expect(within(mini).getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+18005551234");
+  });
+
+  it("hides the cost on the Next up card when the household has turned costs off", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const priced = segment({ id: 1, price: { amount_minor: 45000, currency: "USD", source: "email" } as never });
+    app.state = { show_costs: false } as never;
+    serve([trip([priced, stay, home])]);
+    render(Upcoming);
+    const mini = await card();
+    expect(within(mini).queryByText("$450.00")).toBeNull();
+    expect(mini.querySelector("[data-cost]")).toBeNull();
+    app.state = null;
   });
 
   it("keeps the pause warning in the booking sheet too", async () => {

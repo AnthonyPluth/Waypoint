@@ -41,6 +41,14 @@ The desktop frame b2 does not draw these; the owner settled them when reviewing 
 3. Replay trip plays in the left column in place of the map, using only the replay's own controls and with no Hide replay button; the map comes back when the replay ends (it plays to the end, or the slider is moved to the end). For a person who asks for reduced motion the replay has no controls, so Replay trip is not offered on the map.
 4. The Places fact is a count, as in b2: "3 states". One place is named ("Utah", "France"); only countries is "2 countries"; a mix of states and other countries is "2 places".
 
+## Owner decisions on the bookings build (2026-11-17, #711)
+
+The c frames do not draw these; the owner settled them when the build of the Bookings sheet and list (#711) hit choices the issue left open.
+
+1. `Other` is the bookings of kind parking, even when dated; it is the last group, headed `Other` (the frames call it "Not dated"). Every other booking is on its start day, and a car booking that spans more than one day is under `Whole trip`. A cancelled booking stays in its group with a quiet `Cancelled` label.
+2. #711 builds the list, the sheet and the grouping only, and wires none of them into the page: the booking cards with Edit, Move and Remove stay on a completed trip until #712 wires the list, the sheet and the detail sheet together.
+3. Desktop (c3) is a flat list of dated rows in the 400 px column, with no group headings, each row carrying its date; the phone sheet is the grouped list. The grouping function serves both.
+
 Until the Bookings sheet (#711) and the booking detail sheet (#712) land, a past trip keeps its existing booking cards below the days, with Edit, Move and Remove; they go away when those land.
 
 ## Open questions for the owner

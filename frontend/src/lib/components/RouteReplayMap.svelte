@@ -86,7 +86,7 @@
   let ran = $state(false);
   $effect(() => { if (playing) ran = true; });
   $effect(() => {
-    if (!ran || playing || progress < 1 || compact || calm) return;
+    if (!ran || playing || progress < 1 || compact) return;
     untrack(() => { ran = false; onended?.(); });
   });
   const scrub = (e: Event) => { ran = true; touched = true; playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };

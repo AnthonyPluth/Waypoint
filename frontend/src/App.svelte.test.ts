@@ -115,9 +115,15 @@ describe("the shell", () => {
     const wrapper = () => container.querySelector("main > div") as HTMLElement;
     expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
     expect(wrapper().className).toContain("max-w-3xl");
+    app.state = null;
+    app.bootError = "Offline";
     app.offline = true;
-    await waitFor(() => expect(wrapper().className).not.toContain("lg:max-w-[80rem]"));
+    await screen.findByTestId("nothing-saved");
+    expect(wrapper().className).toContain("max-w-3xl");
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
     app.offline = false;
+    app.bootError = "";
+    app.state = state();
     layout.wide = true;
     await waitFor(() => expect(wrapper().className).toContain("lg:max-w-[80rem]"));
     await go("#trip/3/flight/7");
