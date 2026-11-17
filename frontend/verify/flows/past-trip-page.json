@@ -37,6 +37,7 @@
     {"wait_for": "[data-testid=photo-days] [data-day]"},
     {"expect_text": {"selector": "h1", "text": "Trip to Orlando"}},
     {"press": {"selector": "input[aria-label='Position along the route']", "key": "End"}},
+    {"wait_for": "role=button[name='Sharing']", "timeout": 30000},
     {"screenshot": "two-photos"}
   ]
 }

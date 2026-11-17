@@ -508,6 +508,28 @@ describe("PastTrip Sharing", () => {
     expect(screen.getAllByTestId("photo-reminder")).toHaveLength(1);
   });
 
+  it("shows the button of the next trip after moving from one with no control, in the same page", async () => {
+    photos = many(2);
+    best = [];
+    const next = trip([stay, there, back], { id: 8, name: "Autumn loop", destination: "Utah", start_date: "2026-03-01", end_date: "2026-03-08" });
+    sharingReply = async () => NO_SHARING;
+    vi.mocked(api).mockImplementation(async (path) => {
+      const p = String(path);
+      if (p.includes("/photo-sharing")) return (p.includes("/trips/8/") ? sharing() : NO_SHARING) as never;
+      if (p === "/api/photo-sources") return { sources, permissions: [] } as never;
+      if (p.endsWith("/photos")) return reply(photos, best) as never;
+      if (p.endsWith("/summary")) return summary as never;
+      if (p === "/api/distance-unit") return { distance_unit: "mi" } as never;
+      if (p.endsWith("/places")) return places as never;
+      throw new Error(`unexpected ${p}`);
+    });
+    const view = show({ trip: flown });
+    await settled();
+    await waitFor(() => expect(screen.queryByTestId("sharing-slot")).toBeNull());
+    await view.rerender({ trip: next } as never);
+    expect(await sharingButton()).toBeTruthy();
+  });
+
   it("opens the panel as a sheet on a phone", async () => {
     viewport.phone = true;
     photos = many(6);

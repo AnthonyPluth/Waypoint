@@ -23,6 +23,8 @@
     {"click": "role=button[name^='Put back the photo from'] >> nth=0"},
     {"expect_text": {"selector": "[data-testid=your-photos]", "text": "13 photos from your library"}},
     {"expect_text": {"selector": "[data-testid=your-photos]", "text": "Removed from this trip (1)"}},
-    {"expect_text": {"selector": "[data-testid=trip-summary]", "text": "13 photos"}}
+    {"expect_text": {"selector": "[data-testid=trip-summary]", "text": "13 photos"}},
+    {"click": "role=button[name='Close']"},
+    {"wait_for": "role=button[name='Sharing'][expanded=false]"}
   ]
 }
