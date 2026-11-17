@@ -21,6 +21,13 @@ describe("ConfirmDialog", () => {
     expect(onconfirm).not.toHaveBeenCalled();
   });
 
+  it("stacks above a bottom sheet and the photo viewer, which sit at 60 and 61", async () => {
+    render(ConfirmHarness, { onconfirm: vi.fn(), open: true });
+    const dialog = await screen.findByRole("dialog", { name: "Delete the thing?" });
+    expect(dialog.className).toContain("z-[62]");
+    expect(document.querySelector("[data-slot=confirm-overlay]")?.className).toContain("z-[62]");
+  });
+
   it("closes from Cancel without confirming", async () => {
     const onconfirm = vi.fn();
     render(ConfirmHarness, { onconfirm, open: true });

@@ -20,7 +20,7 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 | l | [l-others-view.html](l-others-view.html) | What everyone else sees (no trace of unshared photos), and the viewer when a photo is taken back |
 | m | [m-sharing-settings.html](m-sharing-settings.html) | Settings, Photo sharing: default scope, Share on all my trips, per-trip list |
 | n | [trip-photo-sharing.html](trip-photo-sharing.html) | The trip page's Photos header with a Sharing button (beside Select and See all) that opens the sharing controls: a popover on desktop, a bottom sheet on phone; today's page and the closed state beside it |
-| o | [past-trip-sharing.html](past-trip-sharing.html) | Decided by the owner on 2026-11-17 ([#772](https://github.com/AnthonyPluth/Waypoint/issues/772)): `Sharing` beside `View photos` on a completed trip's page, the panel as on a current trip (popover on desktop, bottom sheet on phone), every state of the panel, the reserved button slot; two placements not chosen kept for the record |
+| o | [past-trip-sharing.html](past-trip-sharing.html) | Decided by the owner on 2026-11-17 ([#772](https://github.com/AnthonyPluth/Waypoint/issues/772), amended the same day on [#789](https://github.com/AnthonyPluth/Waypoint/issues/789): `Sharing` alone where `View photos` isn't drawn): `Sharing` beside `View photos` on a completed trip's page, the panel as on a current trip (popover on desktop, bottom sheet on phone), every state of the panel, the reserved button slot; two placements not chosen kept for the record |
 
 ## Decisions the designs fix
 
@@ -57,9 +57,13 @@ A trip that has ended is drawn by `PastTrip.svelte` (the photo-led page, the day
 
 The page draws, at phone and desktop width: today's page with the card this replaces (0); placement A, closed and open, for one section and for a steward with several (A); the states of the panel and the page (S); and the two placements not chosen (B, C).
 
+### Amendment (2026-11-17, #789)
+
+The frames draw `View photos` beside `Sharing` with 248 photos, but the page draws `View photos` only when the hero takes every photo the viewer can see (exactly three, so the days are empty; the #748 test "has no View photos button while the days show photos" holds that). The owner decided on 2026-11-17 (build issue [#789](https://github.com/AnthonyPluth/Waypoint/issues/789)): `Sharing` sits alone, left-aligned, in the row where `View photos` would be whenever `View photos` isn't drawn; `View photos` still appears beside it in the three-photo case; `View photos`'s behaviour does not change. Frames A1, A2, A3, S1, S3, S4 and S6 draw two buttons and so differ from the built page in the common case (a photo hero with days below). The reserved slot and its collapse work as decided below: with no `View photos` and no control, the row collapses once after the state loads, as under the map hero.
+
 ### Decisions (2026-11-17)
 
-- Placement A: a `Sharing` outline button beside `View photos` in the row under the hero. B (a visible `Photos by day` header with `Sharing` at its right) and C (`Sharing` after `Replay` in the facts line) are not chosen; they stay on the page for the record.
+- Placement A: a `Sharing` outline button in the row under the hero, beside `View photos` when that is drawn (see the amendment below). B (a visible `Photos by day` header with `Sharing` at its right) and C (`Sharing` after `Replay` in the facts line) are not chosen; they stay on the page for the record.
 - The panel opens as on a current trip: a non-modal popover under the button on desktop, the app's modal bottom sheet on phone. The popover opens left-aligned under the left-hand button, with the caret over it.
 - With fewer than three photos the page leads with the map and has no `View photos`; `Sharing` then sits alone on its own row under the map.
 - The reminder after Not now moves up and sits directly under the button row (no button), instead of below the last day. The first-visit prompt stays inline above the days, with no button.

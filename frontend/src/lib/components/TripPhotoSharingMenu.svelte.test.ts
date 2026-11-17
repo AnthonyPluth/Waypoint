@@ -115,9 +115,10 @@ describe("The Sharing button", () => {
     expect(screen.queryByTestId("your-photos")).toBeNull();
   });
 
-  it("is not there on a past trip's timeline, which keeps the card inline", async () => {
+  it("is left to the past trip's page on a timeline, which draws no card and no button itself", async () => {
     mount({ timeline: true });
-    expect(await screen.findByTestId("your-photos")).toBeInTheDocument();
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/trips/7/photo-sharing?person_id=1", { keep: true }));
+    expect(screen.queryByTestId("your-photos")).toBeNull();
     expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
   });
 

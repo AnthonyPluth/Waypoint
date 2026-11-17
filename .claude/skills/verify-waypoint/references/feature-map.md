@@ -270,7 +270,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`, `#trip/3`.
 - **Widths:** phone, desktop.
 - **Touches:** `Trip options`, `Show all`, `Position along the route`.
-- **Expects to see:** `Trip to Denver`, `13 photos`, `Merge another trip`, `Trip to Paris`, `Trip to Orlando`.
+- **Expects to see:** `Trip to Denver`, `13 photos`, `Photo sharing for this trip`, `Merge another trip`, `Trip to Paris`, `Trip to Orlando`.
 - **Fakes (the demo server can't):** `fake_photo_limit`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow past-trip-page`; or `poetry run python run.py verify --flow past-trip-page`.
