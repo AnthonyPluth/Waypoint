@@ -134,10 +134,10 @@ describe("flowProblems", () => {
   it("adds a train, a rental car, parking, a visit and a cancelled stay to a trip, with ids of their own, and leaves a trip with no bookings as it is", () => {
     const model = { id: 4, start_date: "2025-06-12", segments: [{ id: 40, kind: "flight", status: "confirmed", start_local: "2025-06-12T09:00", end_local: "2025-06-12T10:00", travelers: [] }] };
     const made = fakeBookings(model);
-    expect(made.segments.map((s) => [s.kind, s.status])).toEqual([["flight", "confirmed"], ["train", "confirmed"], ["car", "confirmed"], ["parking", "confirmed"], ["visit", "confirmed"], ["hotel", "cancelled"]]);
-    expect(new Set(made.segments.map((s) => s.id)).size).toBe(6);
+    expect(made.segments.map((s) => [s.kind, s.status])).toEqual([["flight", "confirmed"], ["train", "confirmed"], ["car", "confirmed"], ["parking", "confirmed"], ["visit", "confirmed"], ["hotel", "changed"], ["hotel", "cancelled"]]);
+    expect(new Set(made.segments.map((s) => s.id)).size).toBe(7);
     expect(made.segments.every((s) => s.trip_id === 4 || s.id === 40)).toBe(true);
-    expect(made.segments[5].end_local).toBe("2025-06-15T11:00");
+    expect(made.segments[6].end_local).toBe("2025-06-15T11:00");
     const empty = { id: 5, start_date: null, segments: [] };
     expect(fakeBookings(empty)).toBe(empty);
   });

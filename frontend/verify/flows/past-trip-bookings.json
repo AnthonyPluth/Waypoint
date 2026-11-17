@@ -84,6 +84,30 @@
     },
     {
       "screenshot": "done-trip-detail"
+    },
+    {
+      "fake_bookings": "past"
+    },
+    {
+      "goto": "#trip/1"
+    },
+    {
+      "wait_for": "[data-testid=past-trip]"
+    },
+    {
+      "click_if_present": "button[aria-haspopup=dialog]:has-text('Bookings') >> visible=true"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid=past-bookings]",
+        "text": "Red Cliff Lodge"
+      }
+    },
+    {
+      "screenshot": "bookings-changed"
     }
   ]
 }

@@ -131,6 +131,30 @@
       "wait_for": "[data-testid=past-bookings]"
     },
     {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Red Cliff Lodge\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Red Cliff Lodge\"]"
+    },
+    {
+      "expect_text": {
+        "selector": "role=dialog[name=\"Red Cliff Lodge\"]",
+        "text": "Changed"
+      }
+    },
+    {
+      "screenshot": "changed-stay"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Canyon Rim Motel\") >> visible=true"
     },
     {
