@@ -51,9 +51,10 @@ describe("the Home next-flight card", () => {
     const link = await screen.findByRole("link", { name: "EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am" });
     expect(link).toHaveAttribute("href", "#trip/7/flight/3");
     expect(screen.getAllByRole("link")).toHaveLength(1);
-    const route = document.querySelector("[data-flight-home] [aria-hidden='true'] [data-plane]")?.closest("[aria-hidden='true']");
-    expect(route).not.toBeNull();
-    expect(within(route as HTMLElement).getByText("DEN")).toBeInTheDocument();
+    const line = document.querySelector("[data-flight-home] [data-plane]")?.closest("[aria-hidden='true']");
+    expect(line).not.toBeNull();
+    expect(screen.getByText("DEN").closest("[aria-hidden='true']")).toBeNull();
+    expect(screen.getByText("10:15 am").closest("[aria-hidden='true']")).toBeNull();
   });
 
   it("shows the pill, amber times, the gate and when it was updated when delayed", async () => {
@@ -84,6 +85,51 @@ describe("the Home next-flight card", () => {
     expect(screen.getByText("10:52 am")).toBeInTheDocument();
     expect(screen.getByText("Terminal — · Gate —")).toBeInTheDocument();
     expect(document.querySelector("[data-updated]")).toBeNull();
+  });
+});
+
+describe("what the cards keep from the ones they replace", () => {
+  const paused = { reason: "limit" as const, until: "2025-07-01T00:00:00Z" };
+  const overnight = segment({
+    id: 3, trip_id: 7, provider: "Example Air", origin: "DEN", destination: "GJT", start_local: "2025-06-12T23:30", start_zone: DEN, end_local: "2025-06-13T00:40", end_zone: DEN,
+    details: { flight_number: "EA 214" },
+  });
+
+  it("says live updates are paused on the Home card and the booking, whether or not a status is stored, and says nothing otherwise", async () => {
+    const home = render(FlightHome, { segment: booked, status: delayed, liveOn: true, now: EARLY, eyebrow: "Next up", tripName: "Loop", paused });
+    expect(await screen.findByRole("status")).toHaveTextContent(/^Live updates paused until .* \(monthly limit\)$/);
+    home.unmount();
+    const bare = render(FlightHome, { segment: booked, liveOn: true, now: EARLY, eyebrow: "Next up", tripName: "Loop", paused });
+    expect(await screen.findByRole("status")).toHaveTextContent("Live updates paused until");
+    bare.unmount();
+    const none = render(FlightHome, { segment: booked, status: delayed, liveOn: true, now: EARLY, eyebrow: "Next up", tripName: "Loop" });
+    await screen.findByRole("link");
+    expect(none.container.querySelector("[data-paused]")).toBeNull();
+    none.unmount();
+    render(FlightBooking, { segment: booked, status: flying, liveOn: true, now: AIR, paused });
+    expect(await screen.findByRole("status")).toHaveTextContent("Live updates paused until");
+  });
+
+  it("shows the arrival day beside the arrival time of an overnight flight, on the card and in the booking", async () => {
+    const home = render(FlightHome, { segment: overnight, liveOn: true, now: at("2025-06-12T20:00"), eyebrow: "Next up", tripName: "Loop" });
+    const later = await waitFor(() => { const el = home.container.querySelector("[data-later]"); expect(el).not.toBeNull(); return el!; });
+    expect(later).toHaveTextContent("+1 day");
+    expect(later.querySelector(".sr-only")).toHaveTextContent(", 1 day later on the calendar than departure");
+    home.unmount();
+    render(FlightBooking, { segment: overnight, liveOn: true, now: at("2025-06-12T20:00") });
+    expect(await screen.findByText("Lands 12:40 am MDT +1 day")).toBeInTheDocument();
+  });
+
+  it("keeps both times of the compact booking, with their zones, in the accessibility tree", async () => {
+    render(FlightBooking, { segment: booked, status: flying, liveOn: true, now: AIR });
+    await screen.findByRole("link");
+    for (const text of ["Departed 9:46 am MDT", "Lands 10:52 am MDT"]) expect(screen.getByText(text).closest("[aria-hidden='true']")).toBeNull();
+  });
+
+  it("leaves the times out when told to, for bookings that disagree", async () => {
+    render(FlightBooking, { segment: booked, status: flying, liveOn: true, now: AIR, showTimes: false });
+    await screen.findByRole("link");
+    expect(screen.queryByText(/^Lands /)).toBeNull();
   });
 });
 

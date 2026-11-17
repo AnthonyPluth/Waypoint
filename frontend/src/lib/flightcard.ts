@@ -305,7 +305,7 @@ export function bookingTimes(v: FlightCardView, viewer: string): { left: string;
   const show = zonesShown(v, viewer);
   const left = v.state === "in-the-air" || v.state === "landed" || v.state === "diverted" ? "Departed" : "Departs";
   const right = v.state === "landed" ? "Landed" : "Lands";
-  return { left: `${left} ${withZone(v.depart, show)}`, right: `${right} ${withZone(v.arrive, show)}` };
+  return { left: `${left} ${withZone(v.depart, show)}`, right: `${right} ${withZone(v.arrive, show)}${v.arrive.later ? ` ${v.arrive.later}` : ""}` };
 }
 
 export function footerPlace(v: FlightCardView): string {
