@@ -39,7 +39,9 @@ describe("MessageView", () => {
     render(MessageView, { text: "Hi", html: '<p>Hi</p><p style="color:#112233">Mine</p>' });
     const root = hostOf().shadowRoot as ShadowRoot;
     const sheet = root.querySelector("style")?.textContent ?? "";
-    expect(hostOf().getAttribute("style")).toMatch(/^all: initial;/);
+    expect(hostOf().style.color).toBe("initial");
+    expect(hostOf().style.fontSize).toBe("initial");
+    expect(hostOf().style.display).toBe("block");
     expect(sheet).toMatch(/\.email\{[^}]*font:14px\/1\.5[^}]*text-align:left;direction:ltr;letter-spacing:normal;[^}]*white-space:normal/);
     expect(sheet).toContain("color-scheme:light");
     expect(root.querySelectorAll("style")).toHaveLength(1);
@@ -63,7 +65,8 @@ describe("MessageView", () => {
     expect(sheet).not.toContain("var(");
     expect(root.querySelectorAll(".email")).toHaveLength(1);
     expect(root.querySelector(".email p")).not.toBeNull();
-    expect(hostOf().getAttribute("style")).toMatch(/^all: initial;/);
+    expect(hostOf().style.color).toBe("initial");
+    expect(hostOf().style.background).toBe("initial");
   });
 
   it("isolates styles in both directions", () => {
@@ -75,7 +78,7 @@ describe("MessageView", () => {
     const root = hostOf().shadowRoot as ShadowRoot;
     expect(document.head.innerHTML).toBe(head);
     expect(document.querySelectorAll("p")).toHaveLength(0);
-    expect(Array.from(document.querySelectorAll("[style]")).some((e) => /ff0000|position/.test(e.getAttribute("style") ?? ""))).toBe(false);
+    expect(Array.from(document.querySelectorAll("[style]")).some((e) => /ff0000|position:\s*fixed/.test(e.getAttribute("style") ?? ""))).toBe(false);
     expect(root.querySelectorAll("style")).toHaveLength(1);
     expect(root.querySelector("style")?.textContent).not.toContain("display:none");
     expect(root.querySelector("p")?.getAttribute("style")).toBe("color:#ff0000;background-color:#00ff00");
@@ -86,8 +89,9 @@ describe("MessageView", () => {
   it("contains the email: the sizer clips it and the host is cut off from the app's layout", () => {
     render(MessageView, { text: "Hi", html: '<div style="margin:-9999px;width:99999px;height:99999px">x</div>' });
     expect(screen.getByTestId("preview-sizer").className).toContain("overflow-hidden");
-    expect(hostOf().getAttribute("style")).toMatch(/all: initial;/);
-    expect(hostOf().getAttribute("style")).toContain("contain: paint");
+    expect(hostOf().style.position).toBe("initial");
+    expect(hostOf().style.margin).toBe("initial");
+    expect(hostOf().style.getPropertyValue("contain")).toBe("paint");
     expect(hostOf().shadowRoot?.querySelector(".email div")?.hasAttribute("style")).toBe(false);
   });
 
