@@ -49,7 +49,14 @@ The c frames do not draw these; the owner settled them when the build of the Boo
 2. #711 builds the list, the sheet and the grouping only, and wires none of them into the page: the booking cards with Edit, Move and Remove stay on a completed trip until #712 wires the list, the sheet and the detail sheet together.
 3. Desktop (c3) is a flat list of dated rows in the 400 px column, with no group headings, each row carrying its date; the phone sheet is the grouped list. The grouping function serves both.
 
-Until the Bookings sheet (#711) and the booking detail sheet (#712) land, a past trip keeps its existing booking cards below the days, with Edit, Move and Remove; they go away when those land.
+The Bookings sheet (#711) and the booking detail sheet (#712) now take the place of a past trip's booking cards.
+
+## Owner decisions on the booking detail build (2026-11-17, #712)
+
+The d frames do not draw these; the owner settled them when #712 hit a choice the design left open.
+
+1. Move and Remove: the booking cards had Edit, Move and Remove (the last two under More), and d draws only Edit and Close. They stay reachable in a `More` menu beside Edit in the detail header (Edit always visible, Close as drawn), with the old card's labels and behaviour: `Move`, which opens the move dialog, and `Remove`, which asks before deleting. This departs from d, which draws no More; the owner decided it on 2026-11-17.
+2. #712 wires the Bookings row, sheet and desktop list (#711) and the detail together on a completed trip, so its booking cards are gone; a trip still to come or under way keeps its cards.
 
 ## Open questions for the owner
 

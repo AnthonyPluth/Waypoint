@@ -281,6 +281,8 @@
     transform: translateY(var(--sheet-drag, 0px)); }
   .sheet[data-side="right"] { top: 0; right: 0; bottom: 0; width: min(34rem, 100vw); border-top: 0; border-bottom: 0; border-right: 0; }
   .sheet[data-side="right"][data-wide] { width: min(40rem, 100vw); }
+  .sheet[data-side="right"][data-panel] { width: min(460px, 100vw); background: var(--popover); }
+  .sheet[data-side="bottom"][data-panel] { background: var(--popover); }
   .sheet { scroll-padding-bottom: 6rem; }
   .review-split { display: flex; flex-direction: column; gap: 1rem; }
   .review-actions { position: sticky; bottom: 0; z-index: 1; padding-block: 0.75rem; background: var(--card); border-top: 1px solid var(--border); }

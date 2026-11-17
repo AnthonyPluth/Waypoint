@@ -44,7 +44,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_flight_status: "string", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", fake_shell: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_bookings: "string", fake_flight_status: "string", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", fake_shell: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -101,6 +101,24 @@ export function fakeArchive(trips, count) {
     return { ...model, id, name: `Trip to ${city} ${i + 1}`, destination: city, start_date: start, end_date: end, segments, emails: 0, can_clear_emails: false };
   });
 }
+
+export function fakeBookings(trip) {
+  const model = trip.segments[0];
+  if (!model) return trip;
+  const day = trip.start_date ?? model.start_local.slice(0, 10);
+  const next = Math.max(0, ...trip.segments.map((s) => s.id)) + 1;
+  const made = (n, extra) => ({ ...model, id: next + n, trip_id: trip.id, status: "confirmed", provider: null, origin: null, destination: null, details: {}, itinerary: [], days: [], logo: null, logo_label: null, hotel_brand: null, has_email: false, email_update: null, gate_code: null, price: null, links: { app: null, open: null, open_kind: null, directions: null, call: null }, ...extra });
+  const added = [
+    made(0, { kind: "train", provider: "Coast Line 14", origin: "Portland", destination: "Seattle", confirmation: "TR55P9", start_local: `${day}T08:10`, end_local: `${day}T11:45`, start_zone: "America/Los_Angeles", end_zone: "America/Los_Angeles", details: { seat: "21B, 21A", cabin: "Business" }, price: { amount_minor: 9600, currency: "USD", source: "manual" } }),
+    made(3, { kind: "car", provider: "Example Rentals", origin: "Grand Junction Regional Airport", destination: "Flagstaff Pulliam Airport", confirmation: "R4T9W2", start_local: `${day}T11:30`, end_local: `${nextDay(day)}T14:00`, details: { car_class: "Compact SUV", address: "1100 Walker Field Drive, Grand Junction" }, price: { amount_minor: 61200, currency: "USD", source: "manual" } }),
+    made(4, { kind: "parking", origin: "Airport long-term parking", confirmation: "PK3318", start_local: `${day}T06:00`, end_local: `${nextDay(day)}T22:00`, details: { address: "Denver Airport, Lot C", space_type: "Covered", vehicle: "Subaru Outback", notes: "Shuttle every 10 minutes from the lot" }, price: { amount_minor: 8400, currency: "USD", source: "manual" } }),
+    made(1, { kind: "visit", destination: "US", confirmation: null, start_local: `${day}T00:00`, end_local: `${day}T00:00`, details: { notes: "Staying at Sam’s" } }),
+    made(2, { kind: "hotel", status: "cancelled", origin: "Canyon Rim Motel", destination: "Page", confirmation: "CM48X", start_local: `${day}T15:00`, end_local: `${nextDay(day)}T11:00`, details: { address: "12 Lakeview Drive, Page, AZ 86040" }, price: { amount_minor: 98600, currency: "USD", source: "manual" } }),
+  ];
+  return { ...trip, segments: [...trip.segments, ...added] };
+}
+
+const nextDay = (day) => new Date(Date.parse(`${day}T00:00:00Z`) + 3 * 86_400_000).toISOString().slice(0, 10);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, "..", "..");
@@ -254,6 +272,12 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
       const t = made.get(id);
       if (!t || route.request().method() !== "GET") return route.fallback();
       return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
+    });
+  } else if ("fake_bookings" in step) {
+    await page.route(/\/api\/trips\/\d+$/, async (route) => {
+      if (route.request().method() !== "GET") return route.fallback();
+      const response = await route.fetch();
+      await route.fulfill({ response, json: fakeBookings(await response.json()) });
     });
   } else if ("fake_flight_status" in step) {
     await page.route("**/api/flight-status", async (route) => {

@@ -1,0 +1,215 @@
+{
+  "name": "past-booking-detail",
+  "page": "trips",
+  "signed_in": true,
+  "allow_console": [
+    "Applying inline style violates the following Content Security Policy",
+    "Blocked script execution in"
+  ],
+  "steps": [
+    {
+      "fake_bookings": "past"
+    },
+    {
+      "goto": "#trip/1"
+    },
+    {
+      "wait_for": "[data-testid=past-trip]"
+    },
+    {
+      "click_if_present": "button[aria-haspopup=dialog]:has-text('Bookings') >> visible=true"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"JFK to CDG\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"JFK to CDG\"]"
+    },
+    {
+      "screenshot": "flight"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+    },
+    {
+      "screenshot": "stay"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Example Rentals\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Example Rentals · Grand Junction Regional Airport\"]"
+    },
+    {
+      "screenshot": "car"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Portland to Seattle\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Portland to Seattle\"]"
+    },
+    {
+      "screenshot": "train"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Airport long-term parking\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Airport long-term parking\"]"
+    },
+    {
+      "screenshot": "parking"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"United States\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"United States\"]"
+    },
+    {
+      "screenshot": "visit"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Canyon Rim Motel\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Canyon Rim Motel\"]"
+    },
+    {
+      "screenshot": "cancelled-stay"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+    },
+    {
+      "click": "button[aria-label^='More options for']"
+    },
+    {
+      "wait_for": "button[aria-label^='Move ']"
+    },
+    {
+      "expect_text": {
+        "selector": "role=dialog[name=\"Hôtel du Parc\"]",
+        "text": "Remove"
+      }
+    },
+    {
+      "screenshot": "more-open"
+    },
+    {
+      "click": "button[aria-label^='More options for']"
+    },
+    {
+      "screenshot": "more-closed"
+    },
+    {
+      "click": "[role=dialog] >> nth=-1 >> button[aria-label='Close']"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "goto": "#trip/5"
+    },
+    {
+      "wait_for": "[data-testid=past-trip]"
+    },
+    {
+      "click_if_present": "button[aria-haspopup=dialog]:has-text('Bookings') >> visible=true"
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    },
+    {
+      "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Example Voyager\") >> visible=true"
+    },
+    {
+      "wait_for": "role=dialog[name=\"Example Voyager · Miami\"]"
+    },
+    {
+      "screenshot": "cruise"
+    },
+    {
+      "press": {
+        "selector": "[role=dialog] >> nth=-1",
+        "key": "Escape"
+      }
+    },
+    {
+      "wait_for": "[data-testid=past-bookings]"
+    }
+  ]
+}

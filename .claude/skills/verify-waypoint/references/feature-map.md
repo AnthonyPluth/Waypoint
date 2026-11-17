@@ -266,6 +266,25 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Example Airport Long-Term Lot`, `Entry`, `Space type`.
 - **Drive it:** `tools/control flow parking`; or `poetry run python run.py verify --flow parking`.
 
+#### `past-booking-detail`
+
+- **Starts at:** `#trips`; goes to: `#trip/1`, `#trip/5`.
+- **Widths:** phone, desktop.
+- **Touches:** `Bookings`, `JFK to CDG`, `Hôtel du Parc`, `Example Rentals`, `Portland to Seattle`, `Airport long-term parking`, `United States`, `Canyon Rim Motel`, `More options for`, `Close`, `Example Voyager`.
+- **Expects to see:** `Remove`.
+- **Fakes (the demo server can't):** `fake_bookings`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-booking-detail`; or `poetry run python run.py verify --flow past-booking-detail`.
+
+#### `past-trip-bookings`
+
+- **Starts at:** `#trips`; goes to: `#trip/1`, `#trip/2`.
+- **Widths:** phone, desktop.
+- **Touches:** `Bookings`, `Hôtel du Parc`, `Bayview Inn`.
+- **Expects to see:** `Trip to Paris`, `Hôtel du Parc`, `Edit`, `Trip to San Francisco`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-trip-bookings`; or `poetry run python run.py verify --flow past-trip-bookings`.
+
 #### `past-trip-countries`
 
 - **Starts at:** `#trips`; goes to: `#stats`.

@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeAirborne, fakeArchive, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeAirborne, fakeArchive, fakeBookings, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -104,6 +104,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_immich: true }] })).toEqual(["step 1: fake_immich takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: 400 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_bookings: "past" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_bookings: true }] })).toEqual(["step 1: fake_bookings takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_flight_status: "in-the-air" }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_flight_status: true }] })).toEqual(["step 1: fake_flight_status takes a string"]);
     expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: 2 }] })).toEqual([]);
@@ -127,6 +129,17 @@ describe("flowProblems", () => {
     expect(new Set(made.map((t) => t.id)).size).toBe(120);
     expect(made.every((t) => t.id > 7 && t.segments[0].trip_id === t.id)).toBe(true);
     expect(fakeArchive([], 5)).toEqual([]);
+  });
+
+  it("adds a train, a rental car, parking, a visit and a cancelled stay to a trip, with ids of their own, and leaves a trip with no bookings as it is", () => {
+    const model = { id: 4, start_date: "2025-06-12", segments: [{ id: 40, kind: "flight", status: "confirmed", start_local: "2025-06-12T09:00", end_local: "2025-06-12T10:00", travelers: [] }] };
+    const made = fakeBookings(model);
+    expect(made.segments.map((s) => [s.kind, s.status])).toEqual([["flight", "confirmed"], ["train", "confirmed"], ["car", "confirmed"], ["parking", "confirmed"], ["visit", "confirmed"], ["hotel", "cancelled"]]);
+    expect(new Set(made.segments.map((s) => s.id)).size).toBe(6);
+    expect(made.segments.every((s) => s.trip_id === 4 || s.id === 40)).toBe(true);
+    expect(made.segments[5].end_local).toBe("2025-06-15T11:00");
+    const empty = { id: 5, start_date: null, segments: [] };
+    expect(fakeBookings(empty)).toBe(empty);
   });
 
   it("answers an Immich test with a made-up user, a refused key or an unreachable server, and makes the library a save would", () => {
