@@ -62,8 +62,8 @@ The d frames do not draw these; the owner settled them when #712 hit a choice th
 
 The d frames draw only Cancelled; the owner settled these when #807's second review raised them.
 
-1. A booking whose status is `changed` shows a `Changed` chip (the warn-tone status chip the old booking card showed, `bookingChip("changed")`) in the booking detail header and on its row in the Bookings list, phone sheet and desktop list alike. A cancelled booking keeps the red chip in the detail and the quiet `Cancelled` label on its row. The look of the chip was put to the owner on 2026-11-17 in the make verify images of the pull request that built it (#809).
-2. In a combined booking with a cancelled leg, the `Status` row carries that leg's confirmation code beside its note, and the Travellers row marks each traveller on the cancelled leg (`On cancelled booking <code>`). A traveller's seat comes from the live leg; where the live legs give a traveller different seats, each is shown with its leg's code.
+1. A booking whose status is `changed` shows a `Changed` chip (the warn-tone status chip the old booking card showed, `bookingChip("changed")`) in the booking detail header and on its row in the Bookings list, phone sheet and desktop list alike. A cancelled booking keeps the red chip in the detail and the quiet `Cancelled` label on its row. The owner approved the look of the chip on 2026-11-17 after seeing the make verify images of the pull request that built it (#809): phone and desktop, the detail header and the list row.
+2. In a combined booking with a cancelled leg, the `Status` row carries that leg's confirmation code beside its note, and the Travellers row marks each traveller on the cancelled leg (`On cancelled booking <code>`). A traveller's seat comes from the leg that still stands, or from the cancelled leg when that is the traveller's only one; where the live legs give a traveller different seats, each is shown with its leg's code.
 3. A seat shows once: beside the traveller when the Travellers row is listed and names it; the `Seat` row keeps only the seats no listed traveller carries.
 
 ## Open questions for the owner
