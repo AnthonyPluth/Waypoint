@@ -1,7 +1,7 @@
 import { ignoreFailure } from "./act";
 import { apiCall } from "./contract";
 import type { Mk, MkDirections, MkRoute } from "./mapkit";
-import type { Roads, Stop } from "./route-replay";
+import { driveKey, type Roads, type SavedLeg, type Stop } from "./route-replay";
 
 export type LatLon = { latitude: number; longitude: number };
 export type RoutePath = number[][];
@@ -31,7 +31,7 @@ let running = 0;
 let generation = 0;
 
 const round = (n: number): string => n.toFixed(PRECISION);
-const keyOf = (a: LatLon, b: LatLon): string => `${round(a.latitude)},${round(a.longitude)}>${round(b.latitude)},${round(b.longitude)}`;
+const keyOf = driveKey;
 const tripKey = (trip: number, key: string): string => `${trip}:${key}`;
 
 export const clearRouteCache = (): void => {
@@ -255,10 +255,11 @@ export function savedRoutes(trip: number): Promise<SavedRoutes> {
 }
 
 export function savedRoads(stops: Stop[], saved: SavedRoutes): Roads {
-  const legs: Roads["legs"] = [];
+  const legs: SavedLeg[] = [];
   for (let i = 1; i < stops.length; i++) {
-    const path = isDrive(stops[i - 1], stops[i]) ? saved.get(keyOf(stops[i - 1], stops[i])) : undefined;
-    if (path) legs.push({ from_segment_id: 0, to_segment_id: 0, points: path, refs: [] });
+    const key = keyOf(stops[i - 1], stops[i]);
+    const path = isDrive(stops[i - 1], stops[i]) ? saved.get(key) : undefined;
+    if (path) legs.push({ from_segment_id: 0, to_segment_id: 0, points: path, refs: [], key });
   }
   return { legs, interstates: [] };
 }

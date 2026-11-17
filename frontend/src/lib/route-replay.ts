@@ -197,11 +197,25 @@ const lonLat = (s: Pick<Point, "latitude" | "longitude">): [number, number] => [
 
 const km = (at: number[], s: Stop): number => geoDistance([at[1], at[0]], [s.longitude, s.latitude]) * EARTH_KM;
 
+const DRIVE_DECIMALS = 4;
+type LatLon = Pick<Stop, "latitude" | "longitude">;
+export type SavedLeg = Roads["legs"][number] & { key: string };
+
+export const driveKey = (a: LatLon, b: LatLon): string =>
+  `${a.latitude.toFixed(DRIVE_DECIMALS)},${a.longitude.toFixed(DRIVE_DECIMALS)}>${b.latitude.toFixed(DRIVE_DECIMALS)},${b.longitude.toFixed(DRIVE_DECIMALS)}`;
+
+const savedKey = (leg: Roads["legs"][number]): string | null => ("key" in leg && typeof leg.key === "string" ? leg.key : null);
+
 export function roadFor(from: Stop, to: Stop, roads: Roads): Roads["legs"][number] | null {
   if (to.via !== null) return null;
   let best: Roads["legs"][number] | null = null;
   let nearest = Infinity;
   for (const leg of roads.legs) {
+    const key = savedKey(leg);
+    if (key !== null) {
+      if (key === driveKey(from, to)) return leg;
+      continue;
+    }
     const start = leg.points[0], end = leg.points.at(-1);
     if (leg.points.length < 2 || !start || !end) continue;
     const a = km(start, from), b = km(end, to);

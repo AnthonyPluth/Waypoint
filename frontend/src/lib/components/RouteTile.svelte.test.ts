@@ -83,6 +83,22 @@ describe("the route on a Past trips card with no photos", () => {
     expect(legs(container)[0]).toContain("Q");
   });
 
+  it("keeps the arc for a second drive with no saved road, even when its stops sit close to the first drive's", async () => {
+    const A = { latitude: 40.0, longitude: -105.0 }, B = { latitude: 40.4, longitude: -105.0 }, C = { latitude: 40.8, longitude: -105.0 };
+    const three = trip([stay(91, 9, "A", "2026-09-03T15:00", "2026-09-04T10:00"), stay(92, 9, "B", "2026-09-04T15:00", "2026-09-05T10:00"), stay(93, 9, "C", "2026-09-05T15:00", "2026-09-06T10:00")],
+      { id: 9, name: "Short hops", start_date: "2026-09-03", end_date: "2026-09-06" });
+    vi.mocked(api).mockImplementation(async (path) => {
+      const url = String(path);
+      if (url.endsWith("/places")) return places({ stays: [{ segment_id: 91, ...A, precision: "city" }, { segment_id: 92, ...B, precision: "city" }, { segment_id: 93, ...C, precision: "city" }] }) as never;
+      if (url.startsWith("/api/driving-routes")) return { trips: [{ trip_id: 9, routes: [{ start: A, end: B, path: [[40.0, -105.0], [40.2, -104.9], [40.4, -105.0]] }] }] } as never;
+      throw new Error("down");
+    });
+    const { container } = render(PastTripCard, { trip: three, today: TODAY });
+    await waitFor(() => expect(legs(container)).toHaveLength(2));
+    await waitFor(() => expect(legs(container)[0]).not.toContain("Q"));
+    expect(legs(container)[1]).toContain("Q");
+  });
+
   it("draws a flight as its arc and a drive as its road on the same card", async () => {
     const mixed = trip([
       stay(91, 9, "Denver", "2026-09-03T15:00", "2026-09-05T10:00"), stay(92, 9, "Salt Lake City", "2026-09-05T15:00", "2026-09-06T10:00"),

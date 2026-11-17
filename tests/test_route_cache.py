@@ -330,6 +330,42 @@ class BatchedLookupTests(RouteCacheCase):
         with mock.patch("waypoint.server.api.driving_routes.time", mock.Mock(time=lambda: now + driving_routes.REPLACE_AFTER_SECONDS)):
             self.assertEqual(self.batch("ana", trip), (200, {"trips": []}))
 
+    def shared_trip_with_a_stored_drive(self):
+        first = self.book("ana", DENVER)
+        second = self.book("ana", SALT_LAKE, trip_id=first["trip_id"])
+        trip = first["trip_id"]
+        drive = drive_of(self.ok("ana", "GET", f"/api/trips/{trip}/places"))
+        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
+        self.assertEqual(self.put("ana", trip, drive)[0], 200)
+        self.assertEqual(len(self.batch("ben", trip)[1]["trips"]), 1)
+        return trip, drive, first, second
+
+    def assert_batch_and_single_agree_on_no_routes(self, trip, drive):
+        self.assertEqual(len(self.rows()), 1)
+        self.assertEqual(self.look_up("ben", trip, drive), (200, {"routes": []}))
+        self.assertEqual(self.batch("ben", trip), (200, {"trips": []}))
+
+    def test_a_drive_whose_booking_was_deleted_is_left_out_as_the_single_lookup_leaves_it_out(self):
+        trip, drive, _first, second = self.shared_trip_with_a_stored_drive()
+        self.ok("ana", "DELETE", f"/api/segments/{second['id']}")
+        self.assert_batch_and_single_agree_on_no_routes(trip, drive)
+
+    def test_a_drive_whose_booking_was_moved_to_another_trip_is_left_out_as_the_single_lookup_leaves_it_out(self):
+        trip, drive, _first, second = self.shared_trip_with_a_stored_drive()
+        self.ok("ana", "POST", f"/api/segments/{second['id']}/move", {"trip_id": None})
+        self.assert_batch_and_single_agree_on_no_routes(trip, drive)
+
+    def test_a_drive_whose_booking_was_split_off_to_a_trip_the_caller_cannot_see_is_left_out_as_the_single_lookup_leaves_it_out(self):
+        trip, drive, _first, second = self.shared_trip_with_a_stored_drive()
+        self.ok("ana", "POST", f"/api/trips/{trip}/split", {"segment_ids": [second["id"]]})
+        self.assert_batch_and_single_agree_on_no_routes(trip, drive)
+
+    def test_a_drive_the_trip_still_makes_stays_in_the_batch_after_another_booking_is_removed(self):
+        trip, drive, _first, _second = self.shared_trip_with_a_stored_drive()
+        third = self.book("ana", {**HOTEL, "destination": "Chicago"}, trip_id=trip)
+        self.ok("ana", "DELETE", f"/api/segments/{third['id']}")
+        self.assertEqual([r["path"] for t in self.batch("ben", trip)[1]["trips"] for r in t["routes"]], [line(drive)])
+
     def test_the_ask_must_be_between_one_and_the_limit_of_trip_numbers(self):
         self.assertEqual(self.call("ana", "GET", "/api/driving-routes")[0], 400)
         for bad in ("trip=x", "trip=-1", "trip=1.5", "trip=", "trip=%EF%BC%91", "trip=1234567890123"):

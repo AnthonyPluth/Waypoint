@@ -193,9 +193,16 @@ def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], now:
         return []
     rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_(seen), DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)
                             .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon))
+    stops: dict[int, list[tuple[float, float]]] = {}
+    for trip_id in seen:
+        places = tripmap.places(conn, viewer, trip_id)
+        stops[trip_id] = _stops(places) if places is not None else []
     out: dict[int, TripRoutes] = {}
     for row in rows:
+        start: Place = {"latitude": row.from_lat / SCALE, "longitude": row.from_lon / SCALE}
+        end: Place = {"latitude": row.to_lat / SCALE, "longitude": row.to_lon / SCALE}
+        if not _on_trip(stops[row.trip_id], (start["latitude"], start["longitude"], end["latitude"], end["longitude"])):
+            continue
         found = out.setdefault(row.trip_id, {"trip_id": row.trip_id, "routes": []})
-        found["routes"].append({"start": {"latitude": row.from_lat / SCALE, "longitude": row.from_lon / SCALE},
-                                "end": {"latitude": row.to_lat / SCALE, "longitude": row.to_lon / SCALE}, "path": _thin(json.loads(row.path))})
+        found["routes"].append({"start": start, "end": end, "path": _thin(json.loads(row.path))})
     return list(out.values())

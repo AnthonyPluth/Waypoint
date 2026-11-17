@@ -468,6 +468,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -1030,6 +1031,7 @@
         "tests/test_offline.py",
         "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
