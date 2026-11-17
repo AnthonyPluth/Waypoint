@@ -9,7 +9,7 @@
   import { mercatorFor } from "$lib/replay-mapkit";
   import { viewport } from "$lib/phone.svelte";
   import { clock } from "$lib/trips";
-  import { activeStop, boundariesShown, datesOf, PIN_TARGET, pinFraction, pinLit, pinsOf, spreadPins, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, roadShapes, roadsShown, SCRUB_STEPS, shieldsOf, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Box, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, boundariesShown, datesOf, PIN_TARGET, pinFraction, pinLit, pinsOf, spreadPins, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, SCRUB_STEPS, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Box, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import X from "@lucide/svelte/icons/x";
@@ -39,7 +39,6 @@
   const projection = $derived(routeProjection(stops, width, height, undefined, roads, geoEqualEarth, clusters));
   const path = $derived(geoPath(projection));
   const legs = $derived(legsOf(stops, projection, roads));
-  const shapes = $derived(roadShapes(roads.interstates, projection));
   const lines = $derived(boundaryShapes(boundaries, projection));
   const spots = $derived(positions(stops, projection));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");
@@ -91,9 +90,7 @@
   const terrain = landFor(() => ({ projection, width, height, box, zoom: width / box.w }));
   const land = $derived(terrain.features.map((c, i) => ({ id: i, d: path(c) ?? "" })));
   const zoom = $derived(box.w / width);
-  const drawn = $derived(roadsShown(projection, zoom) ? shapes.filter((r) => inView(r, box)) : []);
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
-  const shields = $derived(shieldsOf(drawn, box, zoom));
   const zoomed = $derived(box.w < width - 0.5);
   let mapkitView = $state.raw<Box | null>(null);
   const showView = (view: Box) => { mapkitView = view; };
@@ -194,11 +191,6 @@
           {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
         </g>
       {/if}
-      {#if drawn.length}
-        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="interstates">
-          {#each drawn as r, i (i)}<path d={r.d} data-road={r.ref} class="stroke-map-border" stroke-width={1.6 * zoom} />{/each}
-        </g>
-      {/if}
       <g fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="legs">
         {#each legs as leg, i (i)}
           {@const done = calm ? 1 : legProgress(i, stops.length, progress)}
@@ -226,16 +218,6 @@
           {/if}
         {/each}
       </g>
-      {#if shields.length}
-        <g aria-hidden="true" data-testid="shields">
-          {#each shields as sh (sh.ref + sh.x)}
-            <g data-shield={sh.ref} transform="translate({sh.x.toFixed(1)} {sh.y.toFixed(1)}) scale({zoom})">
-              <rect x={-(sh.ref.length * 3 + 4)} y="-8" width={sh.ref.length * 6 + 8} height="16" rx="4" class="fill-card stroke-map-border" stroke-width="1" />
-              <text text-anchor="middle" dy="3.5" font-size="10" font-weight="600" class="fill-muted-foreground">{sh.ref}</text>
-            </g>
-          {/each}
-        </g>
-      {/if}
       <g data-testid="movers" aria-hidden="true">
         {#each movers as m (m.i)}
           <g data-mover={m.i} data-vehicle={m.vehicle} data-plane={m.vehicle === "plane" ? m.i : undefined} data-car={m.vehicle === "car" ? m.i : undefined} data-boat={m.vehicle === "boat" ? m.i : undefined}
@@ -297,7 +279,6 @@
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
     {#if stateLines.length}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
-    {#if roads.interstates.length}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-border" aria-hidden="true"></span>Highway</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
     {/if}
     {#if pins.length}

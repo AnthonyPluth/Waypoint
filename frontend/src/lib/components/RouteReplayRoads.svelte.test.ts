@@ -36,22 +36,20 @@ const list = () => within(screen.getByRole("list", { name: "Stops in order" })).
 const ground = (c: HTMLElement) => c.querySelector("path[data-leg='ground']")!;
 
 describe("RouteReplayMap on the highways", () => {
-  it("draws a road leg along the road, with the roads behind it, and names the roads in the text list", () => {
+  it("draws a road leg along the road, with no highway lines behind it, and names the roads in the text list", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, still: true });
     expect(ground(container).getAttribute("d")).not.toContain("Q");
     expect(ground(container).getAttribute("data-road-leg")).toBe("I-25 I-80");
-    expect([...container.querySelectorAll("[data-road]")].map((p) => p.getAttribute("data-road"))).toEqual(["I-25", "I-80"]);
+    expect(container.querySelector("[data-road]")).toBeNull();
     expect(list()).toEqual(["Stay in Denver, Dec 5 – 6", "Stay in Salt Lake City, Dec 5 – 6"]);
-    expect(screen.getByLabelText("Map key").textContent).toContain("Highway");
+    expect(screen.getByLabelText("Map key").textContent).not.toContain("Highway");
   });
 
-  it("hides the roads and their labels from assistive technology", () => {
+  it("draws no highway lines and no shields, even when the server sent interstates", () => {
     const { container } = render(RouteReplayMap, { stops: [denver, saltLake], year: 2025, roads, still: true });
-    const layer = container.querySelector("[data-testid='interstates']")!;
-    expect(layer.closest("[aria-hidden='true']") ?? layer.getAttribute("aria-hidden")).toBeTruthy();
-    const shields = container.querySelector("[data-testid='shields']")!;
-    expect(shields.getAttribute("aria-hidden")).toBe("true");
-    expect([...shields.querySelectorAll("[data-shield]")].map((s) => s.getAttribute("data-shield")).sort()).toEqual(["I-25", "I-80"]);
+    expect(container.querySelector("[data-testid='interstates']")).toBeNull();
+    expect(container.querySelector("[data-testid='shields']")).toBeNull();
+    expect(container.querySelector("[data-shield]")).toBeNull();
     expect(container.querySelector("[data-testid='movers']")!.getAttribute("aria-hidden")).toBe("true");
   });
 
@@ -97,22 +95,20 @@ describe("RouteReplayMap on the highways", () => {
     expect(list()).toHaveLength(2);
   });
 
-  it("draws the roads only within the camera, so the ones far from a zoomed-in leg are left out", async () => {
+  it("draws no highway lines or shields while zoomed in on a leg either", async () => {
     const airport = stopAt("Denver airport", 39.86, -104.67, "flight", "airport");
     const newYork = stopAt("New York", 40.64, -73.78, null, "airport");
     const east: Roads = { ...roads, interstates: [...roads.interstates, { ref: "I-95", points: [[40.0, -75.0], [41.0, -73.9]] }] };
     const { container } = render(RouteReplayMap, { stops: [newYork, airport, denver, saltLake], year: 2025, roads: east, still: false });
-    const drawn = () => [...container.querySelectorAll("[data-road]")].map((p) => p.getAttribute("data-road"));
-    expect(drawn()).toContain("I-95");
+    expect(container.querySelector("[data-road]")).toBeNull();
     const slider = screen.getByRole("slider", { name: "Position along the route" });
     await fireEvent.input(slider, { target: { value: "2667" } });
     expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("true");
-    expect(drawn()).not.toContain("I-95");
-    expect(drawn()).toContain("I-25");
-    expect(container.querySelector("[data-shield='I-95']")).toBeNull();
+    expect(container.querySelector("[data-road]")).toBeNull();
+    expect(container.querySelector("[data-shield]")).toBeNull();
   });
 
-  it("leaves the roads out of a map too wide to read them", () => {
+  it("keeps the road leg of a map too wide to show anything else", () => {
     const sydney = stopAt("Sydney", -33.9, 151.2, "flight", "airport");
     const { container } = render(RouteReplayMap, { stops: [sydney, denver, saltLake], year: 2025, roads, still: true });
     expect(container.querySelector("[data-testid='interstates']")).toBeNull();

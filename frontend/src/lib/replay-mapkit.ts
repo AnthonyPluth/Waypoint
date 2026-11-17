@@ -2,8 +2,8 @@ import { geoBounds, geoMercator, type GeoProjection } from "d3-geo";
 import { drivingRoutes, type Drive } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
-  activeStop, boundariesShown, cameraAt, inView, legProgress, legsOf, moverAt, positions, reached, roadsShown, routeProjection, shieldsOf,
-  type Boundaries, type Box, type Extent, type Leg, type RoadShape, type Roads, type Spot, type Stop, type Vehicle,
+  activeStop, boundariesShown, cameraAt, inView, legProgress, legsOf, moverAt, positions, reached, routeProjection,
+  type Boundaries, type Box, type Extent, type Leg, type Roads, type Spot, type Stop, type Vehicle,
 } from "./route-replay";
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
@@ -16,7 +16,6 @@ export const MAX_LATITUDE = 85.0511;
 export const SAMPLES = 64;
 export const FLIGHT_WIDTH = 2.5;
 export const GROUND_WIDTH = 2;
-export const ROAD_WIDTH = 1.6;
 export const BOUNDARY_WIDTH = 1;
 export const BOUNDARY_DASH = [4, 3];
 export const MOVER_SCALE = 1.1;
@@ -145,14 +144,6 @@ function moverElement(index: number, vehicle: Vehicle): { node: HTMLElement; bod
   return { node, body };
 }
 
-function shieldElement(ref: string): HTMLElement {
-  const half = ref.length * 3 + 4;
-  const text = element("text", { "text-anchor": "middle", dy: 3.5, "font-size": 10, "font-weight": 600, class: "fill-muted-foreground" });
-  text.textContent = ref;
-  const host = anchored(element("g", {}, element("rect", { x: -half, y: -8, width: ref.length * 6 + 8, height: 16, rx: 4, class: "fill-card stroke-map-border", "stroke-width": 1 }), text), Math.max(half, 8) + 2, { "data-shield": ref });
-  return host;
-}
-
 export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOptions): ReplayMap {
   const { stops, roads, boundaries, width, height, palette, scale, onFailure, tripId = null, more = [], onView } = options;
   const projection = mercatorFor(stops, width, height, roads, more);
@@ -161,7 +152,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   const paths = legs.map(legPath);
   let lastFrame: Frame | null = null;
   let over = false;
-  const interstates = linesOf(roads.interstates, projection);
   const states = linesOf(boundaries, projection);
   const full: Box = { x: 0, y: 0, w: width, h: height };
   const coordinate = (at: Spot) => {
@@ -211,9 +201,7 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   };
   ends.push(clearMover);
   const legMarks = new Map<number, { overlay: MkOverlay; done: number }>();
-  const roadMarks = new Map<number, MkOverlay>();
   const stateMarks = new Map<number, MkOverlay>();
-  const shieldMarks = new Map<string, MkAnnotation>();
   let seen = "";
 
   const rectOf = (box: Box) => {
@@ -245,9 +233,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       else if (!show && mark.shown) { map?.removeAnnotation(mark.annotation); mark.shown = false; }
       mark.ping.style.display = !calm && playing && i === now ? "" : "none";
     });
-    const showRoads = roadsShown(projection, zoom);
-    const drawnRoads = showRoads ? interstates.filter((r) => inView(r, box)) : [];
-    sync(roadMarks, new Set(drawnRoads.map((r) => r.index)), (i) => new mk.PolylineOverlay(geographic(roads.interstates[i].points), { style: style(palette.border, ROAD_WIDTH) }));
     const drawnLines = boundariesShown(projection, zoom) ? states.filter((l) => inView(l, box)) : [];
     sync(stateMarks, new Set(drawnLines.map((l) => l.index)), (i) => new mk.PolylineOverlay(geographic(boundaries[i].points), { style: style(palette.border, BOUNDARY_WIDTH, { lineDash: BOUNDARY_DASH, strokeOpacity: 0.8 }) }));
     let movingLeg = -1;
@@ -279,15 +264,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       const at = moverAt(leg, legProgress(movingLeg, stops.length, progress));
       mover.annotation.coordinate = coordinate(at);
       mover.body.setAttribute("transform", `rotate(${at.angle.toFixed(1)}) scale(${MOVER_SCALE})`);
-    }
-    const shapes: RoadShape[] = drawnRoads.map((r) => ({ ref: roads.interstates[r.index].ref, d: "", left: r.left, top: r.top, right: r.right, bottom: r.bottom, length: r.length, mid: r.mid }));
-    const wanted = new Map(shieldsOf(shapes, box, zoom).map((s) => [`${s.ref}@${s.x.toFixed(1)},${s.y.toFixed(1)}`, s]));
-    for (const [key, annotation] of [...shieldMarks]) if (!wanted.has(key)) { map?.removeAnnotation(annotation); shieldMarks.delete(key); }
-    for (const [key, s] of wanted) {
-      if (shieldMarks.has(key)) continue;
-      const annotation = new mk.Annotation(coordinate({ x: s.x, y: s.y }), () => shieldElement(s.ref), { visible: true });
-      map?.addAnnotation(annotation);
-      shieldMarks.set(key, annotation);
     }
   };
 
