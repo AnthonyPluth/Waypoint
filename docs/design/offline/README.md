@@ -1,6 +1,6 @@
 # Offline access card in the iPhone app: signed-off design
 
-This is the design for [#740](https://github.com/AnthonyPluth/Waypoint/issues/740), part of the offline epic [#734](https://github.com/AnthonyPluth/Waypoint/issues/734): the Settings card that shows and switches "save my upcoming trips" inside the iPhone app. The owner signed it off on 2026-11-17 (answers to the questions the first draft asked). The file is a self-contained HTML page (vector only, no raster images, dark only, phone width 390 px only). The page uses Waypoint's tokens from `frontend/src/app.css` and adds none. Every trip name and time in it is made up.
+This is the design for [#740](https://github.com/AnthonyPluth/Waypoint/issues/740), part of the offline epic [#734](https://github.com/AnthonyPluth/Waypoint/issues/734): the Settings card that shows and switches "save my upcoming trips" inside the iPhone app. The owner signed it off on 2026-11-17 (answers to the questions the first draft asked), with the privacy sentence removed from the card. The file is a self-contained HTML page (vector only, no raster images, dark only, phone width 390 px only). The page uses Waypoint's tokens from `frontend/src/app.css` and adds none. Every trip name and time in it is made up.
 
 | Screen | File | What it shows |
 | --- | --- | --- |
@@ -20,12 +20,12 @@ Decided by the owner on 2026-11-17, with the epic's earlier ones:
 - An app too old to have the offline bridge shows no Offline access card at all. Real browsers keep today's card and every word of it unchanged.
 - Phone width is the only width that ships.
 - Ten saved trips show three names, then "and 7 more" with Show all (and Show fewer).
-- The privacy sentence: "Kept in Waypoint's private storage on this device, protected by the phone's lock. Other apps and websites can't read it, and Waypoint adds no encryption of its own."
+- The card carries no sentence about how the trips are stored (private storage, the phone's lock, no encryption of Waypoint's own). That explanation lives in the docs: `docs/src/content/docs/start/offline.md` and `ios/README.md`, which the build updates (#740, #741). The backups line stays on the card.
 - Inside the app that supports the bridge, the card never shows "Offline access isn't available on this device" or the passkey setup.
 
 ## What the card shows
 
-One card in the same place and the same `rows` pattern as the browser's: a status line (On for this device, Off on this device, Couldn't save the trips, The saved trips can't be read) with a chip, the saved trips by name with when they were saved and when each is removed, a switch named "Save my upcoming trips", one sentence on how they are kept and the backup line. A failed save keeps the older copy and is tried again at the next online open. A copy that can't be read is deleted by switching saving off and on.
+One card in the same place and the same `rows` pattern as the browser's: a status line (On for this device, Off on this device, Couldn't save the trips, The saved trips can't be read) with a chip, the saved trips by name with when they were saved and when each is removed, a switch named "Save my upcoming trips", the backup line. A failed save keeps the older copy and is tried again at the next online open. A copy that can't be read is deleted by switching saving off and on.
 
 ## Bridge status: what the build adds
 
