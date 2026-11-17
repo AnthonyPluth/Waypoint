@@ -1052,6 +1052,7 @@ describe("Trip", () => {
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
       expect(await screen.findByRole("link", { name: "Google Maps" })).toBeTruthy();
       first.unmount();
+      document.body.style.pointerEvents = "";
       held = trip([{ ...stay, status: "cancelled", details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       render(TripPage);
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
