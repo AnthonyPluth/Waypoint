@@ -214,7 +214,22 @@ describe("RouteReplay with the flag on", () => {
     expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
     await waitFor(() => expect(svg(container)).toBeTruthy());
     expect(container.querySelector("[data-mapkit]")).toBeNull();
-    expect(fake.last().destroyed).toBe(true);
+    expect(fake.maps).toHaveLength(0);
+    expect(fake.directions.calls).toHaveLength(0);
+  });
+
+  it("uses MapKit again for a replay that opens after a failure and a later token refresh", async () => {
+    const preload = loadMapkit();
+    await loadScript();
+    await preload;
+    fake.emit("error", { status: "Unauthorized" });
+    const done = vi.fn();
+    fake.inits[0].authorizationCallback(done);
+    await waitFor(() => expect(done).toHaveBeenCalledWith("a.b.c"));
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(svg(container)).toBeNull();
+    expect(fake.maps).toHaveLength(1);
   });
 
   it("falls back to the flat map when the script can't be loaded", async () => {
@@ -261,6 +276,17 @@ describe("RouteReplayMap on MapKit", () => {
     maps.fail();
     await waitFor(() => expect(svg(container)).toBeTruthy());
     expect(fake.last().destroyed).toBe(true);
+    expect(maps.watching()).toBe(0);
+  });
+
+  it("builds no Apple map and asks Apple for no directions when MapKit has already failed", async () => {
+    const maps = fakeMaps();
+    maps.fail();
+    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false, maps });
+    await waitFor(() => expect(svg(container)).toBeTruthy());
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
+    expect(fake.maps).toHaveLength(0);
+    expect(fake.directions.calls).toHaveLength(0);
     expect(maps.watching()).toBe(0);
   });
 

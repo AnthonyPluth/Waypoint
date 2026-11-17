@@ -95,5 +95,6 @@ export const fakeMk: Mk = {
 
 export const fakeMaps = (): Maps & { fail(): void; watching(): number } => {
   const failures = new Set<() => void>();
-  return { mk: fakeMk, onFailure: (l) => { failures.add(l); return () => { failures.delete(l); }; }, fail: () => { for (const l of [...failures]) l(); }, watching: () => failures.size };
+  let down = false;
+  return { mk: fakeMk, failed: () => down, onFailure: (l) => { failures.add(l); return () => { failures.delete(l); }; }, fail: () => { down = true; for (const l of [...failures]) l(); }, watching: () => failures.size };
 };
