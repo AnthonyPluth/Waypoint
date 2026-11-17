@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date, time, timedelta
 
-from . import when
+from . import fields, when
 from .booking import Booking, Parsed, Passenger
 from .parsers._text import lines
 
@@ -75,11 +75,15 @@ def _booking(rows: list[str]) -> Booking:
         raise Unreadable("")
     if "property" not in found:
         raise Unreadable("no hotel name found")
-    name = found["property"][1][:100]
+    name: str | None = found["property"][1][:100]
+    if name and fields.amount_only(name):
+        name = None
     first = when.find_date(found["checkin"][1])
     if first is None:
         raise Unreadable("check-in isn't a date")
-    sources: dict[str, str] = {"origin": found["property"][0], "start_local": found["checkin"][0]}
+    sources: dict[str, str] = {"start_local": found["checkin"][0]}
+    if name:
+        sources["origin"] = found["property"][0]
     at_in = when.find_time(found["checkin"][1])
     last: date | None = None
     at_out: time | None = None

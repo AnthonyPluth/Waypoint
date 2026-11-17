@@ -4193,9 +4193,6 @@
           },
           "openrouter_key": {
             "type": "string"
-          },
-          "auto": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -4228,9 +4225,6 @@
               "saved",
               null
             ]
-          },
-          "auto": {
-            "type": "boolean"
           }
         },
         "required": [
@@ -4238,8 +4232,7 @@
           "ollama_url",
           "ollama_model",
           "openrouter_model",
-          "key",
-          "auto"
+          "key"
         ],
         "additionalProperties": false
       },
@@ -7870,13 +7863,17 @@
           },
           "ai": {
             "type": "boolean"
+          },
+          "ai_hosted": {
+            "type": "boolean"
           }
         },
         "required": [
           "items",
           "matches",
           "who",
-          "ai"
+          "ai",
+          "ai_hosted"
         ],
         "additionalProperties": false
       },

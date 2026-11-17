@@ -4,7 +4,6 @@ export interface AiBody {
   ollama_model?: string;
   openrouter_model?: string;
   openrouter_key?: string;
-  auto?: boolean;
 }
 
 export interface AiSettings {
@@ -13,7 +12,6 @@ export interface AiSettings {
   ollama_model: string;
   openrouter_model: string;
   key: "env" | "saved" | null;
-  auto: boolean;
 }
 
 export interface AiSuggestion {
@@ -873,6 +871,7 @@ export interface Review {
   matches: ReviewMatch[];
   who: WhoIsThis[];
   ai: boolean;
+  ai_hosted: boolean;
 }
 
 export interface ReviewBooking {

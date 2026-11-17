@@ -296,6 +296,7 @@ class Review(TypedDict):
     matches: list[ReviewMatch]
     who: list[WhoIsThis]
     ai: bool
+    ai_hosted: bool
 
 
 class Preview(TypedDict):
@@ -353,7 +354,6 @@ class AiSettings(TypedDict):
     ollama_model: str
     openrouter_model: str
     key: Literal["env", "saved"] | None
-    auto: bool
 
 
 class AiBody(TypedDict):
@@ -362,7 +362,6 @@ class AiBody(TypedDict):
     ollama_model: NotRequired[str]
     openrouter_model: NotRequired[str]
     openrouter_key: NotRequired[str]
-    auto: NotRequired[bool]
 
 
 class Person(TypedDict):

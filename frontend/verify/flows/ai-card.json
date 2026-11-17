@@ -1,0 +1,17 @@
+{
+  "name": "ai-card",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/mail" },
+    { "wait_for": "#ai-title" },
+    { "scroll_to": "#ai-title" },
+    { "screenshot": "off" },
+    { "click": "label:has-text('Local (Ollama)')" },
+    { "expect_text": { "selector": "body", "text": "stays on your household’s server and network" } },
+    { "screenshot": "local" },
+    { "click": "label:has-text('OpenRouter')" },
+    { "expect_text": { "selector": "body", "text": "OpenRouter, a hosted service outside your household" } },
+    { "scroll_to": "#ai-title" },
+    { "screenshot": "openrouter" }
+  ]
+}

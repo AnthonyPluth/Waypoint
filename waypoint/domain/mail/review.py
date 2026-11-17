@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Collection
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from sqlalchemy import and_, delete, or_, select, update
 
@@ -85,6 +85,29 @@ def set_read_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, 
     held = conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
     if all(x.get("parsed") for x in suggestions_of(held)):
         set_suggestions(conn, mailbox_id, message_id, suggestions, None)
+
+
+def fixed_suggestions(conn: db.Connection, mailbox_id: int, message_id: str) -> list[ai.Suggestion]:
+    held = suggestions_of(conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar())
+    return held if all(x.get("parsed") for x in held) else []
+
+
+NOT_VALUES = ("sources", "parsed")
+
+
+def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> list[ai.Suggestion]:
+    waiting = list(fixed)
+    out: list[ai.Suggestion] = []
+    for suggestion in said:
+        merged: dict[str, Any] = dict(suggestion)
+        same = next((p for p in waiting if p.get("kind") == suggestion.get("kind")), None)
+        if same is not None:
+            waiting.remove(same)
+        for key, value in (same or {}).items():
+            if value and key not in NOT_VALUES:
+                merged[key] = value
+        out.append(cast(ai.Suggestion, merged))
+    return out
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:

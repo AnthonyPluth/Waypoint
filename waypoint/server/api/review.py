@@ -27,7 +27,7 @@ def api_review(conn, _q, _b) -> Review:
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
                     for t, s in trips.unmatched(conn, viewer(conn))],
-            "ai": ai.mail_config(conn) is not None}
+            "ai": ai.mail_config(conn) is not None, "ai_hosted": ai.hosted(conn)}
 
 
 def _pick(linked: gatecode.Linked | None) -> None:

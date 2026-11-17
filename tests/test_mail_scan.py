@@ -2291,8 +2291,8 @@ class KeptPictureTests(ScanCase):
         self.add_mail("msg-pics", with_pictures("no_markup"))
         asked = []
         config = scan.ai.Config("local", "llama3", url="http://ollama.example:1234")
-        with remote_pictures(), mock.patch.object(scan.ai, "mail_config", return_value=config), mock.patch.object(scan.autoask, "chosen", return_value=True), \
-                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, timeout=None: asked.append(text) or ai.Reading([])):
+        with remote_pictures(), mock.patch.object(scan.ai, "mail_config", return_value=config), mock.patch.object(scan.autoask, "active", return_value=True), \
+                mock.patch.object(scan.ai, "suggest", side_effect=lambda cfg, text, timeout=None, known=(): asked.append(text) or ai.Reading([])):
             self.scan()
         self.assertTrue(asked)
         for text in asked:
@@ -2546,7 +2546,7 @@ class MailScanApiTests(GoogleCase):
         self.assertEqual(sorted(i["reason"] for i in mine["items"]), ["incomplete", "no_markup"])
         item = next(i for i in mine["items"] if i["reason"] == "no_markup")
         self.assertEqual((item["address"], item["sender_domain"], item["received"]), ("ana@gmail.example", "example-air.example", "2026-10-17"))
-        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "matches": [], "who": [], "ai": False})
+        self.assertEqual(self.call("ben", "GET", "/api/review")[1], {"items": [], "matches": [], "who": [], "ai": False, "ai_hosted": False})
         for method, path in (("DELETE", f"/api/review/{item['id']}"), ("POST", f"/api/review/{item['id']}/ignore")):
             status, body = self.call("ben", method, path, {} if method == "POST" else None)
             self.assertEqual((status, body["error"]), (404, "No such item"), path)
@@ -2873,29 +2873,27 @@ class MailScanApiTests(GoogleCase):
         self.assertFalse(self.call("ana", "GET", "/api/review")[1]["ai"])
         self.assertNotIn("ai_mode", self.call("ana", "GET", "/api/review")[1])
         status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
-        self.assertEqual((status, body["error"]), (400, ai.NEEDS_LOCAL))
+        self.assertEqual((status, body["error"]), (400, ai.NEEDS_AI))
         self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
         self.assertEqual(self.call("ana", "POST", "/api/review/9999/suggest", {})[0], 404)
         self.share()
         status, body = self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})
-        self.assertEqual((status, body["error"]), (400, ai.NEEDS_LOCAL))
+        self.assertEqual((status, body["error"]), (400, ai.NEEDS_AI))
 
-    def test_asking_the_ai_in_hosted_mode_is_refused_and_nothing_is_sent(self):
+    def test_asking_the_ai_in_hosted_mode_is_offered_and_goes_to_the_hosted_ai_alone(self):
         self.put("no_markup")
         self.scan_now()
         [item] = self.call("ana", "GET", "/api/review")[1]["items"]
         with db.session() as conn:
-            for key, value in ((sk.AI_MODE, "openrouter"), (sk.AI_OPENROUTER_MODEL, "some/model"), (sk.AI_OPENROUTER_KEY, "sk-or-test-key-7f3a91c2b8"),
-                               (sk.AI_AUTO, "1")):
+            for key, value in ((sk.AI_MODE, "openrouter"), (sk.AI_OPENROUTER_MODEL, "some/model"), (sk.AI_OPENROUTER_KEY, "sk-or-test-key-7f3a91c2b8")):
                 db.set_setting(conn, key, value)
         self.addCleanup(self.ai_off)
         self.addCleanup(self.hosted_off)
-        asked: list[str] = []
-        with refusing_ai_hosts(self, asked):
-            self.assertEqual(self.call("ana", "GET", "/api/review")[1]["ai"], False)
-            status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
-        self.assertEqual((status, body["error"], asked), (400, "Reading email with AI needs Local (Ollama) in Settings → AI.", []))
-        self.assertEqual(self.call("ana", "GET", "/api/review")[1]["items"][0]["suggestions"], [])
+        reply = self.call("ana", "GET", "/api/review")[1]
+        self.assertEqual((reply["ai"], reply["ai_hosted"]), (True, True))
+        (status, body), asked = self.asked("ana", item["id"])
+        self.assertEqual((status, body), (200, {"ok": True}))
+        self.assertEqual(asked.call_args.args[0], scan.ai.Config("openrouter", "some/model", key="sk-or-test-key-7f3a91c2b8"))
 
     SUGGESTED = {"kind": "flight", "provider": "Example Air", "confirmation": "QW4R7T", "origin": "BOS", "destination": "DEN",
                  "start_local": "2026-12-02T07:15", "end_local": "2026-12-02T10:05"}
@@ -2913,7 +2911,7 @@ class MailScanApiTests(GoogleCase):
 
     def hosted_off(self):
         with db.session() as conn:
-            for key in (sk.AI_OPENROUTER_MODEL, sk.AI_OPENROUTER_KEY, sk.AI_AUTO):
+            for key in (sk.AI_OPENROUTER_MODEL, sk.AI_OPENROUTER_KEY):
                 db.set_setting(conn, key, None)
 
     def test_review_offers_ask_ai_only_when_a_local_ai_would_read_the_mail(self):

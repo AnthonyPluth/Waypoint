@@ -45,5 +45,19 @@ class LodgingReaderTests(unittest.TestCase):
             with self.subTest(why):
                 self.assertEqual(read(body), ((), why))
 
+    def test_a_name_that_is_only_a_price_or_a_number_is_no_hotel_name_and_the_rest_is_still_read(self):
+        for shown in ("$401.30", "401.30", "USD 401.30", "401,30 €", "€1,240.00", "US$ 401.30", "12", "(401.30)"):
+            for body in (f"<p>Hotel: {shown}</p>", f"<p>Hotel name: {shown}</p>"):
+                with self.subTest(shown=shown, body=body):
+                    [b], why = read(body + "<p>Check-in: 2026-11-21</p><p>Check-out: 2026-11-22</p><p>Reservation number: ab12cd34</p>")
+                    self.assertEqual((b.provider, b.origin, b.confirmation, b.start[:10], b.end[:10], why), (None, None, "AB12CD34", "2026-11-21", "2026-11-22", None))
+                    self.assertNotIn("origin", dict(b.generic))
+
+    def test_a_name_with_a_number_in_it_is_still_a_name(self):
+        for shown in ("Hotel 626", "The 1 Hotel", "Room Mate 2", "Motel 6"):
+            with self.subTest(shown):
+                [b], why = read(f"<p>Hotel: {shown}</p><p>Check-in: 2026-11-21</p><p>Check-out: 2026-11-22</p>")
+                self.assertEqual((b.provider, why), (shown, None))
+
     def test_mail_with_no_check_in_is_not_a_lodging_mail(self):
         self.assertEqual(read("<p>Hello, here is your newsletter</p>"), ((), ""))

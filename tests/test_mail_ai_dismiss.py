@@ -5,7 +5,7 @@ from unittest import mock
 from sqlalchemy import select
 
 from tests.privacy import no_leaks
-from tests.test_mail_ai import BODY, FOOTER, GOOD, IDS, QUOTED, REPLY_CANARY, KEY, ScanAiCase
+from tests.test_mail_ai import BODY, FOOTER, GOOD, IDS, QUOTED, REPLY_CANARY, ScanAiCase
 from tests.test_mail_scan import NOW, eml
 from waypoint import tls
 from waypoint.domain.mail import ai, review, scan
@@ -57,9 +57,10 @@ class VerdictParseTests(unittest.TestCase):
 
 class VerdictCase(ScanAiCase):
     def asked_by_hand(self, name="promo_ids"):
-        self.turn_on(auto=False)
+        self.turn_off()
         self.put(name)
         self.assertEqual(self.scan().review, 1)
+        self.turn_on()
         [item] = self.items()
         self.fake.content = VERDICT
         return item
@@ -104,7 +105,7 @@ class AskAiVerdictTests(VerdictCase):
         self.assertEqual((self.items(), self.stored()), ([], []))
 
     def test_the_grouped_items_all_stay_when_one_of_them_is_asked_about(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         for message_id in ("m-a", "m-b", "m-c"):
             self.google.mail[message_id] = eml("promo_ids")
         with db.session() as conn:
@@ -148,23 +149,16 @@ class AskAiVerdictTests(VerdictCase):
         [kept] = self.items()
         self.assertEqual(kept["suggestion_error"], ai.UNREACHABLE)
 
-    def test_hosted_mode_never_reads_the_email(self):
-        import os
-        env = mock.patch.dict(os.environ, {ai.KEY_ENV: KEY})
-        env.start()
-        self.addCleanup(env.stop)
-        self.turn_on("openrouter", auto=False)
-        from waypoint.storage import settings_keys as sk
-        with db.session() as conn:
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "some/model")
+    def test_a_hosted_model_that_calls_the_email_a_promotion_dismisses_nothing_either(self):
+        self.turn_on("openrouter")
         self.put("promo_ids")
         self.scan()
         [item] = self.items()
+        self.fake.reset()
         self.fake.content = VERDICT
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            with self.assertRaises(scan.NoAi):
-                scan.suggest_now("u-jane", item["id"], NOW)
-        self.assertEqual(self.fake.requests, [])
+        with no_leaks(self, BODY, *IDS, database=self.path, sent_ok=True):
+            scan.suggest_now("u-jane", item["id"], NOW)
+        self.assertEqual(len(self.fake.requests), 1)
         self.assertEqual([i["id"] for i in self.items()], [item["id"]])
 
 

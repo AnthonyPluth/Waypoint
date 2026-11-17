@@ -17,7 +17,7 @@ from ...providers import gmail, mailimages
 from ...storage import db, gate_codes, stored_mail
 from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
-from .. import airports, people, trips, visibility
+from .. import airports, loyalty, people, trips, visibility
 from ..visibility import Viewer
 from . import ai, autoask, extract, followup, gatecode, glance, ingest, newer, nothing_new, query, review, triage
 from .booking import Passenger
@@ -331,7 +331,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
                    parking=_parking_in(message.bookings))
         if read:
             review.set_read_suggestions(conn, mailbox_id, message_id, read)
-        if not usable and (strong or message.markup or message.bookings) and autoask.switched_on(conn):
+        if not usable and (strong or message.markup or message.bookings) and autoask.active(conn):
             autoask.wait(conn, mailbox_id, message_id)
         queued = 1
     elif held:
@@ -342,7 +342,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
-NO_AI = ai.NEEDS_LOCAL
+NO_AI = ai.NEEDS_AI
 
 
 class NoAi(Exception):
@@ -404,7 +404,7 @@ class Read(NamedTuple):
 
 def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str = "", revises: bool = False) -> Read:
     try:
-        reading = ai.suggest(cfg, text, timeout)
+        reading = ai.suggest(cfg, text, timeout, _known(cfg))
         return Read(reading.bookings, reading.error, False, max(reading.parking, _parking_in(reading.bookings)),
                     nothing_new.signals(text, subject, revises))
     except ai.AiError as e:
@@ -412,6 +412,13 @@ def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str 
     except Exception as e:
         monitoring.report(e, values=False)
         return Read([], SUGGESTION_FAILED, True)
+
+
+def _known(cfg: ai.Config) -> tuple[str, ...]:
+    if cfg.mode != ai.OPENROUTER:
+        return ()
+    with db.session() as conn:
+        return tuple(loyalty.known_numbers(conn))
 
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
@@ -555,7 +562,7 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     for message_id in message_ids:
         with db.session() as conn:
             cfg = ai.mail_config(conn)
-            if cfg is None or not autoask.fills_gaps(conn):
+            if cfg is None:
                 return asked
         left = BUDGET - (_clock() - started)
         if left <= 0:
@@ -590,7 +597,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
     while True:
         with db.session() as conn:
             cfg = ai.mail_config(conn)
-            if cfg is None or not autoask.chosen(conn):
+            if cfg is None:
                 return asked, made, cleared
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
         if message_id is None:
@@ -611,8 +618,11 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         subject, revises = extract.guard(raw)
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
-            filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(),
-                             read.parking, signals=read.signals, dismiss_known=True, sender=extract.own_sender(raw))
+            fixed = review.fixed_suggestions(conn, mailbox_id, message_id)
+            said = review.keeping_fixed(fixed, read.suggestions)
+            answered = bool(said)
+            filed = _file_ai(conn, mailbox_id, message_id, said or fixed, read.error, None if read.failed or (fixed and not answered) else True, time.time(),
+                             read.parking, signals=read.signals, dismiss_known=answered and not fixed, sender=extract.own_sender(raw))
             made, cleared = made + filed.added, cleared + filed.cleared
             if filed.known:
                 known[filed.known] += 1
@@ -648,7 +658,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     known: Counter[str] = Counter()
     gaps: list[str] = []
     with db.session() as conn:
-        filling = not again and not backfill and autoask.fills_gaps(conn)
+        filling = not again and not backfill and autoask.active(conn)
     started = _clock()
     forced: set[str] = set()
     strong = True

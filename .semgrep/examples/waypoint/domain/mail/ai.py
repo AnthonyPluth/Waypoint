@@ -5,5 +5,5 @@ OPENROUTER = "https://openrouter.ai/api/v1/chat/completions"
 # ok: waypoint-ai-hosts
 OLLAMA_PATH = "/api/chat"
 
-# ok: waypoint-mail-ai-local-only
+# ok: waypoint-mail-ai-chosen-mode
 cfg = ai.config(conn)

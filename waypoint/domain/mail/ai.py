@@ -34,7 +34,7 @@ MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
-NEEDS_LOCAL = "Reading email with AI needs Local (Ollama) in Settings → AI."
+NEEDS_AI = "Reading email with AI needs an AI mode (Local or OpenRouter) in Settings → AI."
 
 
 @dataclass(frozen=True)
@@ -119,7 +119,12 @@ def config(conn: db.Connection) -> Config | None:
 
 
 def mail_config(conn: db.Connection) -> Config | None:
-    return config(conn) if mode(conn) == LOCAL else None
+    return config(conn)
+
+
+def hosted(conn: db.Connection) -> bool:
+    cfg = mail_config(conn)
+    return cfg is not None and cfg.mode == OPENROUTER
 
 
 MODEL_NAME = re.compile(r"[\w.:/@+-]{1,100}")
@@ -535,14 +540,16 @@ def pick_picture(cfg: Config, pictures: Sequence[bytes], timeout: float | None =
     return chosen - 1
 
 
-def suggest(cfg: Config, text: str, timeout: float | None = None) -> Reading:
-    if cfg.mode != LOCAL:
-        raise AiError(NEEDS_LOCAL)
+def suggest(cfg: Config, text: str, timeout: float | None = None, known: tuple[str, ...] = ()) -> Reading:
+    if cfg.mode not in (LOCAL, OPENROUTER):
+        raise AiError(NEEDS_AI)
+    if cfg.mode == OPENROUTER:
+        text = redact(text, known)
     if not text.strip():
         raise AiError(NO_BOOKING)
     began = time.monotonic()
     first = _attempt(cfg, text, timeout)
-    if not _doubtful(first, text):
+    if cfg.mode != LOCAL or not _doubtful(first, text):
         return _reading(first)
     left = None if timeout is None else timeout - (time.monotonic() - began)
     if left is not None and left <= 0:

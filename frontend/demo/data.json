@@ -78362,7 +78362,8 @@
         "start_zone": "America/New_York"
       }
     ],
-    "ai": false
+    "ai": false,
+    "ai_hosted": false
   },
   "flight_status": {
     "enabled": false,

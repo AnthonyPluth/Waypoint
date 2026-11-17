@@ -58,14 +58,17 @@ class ReadSuggestionTests(ScanAiCase):
                          ("parking", LOT, "2027-03-05T15:00:00", "2027-03-09T15:00:00", "100200300", "SpotHero", "1 Example Avenue", "(555) 010-0100", True))
         self.assertNotIn("start_zone", s)
 
-    def test_the_email_is_not_sent_to_the_ai_when_the_parser_already_read_it(self):
+    def test_the_email_is_sent_to_the_ai_to_fill_the_zone_and_a_failed_call_keeps_what_the_parser_read(self):
         self.turn_on()
+        self.fake.status = 500
         self.add_mail("spot", FIXTURE.read_bytes())
-        with no_leaks(self, *CANARIES, database=self.path):
+        with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
             result = self.scan()
         self.assertEqual(result.review, 1)
-        self.assertEqual(self.fake.requests, [])
-        self.assertEqual(self.waiting(), [None])
+        self.assertEqual(len(self.fake.requests), 1)
+        self.assertEqual(self.waiting(), ["waiting"])
+        [item] = self.items()
+        self.assertEqual([(s["origin"], s["parsed"]) for s in item["suggestions"]], [(LOT, True)])
 
     def test_scanning_again_keeps_one_item_with_one_suggestion(self):
         self.add_mail("spot", FIXTURE.read_bytes())

@@ -1,35 +1,31 @@
 ---
 title: AI suggestions
-description: The optional AI that suggests the booking in mail Waypoint couldn’t read. Off by default, and email goes only to your own Ollama server.
+description: The optional AI that fills in what Waypoint couldn’t read in a booking email. Off by default; turning on Local (Ollama) or OpenRouter is the one choice, and the Settings card says where the text goes.
 sidebar:
   order: 6
 ---
 
-**Settings → Mail & review → AI** is off until you turn it on. Email is read with AI only in Local (Ollama) mode, by your own Ollama server. When that is set, you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (under Check suggestions or Add missing details) and a model suggests the booking. A booking Waypoint could already read is never sent. Nothing is sent until someone chooses **Ask AI**, unless you also turn on the second switch below.
+**Settings → Mail & review → AI** is off until you turn it on. Turning an AI mode on is the whole choice: there is no second setting for reading mail automatically. With Local (Ollama) or OpenRouter on, Waypoint sends the text of booking emails it couldn’t read fully to that AI to fill the gaps, and you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (under Check suggestions or Add missing details) to ask about one message yourself. A booking Waypoint read completely is never sent. With the AI off, nothing is sent anywhere.
 
 ## Choosing where it runs
 
 - **Off.** Nothing goes to an AI.
-- **Local (Ollama).** An [Ollama](https://ollama.com) server on your own network: enter its address and a model. The email text goes to it exactly as written and never leaves your network. This is the only mode that reads email.
-- **OpenRouter.** [OpenRouter](https://openrouter.ai) with a model and your key, for [the destination button on a trip](#the-destination-button-on-a-trip) alone. It never reads email: **Ask AI** and the automatic switch are not offered, and an **Ask AI** request that arrives anyway is refused with “Reading email with AI needs Local (Ollama) in Settings → AI.” Every request sets `provider.data_collection: "deny"` and `provider.zdr: true`, so only providers that keep no prompts and don’t train on them can answer. If none can for your model, nothing is sent and the button says so: choose another model.
-
-A household that used OpenRouter to read email before this changed now sends nothing; the suggestions already saved on Review items stay as they were. Choose Local to read email again.
+- **Local (Ollama).** An [Ollama](https://ollama.com) server on your own network: enter its address and a model. The email text goes to it exactly as written and never leaves your network.
+- **OpenRouter.** [OpenRouter](https://openrouter.ai) with a model and your key. It is a hosted service outside your household, so the text of those emails leaves your server and goes to OpenRouter. Before it goes, Waypoint removes email addresses, the loyalty and Known Traveler numbers saved under [Loyalty](/Waypoint/start/loyalty/) wherever the email writes them, and anything shaped like a card, account or member number. The Settings card says this in plain words when OpenRouter is chosen. Every request sets `provider.data_collection: "deny"` and `provider.zdr: true`, so only providers that keep no prompts and don’t train on them can answer. If none can for your model, nothing is sent and the item says so: choose another model. OpenRouter is asked once per message (Local may be asked twice, see [below](#what-comes-back)), and it is never sent a picture.
 
 The OpenRouter key is saved encrypted with `WAYPOINT_SECRET_KEY` (in backups too), or read from the `OPENROUTER_API_KEY` environment variable, which wins. It never shows again once saved and is never logged.
 
 Complete results are added to trips automatically; partial ones stay in Review. A result is complete when it has a confirmation code, places, local departure or check-in and arrival or check-out dates and times, and resolvable time zones (flights also need a flight number). No facts are invented to complete a booking.
 
-## Reading unreadable mail automatically
+## What a scan sends by itself
 
-**Read unreadable mail with AI automatically** is a second, separate switch below the choice of where the AI runs. It is off until you turn it on and offered only while the AI is set to Local. Turning it on shows a warning: “Waypoint will send the text of travel emails it couldn’t read to the AI you chose, without asking each time.” Choosing **Off** or **OpenRouter** for the AI turns the switch off with it.
-
-Both switches are needed: with either off, a scan sends no email text anywhere, though **Ask AI** on an item works either way. With both on, a scan asks the AI about a message by itself only when all of these hold:
+With an AI mode on, a scan asks the AI about a message by itself only when all of these hold:
 
 - It passed Waypoint’s check for travel mail with a strong travel signal: it is from a travel sender Waypoint knows, is in a label you picked, carries structured booking data, or has two or more travel words in its subject and snippet. Shopping, codes, newsletters and replies are never sent.
-- No reader made a booking from it.
+- No reader made a complete booking from it: either no reader made one, or what a reader found has a gap (such as a hotel name that was really a price, a missing confirmation code, address or time zone), so it waits in Review.
 - It isn’t a follow-up of a booking you can see (a receipt, check-in notice or reminder that Waypoint attaches to the booking).
 
-A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight’s cabin, a hotel’s address or phone, a cruise’s ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and never adds a booking. Messages with nothing missing aren’t sent. Filling gaps this way needs the consent in the warning as it now reads: a household that turned the switch on under its earlier wording keeps the narrower behaviour (unreadable mail only) until someone turns the switch off and on again.
+A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight’s cabin, a hotel’s address or phone, a cruise’s ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and never adds a booking. Messages with nothing missing aren’t sent. A household that turned on “Read unreadable mail with AI automatically” in an earlier version keeps nothing of that setting: its value is ignored, and the AI reads as the mode says.
 
 There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about and how many emails it attached to their bookings as nothing new, counts only.
 
@@ -37,7 +33,7 @@ What is sent and where it goes are exactly as for **Ask AI**. The item in Review
 
 ## Emails that aren’t bookings
 
-When the AI finds no booking in a message, the item stays in Review with a note that no booking was found, whatever the message is: a promotion, a loyalty or account statement, a newsletter, a receipt or anything else. This applies to **Ask AI** and to the automatic reading alike. Waypoint never dismisses an item because the AI thinks an email isn’t about a booking, and the model isn’t asked to say so (an answer that does is ignored): any pattern Waypoint could check an email against would miss some cancellation, change or booking, and a miss would delete the only copy. You dismiss the item yourself, which deletes the stored copy of the email.
+When the AI finds no booking in a message, the item stays in Review with a note that no booking was found, whatever the message is: a promotion, a loyalty or account statement, a newsletter, a receipt or anything else. This applies to **Ask AI** and to a scan’s reading alike. Waypoint never dismisses an item because the AI thinks an email isn’t about a booking, and the model isn’t asked to say so (an answer that does is ignored): any pattern Waypoint could check an email against would miss some cancellation, change or booking, and a miss would delete the only copy. You dismiss the item yourself, which deletes the stored copy of the email.
 
 - The AI’s answer, an error, a timeout or an answer Waypoint can’t read never takes an item off the list or deletes a stored email. A result with a booking in it is filed as before.
 - A scan counts the emails the AI was asked about and the ones it attached as nothing new ([below](#emails-that-add-nothing-new)) in the mailbox’s last-scan line in Settings, never with a subject, sender or text.
@@ -66,7 +62,7 @@ For both, also:
 - Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat.
 - Every seat (such as 22A) and every time of day the text prints, in any layout, is one the booking already holds (for an older copy, also one the reading itself returned). A check-in deadline or a seat the booking doesn’t have keeps the email.
 - The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price, total or rate, room, suite, bed, breakfast or vehicle, link, itinerary or note, no flight number the model didn’t return (however it is written: `EX102`, `EX 102`, `EX-102`, in lower case or after a “Flight” label), no day other than the days the model returned (a second date for the same flight number keeps it), and no confirmation code other than the booking’s own. Times, totals and passenger labels are recognised in the same formats Waypoint’s own readers accept, in any currency it knows. Any of these keeps the email in Review.
-- The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With AI off, in hosted mode, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
+- The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With AI off, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
 
 An email’s date is the day its own `Date` line gives, but never later than the day it reached the mailbox (Gmail’s own record of when it arrived), so an email dated in the future can’t make a booking’s real later changes look older.
 
@@ -74,9 +70,9 @@ The mailbox’s last-scan line in Settings counts these with the reason, “alre
 
 ## What is sent
 
-The setting is the household’s: any member can change it, and once the automatic switch is on, qualifying mail from every connected mailbox is sent. Whoever sets the Ollama address chooses where that mail goes, so use a server you trust.
+The setting is the household’s: any member can change it, and once an AI mode is on, qualifying mail from every connected mailbox is sent. Whoever sets the Ollama address or the OpenRouter model and key chooses where that mail goes, so use a server or a service you trust.
 
-Only the message’s plain text goes out, for an item in Check suggestions or Add missing details, unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address. The sender, subject and markup are not sent, and prompts and replies are never logged. Pictures are not sent with the text either; the one case where they are sent is [the gate code of a parking booking](#picking-a-parking-gate-code), below. Only one part of Waypoint sends email text anywhere, and only to your Ollama server.
+Only the message’s plain text goes out, for an item in Check suggestions or Add missing details and for a message a scan found with gaps. To Local (Ollama) it goes unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address; if you want a hosted service, choose OpenRouter, which gets the text with email addresses and those numbers removed. The sender, subject and markup are not sent, and prompts and replies are never logged. Pictures are not sent with the text either; the one case where they are sent is [the gate code of a parking booking](#picking-a-parking-gate-code), below. Only one part of Waypoint sends email text anywhere, and only to the AI you chose.
 
 ### Who can ask
 
@@ -84,7 +80,7 @@ Anyone who can see an unread item in Review can choose **Ask AI** on it, or **As
 
 ### The destination button on a trip
 
-The sparkle button beside a trip’s destination ([Trips](/Waypoint/start/trips/#the-destination-under-a-trips-dates)) is the one other thing this setting sends, and only when someone presses it while the AI is set to Local or OpenRouter. It never involves email. It sends:
+The sparkle button beside a trip’s destination ([Trips](/Waypoint/start/trips/#the-destination-under-a-trips-dates)) is the one other thing this setting sends that involves no email, and only when someone presses it while the AI is set to Local or OpenRouter. It never involves email. It sends:
 
 - the trip’s name with its month and year taken off (and email addresses and long numbers replaced, in case the name holds one);
 - for each booking that isn’t cancelled, in trip order, its kind and its place: the city and state or country of a flight’s arrival, or the state or country of a stay’s or rental’s address.
@@ -108,13 +104,13 @@ With Local (Ollama), Waypoint first asks the model not to think. When that answe
 
 ## Seats on a flight
 
-The model is also asked which traveller has which seat, when the email prints a seat for each passenger by name. Both stay on your network.
+The model is also asked which traveller has which seat, when the email prints a seat for each passenger by name. Both go only to the AI you chose.
 
 Waypoint keeps a seat for a traveller only when the name and the seat both appear in the text that was sent and the seat is printed right beside the name; anything else, including a name given twice or two travellers given one seat, is dropped. It never chooses or books a seat. In the form the seats show under the flight, outlined so you check them first, and a name that matches one person in [People](/Waypoint/start/people/) is put on the flight as that person. Seats are saved with the suggestion in Review, never the email, and aren’t carried over when an assistant adopts a suggestion over [MCP](/Waypoint/start/mcp/). Only flights take seats.
 
 ## Turning it off
 
-Choosing **Off**, or turning the automatic switch off, stops the sending at once, including a scan under way: the settings are read again before each message. So does choosing OpenRouter.
+Choosing **Off** stops the sending at once, including a scan under way: the settings are read again before each message.
 
 ## Picking a parking gate code
 
@@ -125,6 +121,6 @@ A parking booking’s email can hold several pictures that could be the QR code 
 - It is asked when a scan files the booking and also when you resolve a Review item that links such a message to a parking booking: matching it to a booking, adding it as a booking, or adding it to one (asked when you finish the item, not at the attach), or finishing it with the booking it made, in the app or through an AI assistant. Your action is saved first, and the reply can take up to 30 seconds longer while the model answers; the question never fails or undoes the action, is asked once per action, and is asked only about the message that opened the choice, or the newest one to reopen it, whatever the dates of the others; a choice that was already waiting before this was recorded sends nothing until a later email reopens it. If it can’t pick, **Choose the code** stays as it was.
 - During a scan the question is skipped when little of the scan’s time is left, and waits no longer than that time allows; the choice then stays with you.
 - Waypoint never decodes the code itself; the model only chooses between the pictures.
-- With OpenRouter chosen or the AI off, no picture is sent anywhere.
+- With OpenRouter chosen or the AI off, no picture is sent anywhere: pictures go only to your own Ollama server.
 - A model that can’t read pictures, an error, a timeout or an answer that doesn’t clearly name one picture leaves **Choose the code** exactly as it was, with no message.
 - The pictures stay on your network, and neither they nor the prompt or the reply are ever logged.

@@ -37,7 +37,7 @@ export async function api<T = unknown>(path: string, options: Options = {}): Pro
       "/api/airports":{airports:Object.values(data.airports)},
       "/api/flight-status":data.flight_status,
       "/api/mailboxes":{configured:false,mailboxes:[]},
-      "/api/ai":{mode:"off",ollama_url:"",ollama_model:"",openrouter_model:"",key:null,auto:false},
+      "/api/ai":{mode:"off",ollama_url:"",ollama_model:"",openrouter_model:"",key:null},
       "/api/home":{city:"New York",state:"NY",zip:"10001",country:"US",saved:true,placed:true,latitude:40.7128,longitude:-74.006,zone:"America/New_York"},
       "/api/distance-unit":{distance_unit:"mi"},
       "/api/logodev":{configured:false,searchable:false,with_logo:0,unknown:0,waiting:0,last_error:null},

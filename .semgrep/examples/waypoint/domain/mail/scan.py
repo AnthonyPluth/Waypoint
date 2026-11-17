@@ -34,14 +34,14 @@ found = extract.read(message)
 # ok: waypoint-message-body
 sender = found.sender_domain
 
-# Mail code gets its AI config from ai.mail_config(), which is Local (Ollama) or nothing; ai.config() can be the hosted one.
-# ruleid: waypoint-mail-ai-local-only
+# Mail code gets its AI config from ai.mail_config(), which is the household's chosen mode or nothing; ai.config() and a hand-built hosted config are for the destination button.
+# ruleid: waypoint-mail-ai-chosen-mode
 cfg = ai.config(conn)
-# ruleid: waypoint-mail-ai-local-only
+# ruleid: waypoint-mail-ai-chosen-mode
 hosted = ai.Config("openrouter", "some/model", key=key)
-# ruleid: waypoint-mail-ai-local-only
+# ruleid: waypoint-mail-ai-chosen-mode
 from .ai import config
-# ok: waypoint-mail-ai-local-only
+# ok: waypoint-mail-ai-chosen-mode
 cfg = ai.mail_config(conn)
-# ok: waypoint-mail-ai-local-only
+# ok: waypoint-mail-ai-chosen-mode
 local = ai.Config("local", "llama3", url=url)
