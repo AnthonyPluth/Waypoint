@@ -324,6 +324,6 @@ export function flightsToday(trips: Trip[], now: number, viewer: string): Segmen
   const today = dayIn(now, viewer);
   return trips
     .flatMap((t) => bookingCards(t.segments).map((c) => c.lead))
-    .filter((s) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && (dayIn(startAt(s), viewer) === today || (startAt(s) <= now && endAt(s) > now)))
+    .filter((s) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && (s.start_local.slice(0, 10) === today || (startAt(s) <= now && endAt(s) > now)))
     .sort((a, b) => startAt(a) - startAt(b) || a.id - b.id);
 }

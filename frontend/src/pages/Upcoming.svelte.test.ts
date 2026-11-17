@@ -1128,4 +1128,13 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     expect(await within(sheet).findByText(/^Live updates paused until .* \(monthly limit\)$/)).toBeInTheDocument();
     viewport.phone = false;
   });
+
+  it("counts a flight as today by the airport’s own date, like the day-by-day list", async () => {
+    at("2026-11-20T21:00:00-05:00");
+    const late = segment({ id: 1, origin: "LAX", destination: "SFO", start_local: "2026-11-20T23:30", start_zone: "America/Los_Angeles", end_local: "2026-11-21T00:50", end_zone: "America/Los_Angeles", details: { flight_number: "AA 55" } });
+    serve([trip([late])]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: "Flights today" });
+    expect(within(list).getByText("Departs 11:30 pm PST")).toBeInTheDocument();
+  });
 });
