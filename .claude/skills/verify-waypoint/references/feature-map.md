@@ -571,8 +571,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 ## flight (`flight`)
 
 - **What exists:** No docs page of its own.
-- **Reach it:** URL `#flight`; control `tools/control goto flight`.
-- **Drive it:** `tools/control goto flight`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
+- **Reach it:** not in the navigation; open a trip from `#trips` and click its flight card; URL `#trip/<id>/flight/<segment id>`; control `tools/control goto trips`, then `click` a trip and `click` its flight card.
+- **Drive it:** reach it as above, then `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
 
 ## Stats (`stats`)
 

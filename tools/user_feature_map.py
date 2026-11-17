@@ -14,6 +14,7 @@ DOCS = "docs/src/content/docs/start"
 DOCS_LINK = "../../../../docs/src/content/docs/start"
 SETTINGS_DOCS = ("ai", "gmail", "import", "mcp", "offline", "reminders")
 VIEWPORT_ORDER = ["phone", "desktop", "laptop", "wide", "zoomed"]
+FOLLOWED = {"flight": ("its flight card", "#trip/<id>/flight/<segment id>")}
 
 
 def exported_list(verify: str, name: str) -> list[str]:
@@ -35,7 +36,24 @@ def nav_inside(nav: str) -> dict[str, str]:
     return dict(re.findall(r"(\w+): \"([^\"]+)\"", found.group(1))) if found else {}
 
 
-def reach(page: str, labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str], signed: tuple[str, ...] = ()) -> str:
+def opened_pages(verify: str) -> dict[str, dict[str, str]]:
+    found = re.search(r"export const OPENED_PAGES = \{(.*?)\n?\};", verify, re.DOTALL)
+    if not found:
+        return {}
+    out = {}
+    for name, body in re.findall(r"(\w+): \{ (from: .*?), ready:", found.group(1), re.DOTALL):
+        out[name] = dict(re.findall(r'(\w+): "((?:[^"\\]|\\.)*)"', body))
+    return out
+
+
+def reach(page: str, labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str], signed: tuple[str, ...] = (),
+          opened: dict[str, dict[str, str]] | None = None) -> str:
+    step = (opened or {}).get(page, {})
+    if step.get("follow") and page in FOLLOWED:
+        card, url = FOLLOWED[page]
+        source = step["from"]
+        return (f"not in the navigation; open a trip from `#{source}` and click {card}; URL `{url}`; "
+                f"control `tools/control goto {source}`, then `click` a trip and `click` {card}")
     if page in signed and page in inside:
         lit = labels.get(inside[page], inside[page])
         return (f"not in the navigation (it keeps {lit} lit); URL `#{page}/<id>`, opened by clicking an item on `#{inside[page]}`; "
@@ -151,7 +169,8 @@ def flow_lines(flow: dict, notes: dict[str, list[str]]) -> list[str]:
 
 
 def render(page_names: list[str], labels: dict[str, str], tabs: list[str], more: list[str], inside: dict[str, str], own: list[str],
-           all_flows: list[dict], notes: dict[str, list[str]], root: Path = ROOT, signed: tuple[str, ...] = ()) -> str:
+           all_flows: list[dict], notes: dict[str, list[str]], root: Path = ROOT, signed: tuple[str, ...] = (),
+           opened: dict[str, dict[str, str]] | None = None) -> str:
     lines = [
         "# User feature map",
         "",
@@ -169,12 +188,15 @@ def render(page_names: list[str], labels: dict[str, str], tabs: list[str], more:
     for page in page_names:
         label = labels.get(page, page)
         lines += [f"## {label} (`{page}`)", "", f"- **What exists:** {docs_line(page, root)}",
-                  f"- **Reach it:** {reach(page, labels, tabs, more, inside, own, signed)}."]
+                  f"- **Reach it:** {reach(page, labels, tabs, more, inside, own, signed, opened)}."]
         if page in signed and page in inside:
             lines.append(f"- **Drive it:** `tools/control start --signed-in jane`, `tools/control goto {inside[page]}`, `click` an item, "
                          f"`tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check "
                          f"`make verify PAGES=\"{page}\"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in "
                          f"frontend/verify/verify.mjs names).")
+        elif (opened or {}).get(page, {}).get("follow") and page in FOLLOWED:
+            lines.append(f"- **Drive it:** reach it as above, then `tools/control snapshot --text`, then `click`/`type`/`press`; "
+                         f"`tools/control viewport phone|desktop`; batch check `make verify PAGES=\"{page}\"`.")
         elif page not in own:
             lines.append(f"- **Drive it:** `tools/control goto {page}`, `tools/control snapshot --text`, then `click`/`type`/`press`; "
                          f"`tools/control viewport phone|desktop`; batch check `make verify PAGES=\"{page}\"`.")
@@ -201,7 +223,10 @@ def generate(root: Path = ROOT) -> tuple[str, list[str]]:
     if not page_names:
         problems.append("no PAGES found in frontend/verify/verify.mjs")
     signed = tuple(exported_list(verify, "SIGNED_PAGES"))
-    text = render(page_names, nav_labels(nav), nav_list(nav, "TAB_PAGES"), nav_list(nav, "MORE_PAGES"), nav_inside(nav), own, all_flows, notes, root, signed)
+    opened = opened_pages(verify)
+    problems += [f"OPENED_PAGES: `{name}` has a follow step but FOLLOWED in tools/user_feature_map.py has no URL for it"
+                 for name, step in opened.items() if step.get("follow") and name not in FOLLOWED]
+    text = render(page_names, nav_labels(nav), nav_list(nav, "TAB_PAGES"), nav_list(nav, "MORE_PAGES"), nav_inside(nav), own, all_flows, notes, root, signed, opened)
     return text, problems
 
 

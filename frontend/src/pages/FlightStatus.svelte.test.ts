@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -270,6 +270,19 @@ describe("seats", () => {
     await headline();
     const rows = within(screen.getByRole("list", { name: "Seats by traveller" })).getAllByRole("listitem");
     expect(rows.map(words)).toEqual(["Ada 12A", "June 12B"]);
+  });
+
+  it("gives two travellers who share a name each their own seat, at desktop and phone width", async () => {
+    const twins = segment({ ...booked, travelers: [{ id: 1, person_id: null, name: "Sam Lee", seat: "12A" }, { id: 2, person_id: null, name: "Sam Lee", seat: "12B" }] });
+    const shared = trip([twins], { id: 7, name: "Four Corners loop" });
+    open(NOW.air, listOf([inTheAir(NOW.air)]), shared);
+    await headline();
+    expect(within(screen.getByRole("list", { name: "Seats by traveller" })).getAllByRole("listitem").map(words)).toEqual(["Sam LeeSeat 12A · Economy", "Sam LeeSeat 12B · Economy"]);
+    cleanup();
+    viewport.phone = true;
+    open(NOW.air, listOf([inTheAir(NOW.air)]), shared);
+    await headline();
+    expect(within(screen.getByRole("list", { name: "Seats by traveller" })).getAllByRole("listitem").map(words)).toEqual(["Sam 12A", "Sam 12B"]);
   });
 
   it("says a seat is not known yet rather than leaving it out", async () => {
