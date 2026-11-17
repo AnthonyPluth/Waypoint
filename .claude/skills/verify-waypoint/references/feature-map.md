@@ -296,6 +296,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
   - A past trip with photos (the road trip), one with none (the Paris trip, whose hero is the route map with "No photos yet") and, with `fake_photo_limit`, one with two photos (the Lakeside Resort trip), then the Trip options menu, Show all days and a photo in the viewer. Needs `--signed-in jane` for `tools/control`.
   - The map hero plays the replay on its own; the flow presses `End` on "Position along the route" before those pictures, as make verify does for the trip page, so they are the same every time.
 
+#### `past-trip-saved-route`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow past-trip-saved-route`; or `poetry run python run.py verify --flow past-trip-saved-route`.
+
 #### `past-trips-list`
 
 - **Starts at:** `#trips`; goes to: `#trips?year=2025`, `#trips?year=2026&q=Orlando`.

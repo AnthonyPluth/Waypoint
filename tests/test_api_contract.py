@@ -145,6 +145,7 @@ class Replies(DbCase):
         seg = trips_api.api_segment_add(self.c, {}, {"kind": "flight", "origin": "AKL", "destination": "LAX",
                                                       "start_local": f"{today:%Y-%m-%d}T22:15", "end_local": f"{today:%Y-%m-%d}T23:50",
                                                       "travelers": [{"name": "DOE/JANE MS"}]})
+        self.check("GET /api/driving-routes", driving_routes_api.api_driving_routes_for_trips(self.c, {"trip": [str(seg["trip_id"])]}, {}))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u8", address="joan@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m8", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
@@ -606,7 +607,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/trips/{id}/summary", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes", "GET /api/trips/{id}/summary", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

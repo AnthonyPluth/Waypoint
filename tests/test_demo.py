@@ -1,3 +1,5 @@
+import json
+import time
 from datetime import UTC, date, datetime
 
 from collections import Counter
@@ -6,10 +8,10 @@ from unittest import mock
 from sqlalchemy import MetaData, func, select
 
 from waypoint import tls
-from waypoint.domain import demo, people, photos, stats, trips
+from waypoint.domain import demo, driving_routes, people, photos, stats, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.storage import gate_codes, secretbox, stored_mail
-from waypoint.storage.models import Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment
+from waypoint.storage.models import DrivingRoute, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment
 from tests.shared import DbCase
 
 
@@ -24,6 +26,15 @@ class DemoTests(DbCase):
         before = self.rows()
         added = demo.seed(self.c)
         self.assertEqual(self.rows() - before, added)
+
+    def test_keeps_the_road_of_one_of_the_road_trips_two_drives_for_the_trips_cards(self):
+        demo.seed(self.c, date(2026, 10, 5))
+        (row,) = list(self.c.orm.scalars(select(DrivingRoute)))
+        self.assertGreater(len(json.loads(row.path)), 10)
+        household = Viewer(None, household=True)
+        found = driving_routes.cached_for_trips(self.c, household, [str(row.trip_id)], time.time())
+        self.assertEqual([t["trip_id"] for t in found], [row.trip_id])
+        self.assertEqual(len(found[0]["routes"]), 1)
 
     def check_dates(self, today: date) -> None:
         demo.seed(self.c, today)

@@ -11,9 +11,9 @@ from sqlalchemy import func, select, update
 
 from ..providers import flightstatus as service
 from ..storage import db, secretbox, stored_mail
-from ..storage.models import (BrandLogo, FlightStatus, LoyaltyId, Mailbox, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, ReviewItem,
+from ..storage.models import (BrandLogo, DrivingRoute, FlightStatus, LoyaltyId, Mailbox, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, ReviewItem,
                               Segment, SegmentCode, SegmentMessage, SegmentPort, SegmentTraveler, StoredMessage, Trip, TripPerson, User)
-from . import flightstatus, logos, loyalty, people, photoqueue, photos, pixels, trips
+from . import driving_routes, flightstatus, logos, loyalty, people, photoqueue, photos, pixels, tripmap, trips
 from .mail import ai, review, scan
 from .visibility import Viewer
 
@@ -424,8 +424,20 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
                                     "checked": datetime.now(UTC).isoformat(timespec="seconds"), "source": "demo"}, key=["key"])
     assert jane.person_id is not None and sam.person_id is not None
     _photo_library(conn, {JANE: jane.person_id, SAM: sam.person_id})
+    _keep_a_road(conn, jane)
     hold_status(today)
     return _rows(conn) - before
+
+
+def _keep_a_road(conn: db.Connection, viewer: Viewer) -> None:
+    trip_id = _trip_of(conn, MILE_HIGH)
+    found = tripmap.places(conn, viewer, trip_id)
+    assert found is not None
+    start, end = sorted(found["stays"], key=lambda stay: stay["segment_id"])[:2]
+    middle = [point for leg in found["roads"]["legs"] if leg["from_segment_id"] == start["segment_id"] for point in leg["points"]]
+    path = [[start["latitude"], start["longitude"]], *middle, [end["latitude"], end["longitude"]]]
+    driving_routes.store(conn, viewer, trip_id, {"latitude": start["latitude"], "longitude": start["longitude"]},
+                         {"latitude": end["latitude"], "longitude": end["longitude"]}, path, time.time())
 
 
 def _trip_of(conn: db.Connection, origin: str) -> int:
@@ -528,4 +540,4 @@ def restore_status(conn: db.Connection) -> None:
 def _rows(conn: db.Connection) -> int:
     return sum(conn.orm.scalar(select(func.count()).select_from(m)) or 0
                for m in (User, Person, LoyaltyId, BrandLogo, Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus, Mailbox, ReviewItem, StoredMessage, SegmentMessage, SegmentCode,
-                PhotoSource, Photo, PhotoGrant, PhotoExclusion, PhotoTripSync))
+                PhotoSource, Photo, PhotoGrant, PhotoExclusion, PhotoTripSync, DrivingRoute))
