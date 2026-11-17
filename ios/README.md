@@ -123,7 +123,7 @@ Offline epic #734, issue #739. WKWebView has no service worker here, so native c
 
 ## Not built yet
 
-- Local reminders, and a Face ID lock on the app or the saved trips (the saved trips open with the phone's own lock only; `NSFaceIDUsageDescription` in `Info.plist` is not used by any code).
+- Local reminders, and a Face ID lock on the app or the saved trips (the saved trips open with the phone's own lock only).
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.
 - A sign-out button in Settings or the web UI. `ServerSession.signOut` is called by the error screen's **Use another Waypoint**, when the server says the sign-in is no longer valid and when the web view reports a 401 in the foreground; each then shows the signed-out screen.
