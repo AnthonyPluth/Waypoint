@@ -113,7 +113,7 @@ actor OfflineSync {
     private let currentServer: @Sendable () async -> URL?
     private let currentBearer: @Sendable () async throws -> String?
     private var generation = 0
-    let state: OfflineSyncState
+    nonisolated let state: OfflineSyncState
 
     init(store: OfflineStore = .shared,
          settings: OfflineSettings = OfflineSettings(),
