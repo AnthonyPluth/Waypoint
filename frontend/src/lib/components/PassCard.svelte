@@ -22,7 +22,7 @@
   import KindTile from "$lib/components/KindTile.svelte";
   import TrainFront from "@lucide/svelte/icons/train-front";
   import { duration } from "$lib/stats";
-  import { appWord, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, flightProgress, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, shipLeft, shipProgress, shipTrail, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
+  import { appWord, bookingTravellers, daysBetween, dayLabel, dayShift, dayShiftWords, endAt, extraAddress, startAt, flightEvidence, flightProgress, placeOf, seatsInOrder, END_WORD, headline, passHeadline, routeProgress, shipLeft, shipProgress, shipTrail, START_WORD, timesDiffer, untimed, vendorLink } from "$lib/trips";
 
   type Props = {
     segment: Segment; bookings?: Segment[]; now?: number; eyebrow?: string; pulse?: boolean; level?: 2 | 3; class?: string;
@@ -83,9 +83,10 @@
     ["Cost", cost] as [string, string],
   ].filter(([name, value]) => (flight && name === "Gate") || (!!value && !omit.includes(name))).map(([name, value]): [string, string] => [name, value ?? ""]));
   const hasCode = $derived(showCode && codes.length > 0);
-  const people = $derived(bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => (t.person_id != null ? o.person_id === t.person_id : o.person_id == null && o.name.trim().toLowerCase() === t.name.trim().toLowerCase())) === i).map((t) => ({ id: t.person_id, name: t.name })));
+  const travellers = $derived(bookingTravellers(bookings));
+  const people = $derived(travellers.people);
   const longCode = $derived(codes.some((b) => (b.confirmation ?? "").length > 8));
-  const firstNames = $derived(((names) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}` : (names[0] ?? "")))(people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean)));
+  const firstNames = $derived(travellers.names);
 </script>
 
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>

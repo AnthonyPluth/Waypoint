@@ -24,7 +24,7 @@
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
-  import { type Day, type DayItem, appWord, vendorLink, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, appWord, bookingTravellers, vendorLink, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
@@ -128,7 +128,6 @@
   });
   const liveOn = $derived(flightStatus.list?.enabled === true);
   const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
-  const travellersOf = (bookings: Segment[]) => bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => (t.person_id != null ? o.person_id === t.person_id : o.person_id == null && o.name.trim().toLowerCase() === t.name.trim().toLowerCase())) === i).map((t) => ({ id: t.person_id, name: t.name }));
   const compactFlight = (s: Segment) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s);
   const homeFlight = $derived(next !== null && compactFlight(next.segment)
     && nextFlightShown(flightCardView({ segment: next.segment, status: liveOn ? statusFor(next.segment.id) : undefined, liveOn, now, online, city: (code) => code }), startAt(next.segment), now));
@@ -306,8 +305,8 @@
           {#if s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
           {#if s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
           <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button>
-          {@const people = travellersOf(next.bookings)}
-          {#if people.length}<div class="flex w-full items-center gap-2.5"><AvatarStack {people} /><span class="min-w-0 truncate text-sm font-medium">{people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean).join(", ")}</span></div>{/if}
+          {@const travellers = bookingTravellers(next.bookings)}
+          {#if travellers.people.length}<div class="flex w-full items-center gap-2.5"><AvatarStack people={travellers.people} /><span class="min-w-0 truncate text-sm font-medium">{travellers.names}</span></div>{/if}
           {#if next.bookings.length === 1 && s.price && app.state?.show_costs !== false}<p class="w-full text-sm"><span class="eyebrow">Cost</span> <span class="font-medium" data-cost>{formatMoney(s.price.amount_minor, s.price.currency)}</span></p>{/if}
         {/snippet}
       </FlightHome>

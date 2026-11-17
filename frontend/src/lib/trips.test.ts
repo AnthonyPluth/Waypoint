@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler, cardRange, cardLabel, nameList } from "./trips";
+import { AIRBORNE_MAX, flightEvidence, flightProgress, bookingCards, appWord, checkInOpen, CHECK_IN_WINDOW_HOURS, passHeadline, routeProgress, shipProgress, shipLeft, shipTrail, clock, dayIn, dayShift, dayShiftWords, featuredTrip, flightKey, headline, instant, isPast, membershipFor, nextUp, placeOf, programFor, vendorLink, splitTrips, matchesText, inYear, tripYears, START_WORD, tripKinds, END_WORD, subline, seatsInOrder, cityState, extraAddress, samePlace, upcomingTitle, tripDays, untimed, until, when, tripTravellers, stubWords, tripRangeLabel, stripLabel, countdown, nightsWords, pastByYear, tripPeople, showTripTravellers, showBookingTravellers, loyaltyNumbers, bookingCounts, UNNAMED_TRAVELLER, type Traveler, cardRange, cardLabel, nameList, bookingTravellers } from "./trips";
 import type { FlightStatus } from "./api-types";
 import { membership, segment, trip } from "../test/fixtures";
 
@@ -859,6 +859,15 @@ describe("trip card wording", () => {
     expect(nameList(["Ada Brook"])).toBe("Ada Brook");
     expect(nameList(["Ada Brook", "June Brook"])).toBe("Ada Brook and June Brook");
     expect(nameList(["Ada Brook", "June Brook", "Tom Brook"])).toBe("Ada Brook, June Brook and Tom Brook");
+  });
+  it("writes the travellers of bookings once each, by first name", () => {
+    const jane = { id: 1, person_id: 1, name: "Jane Doe", seat: null }, sam = { id: 2, person_id: 2, name: "Sam Doe", seat: null }, mia = { id: 3, person_id: null, name: " mia Doe ", seat: null };
+    const bookings = [segment({ travelers: [jane, sam] }), segment({ travelers: [{ ...jane, id: 4 }, mia, { ...mia, id: 5, name: "MIA DOE" }] })];
+    expect(bookingTravellers(bookings).people).toEqual([{ id: 1, name: "Jane Doe" }, { id: 2, name: "Sam Doe" }, { id: null, name: " mia Doe " }]);
+    expect(bookingTravellers(bookings).names).toBe("Jane, Sam & mia");
+    expect(bookingTravellers([segment({ travelers: [jane, sam] })]).names).toBe("Jane & Sam");
+    expect(bookingTravellers([segment({ travelers: [jane] })]).names).toBe("Jane");
+    expect(bookingTravellers([segment({ travelers: [] })])).toEqual({ people: [], names: "" });
   });
   it("names a card by its parts, leaving out the ones it hasn't got", () => {
     const lisbon = trip([segment({ start_local: "2026-09-03T09:00", end_local: "2026-09-10T10:00", travelers: [{ id: 1, person_id: 1, name: "Ada Brook", seat: null }, { id: 2, person_id: 2, name: "June Brook", seat: null }] })], { id: 9, name: "Lisbon + Alentejo", start_date: "2026-09-03", end_date: "2026-09-10" });

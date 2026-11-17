@@ -548,6 +548,14 @@ export const photoWords = (n: number): string => `${n.toLocaleString(locale())} 
 
 export const cardRange = (trip: Pick<Trip, "start_date" | "end_date">): string => tripRangeLabel(trip).replace(" – ", "–");
 
+export function bookingTravellers(bookings: Segment[]): { people: { id: number | null; name: string }[]; names: string } {
+  const sameTraveller = (a: Traveler, b: Traveler) => (a.person_id != null ? b.person_id === a.person_id : b.person_id == null && b.name.trim().toLowerCase() === a.name.trim().toLowerCase());
+  const people = bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => sameTraveller(t, o)) === i).map((t) => ({ id: t.person_id, name: t.name }));
+  const first = people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean);
+  const names = first.length > 1 ? `${first.slice(0, -1).join(", ")} & ${first[first.length - 1]}` : (first[0] ?? "");
+  return { people, names };
+}
+
 export function nameList(names: string[]): string {
   if (names.length < 2) return names.join("");
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
