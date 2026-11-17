@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { Segment } from "$lib/api-types";
   import KindTile from "$lib/components/KindTile.svelte";
+  import StatusChip from "$lib/components/StatusChip.svelte";
+  import { bookingChip } from "$lib/status";
   import { bookingDetail, bookingGroups, bookingName, type Card } from "$lib/trips";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
 
@@ -27,6 +29,7 @@
         <b class="truncate text-sm font-semibold">{bookingName(s)}</b>
         <span class="text-caption text-muted-foreground">{bookingDetail(card, !grouped)}</span>
       </span>
+      {#if card.changed}<StatusChip chip={bookingChip("changed")} small />{/if}
       <ChevronRight class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </button>
   </li>

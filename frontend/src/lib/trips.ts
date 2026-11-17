@@ -103,7 +103,7 @@ export function flightKey(number: string | undefined | null): string | null {
   return found ? `${found[1]}${found[2]}` : null;
 }
 
-export type Card = { id: string; segments: Segment[]; lead: Segment; cancelled: boolean; timesDiffer: boolean };
+export type Card = { id: string; segments: Segment[]; lead: Segment; cancelled: boolean; changed: boolean; timesDiffer: boolean };
 
 const groupKey = (s: Segment): string | null => {
   const number = s.kind === "flight" ? flightKey(s.details.flight_number) : null;
@@ -122,12 +122,13 @@ export function bookingCards(segments: Segment[]): Card[] {
     if (into) { into.push(segment); continue; }
     const group = [segment];
     if (key) byKey.set(key, group);
-    cards.push({ id: String(segment.id), segments: group, lead: segment, cancelled: false, timesDiffer: false });
+    cards.push({ id: String(segment.id), segments: group, lead: segment, cancelled: false, changed: false, timesDiffer: false });
   }
   for (const card of cards) {
     const live = card.segments.filter((s) => s.status !== "cancelled");
     card.lead = live[0] ?? card.segments[0];
     card.cancelled = live.length === 0;
+    card.changed = live.some((s) => s.status === "changed");
     card.timesDiffer = timesDiffer(card.segments);
   }
   return cards;

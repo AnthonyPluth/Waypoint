@@ -58,6 +58,14 @@ The d frames do not draw these; the owner settled them when #712 hit a choice th
 1. Move and Remove: the booking cards had Edit, Move and Remove (the last two under More), and d draws only Edit and Close. They stay reachable in a `More` menu beside Edit in the detail header (Edit always visible, Close as drawn), with the old card's labels and behaviour: `Move`, which opens the move dialog, and `Remove`, which asks before deleting. This departs from d, which draws no More; the owner decided it on 2026-11-17.
 2. #712 wires the Bookings row, sheet and desktop list (#711) and the detail together on a completed trip, so its booking cards are gone; a trip still to come or under way keeps its cards.
 
+## Owner decisions on the booking detail follow-ups (2026-11-17, #808)
+
+The d frames draw only Cancelled; the owner settled these when #807's second review raised them.
+
+1. A booking whose status is `changed` shows a `Changed` chip (the warn-tone status chip the old booking card showed, `bookingChip("changed")`) in the booking detail header and on its row in the Bookings list, phone sheet and desktop list alike. A cancelled booking keeps the red chip in the detail and the quiet `Cancelled` label on its row. The look of the chip is for the owner to sign off before this merges.
+2. In a combined booking with a cancelled leg, the `Status` row carries that leg's confirmation code beside its note, and the Travellers row marks each traveller on the cancelled leg (`On cancelled booking <code>`). A traveller's seat comes from the live leg; where the live legs give a traveller different seats, each is shown with its leg's code.
+3. A seat shows once: beside the traveller when the Travellers row is listed and names it; the `Seat` row keeps only the seats no listed traveller carries.
+
 ## Open questions for the owner
 
 1. Six photos per day, or three on phone?
