@@ -269,7 +269,7 @@
   });
 </script>
 
-<div class={completedPage && tripId === null ? "" : "mx-auto max-w-3xl"}>
+<div class={tripId === null && !completedPage ? "mx-auto max-w-3xl" : ""}>
 {#if tripId === null && !(trip && completedPage)}
   <a class="mb-4 inline-flex items-center gap-1.5 phone:min-h-11 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 {/if}
