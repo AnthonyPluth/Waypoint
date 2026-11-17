@@ -204,6 +204,86 @@ describe("BookingDetail seats, overnight trains and combined cancellations", () 
   });
 });
 
+describe("BookingDetail seats shown once, and legs of a combined booking", () => {
+  const seated = { ...flight, travelers: [{ ...ada, seat: "12B" }, { ...june, seat: "12A" }] };
+
+  it("shows each seat once, beside its traveller, when every traveller has one", async () => {
+    const { dialog } = await open([seated], /DEN to GJT/);
+    expect(labels(dialog)).not.toContain("Seat");
+    expect(dialog.textContent?.match(/12B/g)).toHaveLength(1);
+    expect(dialog.textContent?.match(/12A/g)).toHaveLength(1);
+  });
+
+  it("keeps a Seat row for a seat that belongs to no listed traveller, without repeating the others", async () => {
+    const extra = { ...seated, details: { ...seated.details, seat: "12A, 12B, 12C" } };
+    const { dialog } = await open([extra], /DEN to GJT/);
+    expect(value(dialog, "Seat").textContent?.trim()).toBe("12C");
+    expect(dialog.textContent?.match(/12B/g)).toHaveLength(1);
+  });
+
+  const live = { ...flight, travelers: [{ ...ada, seat: "12B" }], details: { ...flight.details, flight_number: "AA0101", seat: "12B" } };
+  const dead = { ...flight, id: 9, status: "cancelled" as const, confirmation: "BBBBBB", travelers: [{ ...ada, seat: "9A" }, { ...june, seat: "9B" }], details: { ...flight.details, flight_number: "AA0101", seat: "9A, 9B" } };
+
+  it("ties the cancelled leg's Status row to that leg's confirmation code", async () => {
+    const { dialog } = await open([live, dead], /DEN to GJT/);
+    expect(value(dialog, "Status")).toHaveTextContent("Cancelled, so not in the trip’s total");
+    expect(value(dialog, "Status").querySelector(".mono")).toHaveTextContent("BBBBBB");
+  });
+
+  it("marks the travellers who belong to the cancelled leg, with its code", async () => {
+    const { dialog } = await open([live, dead], /DEN to GJT/);
+    const who = value(dialog, "Travellers");
+    expect(who).toHaveTextContent("Ada Brook · Seat 12B · On cancelled booking BBBBBB");
+    expect(who).toHaveTextContent("June Brook · Seat 9B · On cancelled booking BBBBBB");
+  });
+
+  it("takes a traveller's seat from the live leg, even when the cancelled leg comes first", async () => {
+    const { dialog } = await open([dead, live], /DEN to GJT/);
+    const who = value(dialog, "Travellers");
+    expect(who).toHaveTextContent("Ada Brook · Seat 12B");
+    expect(who).not.toHaveTextContent("Seat 9A");
+  });
+
+  it("keeps the cancelled leg's own seat in its Seat row, without repeating a seat shown beside a traveller", async () => {
+    const { dialog } = await open([dead, live], /DEN to GJT/);
+    const seats = [...dialog.querySelectorAll("dt")].filter((d) => d.textContent?.trim() === "Seat").map((d) => d.nextElementSibling?.textContent?.trim());
+    expect(seats).toEqual(["9A"]);
+  });
+
+  it("shows a traveller's seats per leg when two live legs differ", async () => {
+    const other = { ...live, id: 10, confirmation: "CCCCCC", travelers: [{ ...ada, seat: "14C" }] };
+    const { dialog } = await open([live, other], /DEN to GJT/);
+    expect(value(dialog, "Travellers")).toHaveTextContent("Ada Brook · Seat 12B (K7QX2M) · Seat 14C (CCCCCC)");
+  });
+
+  it("marks nobody and adds no cancelled note when no leg is cancelled", async () => {
+    const { dialog } = await open([live, { ...live, id: 10, confirmation: "CCCCCC" }], /DEN to GJT/);
+    expect(dialog).not.toHaveTextContent(/cancelled/i);
+  });
+});
+
+describe("BookingDetail changed", () => {
+  const changed = { ...stay, id: 11, status: "changed" as const };
+
+  it("shows the Changed chip in the header, in the warn tone", async () => {
+    const { dialog } = await open([changed], /Red Rock Lodge/);
+    expect(within(dialog).getByText("Changed")).toHaveAttribute("data-tone", "warn");
+    expect(dialog).not.toHaveTextContent(/Cancelled/);
+  });
+
+  it("shows the chip when only one leg of a combined booking changed", async () => {
+    const first = { ...flight, details: { ...flight.details, flight_number: "AA0101" } };
+    const second = { ...first, id: 9, confirmation: "BBBBBB", status: "changed" as const };
+    const { dialog } = await open([first, second], /DEN to GJT/);
+    expect(within(dialog).getByText("Changed")).toBeInTheDocument();
+  });
+
+  it("shows no status chip for a confirmed booking", async () => {
+    const { dialog } = await open([stay], /Red Rock Lodge/);
+    expect(within(dialog).queryByText(/^(Changed|Confirmed|Cancelled)$/)).toBeNull();
+  });
+});
+
 describe("BookingDetail cancelled", () => {
   it("shows the red chip, strikes the dates and price and says it is not in the total", async () => {
     const { dialog } = await open([cancelled], /Canyon Rim Motel/);

@@ -270,8 +270,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/1`, `#trip/5`.
 - **Widths:** phone, desktop.
-- **Touches:** `Bookings`, `JFK to CDG`, `Hôtel du Parc`, `Example Rentals`, `Portland to Seattle`, `Airport long-term parking`, `United States`, `Canyon Rim Motel`, `More options for`, `Close`, `Example Voyager`.
-- **Expects to see:** `Remove`.
+- **Touches:** `Bookings`, `JFK to CDG`, `Hôtel du Parc`, `Example Rentals`, `Portland to Seattle`, `Airport long-term parking`, `United States`, `Red Cliff Lodge`, `Canyon Rim Motel`, `More options for`, `Close`, `Example Voyager`.
+- **Expects to see:** `Changed`, `Remove`.
 - **Fakes (the demo server can't):** `fake_bookings`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow past-booking-detail`; or `poetry run python run.py verify --flow past-booking-detail`.
@@ -281,7 +281,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`; goes to: `#trip/1`, `#trip/2`.
 - **Widths:** phone, desktop.
 - **Touches:** `Bookings`, `Hôtel du Parc`, `Bayview Inn`.
-- **Expects to see:** `Trip to Paris`, `Hôtel du Parc`, `Edit`, `Trip to San Francisco`.
+- **Expects to see:** `Trip to Paris`, `Hôtel du Parc`, `Edit`, `Trip to San Francisco`, `Red Cliff Lodge`.
+- **Fakes (the demo server can't):** `fake_bookings`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow past-trip-bookings`; or `poetry run python run.py verify --flow past-trip-bookings`.
 
