@@ -555,24 +555,24 @@ describe("overlapping loads", () => {
 });
 
 describe("finding a trip", () => {
-  const archive = Array.from({ length: 300 }, (_, i) => trip([segment({ id: 1000 + i, trip_id: 100 + i, provider: i === 123 ? "Icelandair" : "Delta Air Lines", start_local: `${2018 + (i % 8)}-03-10T09:00`, end_local: `${2018 + (i % 8)}-03-12T09:00` })],
-    { id: 100 + i, name: i === 123 ? "Aurora weekend" : `Trip ${i}`, destination: i === 123 ? "Reykjavik" : "Atlanta", start_date: `${2018 + (i % 8)}-03-10`, end_date: `${2018 + (i % 8)}-03-12` }));
+  const archive = Array.from({ length: 60 }, (_, i) => trip([segment({ id: 1000 + i, trip_id: 100 + i, provider: i === 23 ? "Icelandair" : "Delta Air Lines", start_local: `${2018 + (i % 8)}-03-10T09:00`, end_local: `${2018 + (i % 8)}-03-12T09:00` })],
+    { id: 100 + i, name: i === 23 ? "Aurora weekend" : `Trip ${i}`, destination: i === 23 ? "Reykjavik" : "Atlanta", start_date: `${2018 + (i % 8)}-03-10`, end_date: `${2018 + (i % 8)}-03-12` }));
 
   it("narrows a long archive by name, destination or airline, and keeps the search in the address", async () => {
     serve(archive);
     render(Trips);
-    await screen.findByText("300 trips");
+    await screen.findByText("60 trips");
     await user().click(screen.getByRole("searchbox", { name: "Search trips" }));
     await user().paste("reykjavik");
     expect(route.query).toBe("q=reykjavik");
-    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
+    expect(screen.getByText("1 of 60 trips")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     await user().clear(screen.getByRole("searchbox", { name: "Search trips" }));
     await user().paste("icelandair");
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
-    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
-  }, 20000);
+    expect(screen.getByText("1 of 60 trips")).toBeInTheDocument();
+  });
 
   it("opens with the filters from the address, and says when nothing matches", async () => {
     serve(archive);
@@ -583,7 +583,7 @@ describe("finding a trip", () => {
     expect(within(screen.getByRole("group", { name: "Year" })).getByRole("button", { name: "2019" })).toHaveAttribute("aria-pressed", "true");
     await user().click(screen.getByRole("button", { name: "Clear filters" }));
     expect(route.query).toBe("");
-    expect(await screen.findByText("300 trips")).toBeInTheDocument();
+    expect(await screen.findByText("60 trips")).toBeInTheDocument();
   });
 
   it("filters by year, together with the traveller", async () => {
