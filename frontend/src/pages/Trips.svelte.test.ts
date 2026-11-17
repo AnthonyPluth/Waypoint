@@ -1241,15 +1241,17 @@ describe("going back to the list", () => {
   let scrollTo: ReturnType<typeof vi.fn>;
   const onPage = (page: string) => waitFor(() => expect(route.page).toBe(page));
 
-  beforeEach(() => {
+  beforeEach(async () => {
     viewport.phone = true;
     scrollTo = vi.fn();
     window.scrollTo = scrollTo as never;
     serve(years());
+    await onPage("trips");
   });
-  afterEach(() => {
+  afterEach(async () => {
     scrolled(0);
     location.hash = "#upcoming";
+    await onPage("upcoming");
   });
 
   async function leaveFor(entry: string) {
@@ -1295,6 +1297,35 @@ describe("going back to the list", () => {
     await screen.findByRole("list", { name: "Past trips in 2026" });
     expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
     expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("puts the list column of two panes back where it was scrolled to", async () => {
+    panes.two = true;
+    viewport.phone = false;
+    const everyTrip = [london, auckland, ...years()];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (numbers(path)) return numbers(path) as never;
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      if (path === "/api/photos/trip-covers") return { trips: [] } as never;
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one) return everyTrip.find((t) => t.id === Number(one[1]));
+      return { trips: everyTrip };
+    });
+    const first = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    const column = screen.getByRole("list", { name: "Past trips in 2026" }).closest(".overflow-y-auto") as HTMLElement;
+    Object.defineProperty(column, "scrollTop", { value: 300, configurable: true });
+    column.dispatchEvent(new Event("scroll"));
+    location.hash = "#trip/3";
+    await onPage("trip");
+    first.unmount();
+    history.back();
+    await onPage("trips");
+    const columnScroll = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    render(Trips);
+    await waitFor(() => expect(columnScroll).toHaveBeenCalledWith(0, 300));
+    columnScroll.mockRestore();
   });
 
   it("takes the in-app back link as going back, and leaves it a plain link when there is nothing to go back to", async () => {
