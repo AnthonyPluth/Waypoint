@@ -272,6 +272,91 @@ class RefusalTests(RouteCacheCase):
         self.assertEqual(self.call("ana", "GET", f"{base}?" + "&".join(["drive=1,2,3,4"] * driving_routes.MAX_DRIVES)), (200, {"routes": []}))
 
 
+class BatchedLookupTests(RouteCacheCase):
+    def setUp(self):
+        super().setUp()
+        with db.session() as conn:
+            conn.execute(DrivingRoute.__table__.delete())
+
+    def batch(self, who, *trips, extra=""):
+        return self.call(who, "GET", "/api/driving-routes?" + "&".join(f"trip={t}" for t in trips) + extra)
+
+    def another_trip(self, who, day):
+        first = self.book(who, {**DENVER, "start_local": f"2027-0{day}-02T15:00", "end_local": f"2027-0{day}-04T10:00"})
+        self.book(who, {**SALT_LAKE, "start_local": f"2027-0{day}-04T15:00", "end_local": f"2027-0{day}-08T10:00"}, trip_id=first["trip_id"])
+        return first["trip_id"]
+
+    def test_one_request_returns_the_saved_routes_of_every_trip_asked_for_and_only_those_with_routes(self):
+        trip, drive = self.trip_with_a_drive()
+        other = self.another_trip("ana", 7)
+        bare = self.another_trip("ana", 8)
+        self.put("ana", trip, drive)
+        self.put("ana", other, drive, line(drive, ((41.0, -109.0),)))
+        status, got = self.batch("ana", trip, other, bare)
+        self.assertEqual(status, 200)
+        self.assertEqual([t["trip_id"] for t in got["trips"]], sorted([trip, other]))
+        by_trip = {t["trip_id"]: t["routes"] for t in got["trips"]}
+        self.assertEqual(by_trip[trip][0]["path"], line(drive))
+        self.assertEqual(by_trip[other][0]["path"], line(drive, ((41.0, -109.0),)))
+        self.assertEqual(sorted(by_trip[trip][0]), ["end", "path", "start"])
+        self.assertEqual(by_trip[trip][0]["start"], {"latitude": round(drive["start"]["latitude"], 4), "longitude": round(drive["start"]["longitude"], 4)})
+
+    def test_a_trip_the_caller_cannot_see_answers_exactly_as_one_with_no_routes_or_one_that_does_not_exist(self):
+        trip, drive = self.trip_with_a_drive("ana")
+        self.put("ana", trip, drive)
+        mine = self.book("ben", {**HOTEL, "destination": "Chicago"})["trip_id"]
+        self.assertEqual(self.batch("ben", trip), (200, {"trips": []}))
+        self.assertEqual(self.batch("ben", trip, mine, 999999), (200, {"trips": []}))
+        self.assertEqual(self.batch("ben", 999999), self.batch("ben", trip))
+        self.assertEqual([t["trip_id"] for t in self.batch("ana", trip, mine)[1]["trips"]], [trip])
+
+    def test_a_trip_shared_with_a_second_member_gives_them_its_routes(self):
+        trip, drive = self.trip_with_a_drive()
+        self.put("ana", trip, drive)
+        self.assertEqual(self.batch("ben", trip), (200, {"trips": []}))
+        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
+        self.assertEqual(len(self.batch("ben", trip)[1]["trips"]), 1)
+
+    def test_an_old_route_is_left_out_and_a_long_path_is_thinned_keeping_both_ends(self):
+        trip, drive = self.trip_with_a_drive()
+        long = line(drive, [(40.0 + i / 100000, -108.0) for i in range(2000)])
+        now = time.time()
+        with at(now):
+            self.put("ana", trip, drive, long)
+        with mock.patch("waypoint.server.api.driving_routes.time", mock.Mock(time=lambda: now + 10)):
+            path = self.batch("ana", trip)[1]["trips"][0]["routes"][0]["path"]
+        self.assertEqual(len(path), driving_routes.CARD_POINTS)
+        self.assertEqual((path[0], path[-1]), (long[0], long[-1]))
+        with mock.patch("waypoint.server.api.driving_routes.time", mock.Mock(time=lambda: now + driving_routes.REPLACE_AFTER_SECONDS)):
+            self.assertEqual(self.batch("ana", trip), (200, {"trips": []}))
+
+    def test_the_ask_must_be_between_one_and_the_limit_of_trip_numbers(self):
+        self.assertEqual(self.call("ana", "GET", "/api/driving-routes")[0], 400)
+        for bad in ("trip=x", "trip=-1", "trip=1.5", "trip=", "trip=%EF%BC%91", "trip=1234567890123"):
+            with self.subTest(ask=bad):
+                self.assertEqual(self.call("ana", "GET", f"/api/driving-routes?{bad}")[0], 400)
+        self.assertEqual(self.call("ana", "GET", "/api/driving-routes?" + "&".join(["trip=1"] * (driving_routes.MAX_TRIPS + 1)))[0], 400)
+        self.assertEqual(self.call("ana", "GET", "/api/driving-routes?" + "&".join(["trip=1"] * driving_routes.MAX_TRIPS)), (200, {"trips": []}))
+
+    def test_the_batch_runs_inside_no_leaks_and_carries_no_trip_details(self):
+        name, code = "Quentin Marlowe-Zzyx", "ZQXW7413"
+        with no_leaks(self, name, code):
+            first = self.book("ana", {**DENVER, "confirmation": code, "travelers": [{"person_id": None, "name": name}]})
+            self.book("ana", {**SALT_LAKE, "confirmation": code, "travelers": [{"person_id": None, "name": name}]}, trip_id=first["trip_id"])
+            trip = first["trip_id"]
+            drive = drive_of(self.ok("ana", "GET", f"/api/trips/{trip}/places"))
+            self.put("ana", trip, drive)
+            got = self.batch("ana", trip)[1]
+            self.assertNotIn(name, repr(got))
+            self.assertNotIn(code, repr(got))
+        self.assertEqual(sorted(got), ["trips"])
+        self.assertEqual(sorted(got["trips"][0]), ["routes", "trip_id"])
+
+    def test_an_assistant_connection_cannot_reach_it(self):
+        from waypoint.server import mcp_access
+        self.assertTrue(mcp_access.blocked("/api/driving-routes"))
+
+
 class BackupTests(DbCase):
     def test_the_stored_paths_travel_in_a_backup_and_come_back_on_restore(self):
         self.c.execute(Trip.__table__.insert().values(id=5, name="Trip", auto=True))

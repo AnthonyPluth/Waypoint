@@ -208,6 +208,22 @@
     },
     {
       "method": "GET",
+      "path": "/api/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_routes_for_trips",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/trips",
       "handler": "waypoint/server/api/trips.py:api_trips",
       "web": [
