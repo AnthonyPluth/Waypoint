@@ -15,7 +15,7 @@
   import X from "@lucide/svelte/icons/x";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, infos = [], unlocated = 0, onshow, tripId, compact = false, onreplay = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; infos?: ClusterInfo[]; unlocated?: number; onshow?: (cluster: number) => void; compact?: boolean; onreplay?: (() => void) | null } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, infos = [], unlocated = 0, onshow, tripId, compact = false, onreplay = null, onended = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; infos?: ClusterInfo[]; unlocated?: number; onshow?: (cluster: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
   const replayable = $derived(stops.length >= 2);
   const clusters = $derived(infos.map((i) => i.cluster));
   const away = $derived(new Set(infos.filter((i) => i.far > 0).map((i) => i.index)));
@@ -84,7 +84,13 @@
     touched = true;
     if (progress >= 1) { progress = 0; tail = 0; playing = true; } else playing = !playing;
   }
-  const scrub = (e: Event) => { touched = true; playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
+  let ran = $state(false);
+  $effect(() => { if (playing) ran = true; });
+  $effect(() => {
+    if (!ran || playing || progress < 1 || compact || calm) return;
+    untrack(() => { ran = false; onended?.(); });
+  });
+  const scrub = (e: Event) => { ran = true; touched = true; playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
 
   const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
@@ -279,7 +285,7 @@
       </div>
     {/if}
     {#if chosen && !viewport.phone && !compact}{@render card(chosen, "absolute bottom-3 right-3 w-[300px] max-w-[calc(100%-1.5rem)]")}{/if}
-    {#if compact && onreplay && replayable}
+    {#if compact && onreplay && replayable && !observed}
       <Button class="absolute bottom-3 left-3" variant="secondary" size="sm" aria-label="Replay trip" aria-expanded="false" onclick={onreplay}><Play class="size-3.5" aria-hidden="true" /> Replay trip</Button>
     {/if}
     {#if !compact}

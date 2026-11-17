@@ -19,7 +19,6 @@
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Play from "@lucide/svelte/icons/play";
-  import X from "@lucide/svelte/icons/x";
 
   type Props = {
     trip: Trip; people: Person[]; now: number; dates: string; costsShown: boolean; loads: number; back: boolean;
@@ -168,10 +167,7 @@
           </div>
           {#if heroKind !== "map"}
             <div class="flex flex-col gap-2.5">
-              {#if replaying}
-                <Button class="self-start" variant="outline" size="sm" aria-expanded="true" aria-controls="past-trip-replay" onclick={() => (replaying = false)}><X class="size-3.5" aria-hidden="true" /> Hide replay</Button>
-              {/if}
-              <div id="past-trip-replay"><RouteReplay {trip} {now} photos={found} compact={!replaying} onreplay={() => (replaying = true)} onstops={(n) => (stopCount = n)} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
+              <div id="past-trip-replay"><RouteReplay {trip} {now} photos={found} compact={!replaying} onreplay={() => (replaying = true)} onended={() => (replaying = false)} onstops={(n) => (stopCount = n)} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
             </div>
           {/if}
           {#if bookings}{@render bookings()}{/if}

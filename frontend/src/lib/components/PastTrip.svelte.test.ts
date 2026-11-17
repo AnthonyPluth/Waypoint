@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ import { api } from "$lib/api";
 import type { Person, PhotoCluster, PhotoSharing, PhotoSource, TripPhoto, TripPhotos as Reply, TripPlaces, TripSummary } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { viewport } from "$lib/phone.svelte";
+import { SCRUB_STEPS } from "$lib/route-replay";
 import { segment, state, trip } from "../../test/fixtures";
 import { createRawSnippet } from "svelte";
 import PastTrip from "./PastTrip.svelte";
@@ -43,6 +44,7 @@ const NO_SHARING: PhotoSharing = { state: "none", scope: null, count: 0, removed
 let photos: TripPhoto[];
 let best: number[];
 let clusters: PhotoCluster[];
+let reported: TripSummary;
 let sources: PhotoSource[];
 let photosFail = false;
 function serve() {
@@ -51,7 +53,7 @@ function serve() {
     if (p.includes("/photo-sharing")) return NO_SHARING;
     if (p === "/api/photo-sources") return { sources, permissions: [] };
     if (p.endsWith("/photos")) { if (photosFail) throw new Error("down"); return reply(photos, best, clusters); }
-    if (p.endsWith("/summary")) return summary;
+    if (p.endsWith("/summary")) return reported;
     if (p === "/api/distance-unit") return { distance_unit: "mi" };
     if (p.endsWith("/places")) return places;
     throw new Error(`unexpected ${p}`);
@@ -75,6 +77,7 @@ beforeEach(() => {
   photos = [];
   best = [];
   clusters = [];
+  reported = summary;
   viewport.phone = true;
   sources = [source()];
   photosFail = false;
@@ -545,13 +548,22 @@ describe("PastTrip on desktop", () => {
       expect(days()).toHaveLength(5);
     });
 
-    it("opens the photo viewer at the first photo from Open gallery, over every photo the viewer may see", async () => {
-      photos = tiles(8);
-      best = [];
+    it("opens a grid of every photo from Open gallery, hero's included, where a tile opens the viewer, and closes it again", async () => {
+      photos = tiles(30);
+      best = photos.slice(0, 7).map((p) => p.id);
       show();
       await settled();
-      await userEvent.click(screen.getByRole("button", { name: "Open gallery" }));
-      expect(within(await screen.findByRole("dialog")).getByText("Photo 1 of 8")).toBeTruthy();
+      const open = screen.getByRole("button", { name: "Open gallery" });
+      expect(open).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(open);
+      const grid = document.getElementById("trip-photos-gallery") as HTMLElement;
+      await waitFor(() => expect(grid.querySelectorAll("[data-photo]").length).toBeGreaterThan(23));
+      expect(grid.querySelector(`[data-photo="${best[0]}"]`)).toBeTruthy();
+      await userEvent.click(grid.querySelector("[data-photo]") as HTMLElement);
+      expect(within(await screen.findByRole("dialog")).getByText(/^Photo \d+ of 30$/)).toBeTruthy();
+      await userEvent.keyboard("{Escape}");
+      await userEvent.click(screen.getByRole("button", { name: "Close gallery" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Open gallery" })).toBeTruthy());
     });
 
     it("has no Open gallery button when there are no photos", async () => {
@@ -588,6 +600,20 @@ describe("PastTrip on desktop", () => {
       expect(within(column()).getByText("Bring the tent.")).toBeTruthy();
     });
 
+    it.each([
+      [["Utah"], ["United States"], "Utah"],
+      [["Utah", "Arizona", "Colorado"], ["United States"], "3 states"],
+      [[], ["France"], "France"],
+      [[], ["France", "Italy"], "2 countries"],
+      [["Utah"], ["United States", "Canada"], "2 places"],
+    ])("words the places of %j in %j as %s", async (states, countries, text) => {
+      reported = { ...summary, states, countries };
+      photos = tiles(4);
+      show({ trip: flown });
+      const facts = await within(column()).findByTestId("trip-summary");
+      await waitFor(() => expect(within(facts).getByText(text, { selector: "dd" })).toBeTruthy());
+    });
+
     it("has no Replay button in the facts and no Bookings row, which are the phone's", async () => {
       photos = tiles(4);
       best = [101, 102, 103];
@@ -611,6 +637,7 @@ describe("PastTrip on desktop", () => {
       photos = tiles(9);
       best = [107, 108, 109];
       clusters = [marlow(38)];
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     });
 
     it("is a group named for its pins, with one button per place named by count and place, and Replay trip on it", async () => {
@@ -624,18 +651,26 @@ describe("PastTrip on desktop", () => {
       expect(within(column()).queryByRole("region", { name: "Stops list" })).toBeNull();
     });
 
-    it("opens the replay with its controls and stops from Replay trip, and puts the map back from Hide replay", async () => {
+    it("plays the replay in the column from Replay trip with only its own controls, and puts the map back when it ends", async () => {
       vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       show({ trip: flown });
       await userEvent.click(await within(column()).findByRole("button", { name: "Replay trip" }));
-      expect(await within(column()).findByRole("slider", { name: "Position along the route" })).toBeTruthy();
+      const slider = await within(column()).findByRole("slider", { name: "Position along the route" });
       expect(within(column()).getByRole("region", { name: "Stops list" })).toBeTruthy();
-      const hide = within(column()).getByRole("button", { name: "Hide replay" });
-      expect(hide).toHaveAttribute("aria-expanded", "true");
-      await userEvent.click(hide);
-      expect(within(column()).queryByRole("slider")).toBeNull();
+      expect(within(column()).queryByRole("button", { name: "Hide replay" })).toBeNull();
+      fireEvent.input(slider, { target: { value: "50" } });
+      expect(within(column()).queryByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeNull();
+      fireEvent.input(slider, { target: { value: String(SCRUB_STEPS) } });
       expect(await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+      expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(column()).getByRole("button", { name: "Replay trip" })).toBeTruthy();
+    });
+
+    it("offers no Replay trip to someone who asks for reduced motion, who would have no controls to leave it with", async () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+      show({ trip: flown });
+      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
     });
 
     it("shows a pin's photos below the map and jumps to them in the days", async () => {

@@ -419,7 +419,7 @@
     {#if timeline && wide && total}
       <div class="flex items-center justify-between gap-3">
         <h2 id="trip-photos-title" class="text-[17px] leading-snug font-semibold tracking-tight outline-none" tabindex="-1" bind:this={heading}>Photos by day</h2>
-        <Button variant="outline" size="sm" onclick={(e) => { const first = photos[0]; if (first) openViewer(first, e.currentTarget); }}>Open gallery</Button>
+        <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>
       </div>
     {:else if timeline}
       <h2 id="trip-photos-title" class="sr-only" tabindex="-1" bind:this={heading}>Photos by day</h2>
@@ -483,7 +483,7 @@
       {#if !asking && !timeline}<p class="text-muted-foreground">{acting.some((a) => (a.sharing?.removed_count ?? 0) > 0) ? "No photos on this trip." : "No photos on this trip yet."}</p>{/if}
     {:else if total > 0}
       <div id="trip-photos-gallery" bind:this={gallery}>
-        {#if timeline}
+        {#if timeline && !expanded}
           {@render daysView()}
         {:else if !expanded}
           <div class="flex gap-2 overflow-x-auto pb-1" data-testid="photo-strip">

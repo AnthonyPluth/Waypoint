@@ -32,6 +32,15 @@ The phone frames do not draw these; the owner settled them when reviewing the bu
 3. Replay trip in the facts line opens the replay inline under the line; a trip's notes show as a paragraph under the facts.
 4. The gallery's Select is not on this page; a photo is removed from the viewer.
 
+## Owner decisions on the desktop build (2026-11-17, PR #794)
+
+The desktop frame b2 does not draw these; the owner settled them when reviewing the build of the desktop trip page (#710).
+
+1. Photos by day: up to 12 photos per day, six across (two rows), as drawn. At 1024 px the right column stays about 300 px wide, which is accepted.
+2. Open gallery opens a tile view of every photo (the existing gallery grid by day, the hero's photos included); a tile opens the viewer, and the button then reads Close gallery.
+3. Replay trip plays in the left column in place of the map, using only the replay's own controls and with no Hide replay button; the map comes back when the replay ends (it plays to the end, or the slider is moved to the end). For a person who asks for reduced motion the replay has no controls, so Replay trip is not offered on the map.
+4. The Places fact is a count, as in b2: "3 states". One place is named ("Utah", "France"); only countries is "2 countries"; a mix of states and other countries is "2 places".
+
 Until the Bookings sheet (#711) and the booking detail sheet (#712) land, a past trip keeps its existing booking cards below the days, with Edit, Move and Remove; they go away when those land.
 
 ## Open questions for the owner
