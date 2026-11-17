@@ -21,11 +21,11 @@ The app's web view is given a normal web session by `POST /auth/app-session`, wh
 
 ## Saved trips
 
-The app can keep your trips on the phone. Saving is off by default and is per phone. The switch for it, the offline page that opens the saved trips and the settings card come in later changes, so today saving is turned on only by an internal setting.
+The app can keep your trips on the phone. Saving is on by default on a new install and is per phone. The switch is **Save my upcoming trips** in **Settings → Offline & notifications → Offline access**; switching it off deletes the saved trips at once, and there is no separate Remove. The first save happens when you open Waypoint online after signing in, and signing in again turns saving back on. An older version of the app without this switch shows no Offline access card.
 
 With saving on, the app reads `GET /api/offline` with its own token when the web app opens and each time you return to the app, and replaces the saved set with the reply. Only the trips you are on are in it, and it never holds loyalty or Known Traveler numbers (see [Offline access](/Waypoint/start/offline/)). The reply carries a `version`; the app saves only a version it knows and otherwise keeps the copy it has. If the phone can't reach the server, the copy it has stays and the app tries again the next time, with nothing shown to you.
 
-The saved trips are files in the app's private storage, protected so they are readable only while the phone is unlocked. The app deletes them when you sign out (**Use another Waypoint** and a 401 from the server included), when the server answers the app's request with 401 or 403, when saving is turned off or removed, and when the server address changes.
+The saved trips are files in the app's private storage inside its sandbox, protected by iOS Data Protection so they are readable only while the phone is unlocked. Other apps and websites can't read them, Waypoint adds no encryption of its own, and the files can be part of your iCloud and computer backups. Opening saved trips needs no Face ID: the phone's lock is the gate. See [Offline](/Waypoint/start/offline/#in-the-iphone-app). The app deletes them when you sign out (**Use another Waypoint** and a 401 from the server included), when the server answers the app's request with 401 or 403, when saving is turned off or removed, and when the server address changes.
 
 ## Ending it
 

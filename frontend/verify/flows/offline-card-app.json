@@ -1,0 +1,210 @@
+{
+  "name": "offline-card-app",
+  "page": "settings",
+  "viewports": [
+    "phone"
+  ],
+  "steps": [
+    {
+      "click": "a[href='#settings/offline'] >> visible=true"
+    },
+    {
+      "fake_shell": "saved"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Saved 12 min ago: “Lisbon in June”, “Denver offsite”."
+      }
+    },
+    {
+      "screenshot": "card-saved"
+    },
+    {
+      "fake_shell": "one"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Saved just now: “Lisbon in June”."
+      }
+    },
+    {
+      "screenshot": "card-one-trip"
+    },
+    {
+      "fake_shell": "ten"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "and 7 more"
+      }
+    },
+    {
+      "screenshot": "card-ten-trips"
+    },
+    {
+      "click": "button:has-text('Show all 10')"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Show fewer"
+      }
+    },
+    {
+      "screenshot": "card-ten-trips-shown"
+    },
+    {
+      "fake_shell": "none"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Nothing is saved yet."
+      }
+    },
+    {
+      "screenshot": "card-nothing-saved"
+    },
+    {
+      "fake_shell": "saving"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Saving your trips…"
+      }
+    },
+    {
+      "screenshot": "card-saving"
+    },
+    {
+      "fake_shell": "failed"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Couldn’t save the trips"
+      }
+    },
+    {
+      "screenshot": "card-failed-kept"
+    },
+    {
+      "fake_shell": "failed-none"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Nothing is saved on this device yet."
+      }
+    },
+    {
+      "screenshot": "card-failed-none"
+    },
+    {
+      "fake_shell": "damaged"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "The saved trips can’t be read"
+      }
+    },
+    {
+      "screenshot": "card-damaged"
+    },
+    {
+      "click": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "Off on this device"
+      }
+    },
+    {
+      "screenshot": "card-off"
+    },
+    {
+      "click": "[data-testid='offline-shell-card'] [role='switch']"
+    },
+    {
+      "expect_text": {
+        "selector": "[data-testid='offline-shell-card']",
+        "text": "On for this device"
+      }
+    },
+    {
+      "screenshot": "card-switched-on-again"
+    },
+    {
+      "fake_shell": "old"
+    },
+    {
+      "reload": true
+    },
+    {
+      "wait_for": "h1:has-text('Offline & notifications')"
+    },
+    {
+      "expect_text": {
+        "selector": "main",
+        "text": "REMINDERS AND CALENDAR"
+      }
+    },
+    {
+      "screenshot": "card-old-app"
+    }
+  ]
+}
