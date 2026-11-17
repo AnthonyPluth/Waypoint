@@ -307,13 +307,20 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`, `#trip/3`.
 - **Widths:** phone, desktop.
 - **Touches:** `Trip options`, `Show all`, `Position along the route`.
-- **Expects to see:** `Trip to Denver`, `13 photos`, `Merge another trip`, `Trip to Paris`, `Trip to Orlando`.
+- **Expects to see:** `Trip to Denver`, `13 photos`, `Photo sharing for this trip`, `Merge another trip`, `Trip to Paris`, `Trip to Orlando`.
 - **Fakes (the demo server can't):** `fake_photo_limit`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow past-trip-page`; or `poetry run python run.py verify --flow past-trip-page`.
 - **What usually breaks:**
   - A past trip with photos (the road trip), one with none (the Paris trip, whose hero is the route map with "No photos yet") and, with `fake_photo_limit`, one with two photos (the Lakeside Resort trip), then the Trip options menu, Show all days and a photo in the viewer. Needs `--signed-in jane` for `tools/control`.
   - The map hero plays the replay on its own; the flow presses `End` on "Position along the route" before those pictures, as make verify does for the trip page, so they are the same every time.
+
+#### `past-trip-saved-route`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow past-trip-saved-route`; or `poetry run python run.py verify --flow past-trip-saved-route`.
 
 #### `past-trips-list`
 
@@ -517,14 +524,6 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `San Francisco`, `Position along the route`.
 - **Expects to see:** `Trips`, `State line`.
 - **Drive it:** `tools/control flow trip-state-lines-flight`; or `poetry run python run.py verify --flow trip-state-lines-flight`.
-
-#### `trip-state-lines-mapkit`
-
-- **Starts at:** `#trips`.
-- **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`.
-- **Expects to see:** `Trips`, `State line`.
-- **Drive it:** `tools/control flow trip-state-lines-mapkit`; or `poetry run python run.py verify --flow trip-state-lines-mapkit`.
 
 #### `trip-state-lines`
 

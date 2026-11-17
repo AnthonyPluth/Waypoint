@@ -596,6 +596,15 @@ class DrivingRoutes(TypedDict):
     routes: list[DrivingRoute]
 
 
+class TripDrivingRoutes(TypedDict):
+    trip_id: int
+    routes: list[DrivingRoute]
+
+
+class DrivingRoutesForTrips(TypedDict):
+    trips: list[TripDrivingRoutes]
+
+
 class DrivingRouteBody(TypedDict):
     start: DrivingPlace
     end: DrivingPlace

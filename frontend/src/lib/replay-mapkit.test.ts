@@ -22,7 +22,7 @@ const roads: Roads = {
 const boundaries = [{ points: [[40.99, -109.05], [37.0, -109.05]] }];
 
 const options = (extra: Partial<ReplayMapOptions> = {}): ReplayMapOptions =>
-  ({ stops: flying, roads: none, boundaries: [], width: 960, height: 520, palette: DEFAULT_PALETTE, scale: 1, onFailure: vi.fn(), ...extra });
+  ({ stops: flying, roads: none, width: 960, height: 520, palette: DEFAULT_PALETTE, scale: 1, onFailure: vi.fn(), ...extra });
 const start = (extra: Partial<ReplayMapOptions> = {}): { replay: ReplayMap; opts: ReplayMapOptions } => {
   const opts = options(extra);
   return { replay: createReplayMap(fakeMk, document.createElement("div"), opts), opts };
@@ -198,7 +198,7 @@ describe("the MapKit map", () => {
   });
 
   it("draws each leg in as time passes, in the flat map's colours and widths", () => {
-    const { replay } = start({ palette: { route: "#111111", stay: "#222222", border: "#333333" }, scale: 0.5 });
+    const { replay } = start({ palette: { route: "#111111", stay: "#222222" }, scale: 0.5 });
     replay.update({ progress: 0.25, playing: true, calm: false });
     const [first] = overlays();
     expect(overlays()).toHaveLength(1);
@@ -218,7 +218,7 @@ describe("the MapKit map", () => {
   });
 
   it("draws a drive along its road, in the ground colour", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads, palette: { route: "#111111", stay: "#222222", border: "#333333" } });
+    const { replay } = start({ stops: [denver, saltLake], roads, palette: { route: "#111111", stay: "#222222" } });
     replay.update({ progress: 1, playing: false, calm: false });
     const drive = overlays().find((o) => colorOf(o) === "#222222" && o.options.style!.options.lineWidth === 2)!;
     expect(drive.points.length).toBeGreaterThanOrEqual(4);
@@ -347,13 +347,11 @@ describe("the MapKit map", () => {
     expect(fake.last().rects).toHaveLength(count);
   });
 
-  it("draws the state lines the flat map draws, only where they are in view, and no highway lines or shields", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads, boundaries });
+  it("draws no state lines, even when the reply has them, and no highway lines or shields", () => {
+    const { replay } = start({ stops: [denver, saltLake], roads, ...{ boundaries } });
     replay.update({ progress: 1, playing: false, calm: true });
-    const dashed = overlays().filter((o) => o.options.style!.options.lineDash);
-    expect(dashed).toHaveLength(1);
-    expect(dashed[0].options.style!.options).toMatchObject({ lineDash: [4, 3], strokeOpacity: 0.8, lineWidth: 1 });
-    expect(overlays().filter((o) => !o.options.style!.options.lineDash)).toHaveLength(1);
+    expect(overlays().filter((o) => o.options.style!.options.lineDash)).toHaveLength(0);
+    expect(overlays()).toHaveLength(1);
     expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);
     replay.update({ progress: 1, playing: false, calm: true });
     expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);

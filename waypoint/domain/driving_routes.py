@@ -9,7 +9,7 @@ from sqlalchemy import and_, or_, select
 from ..storage import db
 from ..storage.models import DrivingRoute
 from . import tripmap
-from .visibility import Viewer
+from .visibility import Viewer, visible_trips
 
 SCALE = 10_000
 MIN_POINTS = 2
@@ -20,6 +20,8 @@ REPLACE_AFTER_SECONDS = 30 * 24 * 3600
 ENDPOINT_REACH_DEGREES = 0.02
 STOP_REACH_DEGREES = 0.001
 PATH_DECIMALS = 6
+MAX_TRIPS = 12
+CARD_POINTS = 300
 
 
 class Invalid(Exception):
@@ -35,6 +37,11 @@ class CachedRoute(TypedDict):
     start: Place
     end: Place
     path: list[list[float]]
+
+
+class TripRoutes(TypedDict):
+    trip_id: int
+    routes: list[CachedRoute]
 
 
 Drive = tuple[float, float, float, float]
@@ -158,3 +165,44 @@ def store(conn: db.Connection, viewer: Viewer, trip_id: int, start: Any, end: An
     db.upsert(conn, DrivingRoute, {"trip_id": trip_id, "from_lat": from_lat, "from_lon": from_lon, "to_lat": to_lat, "to_lon": to_lon,
                                    "path": json.dumps(path, separators=(",", ":")), "stored": now}, key=["trip_id", "from_lat", "from_lon", "to_lat", "to_lon"])
     return True
+
+
+def parse_trips(texts: list[str]) -> list[int]:
+    if not texts:
+        raise Invalid("Send the trips to look up")
+    if len(texts) > MAX_TRIPS:
+        raise Invalid(f"Ask for at most {MAX_TRIPS} trips at a time")
+    ids: list[int] = []
+    for text in texts:
+        if not text.isascii() or not text.isdigit() or len(text) > 12:
+            raise Invalid("Send each trip as its number")
+        ids.append(int(text))
+    return ids
+
+
+def _thin(path: list[list[float]], limit: int = CARD_POINTS) -> list[list[float]]:
+    if len(path) <= limit:
+        return path
+    return [path[round(i * (len(path) - 1) / (limit - 1))] for i in range(limit)]
+
+
+def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], now: float) -> list[TripRoutes]:
+    asked = set(parse_trips(texts))
+    seen = sorted(t.id for t in visible_trips(conn, viewer) if t.id in asked)
+    if not seen:
+        return []
+    rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_(seen), DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)
+                            .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)).all()
+    stops: dict[int, list[tuple[float, float]]] = {}
+    for trip_id in sorted({row.trip_id for row in rows}):
+        places = tripmap.places(conn, viewer, trip_id)
+        stops[trip_id] = _stops(places) if places is not None else []
+    out: dict[int, TripRoutes] = {}
+    for row in rows:
+        start: Place = {"latitude": row.from_lat / SCALE, "longitude": row.from_lon / SCALE}
+        end: Place = {"latitude": row.to_lat / SCALE, "longitude": row.to_lon / SCALE}
+        if not _on_trip(stops[row.trip_id], (start["latitude"], start["longitude"], end["latitude"], end["longitude"])):
+            continue
+        found = out.setdefault(row.trip_id, {"trip_id": row.trip_id, "routes": []})
+        found["routes"].append({"start": start, "end": end, "path": _thin(json.loads(row.path))})
+    return list(out.values())

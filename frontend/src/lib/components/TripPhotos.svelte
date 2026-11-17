@@ -19,9 +19,10 @@
   const NONE: ReadonlySet<number> = new Set();
   const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false) }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
     timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
+    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean;
   } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
@@ -29,6 +30,7 @@
   let sources = $state<PhotoSource[] | null>(null);
   let acting = $state<PersonSharing[]>([]);
   let actingProblem = $state(false);
+  let settled = $state(false);
   let staleView = $state(false);
   let refreshing = $state(false);
   let checking = $state(false);
@@ -46,7 +48,6 @@
   let selected = $state<Set<number>>(new Set());
   let removing = $state(false);
   let heading = $state<HTMLElement | null>(null);
-  let sharingOpen = $state(false);
   let selectButton = $state<HTMLElement | null>(null);
   let broken = $state<Set<number>>(new Set());
   let gallery = $state<HTMLElement | null>(null);
@@ -85,6 +86,11 @@
     untrack(() => onstatus?.(state));
   });
   const looks = $derived(photos.filter((p) => isFar(p) && mineOf(p)).length);
+  $effect(() => {
+    const list = acting;
+    const done = settled;
+    untrack(() => onsharing?.(list, done));
+  });
   $effect(() => {
     const n = looks;
     untrack(() => onlook?.(n));
@@ -183,7 +189,10 @@
       acting = next;
       await Promise.all(next.map((a) => a.load()));
     } finally {
-      if (mine === setups) checking = false;
+      if (mine === setups) {
+        checking = false;
+        settled = true;
+      }
     }
   }
 
@@ -199,6 +208,7 @@
     return () => untrack(() => {
       setups++;
       checking = false;
+      settled = false;
       for (const a of acting) a.dispose();
       acting = [];
     });
@@ -251,6 +261,10 @@
     }
     tile.scrollIntoView?.({ block: "center", behavior: "auto" });
     tile.focus({ preventScroll: true });
+  }
+
+  export function headingElement(): HTMLElement | null {
+    return heading;
   }
 
   export function viewFirst() {
@@ -464,7 +478,7 @@
       </div>
     {/if}
     {#each acting as a (a.personId)}
-      {#if !(sharingOpen && a.mode === "card" && !timeline)}
+      {#if !(sharingOpen && a.mode === "card")}
         <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
       {/if}
       <TripPhotoSharing sharing={a} tripName={trip.name} part="prompt" />
@@ -524,12 +538,9 @@
         <p class="text-caption text-muted-foreground">{brokenOwners.map((n) => `${n}’s`).join(" and ")} photos can’t be loaded right now. They show again once Waypoint can reach their Immich.</p>
       {/if}
     {/if}
-    {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
-    {/each}
-    {#if timeline}
+    {#if !timeline}
       {#each acting as a (a.personId)}
-        <TripPhotoSharing sharing={a} tripName={trip.name} part="card" />
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
       {/each}
     {/if}
     <p class="sr-only" role="status">{announce}</p>

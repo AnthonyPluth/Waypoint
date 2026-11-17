@@ -2,10 +2,10 @@
   import { untrack } from "svelte";
   import type { Maps } from "$lib/mapkit";
   import { createReplayMap, DEFAULT_PALETTE, type ReplayMap } from "$lib/replay-mapkit";
-  import type { Boundaries, Box, Roads, Stop } from "$lib/route-replay";
+  import type { Box, Roads, Stop } from "$lib/route-replay";
 
-  let { maps, tripId, stops, roads, boundaries, width, height, progress, playing, calm, onfailure, more = [], onview, label = "Map of the route, stop by stop; the stops are listed below" }: {
-    maps: Maps; tripId?: number; stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; progress: number; playing: boolean; calm: boolean; onfailure: () => void;
+  let { maps, tripId, stops, roads, width, height, progress, playing, calm, onfailure, more = [], onview, label = "Map of the route, stop by stop; the stops are listed below" }: {
+    maps: Maps; tripId?: number; stops: Stop[]; roads: Roads; width: number; height: number; progress: number; playing: boolean; calm: boolean; onfailure: () => void;
     more?: Pick<Stop, "latitude" | "longitude">[]; onview?: (box: Box) => void; label?: string;
   } = $props();
 
@@ -23,10 +23,10 @@
     }
     const css = getComputedStyle(document.documentElement);
     const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-    const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay), border: color("--map-border", DEFAULT_PALETTE.border) };
+    const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay) };
     let made: ReplayMap;
     try {
-      made = createReplayMap(maps.mk, element, { stops, roads, boundaries, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId, more: untrack(() => more), onView: untrack(() => onview) });
+      made = createReplayMap(maps.mk, element, { stops, roads, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId, more: untrack(() => more), onView: untrack(() => onview) });
     } catch {
       onfailure();
       return;

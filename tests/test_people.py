@@ -4,7 +4,7 @@ from waypoint import oidc
 from waypoint.domain import demo, loyalty, people
 from waypoint.server.api import people as api
 from waypoint.server.common import ApiError, _current
-from waypoint.storage.models import (FlightStatus, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment, SegmentCode, SegmentMessage, SegmentPort, SegmentRecipient, SegmentTraveler, StoredMessage,
+from waypoint.storage.models import (DrivingRoute, FlightStatus, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment, SegmentCode, SegmentMessage, SegmentPort, SegmentRecipient, SegmentTraveler, StoredMessage,
                                      Trip, TripPerson, User)
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase
@@ -90,7 +90,7 @@ class PeopleTests(DbCase):
         self.assertEqual(added, 2 + len(shown) + len(demo.MEMBERSHIPS) + len(demo.DEMO_LOGO_COLORS) + 3 + len(demo.UNREAD) + len(demo.SAME_RESERVATION) + len(demo.SHARED_UNREAD) + 3
                          + sum(self.c.orm.scalar(select(func.count()).select_from(m)) or 0 for m in (Trip, TripPerson, Segment, SegmentPort, SegmentTraveler, FlightStatus,
                                                                                               StoredMessage, SegmentMessage, SegmentCode,
-                                                                                              PhotoSource, Photo, PhotoGrant, PhotoExclusion, PhotoTripSync)))
+                                                                                              PhotoSource, Photo, PhotoGrant, PhotoExclusion, PhotoTripSync, DrivingRoute)))
         self.assertEqual([p["member"] for p in shown], [True, True, False, False])
         self.assertEqual(self.c.orm.scalar(select(func.count()).select_from(User)), 2)
 

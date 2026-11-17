@@ -47,10 +47,11 @@ let clusters: PhotoCluster[];
 let reported: TripSummary;
 let sources: PhotoSource[];
 let photosFail = false;
+let sharingReply: () => Promise<PhotoSharing>;
 function serve() {
   vi.mocked(api).mockImplementation(async (path) => {
     const p = String(path);
-    if (p.includes("/photo-sharing")) return NO_SHARING;
+    if (p.includes("/photo-sharing")) return sharingReply();
     if (p === "/api/photo-sources") return { sources, permissions: [] };
     if (p.endsWith("/photos")) { if (photosFail) throw new Error("down"); return reply(photos, best, clusters); }
     if (p.endsWith("/summary")) return reported;
@@ -81,6 +82,7 @@ beforeEach(() => {
   viewport.phone = true;
   sources = [source()];
   photosFail = false;
+  sharingReply = async () => NO_SHARING;
   serve();
 });
 afterEach(() => { app.state = null; viewport.phone = false; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -412,6 +414,197 @@ describe("PastTrip bookings row", () => {
     show({ trip: flown });
     await screen.findByRole("heading", { level: 1 });
     expect(screen.queryByRole("button", { name: /^Bookings/ })).toBeNull();
+  });
+});
+
+describe("PastTrip Sharing", () => {
+  const sharing = (extra: Partial<PhotoSharing> = {}): PhotoSharing => ({ ...NO_SHARING, state: "shared", scope: "only_me", count: 5, ...extra });
+  const many = (n: number) => [...Array(n).keys()].map((i) => shot(i + 1, 1 + (i % 3)));
+  const sharingButton = () => screen.findByRole("button", { name: "Sharing" });
+  const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("sits alone in the row under a photo hero when View photos isn't drawn, with the card only in the panel", async () => {
+    viewport.phone = false;
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing();
+    show();
+    const button = await sharingButton();
+    expect(screen.queryByRole("button", { name: "View photos" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your photos on this trip" })).toBeNull();
+    expect(before(screen.getByTestId("trip-hero"), button)).toBe(true);
+    expect(before(button, screen.getByTestId("trip-summary"))).toBe(true);
+    await userEvent.click(button);
+    const panel = await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    expect(within(panel).getByRole("region", { name: "Your photos on this trip" })).toBeTruthy();
+    expect(panel.className).toContain("left-[-6px]");
+    expect(screen.queryByRole("button", { name: "Select your photos to remove" })).toBeNull();
+  });
+
+  it("sits beside View photos when the hero takes every photo", async () => {
+    photos = many(3);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing();
+    show();
+    const button = await sharingButton();
+    const view = screen.getByRole("button", { name: "View photos" });
+    expect(view.parentElement).toBe(button.parentElement?.parentElement);
+    expect(before(view, button)).toBe(true);
+  });
+
+  it("sits alone in its own row under the map when the hero is the map", async () => {
+    photos = many(2);
+    best = [1, 2];
+    sharingReply = async () => sharing();
+    show({ trip: flown });
+    const button = await sharingButton();
+    expect(screen.queryByTestId("trip-hero")).toBeNull();
+    expect(screen.queryByRole("button", { name: "View photos" })).toBeNull();
+    expect(before(await screen.findByRole("region", { name: "Route replay" }), button)).toBe(true);
+    expect(before(button, screen.getByTestId("trip-summary"))).toBe(true);
+  });
+
+  it("holds a blank slot while the sharing state loads, then shows the button in its place", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    let release: (value: PhotoSharing) => void = () => {};
+    sharingReply = () => new Promise((resolve) => { release = resolve; });
+    show();
+    const slot = await screen.findByTestId("sharing-slot");
+    expect(slot.textContent).toBe("");
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+    release(sharing());
+    await sharingButton();
+    expect(screen.queryByTestId("sharing-slot")).toBeNull();
+  });
+
+  it("shows no button and no slot to a person with no sharing control once the state is known", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    show();
+    await settled();
+    await waitFor(() => expect(screen.queryByTestId("sharing-slot")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+  });
+
+  it("collapses the row under the map once, for a person with no control", async () => {
+    show({ trip: flown });
+    await screen.findByTestId("no-photos");
+    await waitFor(() => expect(screen.queryByTestId("sharing-slot")).toBeNull());
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+  });
+
+  it("keeps the first-visit prompt above the days, with no button", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing({ state: "ask", scope: null });
+    show();
+    const prompt = await screen.findByRole("group", { name: /Your photos|photos/i });
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+    expect(before(prompt, days()[0])).toBe(true);
+  });
+
+  it("puts the reminder after Not now directly under the button row, above the days, with no button", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing({ state: "declined", scope: null });
+    show();
+    const reminder = await screen.findByTestId("photo-reminder");
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+    expect(before(screen.getByTestId("trip-hero"), reminder)).toBe(true);
+    expect(before(reminder, screen.getByTestId("trip-summary"))).toBe(true);
+    expect(screen.getAllByTestId("photo-reminder")).toHaveLength(1);
+  });
+
+  it("shows the button of the next trip after moving from one with no control, in the same page", async () => {
+    photos = many(2);
+    best = [];
+    const next = trip([stay, there, back], { id: 8, name: "Autumn loop", destination: "Utah", start_date: "2026-03-01", end_date: "2026-03-08" });
+    sharingReply = async () => NO_SHARING;
+    vi.mocked(api).mockImplementation(async (path) => {
+      const p = String(path);
+      if (p.includes("/photo-sharing")) return (p.includes("/trips/8/") ? sharing() : NO_SHARING) as never;
+      if (p === "/api/photo-sources") return { sources, permissions: [] } as never;
+      if (p.endsWith("/photos")) return reply(photos, best) as never;
+      if (p.endsWith("/summary")) return summary as never;
+      if (p === "/api/distance-unit") return { distance_unit: "mi" } as never;
+      if (p.endsWith("/places")) return places as never;
+      throw new Error(`unexpected ${p}`);
+    });
+    const view = show({ trip: flown });
+    await settled();
+    await waitFor(() => expect(screen.queryByTestId("sharing-slot")).toBeNull());
+    await view.rerender({ trip: next } as never);
+    expect(await sharingButton()).toBeTruthy();
+  });
+
+  it("opens no panel on the next trip when the sheet was open as the trip changed", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    const next = trip([stay], { id: 8, name: "Autumn loop", destination: "Utah", start_date: "2026-03-01", end_date: "2026-03-08" });
+    vi.mocked(api).mockImplementation(async (path) => {
+      const p = String(path);
+      if (p.includes("/photo-sharing")) return sharing() as never;
+      if (p === "/api/photo-sources") return { sources, permissions: [] } as never;
+      if (p.endsWith("/photos")) return reply(photos, best) as never;
+      if (p.endsWith("/summary")) return summary as never;
+      if (p === "/api/distance-unit") return { distance_unit: "mi" } as never;
+      if (p.endsWith("/places")) return places as never;
+      throw new Error(`unexpected ${p}`);
+    });
+    const view = show();
+    await userEvent.click(await sharingButton());
+    await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    await view.rerender({ trip: next } as never);
+    const button = await sharingButton();
+    expect(screen.queryByRole("dialog", { name: "Photo sharing for this trip" })).toBeNull();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("does not reopen the panel when sharing is stopped and then shared again", async () => {
+    photos = many(6);
+    best = [1, 2, 3];
+    let current = sharing({ count: 5 });
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      const p = String(path);
+      if (p.includes("/photo-sharing")) {
+        const method = (opts as { method?: string } | undefined)?.method;
+        if (method === "DELETE") current = sharing({ state: "declined", scope: null, count: 5 });
+        if (method === "POST") current = sharing({ count: 5 });
+        return current as never;
+      }
+      if (p === "/api/photo-sources") return { sources, permissions: [] } as never;
+      if (p.endsWith("/photos")) return reply(photos, best) as never;
+      if (p.endsWith("/summary")) return summary as never;
+      if (p === "/api/distance-unit") return { distance_unit: "mi" } as never;
+      if (p.endsWith("/places")) return places as never;
+      throw new Error(`unexpected ${p}`);
+    });
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    show();
+    await user.click(await sharingButton());
+    const panel = await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    await user.click(within(panel).getByRole("button", { name: "Stop sharing on this trip" }));
+    await user.click(within(await screen.findByRole("dialog", { name: "Stop sharing your photos on this trip?" })).getByRole("button", { name: "Stop sharing" }));
+    const reminder = await screen.findByTestId("photo-reminder");
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+    await user.click(within(reminder).getByRole("button", { name: /^Share .* photos on this trip$/ }));
+    await user.click(await screen.findByRole("button", { name: "Share on this trip" }));
+    const button = await sharingButton();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(button).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("opens the panel as a sheet on a phone", async () => {
+    viewport.phone = true;
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing();
+    show();
+    await userEvent.click(await sharingButton());
+    const sheet = await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    expect(within(sheet).getByRole("region", { name: "Your photos on this trip" })).toBeTruthy();
+    viewport.phone = false;
   });
 });
 

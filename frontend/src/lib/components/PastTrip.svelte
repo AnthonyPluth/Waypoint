@@ -8,11 +8,14 @@
   import KindTile from "$lib/components/KindTile.svelte";
   import RouteReplay from "$lib/components/RouteReplay.svelte";
   import TripDetails from "$lib/components/TripDetails.svelte";
+  import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
+  import TripPhotoSharingMenu from "$lib/components/TripPhotoSharingMenu.svelte";
   import TripPhotos from "$lib/components/TripPhotos.svelte";
   import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatTotals } from "$lib/money";
   import { viewport } from "$lib/phone.svelte";
   import { heroCaption, HERO_PHOTOS_WIDE, heroOf, thumbnailUrl } from "$lib/photos";
+  import type { PersonSharing } from "$lib/trip-sharing.svelte";
   import { bookingCounts, tripPeople } from "$lib/trips";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
@@ -32,7 +35,10 @@
   let looks = $state(0);
   let stopCount = $state(0);
   let replaying = $state(false);
-  let gallery = $state<{ showCluster: (cluster: number) => Promise<void>; viewFirst: () => void } | null>(null);
+  let gallery = $state<{ showCluster: (cluster: number) => Promise<void>; viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
+  let acting = $state<PersonSharing[]>([]);
+  let settled = $state(false);
+  let sharingOpen = $state(false);
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let lost = $state<Set<number>>(new Set());
@@ -49,6 +55,10 @@
   });
   const leftOut = $derived<ReadonlySet<number>>(new Set(heroKind === "photos" ? heroIds : []));
   const noPhotos = $derived(signedIn && status === "ready" && found !== null && found.photos.length === 0);
+  const viewDrawn = $derived(!wide && heroKind === "photos" && found !== null && found.photos.length === heroIds.length);
+  const hasControl = $derived(acting.some((a) => a.mode === "card"));
+  const holdSlot = $derived(signedIn && !settled);
+  const controlRow = $derived(viewDrawn || hasControl || holdSlot);
   const caption = $derived(heroCaption(trip, dates));
   const avatars = $derived(tripPeople(trip));
   const names = $derived(avatars.map((p) => p.name).join(", "));
@@ -59,7 +69,12 @@
   $effect(() => {
     void trip.id;
     replaying = false;
+    settled = false;
+    sharingOpen = false;
     lost = new Set();
+  });
+  $effect(() => {
+    if (!hasControl) sharingOpen = false;
   });
   $effect(() => {
     if (heroKind === "map") replaying = false;
@@ -91,6 +106,7 @@
       </div>
       <div class={wide ? "max-w-[60rem]" : ""}><RouteReplay {trip} {now} photos={found} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
       {#if noPhotos}<p class="-mt-3 text-sm text-muted-foreground" data-testid="no-photos">No photos yet</p>{/if}
+      {@render controls()}
     {:else}
       <div class={`relative overflow-hidden rounded-[22px] border border-border bg-surface-3 ${wide ? "h-[260px]" : "h-[170px]"}`} data-testid="trip-hero">
         {#if heroKind === "photos"}
@@ -110,11 +126,9 @@
       </div>
     {/if}
 
-    {#if !wide}
-      {#if heroKind === "photos" && found && found.photos.length === heroIds.length}
-        <div><Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button></div>
-      {/if}
+    {#if heroKind !== "map"}{@render controls()}{/if}
 
+    {#if !wide}
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <TripSummary tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
         <AvatarStack people={avatars} />
@@ -180,8 +194,24 @@
   {/if}
 </div>
 
+{#snippet controls()}
+  {#if controlRow}
+    <div class="flex flex-wrap items-center gap-2">
+      {#if viewDrawn}<Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button>{/if}
+      {#if hasControl}
+        <TripPhotoSharingMenu {acting} tripName={trip.name} align="start" bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
+      {:else if holdSlot}
+        <span class="inline-block h-8 w-[84px] phone:h-11" aria-hidden="true" data-testid="sharing-slot"></span>
+      {/if}
+    </div>
+  {/if}
+  {#each acting as a (a.personId)}
+    <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
+  {/each}
+{/snippet}
+
 {#snippet photos()}
-  <TripPhotos bind:this={gallery} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
+  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next, done) => { acting = next; settled = done; }} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
 {/snippet}
 
 {#snippet total()}

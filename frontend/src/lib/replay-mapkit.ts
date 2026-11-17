@@ -2,13 +2,13 @@ import { geoBounds, geoMercator, type GeoProjection } from "d3-geo";
 import { drivingRoutes, type Drive } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
-  activeStop, boundariesShown, cameraAt, inView, legProgress, legsOf, moverAt, positions, reached, routeProjection,
-  type Boundaries, type Box, type Extent, type Leg, type Roads, type Spot, type Stop, type Vehicle,
+  activeStop, cameraAt, legProgress, legsOf, moverAt, positions, reached, routeProjection,
+  type Box, type Leg, type Roads, type Spot, type Stop, type Vehicle,
 } from "./route-replay";
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
-export type Palette = { route: string; stay: string; border: string };
-export type ReplayMapOptions = { stops: Stop[]; roads: Roads; boundaries: Boundaries; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
+export type Palette = { route: string; stay: string };
+export type ReplayMapOptions = { stops: Stop[]; roads: Roads; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
 export const WORLD = 1;
@@ -16,10 +16,8 @@ export const MAX_LATITUDE = 85.0511;
 export const SAMPLES = 64;
 export const FLIGHT_WIDTH = 2.5;
 export const GROUND_WIDTH = 2;
-export const BOUNDARY_WIDTH = 1;
-export const BOUNDARY_DASH = [4, 3];
 export const MOVER_SCALE = 1.1;
-export const DEFAULT_PALETTE: Palette = { route: "#8fc2ff", stay: "#4fd1b0", border: "#343c52" };
+export const DEFAULT_PALETTE: Palette = { route: "#8fc2ff", stay: "#4fd1b0" };
 
 const SVG = "http://www.w3.org/2000/svg";
 const lat = (y: number) => Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, y));
@@ -82,26 +80,6 @@ export function cutAt(path: Path, share: number): Spot[] {
   return out;
 }
 
-type Line = Extent & { index: number; length: number; mid: Spot };
-
-function linesOf(lines: { points: number[][] }[], projection: GeoProjection): Line[] {
-  const out: Line[] = [];
-  lines.forEach((line, index) => {
-    const points: Spot[] = [];
-    for (const [la, lo] of line.points) {
-      const at = projection([lo, la]);
-      if (at) points.push({ x: at[0], y: at[1] });
-    }
-    if (points.length < 2) return;
-    const { along } = pathOf(points);
-    const half = along[along.length - 1] / 2;
-    const k = Math.max(1, along.findIndex((a) => a >= half));
-    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
-    out.push({ index, left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys), length: along[along.length - 1], mid: points[k] });
-  });
-  return out;
-}
-
 function element<K extends keyof SVGElementTagNameMap>(tag: K, attributes: Record<string, string | number>, ...children: SVGElement[]): SVGElementTagNameMap[K] {
   const node = document.createElementNS(SVG, tag);
   for (const [k, v] of Object.entries(attributes)) node.setAttribute(k, String(v));
@@ -145,21 +123,19 @@ function moverElement(index: number, vehicle: Vehicle): { node: HTMLElement; bod
 }
 
 export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOptions): ReplayMap {
-  const { stops, roads, boundaries, width, height, palette, scale, onFailure, tripId = null, more = [], onView } = options;
+  const { stops, roads, width, height, palette, scale, onFailure, tripId = null, more = [], onView } = options;
   const projection = mercatorFor(stops, width, height, roads, more);
   const legs = legsOf(stops, projection, roads);
   const spots = positions(stops, projection);
   const paths = legs.map(legPath);
   let lastFrame: Frame | null = null;
   let over = false;
-  const states = linesOf(boundaries, projection);
   const full: Box = { x: 0, y: 0, w: width, h: height };
   const coordinate = (at: Spot) => {
     const found = projection.invert?.([at.x, at.y]);
     return new mk.Coordinate(lat(found?.[1] ?? 0), found?.[0] ?? 0);
   };
   const coordinates = (points: Spot[]) => points.map(coordinate);
-  const geographic = (points: number[][]) => points.map(([la, lo]) => new mk.Coordinate(la, lo));
   const style = (color: string, lineWidth: number, extra: Record<string, unknown> = {}) => new mk.Style({ strokeColor: color, lineWidth: lineWidth * scale, lineCap: "round", lineJoin: "round", ...extra });
 
   let map: MkMap | null = new mk.Map(host, {
@@ -201,17 +177,11 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
   };
   ends.push(clearMover);
   const legMarks = new Map<number, { overlay: MkOverlay; done: number }>();
-  const stateMarks = new Map<number, MkOverlay>();
   let seen = "";
 
   const rectOf = (box: Box) => {
     const r = mapRectFor(projection, box);
     return new mk.MapRect(r.x, r.y, r.width, r.height);
-  };
-
-  const sync = <K>(marks: Map<K, MkOverlay>, wanted: Set<K>, make: (key: K) => MkOverlay) => {
-    for (const [key, overlay] of [...marks]) if (!wanted.has(key)) { map?.removeOverlay(overlay); marks.delete(key); }
-    for (const key of wanted) if (!marks.has(key)) { const overlay = make(key); map?.addOverlay(overlay); marks.set(key, overlay); }
   };
 
   const draw = (frame: Frame) => {
@@ -225,7 +195,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       host.setAttribute("data-zoomed", String(box.w < width - 0.5));
       onView?.(box);
     }
-    const zoom = box.w / width;
     const now = calm ? stops.length - 1 : activeStop(stops.length, progress);
     stopMarks.forEach((mark, i) => {
       const show = calm || reached(i, stops.length, progress);
@@ -233,8 +202,6 @@ export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOpt
       else if (!show && mark.shown) { map?.removeAnnotation(mark.annotation); mark.shown = false; }
       mark.ping.style.display = !calm && playing && i === now ? "" : "none";
     });
-    const drawnLines = boundariesShown(projection, zoom) ? states.filter((l) => inView(l, box)) : [];
-    sync(stateMarks, new Set(drawnLines.map((l) => l.index)), (i) => new mk.PolylineOverlay(geographic(boundaries[i].points), { style: style(palette.border, BOUNDARY_WIDTH, { lineDash: BOUNDARY_DASH, strokeOpacity: 0.8 }) }));
     let movingLeg = -1;
     legs.forEach((leg, i) => {
       const done = calm ? 1 : legProgress(i, stops.length, progress);

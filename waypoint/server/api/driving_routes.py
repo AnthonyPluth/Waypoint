@@ -4,7 +4,7 @@ import time
 
 from ...domain import driving_routes
 from ..common import ApiError, row_id
-from ..contract import DrivingRouteBody, DrivingRoutes, DrivingRouteStored
+from ..contract import DrivingRouteBody, DrivingRoutes, DrivingRoutesForTrips, DrivingRouteStored
 from .trips import NO_TRIP, viewer
 
 
@@ -17,6 +17,13 @@ def api_driving_routes(conn, q, _b, trip_id) -> DrivingRoutes:
     if found is None:
         raise ApiError(NO_TRIP, 404)
     return {"routes": found}
+
+
+def api_driving_routes_for_trips(conn, q, _b) -> DrivingRoutesForTrips:
+    try:
+        return {"trips": driving_routes.cached_for_trips(conn, viewer(conn), q.get("trip", []), time.time())}
+    except driving_routes.Invalid as e:
+        raise ApiError(str(e)) from None
 
 
 def api_driving_route_store(conn, _q, body: DrivingRouteBody, trip_id) -> DrivingRouteStored:
