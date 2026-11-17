@@ -1328,6 +1328,28 @@ describe("going back to the list", () => {
     columnScroll.mockRestore();
   });
 
+  it("keeps the first list's position when a second visit to Trips is made and left in between", async () => {
+    await leaveFor("#trip/3");
+    location.hash = "#trips";
+    await onPage("trips");
+    const second = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    scrolled(90);
+    location.hash = "#trip/1";
+    await onPage("trip");
+    second.unmount();
+    history.back();
+    await onPage("trips");
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trip/3"));
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trips"));
+    await waitFor(() => expect(route.page).toBe("trips"));
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+  });
+
   it("takes the in-app back link as going back, and leaves it a plain link when there is nothing to go back to", async () => {
     await leaveFor("#trip/3");
     const click = new MouseEvent("click", { cancelable: true, button: 0 });
