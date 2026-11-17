@@ -118,6 +118,23 @@ class StoringAndReadingTests(RouteCacheCase):
             self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive, ((41.0, -109.0),)))
         self.assertEqual(len(self.rows()), 1)
 
+    def test_an_expired_row_and_the_row_of_a_drive_the_trip_no_longer_makes_are_ignored_but_never_deleted_until_the_trip_goes(self):
+        first = self.book("ana", DENVER)
+        second = self.book("ana", SALT_LAKE, trip_id=first["trip_id"])
+        trip = first["trip_id"]
+        drive = drive_of(self.ok("ana", "GET", f"/api/trips/{trip}/places"))
+        now = time.time()
+        with at(now):
+            self.assertEqual(self.put("ana", trip, drive)[1], {"stored": True})
+        with at(now + driving_routes.REPLACE_AFTER_SECONDS * 2):
+            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"], [])
+        self.assertEqual(len(self.rows()), 1)
+        self.ok("ana", "DELETE", f"/api/segments/{second['id']}")
+        self.assertEqual(self.look_up("ana", trip, drive), (200, {"routes": []}))
+        self.assertEqual(len(self.rows()), 1)
+        self.ok("ana", "DELETE", f"/api/segments/{first['id']}")
+        self.assertEqual(self.rows(), [])
+
     def test_a_lookup_takes_several_drives_and_returns_only_the_ones_stored(self):
         trip, drive = self.trip_with_a_drive()
         other = {"start": drive["end"], "end": drive["start"]}
@@ -125,7 +142,7 @@ class StoringAndReadingTests(RouteCacheCase):
         got = self.look_up("ana", trip, drive, other)[1]["routes"]
         self.assertEqual([(r["start"], r["end"]) for r in got], [(drive["start"], drive["end"])])
 
-    def test_a_row_holds_the_rounded_drive_and_the_path_and_nothing_of_the_trip(self):
+    def test_a_row_holds_the_trip_id_the_rounded_drive_and_the_path_and_no_person_or_trip_details(self):
         trip, drive = self.trip_with_a_drive()
         self.put("ana", trip, drive)
         (row,) = self.rows()

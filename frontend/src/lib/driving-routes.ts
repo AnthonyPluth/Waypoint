@@ -14,6 +14,7 @@ export const SERVER_MAX_DRIVES = 30;
 
 const found = new Map<string, RoutePath>();
 const onServer = new Set<string>();
+const sharing = new Set<string>();
 const pending = new Map<string, Promise<RoutePath | null>>();
 const waiting: (() => void)[] = [];
 let running = 0;
@@ -21,11 +22,13 @@ let generation = 0;
 
 const round = (n: number): string => n.toFixed(PRECISION);
 const keyOf = (a: LatLon, b: LatLon): string => `${round(a.latitude)},${round(a.longitude)}>${round(b.latitude)},${round(b.longitude)}`;
+const tripKey = (trip: number, key: string): string => `${trip}:${key}`;
 
 export const clearRouteCache = (): void => {
   generation++;
   found.clear();
   onServer.clear();
+  sharing.clear();
   pending.clear();
   running = 0;
   for (const resume of waiting.splice(0)) resume();
@@ -133,7 +136,7 @@ async function fromServer(trip: number, drives: Drive[], born: number): Promise<
       if (!isCoordinate(route?.start) || !isCoordinate(route?.end) || !isPath(route.path)) continue;
       const key = keyOf(route.start, route.end);
       if (!found.has(key)) found.set(key, route.path);
-      onServer.add(key);
+      onServer.add(tripKey(trip, key));
     }
   } catch {
     ignoreFailure();
@@ -141,10 +144,13 @@ async function fromServer(trip: number, drives: Drive[], born: number): Promise<
 }
 
 function share(trip: number, from: LatLon, to: LatLon, path: RoutePath, key: string, born: number): void {
+  const mine = tripKey(trip, key);
+  if (onServer.has(mine) || sharing.has(mine)) return;
+  sharing.add(mine);
   const body = { start: { latitude: Number(round(from.latitude)), longitude: Number(round(from.longitude)) }, end: { latitude: Number(round(to.latitude)), longitude: Number(round(to.longitude)) }, path: thin(path) };
   apiCall<"PUT /api/trips/{id}/driving-routes">(`/api/trips/${trip}/driving-routes`, { method: "PUT", body, background: true }).then(
-    () => { if (born === generation) onServer.add(key); },
-    ignoreFailure,
+    () => { if (born === generation) { sharing.delete(mine); onServer.add(mine); } },
+    () => { if (born === generation) sharing.delete(mine); },
   );
 }
 
@@ -164,6 +170,14 @@ export function drivingRoutes(mk: Mk, trip: number | null, drives: Drive[], time
 
 export function drivingRoute(mk: Mk, from: LatLon, to: LatLon, timeoutMs = ROUTE_TIMEOUT_MS, trip: number | null = null): Promise<RoutePath | null> {
   const key = keyOf(from, to);
+  const born = generation;
+  return find(mk, from, to, timeoutMs, key).then((path) => {
+    if (path && trip !== null && born === generation) share(trip, from, to, path, key, born);
+    return path;
+  });
+}
+
+function find(mk: Mk, from: LatLon, to: LatLon, timeoutMs: number, key: string): Promise<RoutePath | null> {
   const have = found.get(key);
   if (have) return Promise.resolve(have);
   const inFlight = pending.get(key);
@@ -173,10 +187,7 @@ export function drivingRoute(mk: Mk, from: LatLon, to: LatLon, timeoutMs = ROUTE
     if (born !== generation) return null;
     release();
     pending.delete(key);
-    if (path) {
-      found.set(key, path);
-      if (trip !== null && !onServer.has(key)) share(trip, from, to, path, key, born);
-    }
+    if (path) found.set(key, path);
     return path;
   });
   pending.set(key, job);
