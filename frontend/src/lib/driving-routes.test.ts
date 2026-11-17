@@ -309,7 +309,7 @@ describe("the saved routes the Trips cards draw", () => {
 
   it("reads each route by its two places, thins a long path and ignores what it cannot read", async () => {
     const long = Array.from({ length: CARD_POINTS * 3 }, (_, i) => [40 + i / 10000, -108]);
-    server.mockResolvedValue({ trips: [{ trip_id: 5, routes: [{ start: from, end: to(0), path: long }, { start: from, end: to(1), path: [[1, 2]] }, { start: "x", end: to(2), path: pairs }, { start: from, end: to(3), path: pairs }] }] });
+    server.mockResolvedValue({ trips: [{ trip_id: 5, routes: [{ start: from, end: to(0), path: long }, { start: from, end: to(1), path: [[1, 2]] }, { start: "x", end: to(2), path: pairs }, { start: from, end: to(3), path: pairs }] }] } as never);
     const answer = savedRoutes(5);
     await wait();
     const saved = await answer;
