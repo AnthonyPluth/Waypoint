@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -670,6 +670,18 @@ describe("PastTrip on desktop", () => {
       vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       show({ trip: flown });
       const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
+    });
+
+    it("puts the map back when reduced motion is asked for during the replay in the column", async () => {
+      let change: ((e: { matches: boolean }) => void) | null = null;
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: (_: string, run: typeof change) => { change = run; }, removeEventListener: vi.fn() }));
+      show({ trip: flown });
+      await userEvent.click(await within(column()).findByRole("button", { name: "Replay trip" }));
+      await within(column()).findByRole("slider", { name: "Position along the route" });
+      act(() => change?.({ matches: true }));
+      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
     });
 

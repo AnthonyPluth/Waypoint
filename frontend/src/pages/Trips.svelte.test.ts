@@ -227,7 +227,7 @@ describe("two panes", () => {
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     expect(layout.wide).toBe(false);
-    expect(pane.firstElementChild?.className).toContain("max-w-3xl");
+    expect(pane.firstElementChild?.className ?? "").not.toMatch(/max-w-|mx-auto/);
   });
 
   it("shows the first trip beside the list on a wide screen, and the one you pick", async () => {
