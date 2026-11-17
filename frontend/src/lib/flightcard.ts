@@ -1,6 +1,6 @@
-import type { FlightStatus, FlightStatusPause, Segment } from "./api-types";
+import type { FlightStatus, FlightStatusPause, Segment, Trip } from "./api-types";
 import { liveChip, type Chip } from "./status";
-import { clock, dayIn, dayLabel, daysBetween, dayShiftWords, flightEvidence, flightProgress, instant, LIVE_STALE_HOURS, seatsInOrder } from "./trips";
+import { bookingCards, clock, dayIn, endAt, startAt, untimed, dayLabel, daysBetween, dayShiftWords, flightEvidence, flightProgress, instant, LIVE_STALE_HOURS, seatsInOrder } from "./trips";
 
 export const LIVE_STATUS_STARTS_DAYS = 1;
 export const BOARDING_MINUTES = 40;
@@ -281,4 +281,49 @@ export function pausedWords(p: FlightStatusPause): string {
   if (p.reason === "limit") return `Live updates paused until ${until.toLocaleDateString(undefined, { month: "short", day: "numeric" })} (monthly limit)`;
   const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(until);
   return `Live updates paused until ${time} (${p.reason === "rate" ? "rate limit" : "the status service didn’t accept the key"})`;
+}
+
+export const routeTitle = (v: FlightCardView): string => [`${v.origin} to ${v.destination}`, v.number].filter(Boolean).join(" · ");
+
+export const zonesShown = (v: FlightCardView, viewer: string): boolean => v.depart.zone !== v.arrive.zone || v.depart.zone !== viewer;
+
+const withZone = (t: Stamp, show: boolean): string => (show && t.zoneName ? `${t.time} ${t.zoneName}` : t.time);
+
+export function rowMeta(v: FlightCardView, today: string, viewer: string): string {
+  const show = zonesShown(v, viewer);
+  const dated = (t: Stamp, word: string): string => (t.local.slice(0, 10) === today ? `${word} ${withZone(t, show)}` : `${shortDay(t.local)} · ${withZone(t, show)}`);
+  switch (v.state) {
+    case "in-the-air":
+    case "diverted": return dated(v.arrive, "Lands");
+    case "landed": return dated(v.arrive, "Landed");
+    case "cancelled": return dated(v.depart, "Was due");
+    default: return dated(v.depart, "Departs");
+  }
+}
+
+export function bookingTimes(v: FlightCardView, viewer: string): { left: string; right: string } {
+  const show = zonesShown(v, viewer);
+  const left = v.state === "in-the-air" || v.state === "landed" || v.state === "diverted" ? "Departed" : "Departs";
+  const right = v.state === "landed" ? "Landed" : "Lands";
+  return { left: `${left} ${withZone(v.depart, show)}`, right: `${right} ${withZone(v.arrive, show)}${v.arrive.later ? ` ${v.arrive.later}` : ""}` };
+}
+
+export function footerPlace(v: FlightCardView): string {
+  const terminal = v.facts.find((f) => f.label === "Terminal")?.value ?? null;
+  const gate = v.facts.find((f) => f.label === "Gate")?.value ?? null;
+  if (!terminal && !gate) return "Terminal — · Gate —";
+  return [terminal && `Terminal ${terminal}`, gate && `Gate ${gate}`].filter(Boolean).join(" · ");
+}
+
+export function nextFlightShown(v: FlightCardView, bookedDeparture: number, now: number): boolean {
+  if (v.state === "in-the-air") return true;
+  return (v.state === "scheduled" || v.state === "boarding" || v.state === "delayed") && bookedDeparture - now <= DAY_MS;
+}
+
+export function flightsToday(trips: Trip[], now: number, viewer: string): Segment[] {
+  const today = dayIn(now, viewer);
+  return trips
+    .flatMap((t) => bookingCards(t.segments).map((c) => c.lead))
+    .filter((s) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && (s.start_local.slice(0, 10) === today || (startAt(s) <= now && endAt(s) > now)))
+    .sort((a, b) => startAt(a) - startAt(b) || a.id - b.id);
 }

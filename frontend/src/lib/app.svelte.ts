@@ -4,6 +4,7 @@ import { errMsg } from "./act";
 import { dropEarly, startEarly } from "./early";
 import { syncSavedTrip } from "./offline.svelte";
 import { anyDirty, anySaving, leave } from "./drafts.svelte";
+import { forgetFrom, park, parkedAt } from "./trips-position";
 
 export const app = $state({
   state: null as AppState | null,
@@ -16,12 +17,17 @@ export async function refreshState(background = false): Promise<void> {
   app.state = await api<AppState>("/api/state", background ? { keep: true, background } : { keep: true });
 }
 
+export const layout = $state({ wide: false });
+
 export const route = $state({ page: "upcoming", sub: "" as string, rest: "" as string, query: "" as string });
 
-function readHash(): void {
+function readHash(from?: number): void {
   const [path, query = ""] = (location.hash || "#upcoming").slice(1).split(/\?(.*)/s);
   const [page, sub = "", ...rest] = path.split("/");
-  if ((page || "upcoming") !== route.page) { newPage(); dropEarly(); }
+  if ((page || "upcoming") !== route.page) {
+    if (route.page === "trips" && from !== undefined) park(from);
+    newPage(); dropEarly();
+  }
   route.page = page || "upcoming";
   route.sub = sub;
   route.rest = rest.join("/");
@@ -46,11 +52,27 @@ const entryOf = (): number => {
 };
 let here = entryOf();
 
+export const currentEntry = (): number => here;
+
+export function backToTrips(e: MouseEvent): void {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || !parkedAt(here - 1)) return;
+  e.preventDefault();
+  history.back();
+}
+
+function enter(): number {
+  const left = here;
+  const fresh = typeof (history.state as { wp?: number } | null)?.wp !== "number";
+  here = entryOf();
+  if (fresh) forgetFrom(here);
+  return left;
+}
+
 function onHashChange(): void {
   if (undoing) { undoing = false; clearTimeout(undoTimer); return; }
   const target = location.hash;
   const there = (history.state as { wp?: number } | null)?.wp;
-  if (!anyDirty() && !anySaving()) { here = entryOf(); readHash(); return; }
+  if (!anyDirty() && !anySaving()) { readHash(enter()); return; }
   const back = typeof there === "number" ? here - there : -1;
   if (back !== 0) { undoing = true; history.go(back); clearTimeout(undoTimer); undoTimer = setTimeout(() => { undoing = false; }, 500); }
   leave(() => { location.hash = target; });

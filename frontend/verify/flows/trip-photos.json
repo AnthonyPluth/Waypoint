@@ -6,7 +6,7 @@
     {"expect_text": {"selector": "h1", "text": "Trips"}},
     {"click": "a[href^='#trip/']:has-text('Denver') >> visible=true"},
     {"wait_for": "[data-testid='photo-days'] [data-photo] img"},
-    {"expect_text": {"selector": "[data-testid='trip-summary']", "text": "13 photos"}},
+    {"expect_text": {"selector": "[data-testid=past-trip] >> text=/^13 photos$/", "text": "13 photos"}},
     {"click": "[data-testid='photo-days'] button:has-text('Show all') >> visible=true"},
     {"wait_for": "section[data-day] h3"},
     {"screenshot": "gallery"},

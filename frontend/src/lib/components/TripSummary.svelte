@@ -4,7 +4,7 @@
   import { apiCall } from "$lib/contract";
   import { distance } from "$lib/stats";
 
-  let { tripId, revision = "", facts = false }: { tripId: number; revision?: string; facts?: boolean } = $props();
+  let { tripId, revision = "", facts = false, column = false }: { tripId: number; revision?: string; facts?: boolean; column?: boolean } = $props();
 
   type Loaded = { summary: TripSummary; unit: Stats["distance_unit"] | null } | null;
   let loaded = $state<Loaded>(null);
@@ -12,6 +12,15 @@
 
   const US = "United States";
   const plural = (n: number, word: string) => `${n.toLocaleString()} ${word}${n === 1 ? "" : "s"}`;
+
+  function placeCount(s: TripSummary): string {
+    const others = s.countries.filter((c) => s.states.length === 0 || c !== US);
+    const places = [...s.states, ...others];
+    if (places.length === 1) return places[0];
+    if (others.length === 0) return `${s.states.length} states`;
+    if (s.states.length === 0) return `${others.length} countries`;
+    return `${places.length} places`;
+  }
 
   let latest = 0;
   async function load(id: number) {
@@ -46,8 +55,8 @@
     if (s.nights > 0) out.push({ term: "Nights away", text: plural(s.nights, "night") });
     if (s.distance_km > 0 && unit) out.push({ term: "Distance", text: `${s.road_estimated ? "about " : ""}${distance(s.distance_km, unit)}` });
     const places = [...s.states, ...s.countries.filter((c) => s.states.length === 0 || c !== US)];
-    if (places.length && !facts) out.push({ term: "Places", text: places.join(", ") });
-    if (s.photos.total > 0) out.push({ term: "Photos", text: plural(s.photos.total, "photo"), note: s.photos.inferred > 0 && !facts ? `(${s.photos.inferred.toLocaleString()} placed from the itinerary)` : undefined });
+    if (places.length && (!facts || column)) out.push({ term: "Places", text: column ? placeCount(s) : places.join(", ") });
+    if (s.photos.total > 0 && !column) out.push({ term: "Photos", text: plural(s.photos.total, "photo"), note: s.photos.inferred > 0 && !facts ? `(${s.photos.inferred.toLocaleString()} placed from the itinerary)` : undefined });
     return out;
   });
 </script>

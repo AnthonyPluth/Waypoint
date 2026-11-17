@@ -54,6 +54,7 @@ struct Endpoints: Decodable {
 enum ServerError: LocalizedError {
     case badAddress
     case notReachable(String)
+    case offline(String)
     case notWaypoint
     case needsPublicURL
     case signInFailed(String)
@@ -63,7 +64,7 @@ enum ServerError: LocalizedError {
         switch self {
         case .badAddress:
             return "That doesn't look like a web address. Try something like https://waypoint.example.com."
-        case .notReachable(let why):
+        case .notReachable(let why), .offline(let why):
             return "Couldn't reach that address: \(why)"
         case .notWaypoint:
             return "That address answered, but it doesn't look like Waypoint."
@@ -158,9 +159,13 @@ enum ServerClient {
                     try? await Task.sleep(nanoseconds: retryDelay)
                     continue
                 }
-                throw ServerError.notReachable(error.localizedDescription)
+                throw ServerClient.failure(for: error)
             }
         }
+    }
+
+    static func failure(for error: Error) -> ServerError {
+        OfflineFallback.isUnreachable(error) ? .offline(error.localizedDescription) : .notReachable(error.localizedDescription)
     }
 
     static func opensWithoutSignIn(_ server: URL) async throws -> Bool {
@@ -221,8 +226,12 @@ enum ServerClient {
         request.setValue("1", forHTTPHeaderField: "X-Waypoint")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await send(request)
-        if response.statusCode == 401 { throw ServerError.signedOut }
-        guard response.statusCode == 200, let cookie = try? JSONDecoder().decode(WebCookie.self, from: data) else {
+        return try cookie(from: data, status: response.statusCode)
+    }
+
+    static func cookie(from data: Data, status: Int) throws -> WebCookie {
+        if status == 401 || status == 403 { throw ServerError.signedOut }
+        guard status == 200, let cookie = try? JSONDecoder().decode(WebCookie.self, from: data) else {
             throw ServerError.notWaypoint
         }
         return cookie
@@ -234,5 +243,30 @@ enum ServerClient {
             return false
         }
         return (200..<300).contains(response.statusCode)
+    }
+}
+
+protocol ServerAPI: Sendable {
+    func endpoints(_ server: URL) async throws -> Endpoints
+    func refresh(_ refreshToken: String, endpoints: Endpoints) async throws -> Tokens
+    func webCookie(_ server: URL, accessToken: String) async throws -> WebCookie
+    func revoke(_ refreshToken: String, endpoints: Endpoints) async -> Bool
+}
+
+struct LiveServerAPI: ServerAPI {
+    func endpoints(_ server: URL) async throws -> Endpoints {
+        try await ServerClient.endpoints(server)
+    }
+
+    func refresh(_ refreshToken: String, endpoints: Endpoints) async throws -> Tokens {
+        try await ServerClient.refresh(refreshToken, endpoints: endpoints)
+    }
+
+    func webCookie(_ server: URL, accessToken: String) async throws -> WebCookie {
+        try await ServerClient.webCookie(server, accessToken: accessToken)
+    }
+
+    func revoke(_ refreshToken: String, endpoints: Endpoints) async -> Bool {
+        await ServerClient.revoke(refreshToken, endpoints: endpoints)
     }
 }

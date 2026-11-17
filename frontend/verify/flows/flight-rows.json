@@ -1,0 +1,24 @@
+{
+  "name": "flight-rows",
+  "page": "upcoming",
+  "steps": [
+    { "clock": "2026-06-19T14:35:00Z" },
+    { "fake_flight_status": "in-the-air" },
+    { "reload": true },
+    { "expect_text": { "selector": "h1", "text": "Upcoming" } },
+    { "wait_for": "[data-flight-home] a[data-live-link]" },
+    { "wait_for": "[data-flight-home] [data-plane]" },
+    { "wait_for": "ul[aria-label='Flights today'] li[data-flight-row] a" },
+    { "expect_text": { "selector": "[data-flight-home]", "text": "IN THE AIR" } },
+    { "screenshot": "home-flight" },
+    { "press": { "selector": "[data-flight-home] a[data-live-link]", "key": "Enter" } },
+    { "wait_for": "[data-testid='flight-live'][data-state='in-the-air']" },
+    { "expect_text": { "selector": "h1", "text": "Landing in" } },
+    { "goto": "#upcoming" },
+    { "wait_for": "ul[aria-label='Flights today'] li[data-flight-row] a" },
+    { "click": "ol[aria-label$='day by day'] a:has-text('LHR → JFK') >> visible=true" },
+    { "wait_for": "[role='dialog'] [role='progressbar'][aria-label='Flight progress']" },
+    { "expect_text": { "selector": "[role='dialog']", "text": "Departed" } },
+    { "screenshot": "booking-sheet" }
+  ]
+}

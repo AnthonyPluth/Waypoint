@@ -142,6 +142,29 @@ final class OfflineSyncTests: XCTestCase {
         XCTAssertFalse(sync.state.lastSaveFailed)
     }
 
+    func testAFetchThatFailsAfterAPurgeLeavesLastSaveFailedFalse() async {
+        let sync = makeSync()
+        fetching.onFetch = { await sync.purge() }
+        let outcome = await sync.sync()
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertFalse(sync.state.lastSaveFailed)
+    }
+
+    func testAFetchThatFailsAfterSavingIsSwitchedOffLeavesLastSaveFailedFalse() async {
+        let sync = makeSync()
+        fetching.onFetch = { await sync.setSaving(false) }
+        let outcome = await sync.sync()
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertFalse(sync.state.lastSaveFailed)
+    }
+
+    func testAFetchThatFailsWithSavingStillOnSetsLastSaveFailed() async {
+        let sync = makeSync()
+        let outcome = await sync.sync()
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertTrue(sync.state.lastSaveFailed)
+    }
+
     func testSyncSavesTheReplyWithTheBearerToken() async {
         answer(["Lisbon"])
         let outcome = await makeSync().sync()
