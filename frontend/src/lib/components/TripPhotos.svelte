@@ -8,7 +8,7 @@
   import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
   import TripPhotoSharingMenu from "$lib/components/TripPhotoSharingMenu.svelte";
   import { actingPersons, PersonSharing } from "$lib/trip-sharing.svelte";
-  import { byDay, dayCaption, DAY_PHOTOS, dayPhotoCount, daysFor, dayTileName, firstOfCluster, FIRST_DAYS, isFar, isInferred, localDay, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
+  import { byDay, dayCaption, DAY_PHOTOS, DAY_PHOTOS_WIDE, dayPhotoCount, daysFor, dayTileName, firstOfCluster, FIRST_DAYS, isFar, isInferred, localDay, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
   import { MAX_REMOVED, REMOVE, removeText, toggled } from "$lib/photo-sharing";
   import { clock, dayIn, dayLabel, viewerZone } from "$lib/trips";
   import Check from "@lucide/svelte/icons/check";
@@ -19,9 +19,9 @@
   const NONE: ReadonlySet<number> = new Set();
   const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, leftOut = NONE, onlook, onstatus }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
-    timeline?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
+    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
   } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
@@ -60,7 +60,8 @@
   const shown = $derived(days.slice(0, shownDays));
   const shownCount = $derived(shown.reduce((n, d) => n + d.photos.length, 0));
   const strip = $derived(photos.slice(0, STRIP_SIZE));
-  const pastDaysList = $derived(timeline ? pastDays(photos, leftOut, new Map(trip.segments.map((s) => [s.id, s]))) : []);
+  const perDay = $derived(wide ? DAY_PHOTOS_WIDE : DAY_PHOTOS);
+  const pastDaysList = $derived(timeline ? pastDays(photos, leftOut, new Map(trip.segments.map((s) => [s.id, s])), perDay) : []);
   const shownPast = $derived(allDays ? pastDaysList : pastDaysList.slice(0, FIRST_DAYS));
   const segments = $derived(new Map(trip.segments.map((s) => [s.id, s])));
   const indexOf = $derived(new Map(photos.map((p, i) => [p.id, i])));
@@ -415,7 +416,12 @@
 
 {#if signedIn && shows}
   <section class={`flex flex-col gap-3 ${timeline ? "" : "mb-6"}`} aria-labelledby="trip-photos-title" data-testid="trip-photos">
-    {#if timeline}
+    {#if timeline && wide && total}
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="trip-photos-title" class="text-[17px] leading-snug font-semibold tracking-tight outline-none" tabindex="-1" bind:this={heading}>Photos by day</h2>
+        <Button variant="outline" size="sm" onclick={(e) => { const first = photos[0]; if (first) openViewer(first, e.currentTarget); }}>Open gallery</Button>
+      </div>
+    {:else if timeline}
       <h2 id="trip-photos-title" class="sr-only" tabindex="-1" bind:this={heading}>Photos by day</h2>
     {:else}
     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -539,8 +545,19 @@
 {/if}
 
 {#snippet daysView()}
-  <div class="flex flex-col gap-[22px]" data-testid="photo-days">
+  <div class={`flex flex-col ${wide ? "gap-3.5" : "gap-[22px]"}`} data-testid="photo-days">
     {#each shownPast as d, n (d.day)}
+      {#if wide}
+        <section class="flex flex-col gap-1.5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
+          <div class="flex items-baseline justify-between gap-3 px-0.5">
+            <h3 id={`photo-day-${d.day}`} class="text-sm leading-snug font-semibold outline-none" tabindex="-1">{d.label}</h3>
+            <span class="text-caption text-muted-foreground">{[d.place, dayPhotoCount(d)].filter(Boolean).join(" · ")}</span>
+          </div>
+          <div class="grid grid-cols-6 gap-[3px] overflow-hidden rounded-[14px]">
+            {#each d.shown as p, i (p.id)}{@render tile(p, "", dayTileName(d, i + 1, i === perDay - 1, p), i === perDay - 1 ? d.more : 0)}{/each}
+          </div>
+        </section>
+      {:else}
       <section class="relative ml-1.5 flex flex-col gap-2.5 border-l-2 border-border pl-5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
         <span class="absolute -left-2 top-[3px] size-3.5 rounded-full border-[3px] border-background bg-primary" aria-hidden="true"></span>
         <div class="flex items-center justify-between gap-3">
@@ -554,9 +571,10 @@
           {#each d.shown as p, i (p.id)}{@render tile(p, "", dayTileName(d, i + 1, i === DAY_PHOTOS - 1, p), i === DAY_PHOTOS - 1 ? d.more : 0)}{/each}
         </div>
       </section>
+      {/if}
     {/each}
     {#if !allDays && pastDaysList.length > FIRST_DAYS}
-      <Button variant="outline" class="self-stretch" onclick={() => void revealDays()}>Show all {pastDaysList.length} days</Button>
+      <Button variant="outline" class={wide ? "self-start" : "self-stretch"} onclick={() => void revealDays()}>Show all {pastDaysList.length} days</Button>
     {/if}
   </div>
 {/snippet}

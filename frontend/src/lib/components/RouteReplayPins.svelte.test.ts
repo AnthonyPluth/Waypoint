@@ -82,6 +82,33 @@ describe("photo pins on the route map", () => {
     expect(far.querySelector("[data-far-dot]")).toBeTruthy();
   });
 
+  it("names the pins by count and place alone, and the map for its pins, when it is the trip page's compact map", () => {
+    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, infos });
+    expect(pins(container).map((p) => said(p.getAttribute("aria-label")))).toEqual([
+      "14 photos placed from the itinerary near MSP",
+      "40 photos near San Francisco",
+      "3 photos, 612 km from every booking",
+    ]);
+    expect(screen.getByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+    expect(container.querySelector("svg[role=img]")).toBeNull();
+    expect(pins(container).map((p) => p.querySelector<HTMLElement>("[data-disc]")!.style.width)).toEqual(["31px", "37px", "22px"]);
+  });
+
+  it("draws only the map, the pins and Replay trip when compact, and calls back when it is pressed", () => {
+    const onreplay = vi.fn();
+    render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, infos, onreplay });
+    expect(screen.queryByRole("list", { name: "Map key" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Stops list" })).toBeNull();
+    expect(screen.queryByRole("slider")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Replay trip" }));
+    expect(onreplay).toHaveBeenCalledOnce();
+  });
+
+  it("has no Replay trip button without a handler", () => {
+    render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, infos });
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+  });
+
   it("sizes each pin by its count, 16 px plus 4 px for every doubling, at most 40, inside a button of at least 24 px", () => {
     const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, infos });
     expect(pins(container).map((p) => p.querySelector<HTMLElement>("[data-disc]")!.style.width)).toEqual(["31px", "37px", "22px"]);

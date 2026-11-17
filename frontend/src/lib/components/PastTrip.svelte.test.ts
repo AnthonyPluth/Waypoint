@@ -7,9 +7,11 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
 
 import { api } from "$lib/api";
-import type { Person, PhotoSharing, PhotoSource, TripPhoto, TripPhotos as Reply, TripPlaces, TripSummary } from "$lib/api-types";
+import type { Person, PhotoCluster, PhotoSharing, PhotoSource, TripPhoto, TripPhotos as Reply, TripPlaces, TripSummary } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
+import { viewport } from "$lib/phone.svelte";
 import { segment, state, trip } from "../../test/fixtures";
+import { createRawSnippet } from "svelte";
 import PastTrip from "./PastTrip.svelte";
 
 const ada: Person = { id: 1, display_name: "Ada Brook", first_name: "Ada", legal_name: null, aliases: [], member: true, links: [] };
@@ -34,12 +36,13 @@ const shot = (id: number, day = 1, extra: Partial<TripPhoto> = {}): TripPhoto =>
   id, person_id: 1, trip_id: 7, kind: "image", taken_local: `2026-03-${String(day).padStart(2, "0")}T${String(8 + (id % 12)).padStart(2, "0")}:${String(id % 60).padStart(2, "0")}`, zone: "America/Denver", latitude: 39.7, longitude: -105, location_source: "exif",
   segment_id: 2, match: "place", distance_km: 3, cluster: 0, removed_at: null, ...extra,
 });
-const reply = (photos: TripPhoto[], best: number[] = []): Reply => ({ photos, clusters: [], counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best });
+const reply = (photos: TripPhoto[], best: number[] = [], clusters: PhotoCluster[] = []): Reply => ({ photos, clusters, counts: { total: photos.length, located: photos.length, inferred: 0, far: 0 }, people: [], best });
 const source = (extra: Partial<PhotoSource> = {}): PhotoSource => ({ id: 1, person_id: 1, url: "https://immich.example", label: null, status: "ok", mine: true, last_sync: "2026-03-05T06:00", last_error: null, photos: 0, trips: 0, ...extra });
 const NO_SHARING: PhotoSharing = { state: "none", scope: null, count: 0, removed_count: 0, removed: [], window: null, changed: null, audience: [1], sources: [], count_token: "a".repeat(32) };
 
 let photos: TripPhoto[];
 let best: number[];
+let clusters: PhotoCluster[];
 let sources: PhotoSource[];
 let photosFail = false;
 function serve() {
@@ -47,7 +50,7 @@ function serve() {
     const p = String(path);
     if (p.includes("/photo-sharing")) return NO_SHARING;
     if (p === "/api/photo-sources") return { sources, permissions: [] };
-    if (p.endsWith("/photos")) { if (photosFail) throw new Error("down"); return reply(photos, best); }
+    if (p.endsWith("/photos")) { if (photosFail) throw new Error("down"); return reply(photos, best, clusters); }
     if (p.endsWith("/summary")) return summary;
     if (p === "/api/distance-unit") return { distance_unit: "mi" };
     if (p.endsWith("/places")) return places;
@@ -71,11 +74,13 @@ beforeEach(() => {
   app.state = state();
   photos = [];
   best = [];
+  clusters = [];
+  viewport.phone = true;
   sources = [source()];
   photosFail = false;
   serve();
 });
-afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { app.state = null; viewport.phone = false; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("PastTrip hero", () => {
   it("is a mosaic of the first three of best, with the trip's name as the page's h1 and the images decorative", async () => {
@@ -404,5 +409,248 @@ describe("PastTrip bookings row", () => {
     show({ trip: flown });
     await screen.findByRole("heading", { level: 1 });
     expect(screen.queryByRole("button", { name: /^Bookings/ })).toBeNull();
+  });
+});
+
+describe("PastTrip on desktop", () => {
+  const tiles = (count: number, day = 1) => Array.from({ length: count }, (_, i) => shot(100 * day + i + 1, day, { taken_local: `2026-03-0${day}T${String(Math.floor(i / 4) + 6).padStart(2, "0")}:${String((i % 4) * 10).padStart(2, "0")}` }));
+  const marlow = (count: number): PhotoCluster => ({ latitude: 39.7, longitude: -105, count, first: "2026-03-01T08:00", last: "2026-03-07T18:00", cover: 101, inferred: false });
+  const column = () => screen.getByTestId("trip-column");
+  const heroImages = (hero: HTMLElement) => [...hero.querySelectorAll("img")].map((i) => Number(i.getAttribute("src")?.split("/")[3]));
+
+  beforeEach(() => { viewport.phone = false; });
+
+  it("switches with the viewport: two columns on desktop, one stack on a phone", async () => {
+    photos = tiles(9);
+    best = [101, 102, 103];
+    const { unmount } = show();
+    expect(await screen.findByTestId("trip-columns")).toBeTruthy();
+    unmount();
+    viewport.phone = true;
+    show();
+    await screen.findByTestId("trip-hero");
+    expect(screen.queryByTestId("trip-columns")).toBeNull();
+    expect(screen.queryByTestId("trip-column")).toBeNull();
+  });
+
+  it("keeps the left column in view while the photos scroll, 400 px wide beside the photos", async () => {
+    photos = tiles(9);
+    best = [101, 102, 103];
+    show();
+    await screen.findByTestId("trip-hero");
+    expect(column().className).toContain("sticky");
+    expect(column().className).toContain("lg:top-4");
+    expect(column().className).toContain("overflow-y-auto");
+    expect(column().parentElement?.className).toContain("grid-cols-[400px_minmax(0,1fr)]");
+    const photosHeading = await screen.findByRole("heading", { level: 2, name: "Photos by day" });
+    expect(column().parentElement?.contains(photosHeading)).toBe(true);
+    expect(column().contains(photosHeading)).toBe(false);
+  });
+
+  describe("hero", () => {
+    it("is the route map and the quiet line with no photos, and the columns still follow", async () => {
+      show({ trip: flown });
+      expect(await screen.findByTestId("no-photos")).toHaveTextContent("No photos yet");
+      expect(screen.queryByTestId("trip-hero")).toBeNull();
+      expect(screen.getByRole("heading", { level: 1, name: "Spring loop" })).toBeTruthy();
+      expect(screen.getByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(screen.getByTestId("trip-columns")).toBeTruthy();
+      expect(within(column()).queryByRole("region", { name: "Route replay" })).toBeNull();
+    });
+
+    it("is the route map for one or two photos, which stay in the days", async () => {
+      photos = tiles(2);
+      best = [101, 102];
+      show({ trip: flown });
+      await settled();
+      expect(screen.queryByTestId("trip-hero")).toBeNull();
+      expect(screen.queryByTestId("no-photos")).toBeNull();
+      expect(screen.getByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(within(days()[0]).getAllByRole("button")).toHaveLength(2);
+    });
+
+    it.each([3, 4, 6])("is the three-photo mosaic across the full width for %i photos", async (count) => {
+      photos = tiles(count);
+      best = photos.map((p) => p.id);
+      show();
+      const hero = await screen.findByTestId("trip-hero");
+      await waitFor(() => expect(hero.querySelectorAll("img")).toHaveLength(3));
+      expect(heroImages(hero)).toEqual([101, 102, 103]);
+      expect(hero.firstElementChild?.className).toContain("grid-cols-[2fr_1fr]");
+      expect(hero.className).toContain("h-[260px]");
+      expect(hero.className).toContain("rounded-[22px]");
+      expect(hero.className).toContain("border-border");
+    });
+
+    it("is a mosaic of seven for seven or more photos, the first spanning two rows", async () => {
+      photos = tiles(20);
+      best = [110, 103, 105, 101, 107, 102, 109, 111];
+      show();
+      const hero = await screen.findByTestId("trip-hero");
+      await waitFor(() => expect(hero.querySelectorAll("img")).toHaveLength(7));
+      expect(heroImages(hero)).toEqual([110, 103, 105, 101, 107, 102, 109]);
+      expect(hero.firstElementChild?.className).toContain("grid-cols-[2fr_1fr_1fr_1fr]");
+      expect(hero.firstElementChild?.firstElementChild?.className).toContain("row-span-2");
+      expect(hero.querySelectorAll("img[alt='']")).toHaveLength(7);
+      expect(within(hero).getByRole("heading", { level: 1, name: "Spring loop" })).toBeTruthy();
+      expect(within(hero).getByText("Mar 1, 2026 – Mar 8, 2026 · Utah")).toBeTruthy();
+    });
+
+    it("takes the hero's photos out of the days so each shows once", async () => {
+      photos = tiles(20);
+      best = [110, 103, 105, 101, 107, 102, 109];
+      show();
+      const hero = await screen.findByTestId("trip-hero");
+      await waitFor(() => expect(hero.querySelectorAll("img")).toHaveLength(7));
+      const [day] = days();
+      const shown = [...day.querySelectorAll("[data-photo]")].map((t) => Number(t.getAttribute("data-photo")));
+      for (const id of heroImages(hero)) expect(shown).not.toContain(id);
+      expect(day).toHaveTextContent("Marlow Springs · 13 photos");
+    });
+  });
+
+  describe("photos by day", () => {
+    it("has a visible Photos by day heading and days of up to twelve photos, six across, with a +N tile", async () => {
+      photos = [...tiles(40, 1), ...tiles(12, 2)];
+      show();
+      await settled();
+      const heading = screen.getByRole("heading", { level: 2, name: "Photos by day" });
+      expect(heading.className).not.toContain("sr-only");
+      const [one, two] = days();
+      expect(within(one).getAllByRole("button")).toHaveLength(12);
+      expect(one.querySelector(".grid")?.className).toContain("grid-cols-6");
+      expect(within(one).getByRole("button", { name: "Photo 12 and 28 more, Sun Mar 1, Marlow Springs" })).toHaveTextContent("+28");
+      expect(within(two).getAllByRole("button")).toHaveLength(12);
+      expect(within(two).getByRole("button", { name: "Photo 12, Mon Mar 2, Marlow Springs" })).not.toHaveTextContent("+");
+      expect(within(one).getByRole("heading", { level: 3, name: "Sun Mar 1" })).toBeTruthy();
+      expect(one).toHaveTextContent("Marlow Springs · 40 photos");
+    });
+
+    it("draws a day with no rail, dot or route glyph, as the desktop frame does", async () => {
+      photos = tiles(5);
+      show();
+      await settled();
+      const [day] = days();
+      expect(day.className).not.toContain("border-l-2");
+      expect(day.querySelector(".bg-primary")).toBeNull();
+      expect(day.querySelector("[data-testid=day-glyph]")).toBeNull();
+    });
+
+    it("shows the first three days and Show all N days reveals the rest", async () => {
+      photos = [1, 2, 3, 4, 5].flatMap((d) => tiles(2, d));
+      show();
+      await settled();
+      expect(days()).toHaveLength(3);
+      await userEvent.click(screen.getByRole("button", { name: "Show all 5 days" }));
+      expect(days()).toHaveLength(5);
+    });
+
+    it("opens the photo viewer at the first photo from Open gallery, over every photo the viewer may see", async () => {
+      photos = tiles(8);
+      best = [];
+      show();
+      await settled();
+      await userEvent.click(screen.getByRole("button", { name: "Open gallery" }));
+      expect(within(await screen.findByRole("dialog")).getByText("Photo 1 of 8")).toBeTruthy();
+    });
+
+    it("has no Open gallery button when there are no photos", async () => {
+      show();
+      await screen.findByTestId("no-photos");
+      expect(screen.queryByRole("button", { name: "Open gallery" })).toBeNull();
+    });
+  });
+
+  describe("left column", () => {
+    const withTotal = { ...flown, costs: { totals: [{ currency: "USD", amount_minor: 431200 }], priced: 1, bookings: 1 } };
+
+    it("has the Trip summary list, the total, the photo count, the people and the need-a-look chip", async () => {
+      photos = [...tiles(9), shot(50, 1, { match: "far", distance_km: 500 })];
+      best = [101, 102, 103];
+      show({ trip: withTotal });
+      const facts = await within(column()).findByTestId("trip-summary");
+      await waitFor(() => expect(within(facts).getByText("Days", { selector: "dt" })).toBeTruthy());
+      expect([...facts.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Days", "Nights away", "Distance", "Places"]);
+      expect([...facts.querySelectorAll("dd")].map((d) => d.textContent)).toEqual(["8 days", "7 nights", "1,240 mi", "Utah"]);
+      expect(facts).toHaveAccessibleName("Trip summary");
+      expect(within(column()).getByText("$4,312.00", { exact: false }).closest("[data-trip-total]")).toBeTruthy();
+      expect(await within(column()).findByText("10 photos")).toBeTruthy();
+      expect(within(column()).getByTestId("avatar-stack")).toHaveAttribute("role", "img");
+      expect(within(column()).getByText("Jane Doe")).toBeTruthy();
+      expect(await within(column()).findByRole("link", { name: "1 photo needs a look" })).toHaveAttribute("href", "#settings/photos");
+    });
+
+    it("leaves the total out when costs are not shown, and shows the notes under the facts", async () => {
+      photos = tiles(4);
+      show({ costsShown: false, trip: { ...withTotal, notes: "Bring the tent." } });
+      await settled();
+      expect(document.querySelector("[data-trip-total]")).toBeNull();
+      expect(within(column()).getByText("Bring the tent.")).toBeTruthy();
+    });
+
+    it("has no Replay button in the facts and no Bookings row, which are the phone's", async () => {
+      photos = tiles(4);
+      best = [101, 102, 103];
+      show({ trip: flown, onbookings: vi.fn() });
+      await screen.findByTestId("trip-hero");
+      expect(screen.queryByRole("button", { name: "Bookings · 3, 2 flights · 1 stay" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Replay" })).toBeNull();
+    });
+
+    it("gives the bookings list its place under the map", async () => {
+      photos = tiles(4);
+      const bookings = createRawSnippet(() => ({ render: () => "<section aria-label='Bookings list'>listed</section>" }));
+      show({ trip: flown, bookings });
+      await settled();
+      expect(within(column()).getByRole("region", { name: "Bookings list" })).toBeTruthy();
+    });
+  });
+
+  describe("trip map", () => {
+    beforeEach(() => {
+      photos = tiles(9);
+      best = [107, 108, 109];
+      clusters = [marlow(38)];
+    });
+
+    it("is a group named for its pins, with one button per place named by count and place, and Replay trip on it", async () => {
+      show({ trip: flown });
+      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      const pin = await within(map).findByRole("button", { name: "38 photos near Marlow Springs" });
+      expect(pin).toHaveTextContent("38");
+      expect(within(map).getByRole("button", { name: "Replay trip" })).toHaveAttribute("aria-expanded", "false");
+      expect(within(column()).queryByRole("list", { name: "Map key" })).toBeNull();
+      expect(within(column()).queryByRole("slider")).toBeNull();
+      expect(within(column()).queryByRole("region", { name: "Stops list" })).toBeNull();
+    });
+
+    it("opens the replay with its controls and stops from Replay trip, and puts the map back from Hide replay", async () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+      show({ trip: flown });
+      await userEvent.click(await within(column()).findByRole("button", { name: "Replay trip" }));
+      expect(await within(column()).findByRole("slider", { name: "Position along the route" })).toBeTruthy();
+      expect(within(column()).getByRole("region", { name: "Stops list" })).toBeTruthy();
+      const hide = within(column()).getByRole("button", { name: "Hide replay" });
+      expect(hide).toHaveAttribute("aria-expanded", "true");
+      await userEvent.click(hide);
+      expect(within(column()).queryByRole("slider")).toBeNull();
+      expect(await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+      expect(within(column()).getByRole("button", { name: "Replay trip" })).toBeTruthy();
+    });
+
+    it("shows a pin's photos below the map and jumps to them in the days", async () => {
+      show({ trip: flown });
+      await userEvent.click(await within(column()).findByRole("button", { name: "38 photos near Marlow Springs" }));
+      const card = within(column()).getByRole("group", { name: "38 photos near Marlow Springs" });
+      await userEvent.click(within(card).getByRole("button", { name: "Show these photos" }));
+      await waitFor(() => expect(document.activeElement?.hasAttribute("data-photo")).toBe(true));
+    });
+
+    it("has no Replay trip button for a trip with no route, but still a map of where the photos were taken", async () => {
+      show();
+      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
+      expect(within(map).getByRole("button", { name: "38 photos near Marlow Springs" })).toBeTruthy();
+    });
   });
 });

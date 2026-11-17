@@ -1247,6 +1247,18 @@ describe("Trip", () => {
     const cardOf = async (s: ReturnType<typeof segment>) => (await screen.findByRole("list", { name: "Bookings" })).querySelector(`#segment-${s.id}`) as HTMLElement;
     const past = (extra: Partial<TripT> = {}) => trip([hotel], { start_date: "2020-03-01", end_date: "2020-03-04", ...extra });
 
+    it("is not held to 48 rem, which only a trip that is not over keeps", async () => {
+      held = past({ done_at: null });
+      const over = render(TripPage);
+      await screen.findByTestId("past-trip");
+      expect(over.container.firstElementChild?.className ?? "").not.toContain("max-w-3xl");
+      over.unmount();
+      held = trip([flight, stay]);
+      const upcoming = render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(upcoming.container.firstElementChild?.className).toContain("mx-auto max-w-3xl");
+    });
+
     it("shows the completed trip page with the booking cards below it", async () => {
       held = past({ done_at: null });
       render(TripPage);

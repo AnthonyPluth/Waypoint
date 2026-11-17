@@ -7,7 +7,7 @@
     {"goto": "#trip/7"},
     {"wait_for": "[data-testid=trip-hero]"},
     {"expect_text": {"selector": "h1", "text": "Trip to Denver"}},
-    {"expect_text": {"selector": "[data-testid=trip-summary]", "text": "13 photos"}},
+    {"expect_text": {"selector": "[data-testid=past-trip]", "text": "13 photos"}},
     {"wait_for": "[data-testid=photo-days] [data-day]"},
     {"screenshot": "with-photos"},
     {"click": "button[aria-label='Trip options']"},

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -105,6 +105,21 @@ describe("the shell", () => {
     for (const nav of screen.getAllByRole("navigation", { name: "Main" })) {
       expect(within(nav).getByRole("link", { name: "Trips" })).toHaveAttribute("aria-current", "page");
     }
+  });
+
+  it("lets the trip page grow to 80rem on a wide screen, and keeps the flight page at 60rem and Upcoming at 64rem", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("No such trip"));
+    await go("#trip/7");
+    const { container } = render(App);
+    await screen.findByText("No such trip");
+    const wrapper = () => container.querySelector("main > div") as HTMLElement;
+    expect(wrapper().className).toContain("lg:max-w-[80rem]");
+    await go("#trip/3/flight/7");
+    await waitFor(() => expect(wrapper().className).toContain("lg:max-w-[60rem]"));
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
+    await go("#upcoming");
+    await waitFor(() => expect(wrapper().className).toContain("lg:max-w-5xl"));
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
   });
 
   it("opens Upcoming for a route it doesn't know (an old Runway bookmark, say)", async () => {

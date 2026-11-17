@@ -9,7 +9,7 @@
   import { NO_BOUNDARIES, NO_ROADS, stopsOf, worthLocating } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
-  let { trip, now, photos = null, onshow, shown = true, onstops }: { trip: Trip; now: number; photos?: TripPhotos | null; onshow?: (cluster: number) => void; shown?: boolean; onstops?: (count: number) => void } = $props();
+  let { trip, now, photos = null, onshow, shown = true, onstops, compact = false, onreplay = null }: { trip: Trip; now: number; photos?: TripPhotos | null; onshow?: (cluster: number) => void; shown?: boolean; onstops?: (count: number) => void; compact?: boolean; onreplay?: (() => void) | null } = $props();
 
   let places = $state<TripPlaces | null>(null);
   let settled = $state(false);
@@ -30,7 +30,7 @@
   let askedFor: number | null = null;
   $effect(() => {
     const id = trip.id;
-    if (stops.length < 2 || !shown) {
+    if (stops.length < 2 || !shown || compact) {
       askedFor = null;
       untrack(() => { maps = undefined; });
       return;
@@ -59,7 +59,7 @@
 </script>
 
 {#if shown && (stops.length >= 2 || photoOnly)}
-  <section class="mb-6" aria-label={stops.length >= 2 ? "Route replay" : "Trip photo map"}>
-    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} maps={stops.length >= 2 ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
+  <section class={compact ? "" : "mb-6"} aria-label={stops.length >= 2 ? "Route replay" : "Trip photo map"}>
+    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} still={compact ? true : null} {compact} {onreplay} maps={stops.length >= 2 && !compact ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
   </section>
 {/if}
