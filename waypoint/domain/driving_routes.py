@@ -192,9 +192,9 @@ def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], now:
     if not seen:
         return []
     rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_(seen), DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)
-                            .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon))
+                            .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)).all()
     stops: dict[int, list[tuple[float, float]]] = {}
-    for trip_id in seen:
+    for trip_id in sorted({row.trip_id for row in rows}):
         places = tripmap.places(conn, viewer, trip_id)
         stops[trip_id] = _stops(places) if places is not None else []
     out: dict[int, TripRoutes] = {}

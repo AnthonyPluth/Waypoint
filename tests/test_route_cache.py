@@ -366,6 +366,19 @@ class BatchedLookupTests(RouteCacheCase):
         self.ok("ana", "DELETE", f"/api/segments/{third['id']}")
         self.assertEqual([r["path"] for t in self.batch("ben", trip)[1]["trips"] for r in t["routes"]], [line(drive)])
 
+    def test_only_a_trip_with_a_saved_route_has_its_places_worked_out(self):
+        trip, drive = self.trip_with_a_drive()
+        others = [self.another_trip("ana", day) for day in (7, 8, 9)]
+        self.put("ana", trip, drive)
+        with mock.patch.object(driving_routes.tripmap, "places", wraps=driving_routes.tripmap.places) as worked:
+            got = self.batch("ana", trip, *others)[1]
+        self.assertEqual([t["trip_id"] for t in got["trips"]], [trip])
+        self.assertEqual(worked.call_count, 1)
+        self.assertEqual(worked.call_args.args[2], trip)
+        with mock.patch.object(driving_routes.tripmap, "places", wraps=driving_routes.tripmap.places) as worked:
+            self.assertEqual(self.batch("ana", *others), (200, {"trips": []}))
+        self.assertEqual(worked.call_count, 0)
+
     def test_the_ask_must_be_between_one_and_the_limit_of_trip_numbers(self):
         self.assertEqual(self.call("ana", "GET", "/api/driving-routes")[0], 400)
         for bad in ("trip=x", "trip=-1", "trip=1.5", "trip=", "trip=%EF%BC%91", "trip=1234567890123"):
