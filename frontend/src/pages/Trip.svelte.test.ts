@@ -27,6 +27,7 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
+const isCard = (li: Element) => li.classList.contains("pass") || li.hasAttribute("data-flight-card");
 let held: TripT;
 let summary: TripSummaryT;
 let loyalty: LoyaltyEntry[];
@@ -39,6 +40,7 @@ function serve() {
     if (path === "/api/people") return { people: [jane, sam] };
     if (path === "/api/loyalty") return { loyalty, programs: {} };
     if (path === "/api/distance-unit") return { distance_unit: "mi" };
+    if (path.startsWith("/api/airports/")) { const code = path.split("/").pop() ?? ""; return { code, name: `${code} Airport`, city: { JFK: "New York", LHR: "London" }[code] ?? code, country: "", zone: "UTC" }; }
     if (path.endsWith("/summary")) return summary;
     if (path.startsWith("/api/segments/") && opts?.method === "DELETE") { held = { ...held, segments: held.segments.filter((s) => s.id !== 2) }; return { ok: true }; }
     if (path.startsWith("/api/segments/") && opts?.method === "POST") return flight;
@@ -48,7 +50,7 @@ function serve() {
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(Date.UTC(2026, 0, 15, 12));
+  vi.setSystemTime(Date.UTC(2026, 10, 16, 12));
   vi.mocked(api).mockReset();
   held = trip([flight, stay]);
   summary = { days: 7, nights: 6, distance_km: 5570.2, flight_km: 5570.2, road_km: 0, road_estimated: false, states: [], countries: ["United Kingdom", "United States"], photos: { total: 0, inferred: 0 }, kinds: { flight: 1, hotel: 1, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
@@ -60,12 +62,36 @@ afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks();
 
 describe("Trip", () => {
   it("shows a flight’s live status on its card and none on a stay", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 20, 14, 30));
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
-    expect(await within(cards[0]).findByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
-    expect(within(cards[1]).queryByTestId("flight-status")).toBeNull();
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(await within(cards[0]).findByText("Delayed 50 min")).toBeInTheDocument();
+    expect(within(cards[0]).getByRole("article")).toHaveAccessibleName(/^AA 101, .* to .*, delayed 50 minutes, now departs 7:50 pm$/);
+    expect(within(cards[0]).getByText(/^Updated /)).toBeInTheDocument();
+    expect(within(cards[1]).queryByRole("article")).toBeNull();
+    expect(within(cards[1]).queryByText(/Updated /)).toBeNull();
+  });
+
+  it("shows a changed single booking’s Changed chip on its flight card", async () => {
+    held = trip([{ ...flight, status: "changed" }, stay]);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(within(cards[0]).getByText("Changed")).toBeInTheDocument();
+  });
+
+  it("says when live updates are paused on the flight card, with no status stored for it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.UTC(2026, 10, 20, 14, 30));
+    const answer = vi.mocked(api).getMockImplementation()!;
+    const paused = { ...delayed, statuses: [], paused: { until: "2026-12-01T00:00:00+00:00", reason: "limit" } };
+    vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? paused : answer(path, opts)) as never);
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(await within(cards[0]).findByRole("status")).toHaveTextContent(/^Live updates paused until (Nov|Dec) \d+ \(monthly limit\)$/);
+    expect(within(cards[1]).queryByRole("status")).toBeNull();
   });
 
   it("updates a flight’s card from the stored status on its own, without a reload", async () => {
@@ -75,20 +101,21 @@ describe("Trip", () => {
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? found : answer(path, opts)) as never);
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
-    expect(await within(cards[0]).findByRole("button", { name: "Check live status" })).toBeInTheDocument();
-    found = delayed;
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    await waitFor(() => expect(within(cards[0]).getByText("Scheduled")).toBeInTheDocument());
+    expect(within(cards[0]).queryByText(/Updated /)).toBeNull();
+    found = { ...delayed, statuses: [{ ...delayed.statuses[0], fetched_at: "2026-11-20T23:29:00+00:00" }] };
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(await within(cards[0]).findByTestId("flight-status")).toHaveTextContent("Delayed 50 min");
+    expect(await within(cards[0]).findByText("Delayed 50 min")).toBeInTheDocument();
     expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).startsWith("/api/flight-status/"))).toEqual([]);
   });
 
-  it("shows each booking’s brand logo on its card, and none where the server has none", async () => {
-    held = trip([{ ...flight, logo: "/api/segments/1/logo" }, stay]);
+  it("shows a stay’s brand logo on its card, and never an airline’s on a flight, whose mark is Waypoint’s own", async () => {
+    held = trip([{ ...flight, logo: "/api/segments/1/logo" }, { ...stay, logo: "/api/segments/2/logo" }]);
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
-    expect(cards[0].querySelector("img")?.getAttribute("src")).toBe("/api/segments/1/logo");
-    expect(cards[1].querySelector("img")).toBeNull();
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    expect(cards[0].querySelector("img")).toBeNull();
+    expect(cards[1].querySelector("img")?.getAttribute("src")).toBe("/api/segments/2/logo");
   });
 
   describe("travellers", () => {
@@ -125,12 +152,13 @@ describe("Trip", () => {
       expect(card).toHaveTextContent("Jane Doe · Seat 12A");
     });
 
-    it("lists each seat once on a flight, beside its traveller", async () => {
+    it("lists each seat beside its traveller, and in the card’s Seats fact", async () => {
       held = trip([flightFor, car]);
       render(TripPage);
       const card = await cardOf(flightFor);
-      expect(card.textContent?.match(/31A/g)).toHaveLength(1);
-      expect(card.textContent?.match(/31B/g)).toHaveLength(1);
+      expect(within(card).getByText("Jane Doe").parentElement).toHaveTextContent("Seat 31A");
+      expect(within(card).getByText("Sam Doe").parentElement).toHaveTextContent("Seat 31B");
+      expect(card.querySelector("[data-facts]")).toHaveTextContent("Seats 31A, 31B");
     });
 
     it("never lists travellers on a rental car, whether it has the trip's full set or a smaller one", async () => {
@@ -457,7 +485,7 @@ describe("Trip", () => {
   it("asks for a look at the times of a booking whose times couldn’t be settled, and only that one", async () => {
     held = trip([{ ...flight, check_times: true }, stay]);
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     expect(within(cards[0]).getByRole("note")).toHaveTextContent(/Check the times/);
     expect(within(cards[1]).queryByRole("note")).toBeNull();
   });
@@ -465,7 +493,7 @@ describe("Trip", () => {
   it("says what a newer email changed on a booking and what it left alone, and says nothing on another", async () => {
     held = trip([{ ...flight, email_update: { at: 1, updated: ["start_local", "end_local"], disagreed: ["start_zone"] } }, stay]);
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     const notes = within(cards[0]).getAllByRole("note");
     expect(notes[0]).toHaveTextContent("Updated from a newer email: the start and the end changed.");
     expect(notes[1]).toHaveTextContent(/A newer email disagreed with what you set for the start\./);
@@ -478,10 +506,11 @@ describe("Trip", () => {
     const answer = vi.mocked(api).getMockImplementation()!;
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
     render(TripPage);
-    const card = (await screen.findByRole("list", { name: "Bookings" })).querySelector(".pass") as HTMLElement;
+    const card = (await screen.findByRole("list", { name: "Bookings" })).querySelector(".pass, [data-flight-card]") as HTMLElement;
     expect(within(card).getAllByText("time not recorded")).toHaveLength(2);
     expect(within(card).queryByText(/12:00 AM|3:00 AM/)).toBeNull();
     expect(within(card).queryByTestId("flight-status")).toBeNull();
+    expect(card.querySelector("article")).toBeNull();
   });
 
   it("shows an untimed hotel’s end day beside time not recorded, and a past trip’s dates with their year and no time not recorded", async () => {
@@ -490,7 +519,7 @@ describe("Trip", () => {
       segment({ id: 2, kind: "visit", provider: null, origin: null, destination: "JP", start_local: "2005-03-10T00:00", end_local: "2005-03-29T00:00", details: { time_unknown: "yes" } }),
     ], { start_date: "2005-03-10", end_date: "2026-03-10" });
     render(TripPage);
-    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
     expect(cards[1]).toHaveTextContent(/From\s*Thu, Mar 10, 2005\s*To\s*Tue, Mar 29, 2005/);
     expect(cards[1]).not.toHaveTextContent("time not recorded");
@@ -557,11 +586,11 @@ describe("Trip", () => {
   it("shows each booking with its local times, who is on it and the number each would use", async () => {
     render(TripPage);
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
-    const cards = within(screen.getByRole("list", { name: "Bookings" })).getAllByRole("listitem", { name: "" }).filter((li) => li.classList.contains("pass"));
+    const cards = within(screen.getByRole("list", { name: "Bookings" })).getAllByRole("listitem", { name: "" }).filter(isCard);
     const first = within(cards[0]);
     expect(first.getByRole("heading", { name: "JFK → LHR" })).toBeInTheDocument();
-    expect(first.getByText("7:00 PM")).toBeInTheDocument();
-    expect(first.getByText("7:10 AM")).toBeInTheDocument();
+    expect(first.getByText("7:00 pm")).toBeInTheDocument();
+    expect(first.getByText("7:10 am")).toBeInTheDocument();
     expect(first.queryByText("Edited by you")).toBeNull();
     expect(first.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
     expect(first.queryByRole("button", { name: /American AAdvantage number/ })).toBeNull();
@@ -882,7 +911,7 @@ describe("Trip", () => {
     it("is one card for the flight with a block for each booking: its code, its travellers, its own Edit and Remove", async () => {
       render(TripPage);
       const list = await screen.findByRole("list", { name: "Bookings" });
-      const cards = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      const cards = within(list).getAllByRole("listitem").filter(isCard);
       expect(cards).toHaveLength(2);
       expect(within(cards[0]).getAllByRole("heading", { name: "JFK → LHR" })).toHaveLength(1);
       const blocks = within(cards[0]).getAllByRole("listitem").filter((li) => li.hasAttribute("data-booking"));
@@ -897,7 +926,7 @@ describe("Trip", () => {
       expect(within(blocks[0]).getByRole("button", { name: "Edit JFK → LHR booking KQ7M2X" })).toBeInTheDocument();
       expect(within(blocks[1]).getByRole("button", { name: "Edit JFK → LHR booking BBBBBB" })).toBeInTheDocument();
       expect(within(cards[0]).queryByText("Times differ between bookings")).toBeNull();
-      expect(within(cards[0]).getAllByText("Departs")).toHaveLength(1);
+      expect(within(cards[0]).queryAllByText("Departs")).toHaveLength(0);
     });
 
     it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
@@ -912,7 +941,7 @@ describe("Trip", () => {
     it("says when the bookings disagree on the times, and shows each booking’s own rather than picking one", async () => {
       held = trip([flight, { ...sams, start_local: "2026-11-20T21:30" }, stay]);
       render(TripPage);
-      const card = (await screen.findAllByRole("heading", { name: "JFK → LHR" }))[0].closest("li.pass") as HTMLElement;
+      const card = (await screen.findAllByRole("heading", { name: "JFK → LHR" }))[0].closest("li") as HTMLElement;
       expect(within(card).getByText("Times differ between bookings")).toBeInTheDocument();
       expect(within(card).getByText("9:30 PM")).toBeInTheDocument();
       expect(within(card).getByText("7:00 PM")).toBeInTheDocument();
@@ -982,7 +1011,7 @@ describe("Trip", () => {
       Element.prototype.scrollIntoView = scroll;
       route.query = "segment=2";
       render(TripPage);
-      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
       expect(cards.map((c) => c.id)).toEqual(["segment-1", "segment-2"]);
       await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
       expect(scroll.mock.contexts[0]).toBe(cards[1]);
@@ -1023,6 +1052,7 @@ describe("Trip", () => {
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
       expect(await screen.findByRole("link", { name: "Google Maps" })).toBeTruthy();
       first.unmount();
+      document.body.style.pointerEvents = "";
       held = trip([{ ...stay, status: "cancelled", details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       render(TripPage);
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
@@ -1292,7 +1322,7 @@ describe("Trip", () => {
         const answer = vi.mocked(api).getMockImplementation()!;
         vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/flight-status" ? delayed : answer(path, opts)) as never);
       };
-      const flightCard = async () => within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"))[0];
+      const flightCard = async () => within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard)[0];
 
       it("shows none on a past flight, and still shows it on a future one", async () => {
         held = trip([{ ...flight, ...gone }], { start_date: "2020-03-01", end_date: "2020-03-02" });
@@ -1300,11 +1330,12 @@ describe("Trip", () => {
         const view = render(TripPage);
         const card = await flightCard();
         await waitFor(() => expect(card).toHaveTextContent("JFK"));
-        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        expect(within(card).queryByText(/Updated /)).toBeNull();
+        expect(card.querySelector("article")).toBeNull();
         view.unmount();
         held = trip([flight]);
         render(TripPage);
-        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+        expect(await within(await flightCard()).findByRole("article")).toBeInTheDocument();
       });
 
       it("shows none on a past flight with two bookings, and still shows it on a future one", async () => {
@@ -1313,11 +1344,12 @@ describe("Trip", () => {
         const view = render(TripPage);
         const card = await flightCard();
         await waitFor(() => expect(card).toHaveTextContent("BBBBBB"));
-        expect(within(card).queryByTestId("flight-status")).toBeNull();
+        expect(within(card).queryByText(/Updated /)).toBeNull();
+        expect(card.querySelector("article")).toBeNull();
         view.unmount();
         held = trip([flight, sams]);
         render(TripPage);
-        expect(await within(await flightCard()).findByTestId("flight-status")).toBeInTheDocument();
+        expect(await within(await flightCard()).findByRole("article")).toBeInTheDocument();
       });
     });
 
@@ -1575,7 +1607,7 @@ describe("on its own page", () => {
     it("shows a booking's cost on its card, and a cancelled one's struck through", async () => {
       held = trip([paid(flight, 124000, "USD"), { ...paid(stay, 31000, "EUR"), status: "cancelled" }], { costs: { ...costs, totals: [costs.totals[0]], priced: 1, bookings: 1 } });
       render(TripPage);
-      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter((li) => li.classList.contains("pass"));
+      const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
       expect(within(cards[0]).getByText(/\$1,240\.00/)).not.toHaveClass("line-through");
       expect(within(cards[1]).getByText(/€310\.00/)).toHaveClass("line-through");
       expect(within(cards[1]).getByText("Cancelled, so not in the trip’s total")).toBeInTheDocument();
@@ -1675,8 +1707,11 @@ describe("on its own page", () => {
   });
 });
 
+const afterStart = () => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(Date.UTC(2026, 10, 23, 12)); };
+
 describe("Trip photos", () => {
   it("shows the trip’s photos above the bookings once signed in, asking for them once per trip", async () => {
+    afterStart();
     app.state = state();
     const answer = vi.mocked(api).getMockImplementation()!;
     const shot = { id: 5, person_id: 1, trip_id: 1, kind: "image", taken_local: "2026-11-21T16:20", zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null };
@@ -1690,6 +1725,7 @@ describe("Trip photos", () => {
   });
 
   it("draws the photo clusters as pins on the trip’s map and takes Show these photos to the first photo of that cluster in the gallery", async () => {
+    afterStart();
     app.state = state();
     const answer = vi.mocked(api).getMockImplementation()!;
     const shot = (id: number, taken_local: string) => ({ id, person_id: 1, trip_id: 1, kind: "image", taken_local, zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null });
@@ -1774,6 +1810,7 @@ describe("Trip summary", () => {
   });
 
   it("asks for the numbers again, and for the photos, after the person shares their photos on the trip", async () => {
+    afterStart();
     app.state = state({ person_id: 1 });
     let asked = true;
     const answer = vi.mocked(api).getMockImplementation()!;

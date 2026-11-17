@@ -8,7 +8,7 @@ vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$li
 import { api } from "$lib/api";
 import type { PhotoCluster, TripPhoto, TripPhotos, TripPlaces } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
-import { forgetMapkit } from "$lib/mapkit";
+import { forgetMapkit, loadMapkit } from "$lib/mapkit";
 import { stopsOf } from "$lib/route-replay";
 import { fake, fakeMaps, fakeMk } from "../../test/fake-mapkit";
 import { clearRouteCache } from "$lib/driving-routes";
@@ -203,6 +203,18 @@ describe("RouteReplay with the flag on", () => {
     expect(container.querySelectorAll("[data-leg]")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
     expect(screen.getByRole("list", { name: "Stops in order" })).toBeTruthy();
+  });
+
+  it("falls back to the flat map when MapKit failed in the background before the replay opened", async () => {
+    const preload = loadMapkit();
+    await loadScript();
+    await preload;
+    fake.emit("error", { status: "Unauthorized" });
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+    await waitFor(() => expect(svg(container)).toBeTruthy());
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
+    expect(fake.last().destroyed).toBe(true);
   });
 
   it("falls back to the flat map when the script can't be loaded", async () => {

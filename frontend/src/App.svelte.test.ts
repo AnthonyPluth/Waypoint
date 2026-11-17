@@ -8,6 +8,7 @@ vi.mock("svelte-sonner", () => ({ Toaster: vi.fn(), toast: Object.assign(vi.fn()
 
 import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
+import { forgetMapkit, forgetPreload, PRELOAD_MS } from "$lib/mapkit";
 import { state } from "./test/fixtures";
 import App from "./App.svelte";
 
@@ -117,5 +118,57 @@ describe("the shell", () => {
     render(App);
     expect(screen.getByText("Can’t reach Waypoint")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+});
+
+describe("preloading MapKit", () => {
+  const tokenCalls = () => vi.mocked(api).mock.calls.filter(([path]) => path === "/api/mapkit/token");
+  beforeEach(() => {
+    forgetMapkit();
+    forgetPreload();
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("asks once, a few seconds after a signed-in open where the server has MapKit", async () => {
+    app.state = state({ mapkit: true } as never);
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS - 1);
+    expect(tokenCalls()).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(tokenCalls()).toHaveLength(1);
+    app.state = state({ mapkit: true } as never);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    expect(tokenCalls()).toHaveLength(1);
+    unmount();
+  });
+
+  it("asks for nothing when the server has no MapKit, or says nothing about it", async () => {
+    for (const extra of [{ mapkit: false }, {}]) {
+      app.state = state(extra as never);
+      const { unmount } = render(App);
+      await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+      unmount();
+    }
+    expect(tokenCalls()).toHaveLength(0);
+  });
+
+  it("asks for nothing when signed out", async () => {
+    app.state = state({ mapkit: true, user: null } as never);
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    expect(tokenCalls()).toHaveLength(0);
+    unmount();
+  });
+
+  it("asks for nothing while offline", async () => {
+    app.state = state({ mapkit: true } as never);
+    app.offline = true;
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    app.offline = false;
+    expect(tokenCalls()).toHaveLength(0);
+    unmount();
   });
 });

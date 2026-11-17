@@ -47,6 +47,32 @@ describe("stopsOf", () => {
     expect(names(stopsOf(trip([out, unknown, noWhere, rental, stay, lost]), places))).toEqual(["Minneapolis", "San Francisco", "Bayview Inn", "San Francisco"]);
   });
 
+  describe("a rental car at a place the trip already visits", () => {
+    const la = "America/Los_Angeles";
+    const napa = segment({ id: 4, kind: "hotel", origin: "Vine Inn", destination: "Napa, CA", start_local: "2025-12-05T16:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la });
+    const rental = segment({ id: 5, kind: "car", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-05T11:00", start_zone: la, end_local: "2025-12-11T12:00", end_zone: la });
+    const dates = (stops: Stop[]) => stops.map((s) => [s.from.slice(0, 10), s.to.slice(0, 10)]);
+
+    it("is not a stop and does not stretch the airport's dates over the days the car is held", () => {
+      const stops = stopsOf(trip([out, rental, napa, back]), places);
+      expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Vine Inn", "San Francisco", "Minneapolis"]);
+      expect(dates(stops)).toEqual([["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-05"], ["2025-12-05", "2025-12-11"], ["2025-12-11", "2025-12-11"], ["2025-12-11", "2025-12-11"]]);
+    });
+
+    it("gives the same stops when the hotel is booked to start before the car", () => {
+      const early = { ...napa, start_local: "2025-12-05T09:00" };
+      const stops = stopsOf(trip([out, rental, early, back]), places);
+      expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Vine Inn", "San Francisco", "Minneapolis"]);
+      expect(dates(stops)[3]).toEqual(["2025-12-11", "2025-12-11"]);
+    });
+
+    it("still makes a stop of a car picked up somewhere the trip has no other booking", () => {
+      const depot = segment({ id: 6, kind: "car", origin: "Napa", destination: "Napa", start_local: "2025-12-12T09:00", start_zone: la, end_local: "2025-12-12T18:00", end_zone: la });
+      const stops = stopsOf(trip([out, depot]), places);
+      expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Napa"]);
+    });
+  });
+
   it("leaves out cancelled bookings and parking", () => {
     const cancelled = segment({ id: 4, kind: "hotel", status: "cancelled", origin: "Vine Inn", destination: "Napa", start_local: "2025-12-06T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-07T11:00", end_zone: "America/Los_Angeles" });
     const lot = segment({ id: 5, kind: "parking", origin: "Napa Lot", destination: "Napa", start_local: "2025-12-04T15:00", start_zone: "America/Chicago", end_local: "2025-12-05T07:00", end_zone: "America/Chicago" });
