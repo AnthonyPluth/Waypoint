@@ -20,7 +20,7 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 | l | [l-others-view.html](l-others-view.html) | What everyone else sees (no trace of unshared photos), and the viewer when a photo is taken back |
 | m | [m-sharing-settings.html](m-sharing-settings.html) | Settings, Photo sharing: default scope, Share on all my trips, per-trip list |
 | n | [trip-photo-sharing.html](trip-photo-sharing.html) | The trip page's Photos header with a Sharing button (beside Select and See all) that opens the sharing controls: a popover on desktop, a bottom sheet on phone; today's page and the closed state beside it |
-| o | [past-trip-sharing.html](past-trip-sharing.html) | **Awaiting sign-off** ([#772](https://github.com/AnthonyPluth/Waypoint/issues/772)): where the Sharing button sits on a completed trip's page (no Photos header there), how its panel opens, and every state of the panel; three placements side by side |
+| o | [past-trip-sharing.html](past-trip-sharing.html) | Decided by the owner on 2026-11-17 ([#772](https://github.com/AnthonyPluth/Waypoint/issues/772)): `Sharing` beside `View photos` on a completed trip's page, the panel as on a current trip (popover on desktop, bottom sheet on phone), every state of the panel, the reserved button slot; two placements not chosen kept for the record |
 
 ## Decisions the designs fix
 
@@ -51,29 +51,25 @@ The owner signed off on moving the trip page's photo-sharing block behind a butt
 - Nothing about who can see what changes.
 - `docs/PHOTOS.md` mentions a one-line row with `Manage` that the code does not have; the build issue corrects it.
 
-## Sharing on a completed trip (awaiting sign-off, #772)
+## Sharing on a completed trip (decided 2026-11-17, #772)
 
-A trip that has ended is drawn by `PastTrip.svelte` (the photo-led page, the days as a timeline), whose Photos heading is visible to screen readers only. #744's `Sharing` button has no header to sit in there, so the page keeps today's inline `Your photos on this trip` card under the days. The owner decided on 2026-11-17 that past trips get their own design. The page [past-trip-sharing.html](past-trip-sharing.html) draws it. It is a layout question only: the panel, its words (`Photo sharing for this trip`, the radio group, `Stop sharing on this trip`, `Removed from this trip (N)`) and who sees what are #744's and do not change.
+A trip that has ended is drawn by `PastTrip.svelte` (the photo-led page, the days as a timeline), whose Photos heading is visible to screen readers only. #744's `Sharing` button has no header to sit in there, so the page kept today's inline `Your photos on this trip` card under the days. The page [past-trip-sharing.html](past-trip-sharing.html) draws where the control goes. It is a layout change only: the panel, its words (`Photo sharing for this trip`, the radio group, `Stop sharing on this trip`, `Removed from this trip (N)`) and who sees what are #744's and do not change. The owner answered the design's questions in chat on 2026-11-17 (PR #787, issue #772); nothing is open.
 
-The page draws, at phone and desktop width:
+The page draws, at phone and desktop width: today's page with the card this replaces (0); placement A, closed and open, for one section and for a steward with several (A); the states of the panel and the page (S); and the two placements not chosen (B, C).
 
-- Today's page with the card this replaces (0).
-- Proposal A: `Sharing` beside `View photos` in the row under the hero, closed and open (a bottom sheet on phone, a non-modal popover under the button on desktop), for one section and for a steward with several (A).
-- The states: Only me chosen, the first-visit prompt and the reminder after Not now (both stay inline, no button), a person who acts for no one (no control), and a trip with few photos (map hero, the row holds only `Sharing`) (S).
-- Alternatives for comparison: B, a visible `Photos by day` header with `Sharing` at its right; C, `Sharing` after `Replay` in the facts line (B, C).
+### Decisions (2026-11-17)
 
-The desktop frames use the built page, one column at most 48 rem wide, not the two-column page of [trips b2](../trips/b-trip-page.html).
+- Placement A: a `Sharing` outline button beside `View photos` in the row under the hero. B (a visible `Photos by day` header with `Sharing` at its right) and C (`Sharing` after `Replay` in the facts line) are not chosen; they stay on the page for the record.
+- The panel opens as on a current trip: a non-modal popover under the button on desktop, the app's modal bottom sheet on phone. The popover opens left-aligned under the left-hand button, with the caret over it.
+- With fewer than three photos the page leads with the map and has no `View photos`; `Sharing` then sits alone on its own row under the map.
+- The reminder after Not now moves up and sits directly under the button row (no button), instead of below the last day. The first-visit prompt stays inline above the days, with no button.
+- The button's space is held from the start: while the sharing state loads, the slot where `Sharing` will be is reserved (the dashed outline in S6 and S7 is a drawing aid; it is blank in the app), so nothing jumps when the button arrives. Once the state is known and the person has no control, the slot collapses: a person with no control sees a blank space only while the state loads, then none. Beside `View photos` the collapse moves nothing; with the map hero the blank row under the map collapses and the page below moves up once.
+- A person who acts for no one sees no control and no disabled button (S4). Only the people the viewer acts for get a button, as on a current trip.
+- `Select` stays off the completed page: the panel is its only sharing control, and a photo is taken off from the viewer (#748).
+- The inline card is removed from the completed page; its controls live in the panel only.
+- The desktop frames use the built page, one column at most 48 rem wide (`max-w-3xl`), not the two-column page of [trips b2](../trips/b-trip-page.html).
 
-### Open questions for the owner
-
-1. Where does the button sit: A (beside `View photos`, proposed), B (a visible `Photos by day` header) or C (in the facts line beside `Replay`)? A fourth option, D, is A on phone and the trips-b2 header on desktop; it is not drawn.
-2. A page with fewer than three photos leads with the map and has no `View photos`. Is the button alone on its own row under the map (S5, as drawn), or should it join the facts line there while keeping A elsewhere?
-3. In A the button is at the left, so the popover opens left-aligned under it with the caret over the button; in B and C it is right-aligned, as on a current trip. Is a left-aligned popover fine?
-4. The reminder after Not now sits below the last day, far from the button. Keep it there, or move it up under the button row?
-5. The sharing state loads after the page, so the button appears a moment late and the row can change height. Hold its space from the start (an empty row for a person who acts for no one), or let it appear when ready?
-6. A current trip's header has `Select` beside `Sharing`; the completed page has none (a photo is taken off from the viewer, #748). Confirm `Select` stays off this page.
-
-After sign-off the build is the one in #772: `TripPhotoSharingMenu.svelte` on the past trip page, the inline card removed there, the verify flows and the `trip` page images (the Denver trip) updated.
+The build is the one in #772: `TripPhotoSharingMenu.svelte` on the past trip page, the inline card removed there, the verify flows and the `trip` page images (the Denver trip) updated.
 
 ## Fonts
 
