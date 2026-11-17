@@ -53,6 +53,23 @@ describe("RouteReplay when it is not shown", () => {
     expect(loadMapkit).toHaveBeenCalledOnce();
   });
 
+  it("draws the compact trip map without asking for Apple's script or drawing a MapKit map, however long it stays", async () => {
+    const { rerender } = render(RouteReplay, { trip: trip([there, home]), now: after, shown: true, compact: true });
+    expect(await screen.findByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(loadMapkit).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-mapkit]")).toBeNull();
+    await rerender({ trip: trip([there, home]), now: after, shown: true, compact: false });
+    await waitFor(() => expect(loadMapkit).toHaveBeenCalledOnce());
+  });
+
+  it("asks for Apple's script from the first draw of a replay that is not compact", async () => {
+    render(RouteReplay, { trip: trip([there, home]), now: after, shown: true });
+    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    await waitFor(() => expect(loadMapkit).toHaveBeenCalledOnce());
+  });
+
   it("reports no stops for a trip with nothing to place", async () => {
     const onstops = vi.fn();
     render(RouteReplay, { trip: trip([]), now: after, shown: false, onstops });

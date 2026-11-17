@@ -274,6 +274,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Stats`.
 - **Drive it:** `tools/control flow past-trip-countries`; or `poetry run python run.py verify --flow past-trip-countries`.
 
+#### `past-trip-page-desktop`
+
+- **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`.
+- **Widths:** desktop, laptop.
+- **Touches:** `Replay trip`, `Position along the route`, `Show all`, `Open gallery`, `Close gallery`.
+- **Expects to see:** `Trip to Denver`, `13 photos`, `Photos by day`, `Jane Doe`, `Trip to Paris`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-trip-page-desktop`; or `poetry run python run.py verify --flow past-trip-page-desktop`.
+
 #### `past-trip-page`
 
 - **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`, `#trip/3`.

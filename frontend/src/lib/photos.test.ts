@@ -173,6 +173,25 @@ describe("the completed trip's hero and days", () => {
     expect(heroOf(null)).toEqual([]);
   });
 
+  it("takes seven for the wide hero when best has seven the viewer can see, and three when it has three to six", () => {
+    const photos = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((id) => shot(id));
+    expect(heroOf({ photos, best: [9, 8, 7, 6, 5, 4, 3, 2] }, true)).toEqual([9, 8, 7, 6, 5, 4, 3]);
+    expect(heroOf({ photos, best: [9, 8, 7, 6, 5, 4] }, true)).toEqual([9, 8, 7]);
+    expect(heroOf({ photos, best: [9, 8, 7] }, true)).toEqual([9, 8, 7]);
+    expect(heroOf({ photos, best: [9, 8] }, true)).toEqual([]);
+    expect(heroOf({ photos, best: [9, 8, 7, 6, 5, 4, 3, 2] })).toEqual([9, 8, 7]);
+    expect(heroOf({ photos: photos.slice(0, 6), best: [9, 1, 2, 3, 4, 5, 6] }, true)).toEqual([1, 2, 3]);
+    expect(heroOf(null, true)).toEqual([]);
+  });
+
+  it("lets a day show twelve photos where it is told to, leaving the rest as the +N", () => {
+    const photos = Array.from({ length: 20 }, (_, i) => shot(i + 1));
+    const [day] = pastDays(photos, new Set(), new Map(), 12);
+    expect(day.shown).toHaveLength(12);
+    expect(day.more).toBe(8);
+    expect(pastDays(photos, new Set(), new Map())[0].shown).toHaveLength(6);
+  });
+
   it("never takes a hero photo the viewer's reply does not hold", () => {
     expect(heroOf({ photos: [shot(1), shot(2), shot(3)], best: [9, 1, 2, 3] })).toEqual([1, 2, 3]);
     expect(heroOf({ photos: [shot(1), shot(2)], best: [9, 1, 2] })).toEqual([]);
