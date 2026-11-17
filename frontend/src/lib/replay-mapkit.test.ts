@@ -316,7 +316,7 @@ describe("the MapKit map", () => {
   it("moves a car and a boat as the flat map does", () => {
     const car = start({ stops: [denver, saltLake], roads });
     car.replay.update({ progress: 0.5, playing: true, calm: false });
-    expect(fake.last().annotations.size).toBeGreaterThan(2);
+    expect(fake.last().annotations.size).toBe(2);
     expect(annotations().some((a) => a.factory().getAttribute("data-car") === "0")).toBe(true);
     const ship = start({ stops: [denver, { ...saltLake, via: "cruise" }], roads: none });
     ship.replay.update({ progress: 0.5, playing: true, calm: false });
@@ -347,25 +347,15 @@ describe("the MapKit map", () => {
     expect(fake.last().rects).toHaveLength(count);
   });
 
-  it("draws the highways and state lines the flat map draws, with shields, only where they are in view", () => {
+  it("draws the state lines the flat map draws, only where they are in view, and no highway lines or shields", () => {
     const { replay } = start({ stops: [denver, saltLake], roads, boundaries });
     replay.update({ progress: 1, playing: false, calm: true });
-    const widths = overlays().map((o) => o.options.style!.options.lineWidth);
-    expect(widths.filter((w) => w === 1.6)).toHaveLength(2);
     const dashed = overlays().filter((o) => o.options.style!.options.lineDash);
     expect(dashed).toHaveLength(1);
     expect(dashed[0].options.style!.options).toMatchObject({ lineDash: [4, 3], strokeOpacity: 0.8, lineWidth: 1 });
-    const shields = annotations().filter((a) => a.factory().hasAttribute("data-shield"));
-    expect(shields.map((s) => s.factory().getAttribute("data-shield")).sort()).toEqual(["I-25", "I-80"]);
-    expect(shields[0].factory().textContent).toMatch(/^I-/);
+    expect(overlays().filter((o) => !o.options.style!.options.lineDash)).toHaveLength(1);
+    expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);
     replay.update({ progress: 1, playing: false, calm: true });
-    expect(annotations().filter((a) => a.factory().hasAttribute("data-shield"))).toHaveLength(2);
-  });
-
-  it("leaves the highways and state lines out when there are none", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads: none });
-    replay.update({ progress: 1, playing: false, calm: true });
-    expect(overlays().every((o) => o.options.style!.options.lineWidth !== 1.6)).toBe(true);
     expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);
   });
 

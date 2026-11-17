@@ -95,7 +95,7 @@ describe("RouteReplay", () => {
       const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.textContent);
       expect(items[1]).not.toContain("via");
       expect(document.querySelector("path[data-road-leg='I-25 I-80']")).toBeTruthy();
-      expect(document.querySelector("[data-road='I-80']")).toBeTruthy();
+      expect(document.querySelector("[data-road]")).toBeNull();
     });
 
     it("draws the state lines the server sent, and none when the reply has none", async () => {

@@ -28,9 +28,6 @@
       "wait_for": "[data-mapkit] polyline[stroke-dasharray]"
     },
     {
-      "wait_for": "[data-mapkit] [data-shield] svg"
-    },
-    {
       "expect_text": {
         "selector": "[aria-label='Map key']",
         "text": "State line"
