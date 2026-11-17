@@ -7,7 +7,7 @@ import {
 } from "./route-replay";
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
-export type Palette = { route: string; stay: string; border: string };
+export type Palette = { route: string; stay: string };
 export type ReplayMapOptions = { stops: Stop[]; roads: Roads; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number; more?: Pick<Stop, "latitude" | "longitude">[]; onView?: (box: Box) => void };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
@@ -17,7 +17,7 @@ export const SAMPLES = 64;
 export const FLIGHT_WIDTH = 2.5;
 export const GROUND_WIDTH = 2;
 export const MOVER_SCALE = 1.1;
-export const DEFAULT_PALETTE: Palette = { route: "#8fc2ff", stay: "#4fd1b0", border: "#343c52" };
+export const DEFAULT_PALETTE: Palette = { route: "#8fc2ff", stay: "#4fd1b0" };
 
 const SVG = "http://www.w3.org/2000/svg";
 const lat = (y: number) => Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, y));

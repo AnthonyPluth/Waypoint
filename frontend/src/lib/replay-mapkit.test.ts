@@ -198,7 +198,7 @@ describe("the MapKit map", () => {
   });
 
   it("draws each leg in as time passes, in the flat map's colours and widths", () => {
-    const { replay } = start({ palette: { route: "#111111", stay: "#222222", border: "#333333" }, scale: 0.5 });
+    const { replay } = start({ palette: { route: "#111111", stay: "#222222" }, scale: 0.5 });
     replay.update({ progress: 0.25, playing: true, calm: false });
     const [first] = overlays();
     expect(overlays()).toHaveLength(1);
@@ -218,7 +218,7 @@ describe("the MapKit map", () => {
   });
 
   it("draws a drive along its road, in the ground colour", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads, palette: { route: "#111111", stay: "#222222", border: "#333333" } });
+    const { replay } = start({ stops: [denver, saltLake], roads, palette: { route: "#111111", stay: "#222222" } });
     replay.update({ progress: 1, playing: false, calm: false });
     const drive = overlays().find((o) => colorOf(o) === "#222222" && o.options.style!.options.lineWidth === 2)!;
     expect(drive.points.length).toBeGreaterThanOrEqual(4);
