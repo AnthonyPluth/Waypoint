@@ -16,7 +16,7 @@
 
 <li class="relative flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-muted/40" data-flight-row data-state={view.state}>
   <a class="absolute inset-0 z-[1] outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/60" href={`#trip/${segment.trip_id}/flight/${segment.id}`} aria-label={view.name}></a>
-  <span class="flex min-w-0 flex-1 items-center gap-3" aria-hidden="true">
+  <span class="flex min-w-0 flex-1 items-center gap-3">
     <KindTile kind="flight" size={34} decorative />
     <span class="min-w-0 flex-1">
       <b class="block truncate text-body font-semibold">{routeTitle(view)}</b>

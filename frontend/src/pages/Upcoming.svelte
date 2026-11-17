@@ -16,12 +16,15 @@
   import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
+  import AvatarStack from "$lib/components/AvatarStack.svelte";
   import { flightCardView, flightsToday, nextFlightShown } from "$lib/flightcard";
+  import { formatMoney } from "$lib/money";
+  import { isMobile } from "$lib/platform";
   import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
-  import { type Day, type DayItem, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, appWord, vendorLink, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
@@ -125,6 +128,7 @@
   });
   const liveOn = $derived(flightStatus.list?.enabled === true);
   const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
+  const travellersOf = (bookings: Segment[]) => bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => (t.person_id != null ? o.person_id === t.person_id : o.person_id == null && o.name.trim().toLowerCase() === t.name.trim().toLowerCase())) === i).map((t) => ({ id: t.person_id, name: t.name }));
   const compactFlight = (s: Segment) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s);
   const homeFlight = $derived(next !== null && compactFlight(next.segment)
     && nextFlightShown(flightCardView({ segment: next.segment, status: liveOn ? statusFor(next.segment.id) : undefined, liveOn, now, online, city: (code) => code }), startAt(next.segment), now));
@@ -291,8 +295,20 @@
       <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} class="mb-6">
         {#snippet footer()}
           {@render differing(next.bookings)}
+          {@const manage = s.links.app ?? s.manage_url}
+          {@const vendor = vendorLink(s, isMobile())}
+          {#if !(s.links.directions || s.links.call) && manage}
+            <Button variant="action" href={manage} target="_blank" rel="noopener noreferrer" size="sm" class="phone:flex-1">{appWord(s, now, isMobile())}</Button>
+          {:else if !(s.links.directions || s.links.call) && vendor}
+            <Button variant="action" href={vendor.href} size="sm" class="phone:flex-1">{vendor.label}</Button>
+          {/if}
           {#each next.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left font-semibold" />{/each}
+          {#if s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
+          {#if s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
           <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button>
+          {@const people = travellersOf(next.bookings)}
+          {#if people.length}<div class="flex w-full items-center gap-2.5"><AvatarStack {people} /><span class="min-w-0 truncate text-sm font-medium">{people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean).join(", ")}</span></div>{/if}
+          {#if next.bookings.length === 1 && s.price && app.state?.show_costs !== false}<p class="w-full text-sm"><span class="eyebrow">Cost</span> <span class="font-medium" data-cost>{formatMoney(s.price.amount_minor, s.price.currency)}</span></p>{/if}
         {/snippet}
       </FlightHome>
     {:else}

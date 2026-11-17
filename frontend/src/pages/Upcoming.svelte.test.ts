@@ -1091,4 +1091,41 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     expect(within(sheet).getByRole("progressbar", { name: "Flight progress" })).toBeInTheDocument();
     viewport.phone = false;
   });
+
+  it("keeps Check in on the Next up card once check-in is open, within a day of departure", async () => {
+    const managed = segment({ id: 1, manage_url: "https://example.test/manage", links: { app: null, open: null, open_kind: null, directions: null, call: null } });
+    at("2026-11-20T09:00:00-05:00");
+    serve([trip([managed, stay, home])]);
+    const open = render(Upcoming);
+    expect(within(await card()).getByRole("link", { name: "Check in" })).toHaveAttribute("href", "https://example.test/manage");
+    open.unmount();
+    dropEarly();
+    at("2026-11-20T16:00:00-05:00");
+    serve([trip([{ ...managed, start_local: "2026-11-20T19:00" }, stay, home])]);
+    render(Upcoming);
+    expect(within(await card()).getByRole("link", { name: "Check in" })).toBeInTheDocument();
+  });
+
+  it("keeps the travellers and the cost on the Next up card", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const priced = segment({ id: 1, price: { amount_minor: 45000, currency: "USD", source: "email" } as never, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] });
+    serve([trip([priced, stay, home])]);
+    render(Upcoming);
+    const mini = await card();
+    expect(within(mini).getByText("Jane, Sam")).toBeInTheDocument();
+    expect(within(mini).getByText("$450.00")).toBeInTheDocument();
+  });
+
+  it("keeps the pause warning in the booking sheet too", async () => {
+    viewport.phone = true;
+    at("2026-11-21T02:00:00-05:00");
+    serveLive({ ...delayed, paused: { reason: "limit", until: "2026-12-01T00:00:00Z" } });
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const days = await screen.findByRole("list", { name: /day by day/ });
+    await u.click(within(days).getAllByRole("link", { name: "JFK → LHR" })[0]);
+    const sheet = await screen.findByRole("dialog", { name: "JFK → LHR" });
+    expect(await within(sheet).findByText(/^Live updates paused until .* \(monthly limit\)$/)).toBeInTheDocument();
+    viewport.phone = false;
+  });
 });
