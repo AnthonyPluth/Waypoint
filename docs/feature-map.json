@@ -1029,6 +1029,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
