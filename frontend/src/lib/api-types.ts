@@ -300,6 +300,10 @@ export interface DrivingRoutes {
   routes: DrivingRoute[];
 }
 
+export interface DrivingRoutesForTrips {
+  trips: TripDrivingRoutes[];
+}
+
 export interface EmailUpdate {
   at: number;
   updated: ("start_local" | "start_zone" | "end_local" | "end_zone" | "origin" | "destination")[];
@@ -1363,6 +1367,11 @@ export interface TripCovers {
   trips: TripCover[];
 }
 
+export interface TripDrivingRoutes {
+  trip_id: number;
+  routes: DrivingRoute[];
+}
+
 export interface TripHome {
   city: string;
   latitude: number;
@@ -1498,6 +1507,7 @@ export interface Endpoints {
   "POST /api/people/{id}/claim": { body: never; reply: Person };
   "GET /api/people/claim-suggestions": { body: never; reply: ClaimSuggestions };
   "POST /api/people/claim-suggestions/dismiss": { body: never; reply: Ok };
+  "GET /api/driving-routes": { body: never; reply: DrivingRoutesForTrips };
   "GET /api/trips": { body: never; reply: TripList };
   "POST /api/trips": { body: TripBody; reply: Trip };
   "GET /api/trips/{id}": { body: never; reply: Trip };

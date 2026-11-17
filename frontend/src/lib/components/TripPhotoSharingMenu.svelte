@@ -7,8 +7,8 @@
   import type { PersonSharing } from "$lib/trip-sharing.svelte";
   import X from "@lucide/svelte/icons/x";
 
-  let { acting, tripName, fallback, button = $bindable(null), open = $bindable(false) }: {
-    acting: PersonSharing[]; tripName: string; fallback: () => HTMLElement | null | undefined; button?: HTMLElement | null; open?: boolean;
+  let { acting, tripName, fallback, button = $bindable(null), open = $bindable(false), align = "end" }: {
+    acting: PersonSharing[]; tripName: string; fallback: () => HTMLElement | null | undefined; button?: HTMLElement | null; open?: boolean; align?: "start" | "end";
   } = $props();
 
   const TITLE = "Photo sharing for this trip";
@@ -74,8 +74,8 @@
     <Button variant="outline" size="sm" bind:ref={button} aria-haspopup="dialog" aria-expanded={open} aria-controls={viewport.phone ? undefined : panelId} onclick={() => (open ? hide(false) : void show())}>Sharing</Button>
     {#if open && !viewport.phone}
       <div bind:this={panel} id={panelId} role="dialog" aria-modal="false" aria-labelledby={`${panelId}-title`}
-        class="absolute top-[calc(100%+10px)] right-[-6px] z-20 flex w-[392px] max-w-[calc(100vw-2rem)] flex-col gap-3.5 rounded-[18px] border border-border bg-popover p-4 shadow-elevation-3">
-        <span class="absolute top-[-6px] right-7 size-[11px] rotate-45 border-t border-l border-border bg-popover" aria-hidden="true"></span>
+        class={`absolute top-[calc(100%+10px)] ${align === "start" ? "left-[-6px]" : "right-[-6px]"} z-20 flex w-[392px] max-w-[calc(100vw-2rem)] flex-col gap-3.5 rounded-[18px] border border-border bg-popover p-4 shadow-elevation-3`}>
+        <span class={`absolute top-[-6px] ${align === "start" ? "left-[22px]" : "right-7"} size-[11px] rotate-45 border-t border-l border-border bg-popover`} aria-hidden="true"></span>
         <div class="flex items-start justify-between gap-3">
           <h2 id={`${panelId}-title`} class="text-heading outline-none" tabindex="-1" bind:this={title}>{TITLE}</h2>
           <Button variant="ghost" size="icon" class="-mt-1.5 -mr-1.5 size-8" aria-label="Close" onclick={() => hide(true)}><X /></Button>

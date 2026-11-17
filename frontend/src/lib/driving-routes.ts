@@ -1,6 +1,7 @@
 import { ignoreFailure } from "./act";
 import { apiCall } from "./contract";
 import type { Mk, MkDirections, MkRoute } from "./mapkit";
+import { driveKey, type Roads, type SavedLeg, type Stop } from "./route-replay";
 
 export type LatLon = { latitude: number; longitude: number };
 export type RoutePath = number[][];
@@ -11,8 +12,17 @@ export const ROUTE_PARALLEL = 4;
 const PRECISION = 4;
 export const SERVER_MAX_POINTS = 10000;
 export const SERVER_MAX_DRIVES = 30;
+export const CARD_POINTS = 300;
+export const CARD_TRIPS = 12;
+export const CARD_WAIT_MS = 40;
+const NO_SAVED: SavedRoutes = new Map();
+
+export type SavedRoutes = ReadonlyMap<string, RoutePath>;
 
 const found = new Map<string, RoutePath>();
+const forCards = new Map<number, Promise<SavedRoutes>>();
+const queued: { trip: number; resolve: (routes: SavedRoutes) => void }[] = [];
+let queuedTimer: ReturnType<typeof setTimeout> | undefined;
 const onServer = new Set<string>();
 const sharing = new Set<string>();
 const pending = new Map<string, Promise<RoutePath | null>>();
@@ -21,7 +31,7 @@ let running = 0;
 let generation = 0;
 
 const round = (n: number): string => n.toFixed(PRECISION);
-const keyOf = (a: LatLon, b: LatLon): string => `${round(a.latitude)},${round(a.longitude)}>${round(b.latitude)},${round(b.longitude)}`;
+const keyOf = driveKey;
 const tripKey = (trip: number, key: string): string => `${trip}:${key}`;
 
 export const clearRouteCache = (): void => {
@@ -30,6 +40,9 @@ export const clearRouteCache = (): void => {
   onServer.clear();
   sharing.clear();
   pending.clear();
+  forCards.clear();
+  clearTimeout(queuedTimer);
+  for (const waiting of queued.splice(0)) waiting.resolve(NO_SAVED);
   running = 0;
   for (const resume of waiting.splice(0)) resume();
 };
@@ -149,7 +162,7 @@ function share(trip: number, from: LatLon, to: LatLon, path: RoutePath, key: str
   sharing.add(mine);
   const body = { start: { latitude: Number(round(from.latitude)), longitude: Number(round(from.longitude)) }, end: { latitude: Number(round(to.latitude)), longitude: Number(round(to.longitude)) }, path: thin(path) };
   apiCall<"PUT /api/trips/{id}/driving-routes">(`/api/trips/${trip}/driving-routes`, { method: "PUT", body, background: true }).then(
-    () => { if (born === generation) { sharing.delete(mine); onServer.add(mine); } },
+    () => { if (born === generation) { sharing.delete(mine); onServer.add(mine); forCards.delete(trip); } },
     () => { if (born === generation) sharing.delete(mine); },
   );
 }
@@ -192,4 +205,61 @@ function find(mk: Mk, from: LatLon, to: LatLon, timeoutMs: number, key: string):
   });
   pending.set(key, job);
   return job;
+}
+
+export const isDrive = (from: Pick<Stop, "latitude" | "longitude">, to: Pick<Stop, "latitude" | "longitude" | "via">): boolean =>
+  to.via === null && (from.latitude !== to.latitude || from.longitude !== to.longitude);
+
+export const hasDrive = (stops: Stop[]): boolean => stops.some((s, i) => i > 0 && isDrive(stops[i - 1], s));
+
+async function flushCards(batch: typeof queued, born: number): Promise<void> {
+  for (let i = 0; i < batch.length; i += CARD_TRIPS) {
+    const chunk = batch.slice(i, i + CARD_TRIPS);
+    const wanted = new Set(chunk.map((c) => c.trip));
+    const got = new Map<number, Map<string, RoutePath>>();
+    let ok = false;
+    try {
+      const reply = await apiCall<"GET /api/driving-routes">(`/api/driving-routes?${[...wanted].map((t) => `trip=${t}`).join("&")}`, { keep: true, background: true });
+      if (Array.isArray(reply?.trips)) {
+        ok = true;
+        for (const entry of reply.trips) {
+          if (!wanted.has(entry?.trip_id) || !Array.isArray(entry.routes)) continue;
+          const saved = new Map<string, RoutePath>();
+          for (const route of entry.routes) {
+            if (isCoordinate(route?.start) && isCoordinate(route?.end) && isPath(route.path)) saved.set(keyOf(route.start, route.end), thin(route.path, CARD_POINTS));
+          }
+          got.set(entry.trip_id, saved);
+        }
+      }
+    } catch {
+      ignoreFailure();
+    }
+    for (const waiting of chunk) {
+      if (!ok && born === generation) forCards.delete(waiting.trip);
+      waiting.resolve(born === generation ? (got.get(waiting.trip) ?? NO_SAVED) : NO_SAVED);
+    }
+  }
+}
+
+export function savedRoutes(trip: number): Promise<SavedRoutes> {
+  const have = forCards.get(trip);
+  if (have) return have;
+  const born = generation;
+  const job = new Promise<SavedRoutes>((resolve) => {
+    queued.push({ trip, resolve });
+    clearTimeout(queuedTimer);
+    queuedTimer = setTimeout(() => void flushCards(queued.splice(0), born), CARD_WAIT_MS);
+  });
+  forCards.set(trip, job);
+  return job;
+}
+
+export function savedRoads(stops: Stop[], saved: SavedRoutes): Roads {
+  const legs: SavedLeg[] = [];
+  for (let i = 1; i < stops.length; i++) {
+    const key = keyOf(stops[i - 1], stops[i]);
+    const path = isDrive(stops[i - 1], stops[i]) ? saved.get(key) : undefined;
+    if (path) legs.push({ from_segment_id: 0, to_segment_id: 0, points: path, refs: [], key });
+  }
+  return { legs, interstates: [] };
 }

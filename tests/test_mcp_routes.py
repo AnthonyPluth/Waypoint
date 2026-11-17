@@ -38,9 +38,9 @@ BLOCKED = [
     "POST /api/photo-sources/{id}/test", "POST /api/photo-sources/{id}/sync", "GET /api/photo-sources/{id}/resume",
     "GET /api/trips/{id}/photo-sharing", "POST /api/trips/{id}/photo-sharing", "DELETE /api/trips/{id}/photo-sharing",
     "POST /api/trips/{id}/photo-exclusions", "DELETE /api/trips/{id}/photo-exclusions/{id}", "GET /api/trips/{id}/photo-exclusions/{id}/thumbnail", "GET /api/photo-grants", "POST /api/photo-sharing-prefs/{id}",
-    "GET /api/mapkit/token", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes",
+    "GET /api/mapkit/token", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes",
 ]
-NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|home|show-costs|photo-sources|mapkit)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)|^/api/trips/\{id\}/driving-routes(/|$)|^/api/photos(/|$)|^/api/trips/\{id\}/photos(/|$)|^/api/trips/\{id\}/photo-(sharing|exclusions)(/|$)|^/api/photo-grants(/|$)|^/api/photo-sharing-prefs(/|$)")
+NEVER = re.compile(r"^/api/(mailboxes|review|ai|backup|restore|state|offline|feed|reminders|mcp-settings|import|loyalty|home|show-costs|photo-sources|mapkit)(/|$)|^/api/flight-status/|^/api/segments/\{id\}/emails(/|$)|^/api/segments/\{id\}/code(/|$)|^/api/trips/\{id\}/emails(/|$)|^/api/trips/\{id\}/destination(/|$)|^/api/trips/\{id\}/driving-routes(/|$)|^/api/driving-routes(/|$)|^/api/photos(/|$)|^/api/trips/\{id\}/photos(/|$)|^/api/trips/\{id\}/photo-(sharing|exclusions)(/|$)|^/api/photo-grants(/|$)|^/api/photo-sharing-prefs(/|$)")
 
 
 class RouteTests(unittest.TestCase):
@@ -78,7 +78,7 @@ class RouteTests(unittest.TestCase):
                      "/api/photos", "/api/photos/{id}", "/api/photos/{id}/undo", "/api/photos/{id}/thumbnail", "/api/photos/review", "/api/photos/trip-covers", "/api/trips/{id}/photos", "/api/trips/{id}/photos/anything",
                      "/api/photo-sources", "/api/photo-sources/{id}", "/api/photo-sources/{id}/sync", "/api/photo-sources/anything",
                      "/api/trips/{id}/photo-sharing", "/api/trips/{id}/photo-exclusions", "/api/trips/{id}/photo-exclusions/{id}/thumbnail", "/api/photo-grants",
-                     "/api/photo-grants/anything", "/api/photo-sharing-prefs", "/api/photo-sharing-prefs/{id}", "/api/trips/{id}/driving-routes"):
+                     "/api/photo-grants/anything", "/api/photo-sharing-prefs", "/api/photo-sharing-prefs/{id}", "/api/trips/{id}/driving-routes", "/api/driving-routes", "/api/driving-routes/anything"):
             self.assertTrue(mcp_access.blocked(path), path)
         for path in ("/api/flight-status", "/api/trips", "/api/people"):
             self.assertFalse(mcp_access.blocked(path), path)

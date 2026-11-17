@@ -9,7 +9,13 @@
     {"expect_text": {"selector": "h1", "text": "Trip to Denver"}},
     {"expect_text": {"selector": "[data-testid=past-trip] >> text=/^13 photos$/", "text": "13 photos"}},
     {"wait_for": "[data-testid=photo-days] [data-day]"},
+    {"wait_for": "role=button[name='Sharing']"},
     {"screenshot": "with-photos"},
+    {"click": "role=button[name='Sharing']"},
+    {"expect_text": {"selector": "[role=dialog][aria-labelledby]", "text": "Photo sharing for this trip"}},
+    {"screenshot": "sharing-open"},
+    {"press": {"selector": "[role=dialog][aria-labelledby]", "key": "Escape"}},
+    {"wait_for": "role=button[name='Sharing'][expanded=false]"},
     {"click": "button[aria-label='Trip options']"},
     {"wait_for": "[role=menu]"},
     {"expect_text": {"selector": "[role=menu]", "text": "Merge another trip"}},
@@ -31,6 +37,7 @@
     {"wait_for": "[data-testid=photo-days] [data-day]"},
     {"expect_text": {"selector": "h1", "text": "Trip to Orlando"}},
     {"press": {"selector": "input[aria-label='Position along the route']", "key": "End"}},
+    {"wait_for": "role=button[name='Sharing']", "timeout": 30000},
     {"screenshot": "two-photos"}
   ]
 }

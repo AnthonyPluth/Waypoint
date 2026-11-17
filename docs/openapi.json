@@ -373,6 +373,27 @@
         }
       }
     },
+    "/api/driving-routes": {
+      "get": {
+        "operationId": "api_driving_routes_for_trips",
+        "x-handler": "waypoint/server/api/driving_routes.py:api_driving_routes_for_trips",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrivingRoutesForTrips"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips": {
       "get": {
         "operationId": "api_trips",
@@ -5457,6 +5478,21 @@
         ],
         "additionalProperties": false
       },
+      "DrivingRoutesForTrips": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripDrivingRoutes"
+            }
+          }
+        },
+        "required": [
+          "trips"
+        ],
+        "additionalProperties": false
+      },
       "EmailUpdate": {
         "type": "object",
         "properties": {
@@ -10154,6 +10190,25 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "TripDrivingRoutes": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DrivingRoute"
+            }
+          }
+        },
+        "required": [
+          "trip_id",
+          "routes"
         ],
         "additionalProperties": false
       },

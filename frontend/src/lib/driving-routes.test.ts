@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fake, fakeMk, windingPath } from "../test/fake-mapkit";
 import { apiCall } from "./contract";
-import { clearRouteCache, drivingRoute, drivingRoutes, parseRoute, LOOKUP_TIMEOUT_MS, ROUTE_PARALLEL, SERVER_MAX_DRIVES, SERVER_MAX_POINTS, thin } from "./driving-routes";
+import { CARD_POINTS, CARD_TRIPS, CARD_WAIT_MS, clearRouteCache, drivingRoute, drivingRoutes, hasDrive, parseRoute, savedRoads, savedRoutes, LOOKUP_TIMEOUT_MS, ROUTE_PARALLEL, SERVER_MAX_DRIVES, SERVER_MAX_POINTS, thin } from "./driving-routes";
 
 vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 const server = vi.mocked(apiCall);
@@ -271,5 +271,120 @@ describe("the household's stored routes", () => {
     await settle();
     await answer;
     expect((puts()[0][1] as { body: { path: unknown[] } }).body.path).toHaveLength(SERVER_MAX_POINTS);
+  });
+});
+
+describe("the saved routes the Trips cards draw", () => {
+  const pairs = road.map((c) => [c.latitude, c.longitude]);
+  const entry = (trip: number, n: number, path = pairs) => ({ trip_id: trip, routes: [{ start: from, end: to(n), path }] });
+  const wait = () => vi.advanceTimersByTimeAsync(CARD_WAIT_MS + 10);
+  const asked = () => server.mock.calls.filter(([url]) => String(url).startsWith("/api/driving-routes"));
+  const stop = (latitude: number, longitude: number, via: "flight" | null = null) => ({ name: "x", city: "x", code: null, kind: "stay" as const, latitude, longitude, from: "", to: "", via });
+
+  it("asks once for every card that mounts together, and never asks MapKit", async () => {
+    server.mockResolvedValue({ trips: [entry(1, 0), entry(3, 1)] });
+    const answers = [1, 2, 3].map((t) => savedRoutes(t));
+    await wait();
+    const [one, two, three] = await Promise.all(answers);
+    expect(asked()).toHaveLength(1);
+    expect(asked()[0][0]).toBe("/api/driving-routes?trip=1&trip=2&trip=3");
+    expect(one.size).toBe(1);
+    expect(two.size).toBe(0);
+    expect(three.size).toBe(1);
+    expect(fake.directions.calls).toHaveLength(0);
+    expect(puts()).toHaveLength(0);
+  });
+
+  function puts() { return server.mock.calls.filter(([, options]) => options?.method === "PUT"); }
+
+  it("splits a long list into requests of the server's limit and asks for a trip only once", async () => {
+    server.mockResolvedValue({ trips: [] });
+    const ids = Array.from({ length: CARD_TRIPS * 2 + 1 }, (_, i) => i + 1);
+    const answers = [...ids, ...ids].map((t) => savedRoutes(t));
+    await wait();
+    await Promise.all(answers);
+    expect(asked()).toHaveLength(3);
+    expect(asked().map(([url]) => String(url).split("&").length)).toEqual([CARD_TRIPS, CARD_TRIPS, 1]);
+  });
+
+  it("reads each route by its two places, thins a long path and ignores what it cannot read", async () => {
+    const long = Array.from({ length: CARD_POINTS * 3 }, (_, i) => [40 + i / 10000, -108]);
+    server.mockResolvedValue({ trips: [{ trip_id: 5, routes: [{ start: from, end: to(0), path: long }, { start: from, end: to(1), path: [[1, 2]] }, { start: "x", end: to(2), path: pairs }, { start: from, end: to(3), path: pairs }] }] } as never);
+    const answer = savedRoutes(5);
+    await wait();
+    const saved = await answer;
+    expect([...saved.keys()]).toEqual(["39.7400,-104.9900>40.0000,-111.8900", "39.7400,-104.9900>40.3000,-111.8900"]);
+    const path = saved.get("39.7400,-104.9900>40.0000,-111.8900")!;
+    expect(path).toHaveLength(CARD_POINTS);
+    expect([path[0], path.at(-1)]).toEqual([long[0], long.at(-1)]);
+  });
+
+  it("keeps a trip's answer for the next card, and asks again after a failure", async () => {
+    server.mockRejectedValueOnce(new Error("down"));
+    const failed = savedRoutes(1);
+    await wait();
+    expect((await failed).size).toBe(0);
+    server.mockResolvedValue({ trips: [entry(1, 0)] });
+    const again = savedRoutes(1);
+    await wait();
+    expect((await again).size).toBe(1);
+    expect(await savedRoutes(1)).toBe(await again);
+    expect(asked()).toHaveLength(2);
+  });
+
+  it("asks again for a trip once the replay has saved one of its routes", async () => {
+    server.mockResolvedValue({ trips: [] });
+    const first = savedRoutes(7);
+    await wait();
+    await first;
+    const drawn = drivingRoutes(fakeMk, 7, [{ from, to: to(0) }])[0];
+    await vi.advanceTimersByTimeAsync(300);
+    await drawn;
+    server.mockResolvedValue({ trips: [entry(7, 0)] });
+    const next = savedRoutes(7);
+    await wait();
+    expect((await next).size).toBe(1);
+  });
+
+  it("answers nothing for a lookup that clearing the cache cut off, and keeps nothing of the old answer", async () => {
+    server.mockResolvedValue({ trips: [entry(1, 0)] });
+    const waiting = savedRoutes(1);
+    clearRouteCache();
+    expect((await waiting).size).toBe(0);
+    await wait();
+    expect(asked()).toHaveLength(0);
+    let reply: (value: unknown) => void = () => {};
+    server.mockReturnValueOnce(new Promise((resolve) => { reply = resolve; }) as never);
+    const inFlight = savedRoutes(2);
+    await wait();
+    clearRouteCache();
+    reply({ trips: [entry(2, 0)] });
+    expect((await inFlight).size).toBe(0);
+    const stale = savedRoutes(2);
+    server.mockResolvedValue({ trips: [] });
+    await wait();
+    expect((await stale).size).toBe(0);
+    server.mockResolvedValue({ trips: [entry(1, 0)] });
+    const fresh = savedRoutes(1);
+    await wait();
+    expect((await fresh).size).toBe(1);
+  });
+
+  it("finds the saved path of each drive of a trip and none for a flight or a stop that stays put", () => {
+    const saved = new Map([["39.7400,-104.9900>40.0000,-111.8900", pairs]]);
+    const stops = [stop(39.74, -104.99), stop(40, -111.89), stop(40, -111.89), stop(51.47, -0.45, "flight")];
+    const roads = savedRoads(stops, saved);
+    expect(roads.legs).toHaveLength(1);
+    expect(roads.legs[0].points).toBe(pairs);
+    expect(roads.interstates).toEqual([]);
+    expect(savedRoads([stop(39.74, -104.99), stop(40, -111.89, "flight")], saved).legs).toEqual([]);
+    expect(savedRoads(stops, new Map()).legs).toEqual([]);
+  });
+
+  it("says whether a trip has a drive at all, so a flights-only trip is never looked up", () => {
+    expect(hasDrive([stop(1, 2), stop(3, 4)])).toBe(true);
+    expect(hasDrive([stop(1, 2), stop(3, 4, "flight")])).toBe(false);
+    expect(hasDrive([stop(1, 2), stop(1, 2)])).toBe(false);
+    expect(hasDrive([stop(1, 2)])).toBe(false);
   });
 });
