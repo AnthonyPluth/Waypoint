@@ -27,6 +27,7 @@ private final class FakeServerAPI: ServerAPI, @unchecked Sendable {
     var cookie: @Sendable (String) async throws -> WebCookie = { _ in throw FakeServerAPI.noConnection }
     var endpointsFailure: Error?
     var refreshFailure: Error?
+    var refreshDelay: UInt64 = 0
 
     func endpoints(_ server: URL) async throws -> Endpoints {
         if let endpointsFailure { throw endpointsFailure }
@@ -37,6 +38,7 @@ private final class FakeServerAPI: ServerAPI, @unchecked Sendable {
 
     func refresh(_ refreshToken: String, endpoints: Endpoints) async throws -> Tokens {
         refreshRequests.add(refreshToken)
+        if refreshDelay > 0 { try? await Task.sleep(nanoseconds: refreshDelay) }
         if let refreshFailure { throw refreshFailure }
         return Tokens(accessToken: "wpa_renewed", refreshToken: "wpr_renewed", expiresAt: Date().addingTimeInterval(3600))
     }
@@ -193,6 +195,18 @@ final class WebLaunchTests: XCTestCase {
         let launch = await makeSession().launchWebView(gate: gate, patience: 100_000_000)
         XCTAssertEqual(launch, .cachedPage(home))
         XCTAssertLessThan(Date().timeIntervalSince(started), 10)
+        XCTAssertEqual(installed.all, [])
+    }
+
+    func testASlowTokenRenewalDoesNotHoldTheLaunchPastThePatience() async throws {
+        try saveTripsAndPage()
+        api.refreshDelay = 4_000_000_000
+        api.refreshFailure = FakeServerAPI.noConnection
+        let expired = Tokens(accessToken: "wpa_old", refreshToken: "wpr_old", expiresAt: Date().addingTimeInterval(-60))
+        let started = Date()
+        let launch = await makeSession(tokens: expired).launchWebView(gate: gate, patience: 100_000_000)
+        XCTAssertEqual(launch, .cachedPage(home))
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2)
         XCTAssertEqual(installed.all, [])
     }
 

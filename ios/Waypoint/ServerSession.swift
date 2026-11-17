@@ -122,15 +122,19 @@ actor ServerSession {
 
     private func prepareWebView(within patience: UInt64?) async throws -> URL? {
         guard let patience else { return try await prepareWebView() }
-        return try await withThrowingTaskGroup(of: URL?.self) { group in
-            group.addTask { try await self.prepareWebView() }
-            group.addTask {
-                try await Task.sleep(nanoseconds: patience)
-                return nil
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL?, Error>) in
+            let once = ResumeOnce(continuation)
+            Task {
+                do {
+                    once.resume(.success(try await self.prepareWebView()))
+                } catch {
+                    once.resume(.failure(error))
+                }
             }
-            defer { group.cancelAll() }
-            guard let first = try await group.next() else { return nil }
-            return first
+            Task {
+                try? await Task.sleep(nanoseconds: patience)
+                once.resume(.success(nil))
+            }
         }
     }
 
@@ -247,6 +251,23 @@ struct PendingRevocation: Codable, Equatable {
 
     static func removing(_ done: PendingRevocation, from list: [PendingRevocation]) -> [PendingRevocation] {
         list.filter { $0 != done }
+    }
+}
+
+final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<URL?, Error>?
+
+    init(_ continuation: CheckedContinuation<URL?, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ result: Result<URL?, Error>) {
+        lock.lock()
+        let held = continuation
+        continuation = nil
+        lock.unlock()
+        held?.resume(with: result)
     }
 }
 
