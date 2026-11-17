@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { tick } from "svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { Person, Trip } from "$lib/api-types";
-import { app, route } from "$lib/app.svelte";
+import { app, backToTrips, layout, route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { segment, state, trip } from "../test/fixtures";
@@ -26,9 +26,14 @@ const orlando = trip([segment({ id: 3, trip_id: 3, start_local: "2026-08-25T08:0
 const nothingToCount = { days: 0, nights: 0, distance_km: 0, flight_km: 0, road_km: 0, road_estimated: false, states: [], countries: [], photos: { total: 0, inferred: 0 }, kinds: { flight: 0, hotel: 0, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
 const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).endsWith("/summary") ? nothingToCount : undefined);
 
+let coverReply: unknown = { trips: [] };
 function serve(trips = [london, auckland, orlando]) {
   vi.mocked(api).mockImplementation(async (path, opts) => {
     if (numbers(path)) return numbers(path) as never;
+    if (path === "/api/photos/trip-covers") {
+      if (coverReply instanceof Error) throw coverReply;
+      return coverReply as never;
+    }
     if (path === "/api/segments" && opts?.method === "POST") return segment({ id: 9, trip_id: 5 });
     if (path === "/api/people") return { people: [jane, sam] };
     return { trips };
@@ -39,6 +44,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-10-05T12:00:00Z"));
   vi.mocked(api).mockReset();
+  coverReply = { trips: [] };
   route.query = "";
   location.hash = "#trips";
   serve();
@@ -214,6 +220,16 @@ describe("two panes", () => {
     });
   }
 
+  it("keeps the selected trip in the pane at its own width, never the finished-trip page's 80 rem", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    expect(layout.wide).toBe(false);
+    expect(pane.firstElementChild?.className ?? "").not.toMatch(/max-w-|mx-auto/);
+  });
+
   it("shows the first trip beside the list on a wide screen, and the one you pick", async () => {
     panes.two = true;
     serveTrips();
@@ -341,6 +357,13 @@ describe("changing a trip in the pane", () => {
         store = store.map((t) => ({ ...t, segments: t.segments.filter((s) => s.id !== Number(gone[1])) })).filter((t) => t.segments.length);
         return { ok: true };
       }
+      const moving = /^\/api\/segments\/(\d+)\/move$/.exec(String(path));
+      if (moving && opts?.method === "POST") {
+        const into = (opts.body as { trip_id: number }).trip_id;
+        const mover = store.flatMap((t) => t.segments).find((sg) => sg.id === Number(moving[1]))!;
+        store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((sg) => sg.id !== mover.id) } : t.id === into ? { ...t, segments: [...t.segments, { ...mover, trip_id: into }] } : t));
+        return store.find((t) => t.id === into);
+      }
       if (gone && opts?.method === "POST") {
         const moved = segment({ ...second, trip_id: 2 });
         store = store.map((t) => (t.id === 1 ? { ...t, segments: t.segments.filter((s) => s.id !== 4) } : t.id === 2 ? { ...t, segments: [...t.segments, moved] } : t));
@@ -371,6 +394,26 @@ describe("changing a trip in the pane", () => {
     await waitFor(() => expect(within(upcoming).getByText("Lisbon")).toBeInTheDocument());
     expect(within(upcoming).queryByText("Trip to London")).toBeNull();
     expect(await within(pane).findByRole("heading", { level: 1, name: "Lisbon" })).toBeInTheDocument();
+  });
+
+  it("keeps the pane on the trip it was showing when a booking is moved into a past trip", async () => {
+    store = [trip([segment({ id: 6, trip_id: 6, start_local: "2026-10-12T09:00", end_local: "2026-10-14T09:00" })], { id: 6, name: "Trip to Rome" }), ...store];
+    location.hash = "#trips?trip=1";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    const u = user();
+    await bookingOptions(u, "Move Harbour Hotel");
+    const dialog = await screen.findByRole("dialog");
+    const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
+    await waitFor(() => expect(within(choose).getByRole("option", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await u.selectOptions(choose, "3");
+    await u.click(within(dialog).getByRole("button", { name: "Move" }));
+    await waitFor(() => expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getByRole("link", { name: /Trip to Orlando/ })).toBeInTheDocument());
+    await new Promise((r) => setTimeout(r, 200));
+    expect(route.query).toBe("trip=1");
+    expect(within(screen.getByRole("region", { name: "Selected trip" })).getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
   });
 
   it("drops a removed booking from the pane and keeps the trip in the list", async () => {
@@ -522,23 +565,23 @@ describe("overlapping loads", () => {
 });
 
 describe("finding a trip", () => {
-  const archive = Array.from({ length: 300 }, (_, i) => trip([segment({ id: 1000 + i, trip_id: 100 + i, provider: i === 123 ? "Icelandair" : "Delta Air Lines", start_local: `${2018 + (i % 8)}-03-10T09:00`, end_local: `${2018 + (i % 8)}-03-12T09:00` })],
-    { id: 100 + i, name: i === 123 ? "Aurora weekend" : `Trip ${i}`, destination: i === 123 ? "Reykjavik" : "Atlanta", start_date: `${2018 + (i % 8)}-03-10`, end_date: `${2018 + (i % 8)}-03-12` }));
+  const archive = Array.from({ length: 60 }, (_, i) => trip([segment({ id: 1000 + i, trip_id: 100 + i, provider: i === 23 ? "Icelandair" : "Delta Air Lines", start_local: `${2018 + (i % 8)}-03-10T09:00`, end_local: `${2018 + (i % 8)}-03-12T09:00` })],
+    { id: 100 + i, name: i === 23 ? "Aurora weekend" : `Trip ${i}`, destination: i === 23 ? "Reykjavik" : "Atlanta", start_date: `${2018 + (i % 8)}-03-10`, end_date: `${2018 + (i % 8)}-03-12` }));
 
   it("narrows a long archive by name, destination or airline, and keeps the search in the address", async () => {
     serve(archive);
     render(Trips);
-    await screen.findByText("300 trips");
+    await screen.findByText("60 trips");
     await user().click(screen.getByRole("searchbox", { name: "Search trips" }));
     await user().paste("reykjavik");
     expect(route.query).toBe("q=reykjavik");
-    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
+    expect(screen.getByText("1 of 60 trips")).toBeInTheDocument();
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
     await user().clear(screen.getByRole("searchbox", { name: "Search trips" }));
     await user().paste("icelandair");
     expect(screen.getByText("Aurora weekend")).toBeInTheDocument();
-    expect(screen.getByText("1 of 300 trips")).toBeInTheDocument();
+    expect(screen.getByText("1 of 60 trips")).toBeInTheDocument();
   });
 
   it("opens with the filters from the address, and says when nothing matches", async () => {
@@ -550,7 +593,7 @@ describe("finding a trip", () => {
     expect(within(screen.getByRole("group", { name: "Year" })).getByRole("button", { name: "2019" })).toHaveAttribute("aria-pressed", "true");
     await user().click(screen.getByRole("button", { name: "Clear filters" }));
     expect(route.query).toBe("");
-    expect(await screen.findByText("300 trips")).toBeInTheDocument();
+    expect(await screen.findByText("60 trips")).toBeInTheDocument();
   });
 
   it("filters by year, together with the traveller", async () => {
@@ -871,25 +914,28 @@ describe("past trips by year", () => {
     flown(4, "Old", "2024-06-01", "2024-06-02"),
   ];
 
-  it("groups by the year a trip started, newest first, with totals that leave out a part that is 0", async () => {
+  it("groups by the year a trip started, newest first, each year an h2 with its trip count beside it", async () => {
     serve(history());
     render(Trips);
     await screen.findByRole("list", { name: "Past trips in 2026" });
-    expect(screen.getByRole("heading", { level: 3, name: "2026" }).parentElement).toHaveTextContent("2 trips · 10 nights · 3 flights");
-    expect(screen.getByRole("heading", { level: 3, name: "2025" }).parentElement).toHaveTextContent("1 trip · 5 nights · 1 flight");
-    expect(screen.getByRole("heading", { level: 3, name: "2024" }).parentElement).toHaveTextContent("1 trip · 1 night · 1 flight");
-    expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["2026", "2025", "2024"]);
+    expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent("2 trips");
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).toHaveTextContent("1 trip");
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).not.toHaveTextContent("photo");
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["Past", "2026", "2025", "2024"]);
     expect(within(screen.getByRole("list", { name: "Past trips in 2025" })).getByRole("link")).toHaveTextContent("New Year");
     expect(within(screen.getByRole("list", { name: "Past trips in 2026" })).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["#trip/1", "#trip/2"]);
-    expect(screen.getByText("Aug 8 – 15")).toBeInTheDocument();
-    expect(screen.getByText("Dec 29 – Jan 3")).toBeInTheDocument();
+    expect(screen.getByText("Aug 8–15")).toBeInTheDocument();
+    expect(screen.getByText("Dec 29–Jan 3")).toBeInTheDocument();
   });
 
-  it("leaves out flights when a year has none", async () => {
-    serve([stay(1, "Stay", "2026-03-02", "2026-03-05")]);
+  it("adds each year's photo total from the covers reply to its heading", async () => {
+    serve(history());
+    coverReply = { trips: [{ trip_id: 1, count: 168, covers: [11, 12, 13] }, { trip_id: 2, count: 44, covers: [21] }, { trip_id: 3, count: 1, covers: [31] }, { trip_id: 4, count: 0, covers: [] }] };
     render(Trips);
-    expect((await screen.findByRole("heading", { level: 3, name: "2026" })).parentElement).toHaveTextContent("1 trip · 3 nights");
-    expect(screen.queryByText(/flight/)).toBeNull();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent("2 trips · 212 photos"));
+    expect(screen.getByRole("heading", { level: 2, name: "2025" }).parentElement).toHaveTextContent("1 trip · 1 photo");
+    expect(screen.getByRole("heading", { level: 2, name: "2024" }).parentElement).toHaveTextContent("1 trip");
+    expect(screen.getByRole("heading", { level: 2, name: "2024" }).parentElement).not.toHaveTextContent("photo");
   });
 
   it("shows only the newest year on a phone, and reveals the next ones in turn", async () => {
@@ -898,13 +944,267 @@ describe("past trips by year", () => {
     render(Trips);
     await screen.findByRole("list", { name: "Past trips in 2026" });
     expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
-    expect(screen.getByText("Aug 8 – 15 · Nags Head, NC")).toBeInTheDocument();
-    await user().click(screen.getByRole("button", { name: "Show 2025" }));
+    expect(screen.getByText("Aug 8–15")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Show 20/ })).toBeNull();
+    await user().click(screen.getByRole("button", { name: "Show more" }));
     expect(screen.getByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
-    await user().click(screen.getByRole("button", { name: "Show 2024" }));
+    await user().click(screen.getByRole("button", { name: "Show more" }));
     expect(screen.getByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
+  });
+
+  describe("with an observer", () => {
+    type Watch = { cb: IntersectionObserverCallback; el: Element; live: boolean };
+    let watching: Watch[] = [];
+    beforeEach(() => {
+      watching = [];
+      vi.stubGlobal("IntersectionObserver", class {
+        private mine: Watch[] = [];
+        constructor(private cb: IntersectionObserverCallback) {}
+        observe(el: Element) { const w = { cb: this.cb, el, live: true }; this.mine.push(w); watching.push(w); }
+        disconnect() { for (const w of this.mine) w.live = false; }
+        unobserve() {}
+        takeRecords() { return []; }
+      });
+    });
+    afterEach(() => vi.unstubAllGlobals());
+    const near = () => {
+      const w = watching.filter((x) => x.live).at(-1)!;
+      w.cb([{ isIntersecting: true, target: w.el } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
+    };
+    const summaryCalls = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => p.endsWith("/summary"));
+
+    it("loads one year each time the end of the list comes near, with no button", async () => {
+      viewport.phone = true;
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      expect(screen.queryByRole("button", { name: /Show/ })).toBeNull();
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+      expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+      await waitFor(() => expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2025, 1 trip"));
+      await waitFor(() => expect(watching.filter((w) => w.live)).toHaveLength(1));
+      near();
+      expect(await screen.findByRole("list", { name: "Past trips in 2024" })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2024, 1 trip"));
+      expect(screen.queryByTestId("past-more")).toBeNull();
+      expect(watching.some((w) => w.live)).toBe(false);
+    });
+
+    it("looks up the distances of a year only once it is loaded, and shows a quiet line while it loads", async () => {
+      viewport.phone = true;
+      serve(history());
+      let release: (v: unknown) => void = () => {};
+      const base = vi.mocked(api).getMockImplementation()!;
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      await waitFor(() => expect(summaryCalls().sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary"]));
+      vi.mocked(api).mockImplementation((path, opts) => (path === "/api/trips/3/summary" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
+      expect(summaryCalls()).not.toContain("/api/trips/4/summary");
+      expect(watching.some((w) => w.live)).toBe(false);
+      expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+      release(nothingToCount);
+      await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
+    });
+
+    it("does not let the first year's slower lookups finish the next year's loading", async () => {
+      viewport.phone = true;
+      serve(history());
+      const held: Record<string, (v: unknown) => void> = {};
+      const base = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation((path, opts) => (/\/api\/trips\/[1-3]\/summary/.test(String(path)) ? new Promise((r) => { held[String(path)] = r; }) : base(path, opts)) as never);
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
+      await waitFor(() => expect(Object.keys(held).sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary", "/api/trips/3/summary"]));
+      held["/api/trips/1/summary"](nothingToCount);
+      held["/api/trips/2/summary"](nothingToCount);
+      await tick();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(screen.getByText("Loading 2025…")).toBeInTheDocument();
+      expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("");
+      expect(watching.some((w) => w.live)).toBe(false);
+      held["/api/trips/3/summary"](nothingToCount);
+      await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
+      expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2025, 1 trip");
+    });
+
+    it("does not move focus when a year loads", async () => {
+      viewport.phone = true;
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2026" });
+      const search = screen.getByRole("searchbox");
+      search.focus();
+      await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
+      near();
+      await screen.findByRole("list", { name: "Past trips in 2025" });
+      expect(document.activeElement).toBe(search);
+    });
+
+    it("keeps every year on a wide window and watches nothing", async () => {
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2024" });
+      expect(watching).toHaveLength(0);
+      expect(screen.queryByRole("button", { name: /Show/ })).toBeNull();
+    });
+  });
+});
+
+describe("past trip cards", () => {
+  const home = { ...nothingToCount };
+  const past = () => [
+    trip([segment({ id: 31, trip_id: 31, start_local: "2026-08-08T09:00", end_local: "2026-08-15T10:00", travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] })], { id: 31, name: "Beach", destination: "Nags Head, NC" }),
+    trip([segment({ id: 32, trip_id: 32, kind: "hotel", start_local: "2026-03-02T15:00", end_local: "2026-03-05T11:00", origin: null, destination: null })], { id: 32, name: "Spring" }),
+  ];
+  const distanceFor = (km: number) => (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path) === "/api/trips/31/summary" ? { ...home, distance_km: km } : undefined);
+  const serveCards = (covers: unknown, km = 859.6) => {
+    serve(past());
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => distanceFor(km)(path) as never ?? base(path, opts));
+    coverReply = covers;
+  };
+  const beach = () => screen.getByRole("link", { name: /^Beach,/ });
+
+  it("names each card for a screen reader with its dates, nights, distance, photos and people, and hides the mosaic", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName("Beach, Aug 8–15, 7 nights, 534 mi, 168 photos, Jane Doe and Sam Doe"));
+    expect(within(beach()).getByTestId("past-mosaic")).toHaveAttribute("aria-hidden", "true");
+    expect(beach()).toHaveAttribute("href", "#trip/31");
+  });
+
+  it("draws the photo-count pill and the thumbnails the covers reply names", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+    render(Trips);
+    await waitFor(() => expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168"));
+    const pictures = [...beach().querySelectorAll("img")];
+    expect(pictures.map((i) => i.getAttribute("src"))).toEqual(["/api/photos/11/thumbnail", "/api/photos/12/thumbnail", "/api/photos/13/thumbnail"]);
+    expect(pictures.every((i) => i.getAttribute("loading") === "lazy")).toBe(true);
+    expect(api).toHaveBeenCalledWith("/api/photos/trip-covers", expect.anything());
+  });
+
+  it("loads the covers after the trips, so the cards show before the photos arrive", async () => {
+    serveCards({ trips: [] });
+    let release: (v: unknown) => void = () => {};
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((path, opts) => (path === "/api/photos/trip-covers" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
+    render(Trips);
+    expect(await screen.findByRole("link", { name: /^Beach,/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    release({ trips: [{ trip_id: 31, count: 9, covers: [5] }] });
+    expect(await screen.findByTestId("photo-pill")).toHaveTextContent("9");
+  });
+
+  it("keeps a card with no photos, with no pill, and leaves photos out of its name", async () => {
+    serveCards({ trips: [{ trip_id: 31, count: 0, covers: [] }] });
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName("Beach, Aug 8–15, 7 nights, 534 mi, Jane Doe and Sam Doe"));
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    expect(beach().querySelectorAll("img")).toHaveLength(0);
+    expect(within(beach()).getAllByTestId("route-tile")).toHaveLength(1);
+  });
+
+  it("leaves the cards without photos, and says nothing, when the covers reply fails", async () => {
+    serveCards(Object.assign(new Error("Photos need sign-in"), { status: 404 }));
+    render(Trips);
+    await waitFor(() => expect(beach()).toHaveAccessibleName(/^Beach, Aug 8–15, 7 nights/));
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(/Photos need sign-in/)).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent(/^2026\s*2 trips$/);
+  });
+
+  it.each([[null], [{ name: null, email: null, local: true }]])("doesn't ask for covers at all in local mode, where there are no photos (%j)", async (user) => {
+    app.state = state({ user });
+    serveCards({ trips: [{ trip_id: 31, count: 5, covers: [1] }] });
+    render(Trips);
+    await screen.findByRole("link", { name: /^Beach,/ });
+    expect(api).not.toHaveBeenCalledWith("/api/photos/trip-covers", expect.anything());
+    expect(screen.queryByTestId("photo-pill")).toBeNull();
+  });
+
+  it("draws one link to the trip's own page for each card", async () => {
+    serveCards({ trips: [] });
+    render(Trips);
+    const cards = await within(await screen.findByRole("list", { name: "Past trips in 2026" })).findAllByRole("listitem");
+    expect(cards.map((li) => within(li).getAllByRole("link").length)).toEqual([1, 1]);
+    expect(within(cards[0]).getByRole("link")).toHaveAttribute("href", "#trip/31");
+  });
+
+  it("runs the cards two across when no pane is showing, and in one column on a phone", async () => {
+    serveCards({ trips: [] });
+    const { unmount } = render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).toContain("grid-cols-2");
+    unmount();
+    viewport.phone = true;
+    render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).not.toContain("grid-cols-2");
+  });
+});
+
+describe("a past trip never opens the side pane", () => {
+  const upcomingTrip = stay(41, "Next up", "2026-11-14", "2026-11-18");
+  const pastTrip = stay(42, "Long ago", "2026-03-02", "2026-03-05");
+  const paneServer = () => vi.mocked(api).mockImplementation(async (path) => {
+    if (numbers(path)) return numbers(path) as never;
+    if (path === "/api/photos/trip-covers") return { trips: [] } as never;
+    if (path === "/api/people") return { people: [jane, sam] } as never;
+    if (path === "/api/loyalty") return { loyalty: [], programs: {} } as never;
+    const one = /^\/api\/trips\/(\d+)$/.exec(String(path));
+    if (one) return [upcomingTrip, pastTrip].find((t) => t.id === Number(one[1])) as never;
+    return { trips: [upcomingTrip, pastTrip] } as never;
+  });
+
+  it("follows the link to the trip's page instead of choosing it in the pane", async () => {
+    panes.two = true;
+    paneServer();
+    render(Trips);
+    await screen.findByRole("region", { name: "Selected trip" });
+    const card = screen.getByRole("link", { name: /^Long ago,/ });
+    await fireEvent.click(card, { button: 0 });
+    expect(route.query).toBe("");
+    expect(card).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("region", { name: "Selected trip" })).toHaveTextContent("Next up");
+  });
+
+  it("ignores a past trip in the address and picks from the trips still to come", async () => {
+    panes.two = true;
+    location.hash = "#trips?trip=42";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(route.query).toBe("trip=42");
+    paneServer();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    expect(await within(pane).findByRole("heading", { level: 1, name: "Next up" })).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 300));
+    expect(pane).toHaveTextContent("Next up");
+    expect(pane).not.toHaveTextContent("Long ago");
+  });
+
+  it("has no pane, and runs the past cards two across, when nothing is coming up", async () => {
+    panes.two = true;
+    serve([pastTrip]);
+    render(Trips);
+    expect((await screen.findByRole("list", { name: "Past trips in 2026" })).className).toContain("grid-cols-2");
+    expect(screen.queryByRole("region", { name: "Selected trip" })).toBeNull();
+  });
+
+  it("keeps the past cards in one column beside the pane", async () => {
+    panes.two = true;
+    paneServer();
+    render(Trips);
+    await screen.findByRole("region", { name: "Selected trip" });
+    expect(screen.getByRole("list", { name: "Past trips in 2026" }).className).not.toContain("grid-cols-2");
   });
 });
 
@@ -937,5 +1237,139 @@ describe("trip cards on a phone and in two panes", () => {
     expect(first.className).not.toContain("border-primary/35");
     expect(within(first).queryByTestId("pill")).toBeNull();
     expect(link("Trip to Auckland")).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("going back to the list", () => {
+  const flown = (id: number, name: string, start: string, end: string) =>
+    trip([segment({ id: id * 10, trip_id: id, start_local: `${start}T09:00`, end_local: `${end}T10:00` })], { id, name, destination: "Nags Head, NC" });
+  const years = () => [flown(1, "Beach", "2026-08-08", "2026-08-15"), flown(3, "New Year", "2025-12-29", "2026-01-03"), flown(4, "Old", "2024-06-01", "2024-06-02")];
+  const scrolled = (y: number) => {
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+    window.dispatchEvent(new Event("scroll"));
+  };
+  let scrollTo: ReturnType<typeof vi.fn>;
+  const onPage = (page: string) => waitFor(() => expect(route.page).toBe(page));
+
+  beforeEach(async () => {
+    viewport.phone = true;
+    scrollTo = vi.fn();
+    window.scrollTo = scrollTo as never;
+    serve(years());
+    await onPage("trips");
+  });
+  afterEach(async () => {
+    scrolled(0);
+    location.hash = "#upcoming";
+    await onPage("upcoming");
+  });
+
+  async function leaveFor(entry: string) {
+    const first = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    await user().click(screen.getByRole("button", { name: "Show more" }));
+    await screen.findByRole("list", { name: "Past trips in 2025" });
+    scrolled(640);
+    location.hash = entry;
+    await onPage("trip");
+    first.unmount();
+  }
+
+  it("comes back to the same scroll position with the years that were loaded", async () => {
+    await leaveFor("#trip/3");
+    history.back();
+    await onPage("trips");
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+  });
+
+  it("starts at the top, with one year, when the Trips tab is tapped from the trip", async () => {
+    await leaveFor("#trip/3");
+    location.hash = "#trips";
+    await onPage("trips");
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("starts at the top on a fresh visit after the saved position was left behind", async () => {
+    await leaveFor("#trip/3");
+    history.back();
+    await onPage("trips");
+    history.back();
+    await onPage("upcoming");
+    location.hash = "#trips";
+    await onPage("trips");
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("puts the list column of two panes back where it was scrolled to", async () => {
+    panes.two = true;
+    viewport.phone = false;
+    const everyTrip = [london, auckland, ...years()];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (numbers(path)) return numbers(path) as never;
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      if (path === "/api/photos/trip-covers") return { trips: [] } as never;
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one) return everyTrip.find((t) => t.id === Number(one[1]));
+      return { trips: everyTrip };
+    });
+    const first = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    const column = screen.getByRole("list", { name: "Past trips in 2026" }).closest(".overflow-y-auto") as HTMLElement;
+    Object.defineProperty(column, "scrollTop", { value: 300, configurable: true });
+    column.dispatchEvent(new Event("scroll"));
+    location.hash = "#trip/3";
+    await onPage("trip");
+    first.unmount();
+    history.back();
+    await onPage("trips");
+    const columnScroll = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    render(Trips);
+    await waitFor(() => expect(columnScroll).toHaveBeenCalledWith(0, 300));
+    columnScroll.mockRestore();
+  });
+
+  it("keeps the first list's position when a second visit to Trips is made and left in between", async () => {
+    await leaveFor("#trip/3");
+    location.hash = "#trips";
+    await onPage("trips");
+    const second = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    scrolled(90);
+    location.hash = "#trip/1";
+    await onPage("trip");
+    second.unmount();
+    history.back();
+    await onPage("trips");
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trip/3"));
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trips"));
+    await waitFor(() => expect(route.page).toBe("trips"));
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+  });
+
+  it("takes the in-app back link as going back, and leaves it a plain link when there is nothing to go back to", async () => {
+    await leaveFor("#trip/3");
+    const click = new MouseEvent("click", { cancelable: true, button: 0 });
+    backToTrips(click);
+    expect(click.defaultPrevented).toBe(true);
+    await onPage("trips");
+    render(Trips);
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+    const plain = new MouseEvent("click", { cancelable: true, button: 0 });
+    backToTrips(plain);
+    expect(plain.defaultPrevented).toBe(false);
   });
 });

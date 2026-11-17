@@ -8,7 +8,7 @@ vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$li
 import { api } from "$lib/api";
 import type { PhotoCluster, TripPhoto, TripPhotos, TripPlaces } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
-import { forgetMapkit } from "$lib/mapkit";
+import { forgetMapkit, loadMapkit } from "$lib/mapkit";
 import { stopsOf } from "$lib/route-replay";
 import { fake, fakeMaps, fakeMk } from "../../test/fake-mapkit";
 import { clearRouteCache } from "$lib/driving-routes";
@@ -205,6 +205,33 @@ describe("RouteReplay with the flag on", () => {
     expect(screen.getByRole("list", { name: "Stops in order" })).toBeTruthy();
   });
 
+  it("falls back to the flat map when MapKit failed in the background before the replay opened", async () => {
+    const preload = loadMapkit();
+    await loadScript();
+    await preload;
+    fake.emit("error", { status: "Unauthorized" });
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+    await waitFor(() => expect(svg(container)).toBeTruthy());
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
+    expect(fake.maps).toHaveLength(0);
+    expect(fake.directions.calls).toHaveLength(0);
+  });
+
+  it("uses MapKit again for a replay that opens after a failure and a later token refresh", async () => {
+    const preload = loadMapkit();
+    await loadScript();
+    await preload;
+    fake.emit("error", { status: "Unauthorized" });
+    const done = vi.fn();
+    fake.inits[0].authorizationCallback(done);
+    await waitFor(() => expect(done).toHaveBeenCalledWith("a.b.c"));
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(svg(container)).toBeNull();
+    expect(fake.maps).toHaveLength(1);
+  });
+
   it("falls back to the flat map when the script can't be loaded", async () => {
     const { container } = render(RouteReplay, { trip: trip(flights), now: after });
     await waitFor(() => expect(scripts).toHaveLength(1));
@@ -252,6 +279,17 @@ describe("RouteReplayMap on MapKit", () => {
     expect(maps.watching()).toBe(0);
   });
 
+  it("builds no Apple map and asks Apple for no directions when MapKit has already failed", async () => {
+    const maps = fakeMaps();
+    maps.fail();
+    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false, maps });
+    await waitFor(() => expect(svg(container)).toBeTruthy());
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
+    expect(fake.maps).toHaveLength(0);
+    expect(fake.directions.calls).toHaveLength(0);
+    expect(maps.watching()).toBe(0);
+  });
+
   it("takes the map down when the replay goes away", () => {
     const maps = fakeMaps();
     const view = render(RouteReplayMap, { stops, year: 2025, still: true, maps });
@@ -278,7 +316,7 @@ describe("photo pins and Apple's map", () => {
   });
 
   it("does not rebuild Apple's map when the clusters are read again at the same places, and rebuilds it when they move", async () => {
-    render(MapKitClusters, { maps: fakeMaps(), stops, roads: places.roads, boundaries: places.boundaries });
+    render(MapKitClusters, { maps: fakeMaps(), stops, roads: places.roads });
     await waitFor(() => expect(fake.maps).toHaveLength(1));
     await fireEvent.click(screen.getByRole("button", { name: "same" }));
     expect(fake.maps).toHaveLength(1);
@@ -329,5 +367,20 @@ describe("photo pins and Apple's map", () => {
   it("does not use a handle it is given for a map with no route", () => {
     const { container } = render(RouteReplayMap, { stops: [], year: 2025, maps: fakeMaps(), infos: [] });
     expect(container.querySelector("[data-mapkit]")).toBeNull();
+  });
+});
+
+describe("state lines and Apple's map", () => {
+  it("draws no state lines on Apple's map and lists none in its key, and the flat map's lines and key entry come back when MapKit fails", async () => {
+    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mapkit/token" ? token : { ...places, boundaries: [{ points: [[37.0, -109.05], [41.0, -109.05]] }] }) as never);
+    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
+    await loadScript();
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect([...fake.last().overlays].filter((o) => (o as { options: { style?: { options: { lineDash?: unknown } } } }).options.style?.options.lineDash)).toHaveLength(0);
+    expect(screen.getByLabelText("Map key").textContent).not.toContain("State line");
+    fake.emit("error", { status: "Unauthorized" });
+    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeNull());
+    expect(container.querySelectorAll("[data-testid='state-lines'] path")).toHaveLength(1);
+    expect(screen.getByLabelText("Map key").textContent).toContain("State line");
   });
 });

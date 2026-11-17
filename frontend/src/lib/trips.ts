@@ -133,6 +133,53 @@ export function bookingCards(segments: Segment[]): Card[] {
   return cards;
 }
 
+export type BookingGroup = { key: string; heading: string; cards: Card[] };
+
+const wholeTrip = (s: Segment): boolean => s.kind === "car" && !sameDay(s);
+const startDay = (s: Segment): string => s.start_local.slice(0, 10);
+
+export function bookingGroups(segments: Segment[]): BookingGroup[] {
+  const cards = bookingCards(segments).sort((a, b) => a.lead.start_local.localeCompare(b.lead.start_local));
+  const whole = cards.filter((c) => wholeTrip(c.lead));
+  const other = cards.filter((c) => !wholeTrip(c.lead) && c.lead.kind === "parking");
+  const days = new Map<string, Card[]>();
+  for (const card of cards) {
+    if (wholeTrip(card.lead) || card.lead.kind === "parking") continue;
+    days.set(startDay(card.lead), [...(days.get(startDay(card.lead)) ?? []), card]);
+  }
+  return [
+    ...(whole.length ? [{ key: "whole", heading: "Whole trip", cards: whole }] : []),
+    ...[...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, group]) => ({ key: day, heading: dayLabel(`${day}T00:00`), cards: group })),
+    ...(other.length ? [{ key: "other", heading: "Other", cards: other }] : []),
+  ];
+}
+
+export function bookingName(s: Segment): string {
+  if ((s.kind === "flight" || s.kind === "train") && s.origin && s.destination) return `${s.origin} to ${s.destination}`;
+  if (s.kind === "hotel") return [s.origin, s.destination].filter(Boolean).join(", ") || headline(s);
+  return headline(s);
+}
+
+function spanOf(s: Segment): string {
+  const from = dayParts(startDay(s)), to = dayParts(s.end_local.slice(0, 10));
+  const first = `${from.month} ${from.day}`;
+  if (startDay(s) === s.end_local.slice(0, 10)) return first;
+  return `${first}–${from.month === to.month ? "" : `${to.month} `}${to.day}`;
+}
+const timesOf = (s: Segment): string => (untimed(s) ? "time not recorded" : `${clock(s.start_local)} – ${clock(s.end_local)}${dayShift(s.start_local, s.end_local) ? ` ${dayShift(s.start_local, s.end_local)}` : ""}`);
+
+export function bookingDetail(card: Card, dated: boolean): string {
+  const s = card.lead;
+  const nights = nightsLabel(startDay(s), s.end_local.slice(0, 10));
+  const timed = s.kind === "flight" || s.kind === "train" || ((s.kind === "car") && sameDay(s));
+  let detail: string;
+  if (s.kind === "hotel") detail = dated ? [spanOf(s), nights].filter(Boolean).join(" · ") : ["Check in", nights].filter(Boolean).join(" · ");
+  else if (timed) detail = dated ? `${dayLabel(s.start_local)} · ${untimed(s) ? "time not recorded" : clock(s.start_local)}` : timesOf(s);
+  else if (wholeTrip(s)) detail = dated ? `Whole trip · ${spanOf(s)}` : spanOf(s);
+  else detail = s.kind === "visit" ? dayOf(s, s.start_local) : spanOf(s);
+  return card.cancelled ? `${detail} · Cancelled` : detail;
+}
+
 export type Booked = { trip: Trip; segment: Segment; bookings: Segment[] };
 export type NextUp = Booked & { state: "now" | "next"; alongside: Booked[] };
 
@@ -518,18 +565,50 @@ export function nightsWords(trip: Pick<Trip, "start_date" | "end_date">): string
 export const tripPeople = (trip: Trip): { id: number | null; name: string }[] =>
   tripTravellers(trip.segments).map((who) => ({ id: who.key.startsWith("person:") ? Number(who.key.slice(7)) : null, name: who.name }));
 
-export type YearGroup = { year: number; trips: Trip[]; totals: string };
+export type YearGroup = { year: number; trips: Trip[]; photos: number; totals: string };
 
-export function pastByYear(past: Trip[]): YearGroup[] {
+export function pastByYear(past: Trip[], photoCounts: ReadonlyMap<number, number> = new Map()): YearGroup[] {
   const groups = new Map<number, Trip[]>();
   for (const t of past) {
     const year = Number((t.start_date ?? t.end_date ?? "0000").slice(0, 4));
     groups.set(year, [...(groups.get(year) ?? []), t]);
   }
   return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([year, trips]) => {
-    const nights = trips.reduce((sum, t) => sum + (t.start_date && t.end_date ? Math.max(0, dayCount(t.start_date, t.end_date)) : 0), 0);
-    const flights = trips.reduce((sum, t) => sum + t.segments.filter((s) => s.kind === "flight" && s.status !== "cancelled").length, 0);
-    const parts = [plural(trips.length, "trip"), nights ? plural(nights, "night") : "", flights ? plural(flights, "flight") : ""];
-    return { year, trips, totals: parts.filter(Boolean).join(" · ") };
+    const photos = trips.reduce((sum, t) => sum + (photoCounts.get(t.id) ?? 0), 0);
+    return { year, trips, photos, totals: [plural(trips.length, "trip"), photos ? photoWords(photos) : ""].filter(Boolean).join(" · ") };
   });
+}
+
+const KIND_COUNT_WORDS: Record<Segment["kind"], [string, string]> = {
+  flight: ["flight", "flights"], hotel: ["stay", "stays"], car: ["car", "cars"], train: ["train", "trains"], cruise: ["cruise", "cruises"], parking: ["parking", "parking"], visit: ["visit", "visits"],
+};
+
+export function bookingCounts(trip: Pick<Trip, "segments">): { total: number; kinds: Segment["kind"][]; words: string } {
+  const live = trip.segments.filter((s) => s.status !== "cancelled");
+  const held = live.length ? live : trip.segments;
+  const kinds = KIND_ORDER.filter((k) => held.some((s) => s.kind === k));
+  const words = kinds.map((k) => { const n = held.filter((s) => s.kind === k).length; return `${n} ${KIND_COUNT_WORDS[k][n === 1 ? 0 : 1]}`; }).join(" · ");
+  return { total: held.length, kinds, words };
+}
+
+export const photoWords = (n: number): string => `${n.toLocaleString(locale())} photo${n === 1 ? "" : "s"}`;
+
+export const cardRange = (trip: Pick<Trip, "start_date" | "end_date">): string => tripRangeLabel(trip).replace(" – ", "–");
+
+export function bookingTravellers(bookings: Segment[]): { people: { id: number | null; name: string }[]; names: string } {
+  const sameTraveller = (a: Traveler, b: Traveler) => (a.person_id != null ? b.person_id === a.person_id : b.person_id == null && b.name.trim().toLowerCase() === a.name.trim().toLowerCase());
+  const people = bookings.flatMap((b) => b.travelers).filter((t, i, all) => all.findIndex((o) => sameTraveller(t, o)) === i).map((t) => ({ id: t.person_id, name: t.name }));
+  const first = people.map((p) => p.name.trim().split(/\s+/)[0]).filter(Boolean);
+  const names = first.length > 1 ? `${first.slice(0, -1).join(", ")} & ${first[first.length - 1]}` : (first[0] ?? "");
+  return { people, names };
+}
+
+export function nameList(names: string[]): string {
+  if (names.length < 2) return names.join("");
+  return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+}
+
+export function cardLabel(trip: Trip, photos: number, distance: string): string {
+  const people = nameList(tripPeople(trip).map((p) => p.name).filter(Boolean));
+  return [trip.name, cardRange(trip), nightsWords(trip), distance, photos > 0 ? photoWords(photos) : "", people].filter(Boolean).join(", ");
 }

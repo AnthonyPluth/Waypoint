@@ -320,7 +320,7 @@ def _call_endpoint(fetch: Fetch, a: dict) -> Any:
     method = str(a.get("method") or "").upper()
     path = str(a.get("path") or "").strip().lstrip("/")
     path = path[4:] if path.startswith("api/") else path
-    if method not in ("GET", "POST", "DELETE") or not path:
+    if method not in ("GET", "POST", "PUT", "DELETE") or not path:
         raise ToolError("Give a method (GET, POST or DELETE) and a path from list_endpoints, like /api/trips/12.")
     query = a.get("query") or {}
     if not isinstance(query, dict):
@@ -328,7 +328,7 @@ def _call_endpoint(fetch: Fetch, a: dict) -> Any:
     if method == "GET":
         return fetch(path, query)
     body = a.get("body") or {}
-    return fetch(path, query, body) if method == "POST" else fetch(path, query, body, "DELETE")
+    return fetch(path, query, body) if method == "POST" else fetch(path, query, body, method)
 
 
 MAIL_TOOLS: list[dict[str, Any]] = [

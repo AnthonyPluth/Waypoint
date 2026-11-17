@@ -12,7 +12,7 @@
   import { tick } from "svelte";
   import { toast } from "svelte-sonner";
 
-  let { trip, dates, onsaved, editing = $bindable(false) }: { trip: Trip; dates: string; onsaved: (next: Trip) => void; editing?: boolean } = $props();
+  let { trip, dates, onsaved, editing = $bindable(false), bare = false, returnFocus = null }: { trip: Trip; dates: string; onsaved: (next: Trip) => void; editing?: boolean; bare?: boolean; returnFocus?: (() => HTMLElement | null) | null } = $props();
 
   let name = $state("");
   let destination = $state("");
@@ -34,7 +34,8 @@
   const changed = () => name.trim() !== trip.name || typed !== savedDestination() || (hasNotes && notes !== (trip.notes ?? ""));
 
   const close = () => { editing = false; error = ""; };
-  const back = async () => { close(); await tick(); pencil?.focus(); };
+  const opener = () => pencil ?? returnFocus?.() ?? null;
+  const back = async () => { close(); await tick(); opener()?.focus(); };
   const guard = draftGuard({ dirty: () => editing && changed(), saving: () => saving, discard: back });
   const cancel = () => leave(back, [guard]);
   $effect(() => {
@@ -45,7 +46,7 @@
     return () => form.removeEventListener("keydown", escape);
   });
 
-  async function open() {
+  export async function open() {
     name = trip.name;
     destination = savedDestination();
     hasNotes = !!trip.notes;
@@ -71,7 +72,7 @@
       toast.success("Saved");
       onsaved(next);
       await tick();
-      pencil?.focus();
+      opener()?.focus();
     }, { busy: (on) => (saving = on), onError: (m) => (error = m) });
   };
 
@@ -81,13 +82,13 @@
   }, { busy: (on) => (suggesting = on) });
 </script>
 
-{#if !editing}
+{#if !editing && !bare}
   <div class="flex items-start gap-2">
     <h1 class="break-words text-display">{trip.name}</h1>
     <Button bind:ref={pencil} variant="ghost" size="icon" class="mt-1 shrink-0" aria-label="Edit trip details" onclick={open}><Pencil /></Button>
   </div>
   <p class="min-w-0 break-words text-muted-foreground">{dates}{trip.destination ? ` · ${trip.destination}` : ""}</p>
-{:else}
+{:else if editing}
   <form class="mt-1 flex max-w-xl flex-col gap-4" onsubmit={save} aria-label="Edit trip details" bind:this={formEl}>
     <div class="flex flex-col gap-1.5">
       <label class="text-sm font-medium" for="trip-name">Name</label>
@@ -125,4 +126,4 @@
   </form>
 {/if}
 
-<DiscardDialog {guard} returnFocus={() => pencil} />
+<DiscardDialog {guard} returnFocus={opener} />

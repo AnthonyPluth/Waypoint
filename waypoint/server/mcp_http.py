@@ -25,7 +25,7 @@ NO_MAIL = ("This connection can't read email. To allow it, turn on “Read email
 REFUSALS = {mcp_access.WRITE: (READ_ONLY, WRITES_OFF), mcp_access.MAIL: (NO_MAIL, NO_MAIL)}
 OUT_OF_REACH = ("Not found: assistants can't reach mailboxes, the Review queue except through its own tools, AI settings, backups, loyalty and Known "
                 "Traveler numbers, sign-in, the calendar feed, notifications or the assistant settings. Use Waypoint itself for those.")
-METHODS = ("GET", "POST", "DELETE")
+METHODS = ("GET", "POST", "PUT", "DELETE")
 
 
 def fetch_for(access: mcp_access.Access) -> Callable[..., Any]:

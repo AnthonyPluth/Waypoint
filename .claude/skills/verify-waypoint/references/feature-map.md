@@ -64,6 +64,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Fakes (the demo server can't):** `fake_first_run`.
 - **Drive it:** `tools/control flow first-run-scanning`; or `poetry run python run.py verify --flow first-run-scanning`.
 
+#### `flight-rows`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone, desktop.
+- **Touches:** `LHR → JFK`.
+- **Expects to see:** `Upcoming`, `IN THE AIR`, `Landing in`, `Departed`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-rows`; or `poetry run python run.py verify --flow flight-rows`.
+
 #### `more-menu`
 
 - **Starts at:** `#upcoming`.
@@ -73,6 +82,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Drive it:** `tools/control flow more-menu`; or `poetry run python run.py verify --flow more-menu`.
 - **What usually breaks:**
   - Phone only: it opens the More menu of the tab bar. At desktop width (`flow more-menu --viewport desktop`) its first step fails, because there is no More button.
+
+#### `offline-panels-app`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-panels-app`; or `poetry run python run.py verify --flow offline-panels-app`.
 
 #### `offline-trip`
 
@@ -134,6 +150,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **What usually breaks:**
   - The list loads after the heading renders (a Loading indicator first): `wait-settle`, then `snapshot`.
   - A trip's link is `#trip/<id>`; at desktop width the page shows the trip beside the list (the route becomes `#trips?trip=<id>`), so click the link and read the route in the answer.
+  - Past cards: the demo's Past list shows photo mosaics only on a signed-in session (`--signed-in jane`; local mode has no photos and draws the route-map tile). Distances and the route maps load after the cards, so `wait-settle` and then wait a few seconds before a screenshot. A past trip never opens the side pane: the pane (desktop width) shows only for a trip still to come, so filter to a year with none (`#trips?year=2025`) to see the Past cards two across.
 
 ### Flows on Trips
 
@@ -173,7 +190,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Orlando`.
+- **Touches:** `London`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow bundled-logos`; or `poetry run python run.py verify --flow bundled-logos`.
 
@@ -195,11 +212,20 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 #### `flight-card`
 
-- **Starts at:** `#trips`.
+- **Starts at:** `#trips`; goes to: `#design`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`.
-- **Expects to see:** `Trips`, `Heathrow`, `+1 day`.
+- **Expects to see:** `Trips`, `LANDED`, `+1 day`, `DELAYED 50 MIN`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 1 day before departure`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
+
+#### `flight-status`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `London`, `Back to`.
+- **Expects to see:** `Trips`, `Landing in`, `Not known yet`, `Jane`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-status`; or `poetry run python run.py verify --flow flight-status`.
 
 #### `hotel-address`
 
@@ -248,11 +274,47 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `Stats`.
 - **Drive it:** `tools/control flow past-trip-countries`; or `poetry run python run.py verify --flow past-trip-countries`.
 
+#### `past-trip-page-desktop`
+
+- **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`.
+- **Widths:** desktop, laptop.
+- **Touches:** `Replay trip`, `Position along the route`, `Show all`, `Open gallery`, `Close gallery`.
+- **Expects to see:** `Trip to Denver`, `13 photos`, `Photos by day`, `Jane Doe`, `Trip to Paris`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-trip-page-desktop`; or `poetry run python run.py verify --flow past-trip-page-desktop`.
+
+#### `past-trip-page`
+
+- **Starts at:** `#trips`; goes to: `#trip/7`, `#trip/1`, `#trip/3`.
+- **Widths:** phone, desktop.
+- **Touches:** `Trip options`, `Show all`, `Position along the route`.
+- **Expects to see:** `Trip to Denver`, `13 photos`, `Photo sharing for this trip`, `Merge another trip`, `Trip to Paris`, `Trip to Orlando`.
+- **Fakes (the demo server can't):** `fake_photo_limit`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-trip-page`; or `poetry run python run.py verify --flow past-trip-page`.
+- **What usually breaks:**
+  - A past trip with photos (the road trip), one with none (the Paris trip, whose hero is the route map with "No photos yet") and, with `fake_photo_limit`, one with two photos (the Lakeside Resort trip), then the Trip options menu, Show all days and a photo in the viewer. Needs `--signed-in jane` for `tools/control`.
+  - The map hero plays the replay on its own; the flow presses `End` on "Position along the route" before those pictures, as make verify does for the trip page, so they are the same every time.
+
+#### `past-trip-saved-route`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow past-trip-saved-route`; or `poetry run python run.py verify --flow past-trip-saved-route`.
+
+#### `past-trips-list`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`, `#trips?year=2026&q=Orlando`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`, `8`, `May 5–10`, `Oct 8–15`.
+- **Drive it:** `tools/control flow past-trips-list`; or `poetry run python run.py verify --flow past-trips-list`.
+
 #### `photos-remove`
 
 - **Starts at:** `#trips`; goes to: `#trip/7`.
 - **Widths:** phone, desktop.
-- **Expects to see:** `Remove from this trip`, `1 of 12`, `2 selected`, `10 photos from your library`, `11 photos from your library`, `12 photos from your library`, `13 photos from your library`, `Removed from this trip (1)`, `13`.
+- **Expects to see:** `Remove from this trip`, `of 12`, `12 photos from your library`, `13 photos from your library`, `Removed from this trip (1)`, `13 photos`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-remove`; or `poetry run python run.py verify --flow photos-remove`.
 
@@ -325,8 +387,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Orlando`, `Show 20`, `San Francisco (May 2025)`.
-- **Expects to see:** `Trips`, `Jane Doe`.
+- **Touches:** `Orlando`, `San Francisco (May 2025)`.
+- **Expects to see:** `Trips`, `Trip to San Francisco`.
 - **Drive it:** `tools/control flow trip-done-manage`; or `poetry run python run.py verify --flow trip-done-manage`.
 
 #### `trip-done`
@@ -367,7 +429,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`, `Orlando`, `San Francisco`.
+- **Touches:** `London`, `Quay Street Lodge`, `San Francisco`.
 - **Expects to see:** `Trips`, `Check-in`, `Pick-up`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
 
@@ -375,7 +437,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`.
+- **Touches:** `Denver`, `Replay trip`, `Position along the route`, `5 photos near Denver`.
 - **Expects to see:** `Trips`, `5 photos`.
 - **Drive it:** `tools/control flow trip-photo-pin-card-open`; or `poetry run python run.py verify --flow trip-photo-pin-card-open`.
 
@@ -383,16 +445,16 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`, `5 photos near Denver`, `Show these photos`, `Close`.
-- **Expects to see:** `Trips`, `5 photos`, `Day 1`.
+- **Touches:** `Denver`, `Replay trip`, `Position along the route`, `5 photos near Denver`, `Show these photos`.
+- **Expects to see:** `Trips`, `5 photos`.
 - **Drive it:** `tools/control flow trip-photo-pins`; or `poetry run python run.py verify --flow trip-photo-pins`.
 
 #### `trip-photos`
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Denver`, `See all`, `km from every booking`.
-- **Expects to see:** `Trips`, `13`, `Day 1`, `Far from the trip’s bookings`, `12 of 13`.
+- **Touches:** `Denver`, `Show all`, `far from every booking`.
+- **Expects to see:** `Trips`, `13 photos`, `Far from the trip’s bookings`, `of 13`.
 - **Drive it:** `tools/control flow trip-photos`; or `poetry run python run.py verify --flow trip-photos`.
 
 #### `trip-route-replay-backtrack`
@@ -440,17 +502,9 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Show 20`, `San Francisco`, `Position along the route`.
+- **Touches:** `San Francisco`, `Position along the route`.
 - **Expects to see:** `Trips`, `State line`.
 - **Drive it:** `tools/control flow trip-state-lines-flight`; or `poetry run python run.py verify --flow trip-state-lines-flight`.
-
-#### `trip-state-lines-mapkit`
-
-- **Starts at:** `#trips`.
-- **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`.
-- **Expects to see:** `Trips`, `State line`.
-- **Drive it:** `tools/control flow trip-state-lines-mapkit`; or `poetry run python run.py verify --flow trip-state-lines-mapkit`.
 
 #### `trip-state-lines`
 
@@ -508,8 +562,25 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Reach it:** not in the navigation (it keeps Trips lit); URL `#trip/<id>`, opened by clicking an item on `#trips`; it shows its photos only to a signed-in member, so control `tools/control start --signed-in jane`, then `tools/control goto trips` and `click` one.
 - **Drive it:** `tools/control start --signed-in jane`, `tools/control goto trips`, `click` an item, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="trip"` (it starts the signed-in demo server and opens the item `OPENED_PAGES` in frontend/verify/verify.mjs names).
 - **What usually breaks:**
-  - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the Photos section isn't there at all.
-  - The route replay plays on its own; press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
+  - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the page then has no hero photos and no days, and shows the route map and its replay in the hero's place.
+  - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. Its booking cards sit below the days until the Bookings sheet lands.
+  - The route replay plays on its own once it is on the page (the hero when there are no photos, or the replay that Replay trip opens); press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
+
+### Flows on trip
+
+#### `photos-sharing-button`
+
+- **Starts at:** `#trip`; goes to: `#trip/7`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Sharing`, `Photo sharing for this trip`, `13 photos from your library`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow photos-sharing-button`; or `poetry run python run.py verify --flow photos-sharing-button`.
+
+## flight (`flight`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** not in the navigation; open a trip from `#trips` and click its flight card; URL `#trip/<id>/flight/<segment id>`; control `tools/control goto trips`, then `click` a trip and `click` its flight card.
+- **Drive it:** reach it as above, then `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
 
 ## Stats (`stats`)
 
@@ -784,6 +855,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#settings`; goes to: `#settings/assistants`.
 - **Widths:** phone, desktop.
 - **Drive it:** `tools/control flow mcp-settings`; or `poetry run python run.py verify --flow mcp-settings`.
+
+#### `offline-card-app`
+
+- **Starts at:** `#settings`.
+- **Widths:** phone.
+- **Touches:** `Show all 10`.
+- **Expects to see:** `Saved 12 min ago: “Lisbon in June”, “Denver offsite”.`, `Saved just now: “Lisbon in June”.`, `and 7 more`, `Show fewer`, `Nothing is saved yet.`, `Saving your trips…`, `Couldn’t save the trips`, `Nothing is saved on this device yet.`, `The saved trips can’t be read`, `Off on this device`, `On for this device`, `REMINDERS AND CALENDAR`.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-card-app`; or `poetry run python run.py verify --flow offline-card-app`.
 
 #### `offline-settings`
 

@@ -35,7 +35,7 @@ Waypoint keeps Interstates, and US and state routes with a plain route number th
 
 ## State lines
 
-The faint dashed borders between US states that the route replay draws once the map is close enough ([Replaying a past trip’s route](/Waypoint/start/trips/#replaying-a-past-trips-route)) come from the Census Bureau’s 2024 Cartographic Boundary File for States and Equivalent Entities, at 1:5,000,000 (from its [Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html) page). Its metadata gives “Access constraints: None”: it is public domain, with no licence terms or required credit.
+The faint dashed borders between US states that the route replay draws on the bundled map once it is close enough ([Replaying a past trip’s route](/Waypoint/start/trips/#replaying-a-past-trips-route)) come from the Census Bureau’s 2024 Cartographic Boundary File for States and Equivalent Entities, at 1:5,000,000 (from its [Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html) page). Its metadata gives “Access constraints: None”: it is public domain, with no licence terms or required credit.
 
 Only the lines between two states are kept. The coast, the Great Lakes shores and the borders with Canada and Mexico are left out, since the map’s land layer already draws them, and Puerto Rico has no neighbour so it has no line. The lines are simplified to about a kilometre.
 

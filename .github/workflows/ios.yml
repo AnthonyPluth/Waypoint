@@ -6,10 +6,10 @@ name: iOS
 on:
   push:
     branches: [main]
-    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   pull_request:
     branches: [main]
-    paths: [ios/**, waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
+    paths: [ios/**, "!ios/**/*.md", waypoint/static/ios-icon-1024.png, .github/workflows/ios.yml]
   workflow_dispatch:
 
 permissions:
@@ -66,3 +66,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
+      - name: Check the app bundle holds what Capacitor needs
+        # Capacitor exits the app at launch when public/ or capacitor.config.json is missing from the bundle (a mistake in ios/project.yml once left them out).
+        working-directory: ios
+        run: |
+          app=build/Build/Products/Debug-iphonesimulator/Waypoint.app
+          [ -d "$app" ] || { echo "::error::The built app is not at $app."; exit 1; }
+          for f in public/index.html capacitor.config.json; do
+            [ -f "$app/$f" ] || { echo "::error::$f is missing from Waypoint.app. The app would exit at launch. Check the sources in ios/project.yml."; exit 1; }
+          done

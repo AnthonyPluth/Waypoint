@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offline access card in the iPhone app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f; --action: #3563e0;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8; --accent: #1a1e29; --destructive: #ff7b72;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --sidebar: #0a0c12; --sidebar-accent: #171b26; --sidebar-border: #1b1f2b;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-bad-soft: #3a1512; --status-bad-ink: #ff9d96;
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --surface-2: var(--popover); --surface-3: #1f2433;
+  --chart-3: #4fd1b0;
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --avatar-2: #14463c; --avatar-2-ink: #c9f3e6; --avatar-4: #5a3a12; --avatar-4-ink: #ffe3b3; --avatar-5: #5a2433; --avatar-5-ink: #ffd6df;
+  --map-sea: #0b0e15; --map-land: #1c2230; --map-border: #343c52; --map-visited: #3d7bc7;
+  --map-route: #8fc2ff; --map-airport: #f6b73c; --map-stay: #4fd1b0;
+  --map-photo: var(--foreground);
+  --lightbox: #030406;
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--doc-bg); }
+button, input, select { font: inherit; color: inherit; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a { color: var(--status-info-ink); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; background: color-mix(in srgb, var(--doc-bg) 88%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--doc-line); border-radius: 16px; }
+.seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--secondary); border: 1px solid var(--input); }
+.seg button { border: 0; background: transparent; border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.bar .toc { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.bar .toc a { color: var(--muted-foreground); text-decoration: none; padding: 4px 0; }
+.bar .toc a:hover { color: var(--foreground); }
+.checks { border: 1px solid var(--doc-line); border-radius: 16px; padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
+.checks h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal-ink); }
+.checks ol { list-style: decimal; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.checks li::marker { color: var(--muted-foreground); }
+.sec { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.stage { overflow-x: auto; padding-bottom: 6px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
+.fig { display: flex; flex-direction: column; gap: 8px; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec li { overflow-wrap: anywhere; }
+.spec code, .checks code, .lede code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "“" "”"; }
+
+.dev { container-type: inline-size; position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
+body.desk .dev { width: 1280px; border-radius: 14px; }
+body.desk .dev.frag { width: 960px; }
+.dev.tall { height: 844px; }
+body.desk .dev.tall { height: 800px; }
+
+.shell { display: flex; min-height: 100%; }
+.side { display: none; }
+.app { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 6px; }
+.brand { font-weight: 650; letter-spacing: -0.02em; }
+.main { padding: 8px 16px 104px; display: flex; flex-direction: column; gap: 24px; }
+.frag .main { padding: 20px 16px; }
+.tabs { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 6px 22px; background: rgb(255 255 255 / 4%); backdrop-filter: blur(28px) saturate(2) brightness(1.1); box-shadow: inset 0 1px 0 rgb(255 255 255 / 6%); z-index: 3; }
+.tabs a { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--muted-foreground); text-decoration: none; padding: 6px 0; min-height: 44px; position: relative; }
+.tabs a[aria-current] { color: var(--foreground); }
+.tabs .ic { width: 20px; height: 20px; }
+.tabs .count { position: absolute; top: 2px; left: 54%; background: var(--primary); color: var(--primary-foreground); font-size: 10px; border-radius: 99px; padding: 0 5px; }
+@container (min-width: 768px) {
+  .side { display: flex; flex-direction: column; gap: 4px; width: 232px; flex: none; background: var(--sidebar); border-right: 1px solid var(--sidebar-border); padding: 20px 12px; }
+  .side .brand { padding: 0 10px 14px; }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--muted-foreground); text-decoration: none; font-size: 14px; font-weight: 500; }
+  .side a[aria-current] { background: var(--sidebar-accent); color: var(--foreground); }
+  .side .count { margin-left: auto; background: var(--primary); color: var(--primary-foreground); font-size: 11px; border-radius: 99px; padding: 0 7px; font-weight: 600; }
+  .tabs, .top .brand { display: none; }
+  .top { justify-content: flex-end; padding: 16px 40px 0; }
+  .main { padding: 12px 40px 56px; max-width: 920px; width: 100%; }
+  .frag .main { padding: 28px 40px; }
+}
+
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; }
+.t-display { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; }
+.t-title { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.t-heading { font-size: 1.0625rem; line-height: 1.3; letter-spacing: -0.015em; font-weight: 600; }
+.t-caption { font-size: 0.8125rem; line-height: 1.4; }
+.muted { color: var(--muted-foreground); }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 14px; text-decoration: none; min-height: 44px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 14px; font-weight: 600; height: 40px; padding: 0 16px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; text-decoration: none; background: var(--primary); color: var(--primary-foreground); }
+.btn.outline { background: var(--secondary); border-color: var(--input); color: var(--foreground); }
+.btn.ghost { background: transparent; color: var(--foreground); }
+.btn.danger { background: var(--secondary); border-color: var(--input); color: var(--status-bad-ink); }
+.btn.sm { height: 34px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.btn.icon { width: 40px; padding: 0; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+@container (max-width: 767px) { .btn { min-height: 44px; } .btn.icon { min-width: 44px; } }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 99px; font-size: 12px; font-weight: 600; padding: 2px 10px; width: fit-content; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.chip.ok { background: var(--status-ok-soft); color: var(--status-ok-ink); }
+.chip.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.chip.bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.chip.info { background: var(--status-info-soft); color: var(--status-info-ink); }
+.chip.quiet { background: var(--status-quiet-soft); color: var(--status-quiet-ink); }
+.chip.small { font-size: 11px; padding: 1px 8px; }
+.avatar { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 99px; font-size: 12px; font-weight: 650; flex: none; }
+.avatar.sm { width: 24px; height: 24px; font-size: 10px; }
+.a2 { background: var(--avatar-2); color: var(--avatar-2-ink); }
+.a4 { background: var(--avatar-4); color: var(--avatar-4-ink); }
+.a5 { background: var(--avatar-5); color: var(--avatar-5-ink); }
+.rows { background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
+.rows > * + * { border-top: 1px solid var(--border); }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 56px; padding: 12px 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 14px; font-weight: 500; }
+.input { height: 42px; border-radius: 12px; border: 1px solid var(--input); background: var(--secondary); padding: 0 12px; font-size: 15px; width: 100%; min-width: 0; }
+.input.mono { font-size: 14px; }
+.kind { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--kind-stay-soft); color: var(--kind-stay); flex: none; }
+.pass { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 28px; box-shadow: var(--shadow); background: linear-gradient(165deg, color-mix(in oklab, var(--primary) 13%, var(--card)) 0%, var(--card) 62%); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+.fade { -webkit-mask-image: linear-gradient(180deg, #000 30%, transparent); mask-image: linear-gradient(180deg, #000 30%, transparent); }
+
+.px { padding-inline: 4px; }
+.cardsec { display: flex; flex-direction: column; gap: 8px; }
+.grow { min-width: 0; flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; }
+.ttl { font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.t-caption { font-size: 0.875rem; line-height: 1.45; }
+.inl { display: inline-block; vertical-align: -3px; margin-right: 6px; }
+.inl .ic { width: 15px; height: 15px; }
+.sw { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; min-height: 44px; flex: none; cursor: pointer; }
+.sw .track { width: 46px; height: 28px; border-radius: 99px; background: var(--input); position: relative; flex: none; transition: none; }
+.sw .thumb { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 99px; background: var(--foreground); }
+.sw[aria-checked="true"] .track { background: var(--primary); }
+.sw[aria-checked="true"] .thumb { left: 21px; background: var(--primary-foreground); }
+.sw[data-busy="1"] { opacity: 0.6; cursor: default; }
+.spin .ic { animation: none; }
+.link { background: none; border: 0; padding: 0; color: var(--status-info-ink); text-decoration: underline; text-underline-offset: 2px; font-size: 14px; text-align: left; width: fit-content; min-height: 28px; cursor: pointer; }
+.tripl { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--muted-foreground); padding-left: 0; }
+.tripl li::before { content: "·"; margin-right: 8px; }
+.btn.dang { background: var(--destructive); color: #1a0705; }
+.btn.wide { width: 100%; }
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / 60%); z-index: 4; }
+.dlg { position: absolute; z-index: 5; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(340px, calc(100% - 32px)); background: var(--popover); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--elevation-3); padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.dlg p { font-size: 14px; }
+.dlgb { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+.dev.frag.dim { min-height: 440px; }
+.pnl { max-width: 62ch; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; font-size: 14px; display: flex; gap: 8px; align-items: flex-start; }
+.pnl p { min-width: 0; overflow-wrap: anywhere; }
+.pnl .mut { color: var(--muted-foreground); margin-top: 3px; }
+.pnl a { color: var(--foreground); text-underline-offset: 2px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.native { min-height: 560px; display: grid; place-items: center; padding: 24px; background: var(--background); }
+.nat-in { display: flex; flex-direction: column; gap: 12px; align-items: center; text-align: center; max-width: 300px; }
+.nat-ic { width: 64px; height: 64px; border-radius: 99px; background: var(--secondary); display: grid; place-items: center; color: var(--muted-foreground); }
+.ic.big { width: 30px; height: 30px; }
+.proposed { color: var(--signal-ink); background: var(--signal-soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.tag { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--signal-ink); }
+.qs { counter-reset: q; display: flex; flex-direction: column; gap: 14px; max-width: 980px; padding: 0; }
+.qs > li { counter-increment: q; border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px 14px 52px; position: relative; background: var(--card); display: flex; flex-direction: column; gap: 6px; }
+.qs > li::before { content: counter(q); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 8px; background: var(--signal-soft); color: var(--signal-ink); font-family: var(--mono); font-size: 13px; display: grid; place-items: center; }
+.qs b { font-weight: 650; }
+.qs ul { list-style: disc; padding-left: 1.2em; display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--muted-foreground); }
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.notes > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.notes h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.notes ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.notes li { overflow-wrap: anywhere; }
+.notes code, .qs code, .lede code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.notes q { font-weight: 600; quotes: "“" "”"; }
+.dev .tabs { z-index: 3; }
+
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+ <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+ <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+ <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+ <symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+ <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></symbol>
+ <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2Z"/></symbol>
+ <symbol id="i-bag" viewBox="0 0 24 24"><rect x="5" y="7" width="14" height="14" rx="2"/><path d="M9 7V4h6v3M9 21V7M15 21V7"/></symbol>
+ <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 3.1a4 4 0 0 1 0 7.8M21 21v-2a4 4 0 0 0-3-3.9"/></symbol>
+ <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1Z"/></symbol>
+ <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+ <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+ <symbol id="i-bed" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
+ <symbol id="i-car" viewBox="0 0 24 24"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></symbol>
+ <symbol id="i-cloud-check" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.7-9h1.8a4.5 4.5 0 0 1 0 9Z"/><path d="m9 13 2 2 4-4"/></symbol>
+ <symbol id="i-drive" viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><rect x="3" y="15" width="18" height="6" rx="2"/><path d="M7 18h.01"/></symbol>
+ <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+ <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+ <symbol id="i-spin" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.2-8.55"/></symbol>
+ <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+ <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+ <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></symbol>
+ <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4M9 14h.01M15 14h.01"/></symbol>
+ <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+</defs></svg>
+
+<div class="doc">
+  <header class="dochead">
+    <p class="eyebrow">Waypoint · signed off by the owner (2026-11-17) · issue #740, epic #734</p>
+    <h1>The Offline access card in the iPhone app</h1>
+    <p>Inside the iPhone app, saving trips is native: no passkey, no Face ID, and the copy lives in the app’s private storage. This is the Settings card that shows and switches saving, and every state it can be in. Phone width only, dark only, vector only. The decisions are in the last sections and in the README.</p>
+  </header>
+  <div class="bar">
+    <nav class="toc" aria-label="States"><a href="#place">0 In place</a><a href="#off">A Off</a><a href="#saving">B Saving</a><a href="#saved">C Saved</a><a href="#none">D Nothing yet</a><a href="#problems">E Problems</a><a href="#signedout">F Signed out</a><a href="#unsupported">G Not supported</a><a href="#panels">H Panels</a><a href="#decisions">✓ Decisions</a></nav>
+  </div>
+  <section class="sec" id="place"><div class="sechead"><span class="letter">0</span><h2>In place: Settings, Offline &amp; notifications</h2></div><p class="lede">The card keeps the app’s existing <code>rows</code> pattern and sits in the same place, first in the Offline &amp; notifications group, above the reminders. Inside the iPhone app it replaces both the passkey card and the “isn’t available” card. Shown in its most common state (saved, two trips). The states follow in A to G.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>0a · Settings › Offline &amp; notifications, inside the app</figcaption><div class="dev tall"><div class="shell"><nav class="side"><span class="brand">Waypoint</span><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-users"/></svg>People</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class="count">2</span></a><a href="#x" aria-current="page"><svg class="ic " aria-hidden="true"><use href="#i-gear"/></svg>Settings</a></nav><div class="app"><div class="top"><span class="brand">Waypoint</span></div><div class="main"><a class="back" href="#x"><svg class="ic " aria-hidden="true"><use href="#i-back"/></svg>Settings</a><h3 class="t-title">Offline &amp; notifications</h3><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device <span class="chip ok small">Saved</span></p><p class="muted t-caption names">Saved 12 min ago: “Lisbon in June”, “Denver offsite”.</p><p class="muted t-caption ">Each trip is removed 3 days after it ends.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section><section class="cardsec"><h2 class="eyebrow px">Travel reminders</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">Reminders</p><p class="muted t-caption ">Unchanged by this design: reminders and the calendar subscription sit below Offline access, as today.</p></div></div></div></section></div></div><nav class="tabs" aria-label="Main"><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-plane"/></svg>Upcoming</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-bag"/></svg>Trips</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-chart"/></svg>Stats</a><a href="#x"><svg class="ic " aria-hidden="true"><use href="#i-inbox"/></svg>Review<span class="count">2</span></a><a href="#x" aria-current="page" aria-label="More, Settings"><svg class="ic " aria-hidden="true"><use href="#i-more"/></svg>More</a></nav></div></div></figure></div></div></section><section class="sec" id="off"><div class="sechead"><span class="letter">A</span><h2>Off</h2></div><p class="lede">Saving is on by default, so this is the state of a person who switched it off. Switching off deletes the saved trips at once, with no confirmation, as in the browser. There is no setup sheet, no prompt and no device check; the switch is the whole control.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>A · Off on this device</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">Off on this device</p><p class="muted t-caption ">Your upcoming trips aren’t kept on this device. Turn saving on to open them with no connection, even in airplane mode. Anything saved before was deleted when you switched it off.</p></div><span class="sw" role="switch" aria-checked="false" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure></div></div></section><section class="sec" id="saving"><div class="sechead"><span class="letter">B</span><h2>Saving</h2></div><p class="lede">While the app is fetching the trips (the bridge status says it is saving now) the switch is disabled and the line says Saving your trips…. The card then becomes C, D or E.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>B · Saving your trips</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device</p><p class="muted t-caption live"><span class="inl spin"><svg class="ic " aria-hidden="true"><use href="#i-spin"/></svg></span>Saving your trips…</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" aria-disabled="true" tabindex="0" data-busy="1"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div></div></section></div></div></figure></div></div></section><section class="sec" id="saved"><div class="sechead"><span class="letter">C</span><h2>Saved, with the trips and when</h2></div><p class="lede">The saved trips are named with the time of the last save (“12 min ago”, the browser card’s wording), and a line says when each is removed. For many trips the list shows three names, then “and 7 more” with Show all and Show fewer. There is no Remove button: switching saving off is the only way to delete the saved trips.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>C1 · Saved, two trips</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device <span class="chip ok small">Saved</span></p><p class="muted t-caption names">Saved 12 min ago: “Lisbon in June”, “Denver offsite”.</p><p class="muted t-caption ">Each trip is removed 3 days after it ends.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure><figure class="fig"><figcaption>C2 · Saved, one trip</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device <span class="chip ok small">Saved</span></p><p class="muted t-caption names">Saved just now: “Kyoto in spring”.</p><p class="muted t-caption ">Each trip is removed 3 days after it ends.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure><figure class="fig"><figcaption>C3 · Ten trips, collapsed to three names</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device <span class="chip ok small">Saved</span></p><p class="muted t-caption names">Saved 3 hours ago: “Lisbon in June”, “Denver offsite”, “Kyoto in spring” and 7 more.</p><button class="link">Show all 10</button><p class="muted t-caption ">Each trip is removed 3 days after it ends.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure><figure class="fig"><figcaption>C4 · Ten trips, shown in full</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device <span class="chip ok small">Saved</span></p><p class="muted t-caption ">Saved 3 hours ago.</p><ul class="tripl"><li>“Lisbon in June”</li><li>“Denver offsite”</li><li>“Kyoto in spring”</li><li>“Oslo, long weekend”</li><li>“Cape Town visit”</li><li>“Lima and Cusco”</li><li>“Berlin conference”</li><li>“Hobart family trip”</li><li>“Montreal in October”</li><li>“Reykjavik stopover”</li></ul><button class="link">Show fewer</button><p class="muted t-caption ">Each trip is removed 3 days after it ends.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure></div></div></section><section class="sec" id="none"><div class="sechead"><span class="letter">D</span><h2>On, nothing saved yet</h2></div><p class="lede">The first state of a new install: saving is on but the first save happens at the first online open after signing in. The same words cover a phone with no upcoming trip, and one whose saved trips all ended more than 3 days ago and were removed.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>D · On, nothing saved</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">On for this device</p><p class="muted t-caption ">Nothing is saved yet. Your trips under way or starting within a week, and your next upcoming trip, are saved when you open Waypoint online.</p><p class="muted t-caption ">The first save happens when you open Waypoint online after signing in.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div><div class="row"><div class="grow"><p class="muted t-caption">The saved copy can be part of your iCloud and computer backups.</p></div></div></div></section></div></div></figure></div></div></section><section class="sec" id="problems"><div class="sechead"><span class="letter">E</span><h2>Problems</h2></div><p class="lede">A failed save keeps the older copy (the app never replaces a good copy with nothing) and is tried again at the next online open. A copy that can’t be read is deleted by switching saving off, then on. Both use the bridge’s new status flags (see the README).</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>E1 · Couldn’t save, an older copy is kept</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">Couldn’t save the trips <span class="chip bad small">Not updated</span></p><p class="muted t-caption ">The copy from 2 hours ago is still there: “Lisbon in June”, “Denver offsite”.</p><p class="muted t-caption ">Saving is tried again each time you open Waypoint online.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div></div></section></div></div></figure><figure class="fig"><figcaption>E2 · Couldn’t save, nothing saved yet</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">Couldn’t save the trips <span class="chip bad small">Not saved</span></p><p class="muted t-caption ">Nothing is saved on this device yet.</p><p class="muted t-caption ">Saving is tried again each time you open Waypoint online.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div></div></section></div></div></figure><figure class="fig"><figcaption>E3 · The saved trips can’t be read</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">The saved trips can’t be read <span class="chip bad small">Damaged</span></p><p class="muted t-caption ">Switch saving off to delete them, then switch it on again to save your trips afresh.</p></div><span class="sw" role="switch" aria-checked="true" aria-label="Save my upcoming trips" tabindex="0" data-busy="0"><span class="track"><span class="thumb"></span></span><span class="swl">Save my upcoming trips</span></span></div></div></section></div></div></figure></div></div></section><section class="sec" id="signedout"><div class="sechead"><span class="letter">F</span><h2>Signed out</h2></div><p class="lede">Settings can’t be opened while signed out, so there is no card. Signing out deletes the saved trips, and the app’s sign-out screen says so. After signing in again, saving is on.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>F · The app’s signed-out screen</figcaption><div class="dev frag"><div class="native"><div class="nat-in"><span class="nat-ic"><svg class="ic big" aria-hidden="true"><use href="#i-cloud-check"/></svg></span><h3 class="t-title">You are signed out of Waypoint.</h3><p class="muted">Sign in again to see your trips.</p><p class="muted">Saved trips were removed from this device.</p><button class="btn wide">Sign in</button></div></div></div></figure></div></div></section><section class="sec" id="unsupported"><div class="sechead"><span class="letter">G</span><h2>Not supported</h2></div><p class="lede">In a browser, including Safari on an iPhone, the card is exactly as today and its wording is not touched (shown for reference). An installed app too old to have the offline bridge shows no Offline access card at all.</p><div class="stage"><div class="frames"><figure class="fig"><figcaption>G · In a browser, unchanged</figcaption><div class="dev frag "><div class="main"><section class="cardsec" aria-labelledby="offline-title"><h2 id="offline-title" class="eyebrow px">Offline access</h2><div class="rows"><div class="row"><div class="grow"><p class="ttl">Offline access isn’t available on this device</p><p class="muted t-caption ">This browser can’t keep an encrypted copy on the device, so nothing is saved for offline use.</p><p class="muted t-caption ">Waypoint works online as always.</p></div><span class="chip quiet">Unavailable</span></div></div></section></div></div></figure></div></div></section><section class="sec" id="panels"><div class="sechead"><span class="letter">H</span><h2>Upcoming and the trip page</h2></div><p class="lede">These panels read the same state as the card and keep their layout; only the wording changes inside the app (“this device”, no Face ID, no passkey). The green Saved for offline pill is unchanged. Shown in the order saved, trip not saved, off, nothing yet, can’t be read.</p><div class="stage"><div class="frames"><div class="dev frag"><div class="main"><div class="stack"><section class="pnl" aria-label="Offline access"><svg class="ic mut" aria-hidden="true"><use href="#i-drive"/></svg><p><b>Saved on this device</b> <span class="muted">· updated 12 min ago · also saved: “Denver offsite”</span></p></section><section class="pnl" aria-label="Offline access"><svg class="ic mut" aria-hidden="true"><use href="#i-drive"/></svg><p><b>This trip isn’t saved on this device.</b> <span class="muted">Saved: “Lisbon in June”, “Denver offsite”. Only trips under way or starting within a week, and your next upcoming trip, are saved.</span></p></section><section class="pnl" aria-label="Offline access"><svg class="ic mut" aria-hidden="true"><use href="#i-drive"/></svg><p><b>Offline saving is off on this device.</b> <a href="#x">Turn it on in Settings</a>.</p></section><section class="pnl" aria-label="Offline access"><svg class="ic mut" aria-hidden="true"><use href="#i-drive"/></svg><p><b>Nothing is saved yet.</b> <span class="muted">Your trips under way or starting within a week, and your next upcoming trip, are saved when you open Waypoint online.</span></p></section><section class="pnl" aria-label="Offline access"><svg class="ic mut" aria-hidden="true"><use href="#i-drive"/></svg><p><b>The saved trips can’t be read.</b> <a href="#x">Switch saving off and on in Settings</a> to start afresh.</p></section></div></div></div></div></div></section><section class="sec" id="decisions"><div class="sechead"><span class="letter">✓</span><h2>Decisions, signed off 2026-11-17</h2></div><p class="lede">The owner’s answers to the open questions. Nothing is left open.</p><ol class="qs"><li>No Face ID: the phone’s lock is the gate. No encryption of Waypoint’s own; the files may go into iCloud and computer backups.</li><li>No Remove button. Switching saving off is the only way to delete the saved trips, and it deletes them at once.</li><li>The card says “this device”, not “this iPhone”.</li><li>The card keeps the line that the saved copy can be part of iCloud and computer backups.</li><li>No prompt to offer saving. Saving is on by default for a new install and can be switched off in Settings; the very first save happens at the first online open after signing in.</li><li>The bridge’s status reply gains two flags, “saving now” and “last save failed”, so states B and E are real (shape in the README).</li><li>The signed-out screen says “Saved trips were removed from this device.”</li><li>After signing in again, saving is on.</li><li>An app too old for the bridge shows no Offline access card. Real browsers keep today’s card unchanged.</li><li>Phone width is the only width that ships.</li><li>Ten saved trips show three names, then “and 7 more” with Show all.</li><li>The card carries no sentence about how the trips are stored; that explanation lives in the docs. The backups line stays. Signed off with this change on 2026-11-17.</li></ol></section><section class="sec" id="notes"><div class="sechead"><span class="letter">i</span><h2>Notes</h2></div><p class="lede">Accessible names and what is reused.</p><div class="notes">
+<div><h3>Accessible names</h3><ul>
+<li>Section: <q>Offline access</q> (heading).</li>
+<li>Status line: <q>On for this device</q>, <q>Off on this device</q>, <q>Couldn’t save the trips</q>, <q>The saved trips can’t be read</q>. The chip repeats the state in words, never by colour alone.</li>
+<li>Switch: <code>role="switch"</code>, name <q>Save my upcoming trips</q>, 44 px touch target. Disabled while saving.</li>
+<li>Saving line is <code>aria-live="polite"</code>; the result (saved or failed) is announced there.</li>
+</ul></div>
+<div><h3>Tokens and components</h3><ul>
+<li>Only existing tokens: <code>--card</code>, <code>--border</code>, <code>--primary</code>, <code>--status-ok-*</code>, <code>--status-bad-*</code>, <code>--muted-foreground</code>. No new token.</li>
+<li>Components: the app’s <code>rows</code> and <code>row</code>, the existing switch input and the status chip as in the other Settings cards. No dialog and no button on the card.</li>
+<li>Icons are the app’s lucide set: <code>hard-drive-download</code>, <code>loader-circle</code>.</li>
+</ul></div>
+<div><h3>What does not change</h3><ul>
+<li>In a browser, the card, the passkey sheet and every word are as today.</li>
+<li>No Face ID, no passkey, no device check anywhere in the app’s card.</li>
+<li>Reminders and the calendar subscription below the card.</li>
+<li>Every name, trip and time in these frames is made up.</li>
+</ul></div>
+</div></section>
+</div>
+</body>
+</html>

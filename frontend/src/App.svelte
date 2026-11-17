@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ignoreFailure } from "$lib/act";
   import { signInUrl } from "$lib/api";
-  import { app, boot, route } from "$lib/app.svelte";
+  import { app, boot, layout, route } from "$lib/app.svelte";
   import SideNav from "$lib/components/SideNav.svelte";
   import TabBar from "$lib/components/TabBar.svelte";
   import TopBar from "$lib/components/TopBar.svelte";
@@ -10,13 +10,14 @@
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
   import { anyDirty } from "$lib/drafts.svelte";
+  import { preloadMapkit } from "$lib/mapkit";
   import { pageFor } from "$lib/nav";
   import Upcoming from "./pages/Upcoming.svelte";
   import { Toaster } from "svelte-sonner";
   import type { Component } from "svelte";
 
   const LAZY: Record<string, () => Promise<{ default: Component }>> = {
-    trips: () => import("./pages/Trips.svelte"), stats: () => import("./pages/Stats.svelte"), trip: () => import("./pages/Trip.svelte"),
+    trips: () => import("./pages/Trips.svelte"), stats: () => import("./pages/Stats.svelte"), trip: () => import("./pages/Trip.svelte"), flight: () => import("./pages/FlightStatus.svelte"),
     people: () => import("./pages/People.svelte"), review: () => import("./pages/Review.svelte"), settings: () => import("./pages/Settings.svelte"),
     design: () => import("./pages/Design.svelte"),
   };
@@ -25,7 +26,7 @@
   let pageFailed = $state(false);
 
   $effect(() => {
-    const key = pageFor(route.page);
+    const key = pageFor(route.page, route.rest);
     pageFailed = false;
     if (loaded[key]) { Page = loaded[key]; return; }
     Page = null;
@@ -43,6 +44,12 @@
     return () => window.clearTimeout(handle);
   }
 
+  const mapkitOn = $derived(!!app.state?.user && app.state.mapkit === true && !app.offline);
+  $effect(() => {
+    if (!mapkitOn) return;
+    return preloadMapkit();
+  });
+
   $effect(() => {
     if (!app.state) return;
     return whenIdle(() => Object.values(LAZY).forEach((load) => void load().catch(ignoreFailure)));
@@ -54,7 +61,7 @@
   <div class="flex flex-1">
     <SideNav />
     <main class="min-w-0 flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+7rem)] md:px-8 md:pt-8 lg:pb-12">
-      <div class={`mx-auto max-w-3xl ${route.page === "trips" ? "lg:max-w-6xl 2xl:max-w-[90rem]" : route.page === "settings" || route.page === "upcoming" ? "lg:max-w-5xl" : ""}`}>
+      <div class={`mx-auto max-w-3xl ${route.page === "trips" ? "lg:max-w-6xl 2xl:max-w-[90rem]" : route.page === "settings" || route.page === "upcoming" ? "lg:max-w-5xl" : pageFor(route.page, route.rest) === "trip" && layout.wide ? "lg:max-w-[80rem]" : pageFor(route.page, route.rest) === "flight" ? "lg:max-w-[60rem]" : ""}`}>
         {#if app.sessionExpired}
           <Alert.Root class="sticky top-[calc(env(safe-area-inset-top)+4rem)] lg:top-4 z-20 mb-4 flex flex-wrap items-center justify-between gap-3 border-signal bg-signal-soft text-signal-ink shadow-lg">
             <Alert.Description class="text-signal-ink">

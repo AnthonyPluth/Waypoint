@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cameraAt, inView, legsOf, moverAt, planeAt, positions, retraceFor, roadFor, roadShapes, roadsShown, routeProjection, shieldsOf, MAX_SHIELDS, type Roads, type Stop } from "./route-replay";
+import { cameraAt, inView, legsOf, moverAt, planeAt, positions, retraceFor, roadFor, routeProjection, type Roads, type Stop } from "./route-replay";
 
 const stopAt = (name: string, latitude: number, longitude: number, via: Stop["via"] = null, kind: Stop["kind"] = "stay"): Stop =>
   ({ name, city: name, code: null, kind, latitude, longitude, from: "2025-12-05T15:00", to: "2025-12-06T11:00", via });
@@ -102,38 +102,13 @@ describe("legs that follow the interstates", () => {
   });
 });
 
-describe("the interstate layer", () => {
-  const projection = project([denver, saltLake]);
-  const shapes = roadShapes(roads.interstates, projection);
-
-  it("projects each road line with its extent and middle", () => {
-    expect(shapes.map((s) => s.ref)).toEqual(["I-25", "I-80"]);
-    expect(shapes[0].d.startsWith("M")).toBe(true);
-    expect(shapes[0].right).toBeGreaterThanOrEqual(shapes[0].left);
-    expect(shapes[0].length).toBeGreaterThan(0);
-    expect(roadShapes([{ ref: "I-1", points: [[40, -100]] }], projection)).toEqual([]);
-  });
+describe("the camera's view of a line", () => {
+  const line = { left: 100, top: 100, right: 200, bottom: 160 };
 
   it("keeps only the lines within the camera", () => {
-    expect(shapes.every((s) => inView(s, { x: 0, y: 0, w: 960, h: 520 }))).toBe(true);
-    expect(inView(shapes[0], { x: shapes[0].right + 50, y: shapes[0].bottom + 50, w: 100, h: 100 })).toBe(false);
-    expect(inView(shapes[0], { x: shapes[0].left - 10, y: shapes[0].top - 10, w: 20, h: 20 })).toBe(true);
-  });
-
-  it("draws the roads only when the map is close enough to read them", () => {
-    expect(roadsShown(projection, 1)).toBe(true);
-    const world = routeProjection([stopAt("Sydney", -33.9, 151.2), denver], 960, 520);
-    expect(roadsShown(world, 1)).toBe(false);
-    expect(roadsShown(world, 0.1)).toBe(true);
-  });
-
-  it("labels a few roads, each well apart from the others", () => {
-    const box = { x: 0, y: 0, w: 960, h: 520 };
-    expect(shieldsOf(shapes, box, 1).map((s) => s.ref).sort()).toEqual(["I-25", "I-80"]);
-    expect(shieldsOf([...shapes, { ...shapes[0] }], box, 1)).toHaveLength(2);
-    const many = Array.from({ length: 30 }, (_, i) => ({ ...shapes[0], ref: `I-${i}`, mid: { x: 20 + i * 30, y: 20 + (i % 3) * 200 } }));
-    expect(shieldsOf(many, box, 1).length).toBeLessThanOrEqual(MAX_SHIELDS);
-    expect(shieldsOf([{ ...shapes[0], mid: { x: 2, y: 2 } }], box, 1)).toEqual([]);
+    expect(inView(line, { x: 0, y: 0, w: 960, h: 520 })).toBe(true);
+    expect(inView(line, { x: line.right + 50, y: line.bottom + 50, w: 100, h: 100 })).toBe(false);
+    expect(inView(line, { x: line.left - 10, y: line.top - 10, w: 20, h: 20 })).toBe(true);
   });
 });
 

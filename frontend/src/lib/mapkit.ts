@@ -31,9 +31,10 @@ export type Mk = {
   Style: new (options: Record<string, unknown>) => object;
   Directions?: { new (options?: Record<string, unknown>): MkDirections; Transport: { Automobile: unknown } };
 };
-export type Maps = { mk: Mk; onFailure(listener: () => void): () => void };
+export type Maps = { mk: Mk; failed(): boolean; onFailure(listener: () => void): () => void };
 
 export const LOAD_MS = 6000;
+export const RETRY_MS = 30000;
 
 declare global {
   interface Window { mapkit?: Mk }
@@ -58,27 +59,38 @@ function scriptAt(src: string, timeoutMs: number): Promise<Mk | null> {
 }
 
 async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
-  const first = await apiCall<"GET /api/mapkit/token">("/api/mapkit/token").catch(() => null);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const silent = new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), LOAD_MS); });
+  const first = await Promise.race([apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true, background: true }).catch(() => null), silent]);
+  clearTimeout(timer);
   if (first?.enabled !== true || !first.script) return { maps: null, remember: first?.enabled === false };
   const mk = window.mapkit ?? (await scriptAt(first.script, LOAD_MS));
   if (!mk) return { maps: null, remember: false };
   const listeners = new Set<() => void>();
-  const fail = () => { for (const l of [...listeners]) l(); };
+  let failedAt: number | null = null;
+  const failed = () => failedAt !== null && Date.now() - failedAt < RETRY_MS;
+  const fail = () => { failedAt = Date.now(); for (const l of [...listeners]) l(); };
+  const recover = () => { failedAt = null; };
   try {
     mk.init({
       authorizationCallback: (done) => {
-        apiCall<"GET /api/mapkit/token">("/api/mapkit/token").then(
-          (next) => { if (next?.enabled === true && next.token) done(next.token); else fail(); },
+        apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true, background: true }).then(
+          (next) => { if (next?.enabled === true && next.token) { recover(); done(next.token); } else fail(); },
           fail,
         );
       },
       language: typeof navigator !== "undefined" ? navigator.language : undefined,
     });
     mk.addEventListener("error", fail);
+    mk.addEventListener("configuration-change", (event) => { if (event.status === "Initialized") recover(); });
   } catch {
     return { maps: null, remember: false };
   }
-  return { maps: { mk, onFailure: (l) => { listeners.add(l); return () => { listeners.delete(l); }; } }, remember: true };
+  return { maps: { mk, failed, onFailure: (l) => {
+    listeners.add(l);
+    if (failed()) queueMicrotask(() => { if (listeners.has(l)) l(); });
+    return () => { listeners.delete(l); };
+  } }, remember: true };
 }
 
 export function loadMapkit(): Promise<Maps | null> {
@@ -92,3 +104,22 @@ export function loadMapkit(): Promise<Maps | null> {
 }
 
 export const forgetMapkit = (): void => { session = null; };
+
+export const PRELOAD_MS = 4000;
+let preloaded = false;
+
+export function preloadMapkit(): () => void {
+  let idle: number | undefined;
+  const run = () => {
+    if (preloaded) return;
+    preloaded = true;
+    void loadMapkit();
+  };
+  const timer = setTimeout(() => {
+    if (typeof window.requestIdleCallback === "function") idle = window.requestIdleCallback(run, { timeout: 5000 });
+    else run();
+  }, PRELOAD_MS);
+  return () => { clearTimeout(timer); if (idle !== undefined) window.cancelIdleCallback(idle); };
+}
+
+export const forgetPreload = (): void => { preloaded = false; };

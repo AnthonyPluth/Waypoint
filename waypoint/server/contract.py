@@ -333,6 +333,7 @@ class OfflineTrip(TypedDict):
 
 
 class Offline(TypedDict):
+    version: int
     trips: list[OfflineTrip]
 
 
@@ -578,6 +579,40 @@ class TripPlaces(TypedDict):
     stays: list[TripStayPoint]
     roads: TripRoads
     boundaries: list[TripStateLine]
+
+
+class DrivingPlace(TypedDict):
+    latitude: float
+    longitude: float
+
+
+class DrivingRoute(TypedDict):
+    start: DrivingPlace
+    end: DrivingPlace
+    path: list[list[float]]
+
+
+class DrivingRoutes(TypedDict):
+    routes: list[DrivingRoute]
+
+
+class TripDrivingRoutes(TypedDict):
+    trip_id: int
+    routes: list[DrivingRoute]
+
+
+class DrivingRoutesForTrips(TypedDict):
+    trips: list[TripDrivingRoutes]
+
+
+class DrivingRouteBody(TypedDict):
+    start: DrivingPlace
+    end: DrivingPlace
+    path: list[list[float]]
+
+
+class DrivingRouteStored(TypedDict):
+    stored: bool
 
 
 class TripPhoto(TypedDict):

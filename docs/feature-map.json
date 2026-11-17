@@ -208,6 +208,22 @@
     },
     {
       "method": "GET",
+      "path": "/api/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_routes_for_trips",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
       "path": "/api/trips",
       "handler": "waypoint/server/api/trips.py:api_trips",
       "web": [
@@ -228,6 +244,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -252,6 +269,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -260,6 +278,7 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip",
       "web": [
+        "frontend/src/pages/FlightStatus.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
@@ -279,6 +298,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -288,13 +308,49 @@
       "handler": "waypoint/server/api/trips.py:api_trip_places",
       "web": [
         "frontend/src/lib/components/RouteReplay.svelte",
+        "frontend/src/lib/components/RouteTile.svelte",
         "frontend/src/pages/Upcoming.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_home.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_roads.py",
         "tests/test_trip_states.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/trips/{id}/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_routes",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
+        "tests/test_trips.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/trips/{id}/driving-routes",
+      "handler": "waypoint/server/api/driving_routes.py:api_driving_route_store",
+      "web": [
+        "frontend/src/lib/driving-routes.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -306,7 +362,8 @@
       "path": "/api/trips/{id}/summary",
       "handler": "waypoint/server/api/trips.py:api_trip_summary",
       "web": [
-        "frontend/src/lib/components/TripSummary.svelte"
+        "frontend/src/lib/components/TripSummary.svelte",
+        "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -334,12 +391,14 @@
         "tests/test_photo_access.py",
         "tests/test_photo_covers.py",
         "tests/test_photos_api.py",
+        "tests/test_route_cache.py",
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -357,10 +416,12 @@
         "tests/test_monitoring.py",
         "tests/test_photo_access.py",
         "tests/test_photos_api.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -407,6 +468,7 @@
         "tests/test_api_contract.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -470,7 +532,9 @@
       "method": "GET",
       "path": "/api/photos/trip-covers",
       "handler": "waypoint/server/api/photos.py:api_photo_trip_covers",
-      "web": [],
+      "web": [
+        "frontend/src/pages/Trips.svelte"
+      ],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mcp_routes.py",
@@ -967,6 +1031,7 @@
         "tests/test_offline.py",
         "tests/test_photo_sources.py",
         "tests/test_photos_api.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
@@ -988,6 +1053,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],
@@ -1093,7 +1159,8 @@
       "handler": "waypoint/server/api/stats.py:api_distance_unit",
       "web": [
         "frontend/src/lib/components/TripSummary.svelte",
-        "frontend/src/lib/components/settings/DistanceSection.svelte"
+        "frontend/src/lib/components/settings/DistanceSection.svelte",
+        "frontend/src/pages/Trips.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -1999,9 +2066,11 @@
       ],
       "tests": [
         "tests/test_api_contract.py",
+        "tests/test_app_sign_in.py",
         "tests/test_offline.py"
       ],
       "docs": [
+        "start/ios",
         "start/offline"
       ]
     }

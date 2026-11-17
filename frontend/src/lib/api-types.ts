@@ -275,6 +275,35 @@ export interface DistanceUnitBody {
   distance_unit: "mi" | "km";
 }
 
+export interface DrivingPlace {
+  latitude: number;
+  longitude: number;
+}
+
+export interface DrivingRoute {
+  start: DrivingPlace;
+  end: DrivingPlace;
+  path: number[][];
+}
+
+export interface DrivingRouteBody {
+  start: DrivingPlace;
+  end: DrivingPlace;
+  path: number[][];
+}
+
+export interface DrivingRouteStored {
+  stored: boolean;
+}
+
+export interface DrivingRoutes {
+  routes: DrivingRoute[];
+}
+
+export interface DrivingRoutesForTrips {
+  trips: TripDrivingRoutes[];
+}
+
 export interface EmailUpdate {
   at: number;
   updated: ("start_local" | "start_zone" | "end_local" | "end_zone" | "origin" | "destination")[];
@@ -550,6 +579,7 @@ export interface MoveBody {
 }
 
 export interface Offline {
+  version: number;
   trips: OfflineTrip[];
 }
 
@@ -1337,6 +1367,11 @@ export interface TripCovers {
   trips: TripCover[];
 }
 
+export interface TripDrivingRoutes {
+  trip_id: number;
+  routes: DrivingRoute[];
+}
+
 export interface TripHome {
   city: string;
   latitude: number;
@@ -1472,12 +1507,15 @@ export interface Endpoints {
   "POST /api/people/{id}/claim": { body: never; reply: Person };
   "GET /api/people/claim-suggestions": { body: never; reply: ClaimSuggestions };
   "POST /api/people/claim-suggestions/dismiss": { body: never; reply: Ok };
+  "GET /api/driving-routes": { body: never; reply: DrivingRoutesForTrips };
   "GET /api/trips": { body: never; reply: TripList };
   "POST /api/trips": { body: TripBody; reply: Trip };
   "GET /api/trips/{id}": { body: never; reply: Trip };
   "POST /api/trips/{id}": { body: TripBody; reply: Trip };
   "DELETE /api/trips/{id}": { body: never; reply: Ok };
   "GET /api/trips/{id}/places": { body: never; reply: TripPlaces };
+  "GET /api/trips/{id}/driving-routes": { body: never; reply: DrivingRoutes };
+  "PUT /api/trips/{id}/driving-routes": { body: DrivingRouteBody; reply: DrivingRouteStored };
   "GET /api/trips/{id}/summary": { body: never; reply: TripSummary };
   "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };

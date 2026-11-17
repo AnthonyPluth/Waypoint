@@ -13,12 +13,10 @@ export type Roads = TripPlaces["roads"];
 export type Boundaries = TripPlaces["boundaries"];
 export type Track = { points: Spot[]; along: number[] };
 export type Leg = { d: string; flight: boolean; vehicle: Vehicle; from: Spot; control: Spot; to: Spot; road: Track | null; refs: string[] };
-export type RoadShape = { ref: string; d: string; left: number; top: number; right: number; bottom: number; length: number; mid: Spot };
 export type Extent = { left: number; top: number; right: number; bottom: number };
 export type BoundaryShape = Extent & { d: string };
-export type Shield = { ref: string; x: number; y: number };
 export type Box = { x: number; y: number; w: number; h: number };
-type Visit = Stop & { exact?: boolean };
+type Visit = Stop & { exact?: boolean; rental?: boolean };
 type Point = { name: string; city?: string; code?: string | null; kind?: StopKind; latitude: number; longitude: number; exact?: boolean };
 
 export const MIN_SPAN_DEGREES = 10;
@@ -41,11 +39,8 @@ export const ROAD_MATCH_KM = 90;
 export const RETRACE_KM = 48.3;
 export const RETRACE_MIN_SHARE = 0.5;
 export const RETRACE_WHOLE_SHARE = 0.9;
-export const ROAD_MIN_SCALE = 800;
 export const NO_BOUNDARIES: Boundaries = [];
 export const BOUNDARY_MIN_SCALE = 500;
-export const SHIELD_GAP = 150;
-export const MAX_SHIELDS = 8;
 export const HEADING_UNITS = 6;
 
 const EARTH_KM = 6371;
@@ -105,9 +100,10 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const countries = byCountries(trip);
   const live = liveOf(trip).filter((s) => s.kind !== "parking" && (s.kind !== "visit" || countries))
     .sort((a, b) => (countries ? dateOrder(a, b) : instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id));
+  const flies = live.some((s) => s.kind === "flight");
   const out: Visit[] = [];
-  const add = (p: Point | null, from: string, to: string, via: Kind | null) => {
-    if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via });
+  const add = (p: Point | null, from: string, to: string, via: Kind | null, rental = false) => {
+    if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via, ...(rental ? { rental } : {}) });
   };
   for (const s of live) {
     if (s.kind === "flight") {
@@ -119,7 +115,7 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       const found = stay(s, s.destination) ?? city(s.destination);
       add(found && { ...found, kind: "stay", city: found.name, name: head(s.origin ?? "") || found.name }, s.start_local, s.end_local, null);
     } else if (s.kind === "car") {
-      add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null);
+      if (!flies) add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null, true);
     } else if (s.kind === "train") {
       add(city(s.origin), s.start_local, s.start_local, null);
       add(stay(s, s.destination) ?? city(s.destination), s.end_local, s.end_local, "train");
@@ -130,7 +126,7 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       add(returnsToEmbarkation ?? city(s.destination), s.end_local, s.end_local, "cruise");
     }
   }
-  return out;
+  return out.filter((v) => !v.rental || !out.some((o) => !o.rental && samePlace(v, o)));
 }
 
 const samePlace = (a: Point, b: Point): boolean =>
@@ -196,11 +192,25 @@ const lonLat = (s: Pick<Point, "latitude" | "longitude">): [number, number] => [
 
 const km = (at: number[], s: Stop): number => geoDistance([at[1], at[0]], [s.longitude, s.latitude]) * EARTH_KM;
 
+const DRIVE_DECIMALS = 4;
+type LatLon = Pick<Stop, "latitude" | "longitude">;
+export type SavedLeg = Roads["legs"][number] & { key: string };
+
+export const driveKey = (a: LatLon, b: LatLon): string =>
+  `${a.latitude.toFixed(DRIVE_DECIMALS)},${a.longitude.toFixed(DRIVE_DECIMALS)}>${b.latitude.toFixed(DRIVE_DECIMALS)},${b.longitude.toFixed(DRIVE_DECIMALS)}`;
+
+const savedKey = (leg: Roads["legs"][number]): string | null => ("key" in leg && typeof leg.key === "string" ? leg.key : null);
+
 export function roadFor(from: Stop, to: Stop, roads: Roads): Roads["legs"][number] | null {
   if (to.via !== null) return null;
   let best: Roads["legs"][number] | null = null;
   let nearest = Infinity;
   for (const leg of roads.legs) {
+    const key = savedKey(leg);
+    if (key !== null) {
+      if (key === driveKey(from, to)) return leg;
+      continue;
+    }
     const start = leg.points[0], end = leg.points.at(-1);
     if (leg.points.length < 2 || !start || !end) continue;
     const a = km(start, from), b = km(end, to);
@@ -380,25 +390,6 @@ const smooth = (t: number): number => {
   return c * c * (3 - 2 * c);
 };
 
-export function roadShapes(lines: Roads["interstates"], projection: GeoProjection): RoadShape[] {
-  const out: RoadShape[] = [];
-  for (const line of lines) {
-    const points: Spot[] = [];
-    for (const [lat, lon] of line.points) {
-      const at = projection([lon, lat]);
-      if (at) points.push({ x: at[0], y: at[1] });
-    }
-    if (points.length < 2) continue;
-    const along = [0];
-    for (let i = 1; i < points.length; i++) along.push(along[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
-    const half = along[along.length - 1] / 2;
-    const k = Math.max(1, along.findIndex((a) => a >= half));
-    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
-    out.push({ ref: line.ref, d: polyline(points), left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys), length: along[along.length - 1], mid: points[k] });
-  }
-  return out;
-}
-
 export function boundaryShapes(lines: Boundaries, projection: GeoProjection): BoundaryShape[] {
   const out: BoundaryShape[] = [];
   for (const line of lines) {
@@ -416,22 +407,7 @@ export function boundaryShapes(lines: Boundaries, projection: GeoProjection): Bo
 
 export const boundariesShown = (projection: GeoProjection, zoom: number): boolean => projection.scale() / zoom >= BOUNDARY_MIN_SCALE;
 
-export const roadsShown = (projection: GeoProjection, zoom: number): boolean => projection.scale() / zoom >= ROAD_MIN_SCALE;
-
 export const inView = (shape: Extent, box: Box): boolean => shape.right >= box.x && shape.left <= box.x + box.w && shape.bottom >= box.y && shape.top <= box.y + box.h;
-
-export function shieldsOf(shapes: RoadShape[], box: Box, zoom: number): Shield[] {
-  const gap = SHIELD_GAP * zoom;
-  const out: Shield[] = [];
-  for (const shape of [...shapes].sort((a, b) => b.length - a.length)) {
-    if (out.length >= MAX_SHIELDS) break;
-    const { x, y } = shape.mid;
-    if (x < box.x + 12 * zoom || x > box.x + box.w - 12 * zoom || y < box.y + 12 * zoom || y > box.y + box.h - 12 * zoom) continue;
-    if (out.some((s) => Math.hypot(s.x - x, s.y - y) < (s.ref === shape.ref ? gap : gap / 2))) continue;
-    out.push({ ref: shape.ref, x, y });
-  }
-  return out;
-}
 
 export function cameraAt(stops: Stop[], spots: Spot[], width: number, height: number, progress: number, legs: Leg[] = []): Box {
   const full: Box = { x: 0, y: 0, w: width, h: height };

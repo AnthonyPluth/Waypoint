@@ -373,6 +373,27 @@
         }
       }
     },
+    "/api/driving-routes": {
+      "get": {
+        "operationId": "api_driving_routes_for_trips",
+        "x-handler": "waypoint/server/api/driving_routes.py:api_driving_routes_for_trips",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrivingRoutesForTrips"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips": {
       "get": {
         "operationId": "api_trips",
@@ -572,6 +593,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TripPlaces"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/trips/{id}/driving-routes": {
+      "get": {
+        "operationId": "api_driving_routes",
+        "x-handler": "waypoint/server/api/driving_routes.py:api_driving_routes",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrivingRoutes"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "api_driving_route_store",
+        "x-handler": "waypoint/server/api/driving_routes.py:api_driving_route_store",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Waypoint",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "const": "1"
+            },
+            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrivingRouteBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrivingRouteStored"
                 }
               }
             }
@@ -5283,6 +5383,116 @@
         ],
         "additionalProperties": false
       },
+      "DrivingPlace": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "DrivingRoute": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/DrivingPlace"
+          },
+          "end": {
+            "$ref": "#/components/schemas/DrivingPlace"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "DrivingRouteBody": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/DrivingPlace"
+          },
+          "end": {
+            "$ref": "#/components/schemas/DrivingPlace"
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "path"
+        ],
+        "additionalProperties": false
+      },
+      "DrivingRouteStored": {
+        "type": "object",
+        "properties": {
+          "stored": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stored"
+        ],
+        "additionalProperties": false
+      },
+      "DrivingRoutes": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DrivingRoute"
+            }
+          }
+        },
+        "required": [
+          "routes"
+        ],
+        "additionalProperties": false
+      },
+      "DrivingRoutesForTrips": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripDrivingRoutes"
+            }
+          }
+        },
+        "required": [
+          "trips"
+        ],
+        "additionalProperties": false
+      },
       "EmailUpdate": {
         "type": "object",
         "properties": {
@@ -6476,6 +6686,9 @@
       "Offline": {
         "type": "object",
         "properties": {
+          "version": {
+            "type": "integer"
+          },
           "trips": {
             "type": "array",
             "items": {
@@ -6484,6 +6697,7 @@
           }
         },
         "required": [
+          "version",
           "trips"
         ],
         "additionalProperties": false
@@ -9976,6 +10190,25 @@
         },
         "required": [
           "trips"
+        ],
+        "additionalProperties": false
+      },
+      "TripDrivingRoutes": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "routes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DrivingRoute"
+            }
+          }
+        },
+        "required": [
+          "trip_id",
+          "routes"
         ],
         "additionalProperties": false
       },

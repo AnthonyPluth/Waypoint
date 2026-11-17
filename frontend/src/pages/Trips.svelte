@@ -1,29 +1,30 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { errMsg } from "$lib/act";
-  import { app, route, setQuery } from "$lib/app.svelte";
+  import { app, currentEntry, route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
   import { takeEarlyTrips } from "$lib/early";
-  import type { Person, Trip } from "$lib/api-types";
+  import type { Person, Trip, TripCover } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import QuickTripForm from "$lib/components/QuickTripForm.svelte";
   import SegmentForm from "$lib/components/SegmentForm.svelte";
-  import AvatarStack from "$lib/components/AvatarStack.svelte";
   import TravellerAvatars from "$lib/components/TravellerAvatars.svelte";
   import YearChips from "$lib/components/YearChips.svelte";
+  import PastTripCard from "$lib/components/PastTripCard.svelte";
   import TripCard from "$lib/components/TripCard.svelte";
-  import TripKinds from "$lib/components/TripKinds.svelte";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
   import { Sheet } from "$lib/components/ui/sheet";
   import { viewport } from "$lib/phone.svelte";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { panes } from "$lib/panes.svelte";
   import { blankFor } from "$lib/segment-form";
-  import { dayIn, inYear, matchesText, pastByYear, splitTrips, tripRangeLabel, tripPeople, tripYears, viewerZone } from "$lib/trips";
+  import { limited } from "$lib/limit";
+  import { take, track } from "$lib/trips-position";
+  import { distance as distanceText } from "$lib/stats";
+  import { dayIn, inYear, isPast, matchesText, pastByYear, splitTrips, tripYears, viewerZone } from "$lib/trips";
   import TripPane from "./Trip.svelte";
-  import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
   import Search from "@lucide/svelte/icons/search";
   import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
@@ -44,9 +45,50 @@
       const [t, p] = await Promise.all([takeEarlyTrips("trips") ?? apiCall<"GET /api/trips">("/api/trips"), apiCall<"GET /api/people">("/api/people")]);
       if (mine !== latest) return;
       trips = t.trips; people = p.people;
+      void loadCovers();
+      resetDistances();
     } catch (err) { if (mine !== latest) return; trips = null; loadError = errMsg(err); }
   }
   $effect(() => { void load(); });
+
+  let covers = $state<ReadonlyMap<number, TripCover>>(new Map());
+  let coversTicket = 0;
+  async function loadCovers() {
+    const mine = ++coversTicket;
+    if (app.state && (!app.state.user || app.state.user.local)) { covers = new Map(); return; }
+    try {
+      const found = await apiCall<"GET /api/photos/trip-covers">("/api/photos/trip-covers", { keep: true, background: true });
+      if (mine !== coversTicket) return;
+      covers = new Map(found.trips.map((c) => [c.trip_id, c]));
+    } catch {
+      if (mine === coversTicket) covers = new Map();
+    }
+  }
+
+  const lookup = limited(4);
+  let distances = $state<ReadonlyMap<number, number>>(new Map());
+  let unit = $state<"mi" | "km" | null>(null);
+  let resets = $state(0);
+  let distanceGeneration = 0;
+  const asked = new Set<number>();
+  function resetDistances() { asked.clear(); distances = new Map(); distanceGeneration++; resets++; }
+  async function loadDistances(ids: number[], generation: number) {
+    const fresh = ids.filter((id) => !asked.has(id));
+    if (!fresh.length) return;
+    for (const id of fresh) asked.add(id);
+    if (unit === null) {
+      const found = await apiCall<"GET /api/distance-unit">("/api/distance-unit", { keep: true, background: true }).then((u) => u.distance_unit, () => null);
+      if (generation !== distanceGeneration) return;
+      unit = found;
+    }
+    await Promise.all(fresh.map((id) => lookup(
+      () => apiCall<"GET /api/trips/{id}/summary">(`/api/trips/${id}/summary`, { keep: true, background: true }).then((s) => {
+        if (generation === distanceGeneration && s.distance_km > 0) distances = new Map(distances).set(id, s.distance_km);
+      }, () => {}),
+      () => generation !== distanceGeneration,
+    )));
+  }
+  $effect(() => () => { coversTicket++; distanceGeneration++; });
 
   const param = (key: string) => new URLSearchParams(route.query).get(key);
   $effect(() => {
@@ -89,14 +131,73 @@
   });
   const everyTrip = $derived(shown ? [...shown.upcoming, ...shown.past] : []);
   const summary = $derived(trips ? (filtering ? `${everyTrip.length} of ${count(trips.length)}` : `${count(trips.length)}${comingUp ? ` · ${comingUp} coming up` : ""}`) : "");
-  const selected = $derived(everyTrip.find((t) => t.id === tripParam) ?? everyTrip[0] ?? null);
-  const reloaded = (movedTo?: number) => { if (movedTo) setQuery(queryFor({ trip: movedTo })); void load(); };
+  const selected = $derived(shown ? (shown.upcoming.find((t) => t.id === tripParam) ?? shown.upcoming[0] ?? null) : null);
+  const photoCounts = $derived(new Map([...covers.values()].map((c) => [c.trip_id, c.count])));
+  const pastGroups = $derived(shown ? pastByYear(shown.past, photoCounts) : []);
+  const returning = take(currentEntry());
+  let restoring = returning;
+  let revealed = $state(returning?.revealed ?? 1);
+  let scroller = $state<HTMLElement | null>(null);
+  let loadingYear = $state<number | null>(null);
+  let loadedNote = $state("");
+  let sentinel = $state<HTMLElement | null>(null);
+  const observes = typeof IntersectionObserver === "function";
+  const visibleGroups = $derived(viewport.phone ? pastGroups.slice(0, revealed) : pastGroups);
+  const visibleKey = $derived(visibleGroups.flatMap((g) => g.trips.map((t) => t.id)).join(","));
+  function showNextYear() {
+    if (loadingYear !== null || revealed >= pastGroups.length) return;
+    loadingYear = pastGroups[revealed].year;
+    revealed += 1;
+  }
+  function settleYear(year: number | null) {
+    if (year === null || loadingYear !== year) return;
+    const group = pastGroups.find((g) => g.year === loadingYear);
+    loadedNote = group ? `Loaded ${group.year}, ${count(group.trips.length)}` : "";
+    loadingYear = null;
+  }
+  $effect(() => {
+    const key = visibleKey;
+    void resets;
+    if (key) untrack(() => {
+      const year = loadingYear;
+      void loadDistances(key.split(",").map(Number), distanceGeneration).then(() => settleYear(year));
+    });
+  });
+  $effect(() => {
+    const watched = sentinel;
+    if (!watched || !observes || loadingYear !== null) return;
+    const seen = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) untrack(showNextYear); }, { rootMargin: "600px 0px" });
+    seen.observe(watched);
+    return () => seen.disconnect();
+  });
+  $effect(() => {
+    if (!restoring || shown === null) return;
+    const target = restoring;
+    restoring = null;
+    void tick().then(() => {
+      window.scrollTo(0, target.scroll);
+      scroller?.scrollTo(0, target.inner);
+    });
+  });
+  $effect(() => {
+    const position = { scroll: restoring?.scroll ?? window.scrollY, inner: restoring?.inner ?? 0, revealed };
+    track(position);
+    const note = () => { position.scroll = window.scrollY; position.inner = scroller?.scrollTop ?? 0; };
+    window.addEventListener("scroll", note, { capture: true, passive: true });
+    return () => { window.removeEventListener("scroll", note, { capture: true }); track(null); };
+  });
+  const reloaded = (movedTo?: number) => {
+    if (!movedTo) { void load(); return; }
+    void load().then(() => {
+      const found = trips?.find((t) => t.id === movedTo);
+      if (found && !isPast(found, today())) setQuery(queryFor({ trip: movedTo }));
+    });
+  };
   const choose = (e: MouseEvent, t: Trip) => {
-    if (!panes.two || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!panes.two || isPast(t, today()) || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     leave(() => setQuery(queryFor({ trip: t.id })));
   };
-  let revealed = $state(1);
   let paneRevision = $state(0);
 </script>
 
@@ -170,46 +271,36 @@
       {/each}
     </ul>
   {/snippet}
-  {#snippet pastList(group: Trip[])}
-    {@const groups = pastByYear(group)}
-    {@const compact = viewport.phone || panes.two}
-    {@const visible = viewport.phone ? groups.slice(0, revealed) : groups}
-    <div class="flex flex-col gap-4">
-      {#each visible as g (g.year)}
-        <div class="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
-          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-3">
-            <h3 class="text-lg font-bold tracking-tight">{g.year}</h3>
+  {#snippet pastList()}
+    {@const day = today()}
+    {@const paneOpen = panes.two && selected !== null}
+    {@const roomy = !viewport.phone && !paneOpen}
+    <div class="flex flex-col gap-6">
+      {#each visibleGroups as g (g.year)}
+        <div class="flex flex-col gap-3.5">
+          <div class="flex items-baseline justify-between gap-3 px-0.5">
+            <h2 class="text-lg font-bold tracking-tight">{g.year}</h2>
             <span class="text-sm text-muted-foreground">{g.totals}</span>
           </div>
-          <ul aria-label={`Past trips in ${g.year}`}>
+          <ul class={roomy ? "grid grid-cols-2 gap-[18px]" : "flex flex-col gap-3.5"} aria-label={`Past trips in ${g.year}`}>
             {#each g.trips as t (t.id)}
-              {@const current = panes.two && selected?.id === t.id}
-              <li class="border-b border-border last:border-b-0">
-                <a class="group flex items-center gap-4 px-4 py-3 transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none focus-visible:ring-inset {current ? 'bg-surface-2 ring-1 ring-primary ring-inset' : ''}"
-                  href={`#trip/${t.id}`} aria-current={current ? "true" : undefined} onclick={(e) => choose(e, t)}>
-                  {#if compact}
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate font-semibold">{t.name}</span>
-                      <span class="block truncate text-sm text-muted-foreground">{[tripRangeLabel(t), t.destination].filter(Boolean).join(" · ")}</span>
-                    </span>
-                  {:else}
-                    <span class="mono w-32 shrink-0 text-sm text-muted-foreground">{tripRangeLabel(t)}</span>
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate font-semibold">{t.name}</span>
-                      {#if t.destination}<span class="block truncate text-sm text-muted-foreground">{t.destination}</span>{/if}
-                    </span>
-                    <TripKinds trip={t} />
-                    <AvatarStack people={tripPeople(t)} />
-                  {/if}
-                  <ChevronRight class="size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
-                </a>
-              </li>
+              {@const cover = covers.get(t.id)}
+              {@const km = distances.get(t.id)}
+              <li class="min-w-0"><PastTripCard trip={t} today={day} photos={cover?.count ?? 0} covers={cover?.covers ?? []} distance={km && unit ? distanceText(km, unit) : ""} {roomy} /></li>
             {/each}
           </ul>
         </div>
       {/each}
-      {#if viewport.phone && revealed < groups.length}
-        <button type="button" class="self-start rounded-md px-1 py-2 text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" onclick={() => (revealed += 1)}>Show {groups[revealed].year}</button>
+      {#if viewport.phone}
+        <p class="sr-only" role="status" aria-live="polite" aria-label="Past trips loaded">{loadedNote}</p>
+        {#if loadingYear !== null}<p class="px-0.5 text-sm text-muted-foreground">Loading {loadingYear}…</p>{/if}
+        {#if revealed < pastGroups.length}
+          {#if observes}
+            <div bind:this={sentinel} class="h-px" aria-hidden="true" data-testid="past-more"></div>
+          {:else}
+            <button type="button" class="self-start rounded-md px-1 py-2 text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" onclick={showNextYear}>Show more</button>
+          {/if}
+        {/if}
       {/if}
     </div>
   {/snippet}
@@ -218,14 +309,14 @@
       {#if group.length}
         <section class="mb-8" aria-labelledby={`trips-${title}`}>
           <h2 id={`trips-${title}`} class="eyebrow mb-2">{title}</h2>
-          {#if title === "Upcoming"}{@render upcomingList(group)}{:else}{@render pastList(group)}{/if}
+          {#if title === "Upcoming"}{@render upcomingList(group)}{:else}{@render pastList()}{/if}
         </section>
       {/if}
     {/each}
   {/snippet}
   {#if panes.two && selected}
     <div class="grid grid-cols-[clamp(16rem,28%,24rem)_minmax(0,1fr)] items-start gap-8">
-      <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
+      <div bind:this={scroller} class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
       <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} revision={paneRevision} />{/key}</div>
     </div>
   {:else}

@@ -33,6 +33,7 @@ from .api.review import (api_review, api_review_attach, api_review_dismiss, api_
                          api_review_same, api_review_suggest, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_show_costs_save, api_state
+from .api.driving_routes import api_driving_route_store, api_driving_routes, api_driving_routes_for_trips
 from .api.mapkit import api_mapkit_token
 from .api.home import api_home, api_home_clear, api_home_save
 from .api.stats import api_distance_unit, api_distance_unit_save, api_stats
@@ -51,10 +52,13 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/people/{id}/claim", api_person_claim),
     ("GET", "/api/people/claim-suggestions", api_claim_suggestions),
     ("POST", "/api/people/claim-suggestions/dismiss", api_claim_dismiss),
+    ("GET", "/api/driving-routes", api_driving_routes_for_trips),
     ("GET", "/api/trips", api_trips),
     ("POST", "/api/trips", api_trip_add),
     ("GET", "/api/trips/{id}", api_trip),
     ("GET", "/api/trips/{id}/places", api_trip_places),
+    ("GET", "/api/trips/{id}/driving-routes", api_driving_routes),
+    ("PUT", "/api/trips/{id}/driving-routes", api_driving_route_store),
     ("GET", "/api/trips/{id}/summary", api_trip_summary),
     ("POST", "/api/trips/{id}", api_trip_edit),
     ("DELETE", "/api/trips/{id}", api_trip_remove),

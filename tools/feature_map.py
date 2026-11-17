@@ -20,12 +20,12 @@ AREA_DOCS = {
     "trips": "start/trips", "segments": "start/trips", "import": "start/import", "airports": "start/trips", "flight-status": "start/flight-status",
     "reminders": "start/reminders", "feed": "start/reminders",
     "stats": "start/stats", "distance-unit": "start/stats", "home": "start/trips", "show-costs": "start/trips", "mcp-settings": "start/mcp", "assistant": "start/mcp", "offline": "start/offline",
-    "mapkit": "start/trips", "photos": "start/photos", "photo-sources": "start/photos", "photo-grants": "start/photos", "photo-sharing-prefs": "start/photos",
+    "mapkit": "start/trips", "driving-routes": "start/trips", "photos": "start/photos", "photo-sources": "start/photos", "photo-grants": "start/photos", "photo-sharing-prefs": "start/photos",
 }
 
 CALL = re.compile(r"\b(?:apiCall|api|fetch|EventSource)\s*(?:<[^>(]*>)?\(\s*([`\"'])(/api/[^`\"']*)\1")
 TEST_PATH = re.compile(r"""["'`](/api/[^"'`\s?#]*)""")
-VERBS = re.compile(r"\b(GET|POST|DELETE|get|post|delete)\b")
+VERBS = re.compile(r"\b(GET|POST|PUT|DELETE|get|post|put|delete)\b")
 
 
 def routes() -> list[dict]:

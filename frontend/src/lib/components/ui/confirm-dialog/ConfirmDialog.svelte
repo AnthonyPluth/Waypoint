@@ -31,10 +31,10 @@
 <Parts.Root bind:open={() => open, (v) => { if (!busy) open = v; }}>
   <Parts.Portal>
     <Parts.Overlay data-slot="confirm-overlay"
-      class="fixed inset-0 z-[60] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+      class="fixed inset-0 z-[62] bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
     <Parts.Content data-slot="confirm-dialog" onOpenAutoFocus={(e) => { e.preventDefault(); (box ?? cancel)?.focus(); }}
       onCloseAutoFocus={(e) => { const target = returnFocus?.(); if (target?.isConnected) { e.preventDefault(); target.focus(); } }}
-      class="bg-card text-card-foreground fixed top-1/2 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-150">
+      class="bg-card text-card-foreground fixed top-1/2 left-1/2 z-[62] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-5 shadow-2xl outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 duration-150">
       <form class="flex flex-col gap-4" onsubmit={confirm}>
         <Parts.Title class="text-foreground text-base font-semibold">{title}</Parts.Title>
         {#if description}

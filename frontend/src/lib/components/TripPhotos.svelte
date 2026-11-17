@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { tick, untrack, type Snippet } from "svelte";
   import { app } from "$lib/app.svelte";
   import type { Person, PhotoSource, Trip, TripPhoto, TripPhotos } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
   import { Button } from "$lib/components/ui/button";
   import PhotoViewer from "$lib/components/PhotoViewer.svelte";
   import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
+  import TripPhotoSharingMenu from "$lib/components/TripPhotoSharingMenu.svelte";
   import { actingPersons, PersonSharing } from "$lib/trip-sharing.svelte";
-  import { byDay, dayCaption, daysFor, firstOfCluster, isFar, isInferred, localDay, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
+  import { byDay, dayCaption, DAY_PHOTOS, DAY_PHOTOS_WIDE, dayPhotoCount, daysFor, dayTileName, firstOfCluster, FIRST_DAYS, isFar, isInferred, localDay, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
   import { MAX_REMOVED, REMOVE, removeText, toggled } from "$lib/photo-sharing";
   import { clock, dayIn, dayLabel, viewerZone } from "$lib/trips";
   import Check from "@lucide/svelte/icons/check";
@@ -15,18 +16,27 @@
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Play from "@lucide/svelte/icons/play";
 
-  let { trip, people, now, onloaded, onchanged }: { trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void } = $props();
+  const NONE: ReadonlySet<number> = new Set();
+  const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
+
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), headerEnd = null, belowHeader = null }: {
+    trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
+    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
+    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; headerEnd?: Snippet | null; belowHeader?: Snippet | null;
+  } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
   let loaded = $state<Loaded>({ state: "loading" });
   let sources = $state<PhotoSource[] | null>(null);
   let acting = $state<PersonSharing[]>([]);
   let actingProblem = $state(false);
+  let settled = $state(false);
   let staleView = $state(false);
   let refreshing = $state(false);
   let checking = $state(false);
   let expanded = $state(false);
   let shownDays = $state(0);
+  let allDays = $state(false);
   let announce = $state("");
   let viewing = $state(false);
   let at = $state(0);
@@ -52,6 +62,9 @@
   const shown = $derived(days.slice(0, shownDays));
   const shownCount = $derived(shown.reduce((n, d) => n + d.photos.length, 0));
   const strip = $derived(photos.slice(0, STRIP_SIZE));
+  const perDay = $derived(wide ? DAY_PHOTOS_WIDE : DAY_PHOTOS);
+  const pastDaysList = $derived(timeline ? pastDays(photos, leftOut, new Map(trip.segments.map((s) => [s.id, s])), perDay) : []);
+  const shownPast = $derived(allDays ? pastDaysList : pastDaysList.slice(0, FIRST_DAYS));
   const segments = $derived(new Map(trip.segments.map((s) => [s.id, s])));
   const indexOf = $derived(new Map(photos.map((p, i) => [p.id, i])));
   const started = $derived(!!trip.start_date && trip.start_date <= dayIn(now, viewerZone()));
@@ -63,10 +76,25 @@
     return waiting ? "waiting" : "nothing";
   });
   const asking = $derived(acting.some((a) => a.mode === "prompt" || a.mode === "reminder"));
+  const hasCard = $derived(acting.some((a) => a.mode === "card"));
   const sharingShown = $derived(actingProblem || acting.some((a) => a.visible));
-  const shows = $derived(loaded.state === "error" || total > 0 || empty !== null || sharingShown);
+  const shows = $derived(started && (loaded.state === "error" || total > 0 || empty !== null || sharingShown));
   const mineOf = (p: Pick<TripPhoto, "person_id">): PersonSharing | undefined => acting.find((a) => a.personId === p.person_id);
   const ownCount = $derived(photos.filter((p) => mineOf(p)).length);
+  $effect(() => {
+    const state = loaded.state;
+    untrack(() => onstatus?.(state));
+  });
+  const looks = $derived(photos.filter((p) => isFar(p) && mineOf(p)).length);
+  $effect(() => {
+    const list = acting;
+    const done = settled;
+    untrack(() => onsharing?.(list, done));
+  });
+  $effect(() => {
+    const n = looks;
+    untrack(() => onlook?.(n));
+  });
   const frozen = $derived(removing || staleView || acting.some((a) => a.locked));
   const selectedPersons = $derived([...new Set(photos.filter((p) => selected.has(p.id)).map((p) => p.person_id))]);
   const removeLabel = $derived.by(() => {
@@ -93,6 +121,7 @@
       sources = null;
       expanded = false;
       shownDays = 0;
+      allDays = false;
       broken = new Set();
       selecting = false;
       selected = new Set();
@@ -160,7 +189,10 @@
       acting = next;
       await Promise.all(next.map((a) => a.load()));
     } finally {
-      if (mine === setups) checking = false;
+      if (mine === setups) {
+        checking = false;
+        settled = true;
+      }
     }
   }
 
@@ -176,6 +208,7 @@
     return () => untrack(() => {
       setups++;
       checking = false;
+      settled = false;
       for (const a of acting) a.dispose();
       acting = [];
     });
@@ -208,9 +241,41 @@
     if (fromStrip) { await tick(); focusTile(days[0]?.photos[0]?.id); }
   }
 
+  async function showClusterInDays(target: TripPhoto) {
+    const at = pastDaysList.findIndex((d) => d.photos.some((p) => p.id === target.id));
+    if (at < 0) {
+      announce = `Showing the photo from the map, from ${clock(target.taken_local)}`;
+      openViewer(target, null);
+      return;
+    }
+    if (at >= FIRST_DAYS) allDays = true;
+    const day = pastDaysList[at];
+    const near = photos.filter((p) => p.cluster === target.cluster).length;
+    announce = `Showing ${near} ${near === 1 ? "photo" : "photos"} from the map, from ${clock(target.taken_local)}`;
+    await tick();
+    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`);
+    if (!tile) {
+      announce = `Showing the photo from the map, from ${clock(target.taken_local)}`;
+      openViewer(target, gallery?.querySelector<HTMLElement>(`#photo-day-${day.day}`) ?? null);
+      return;
+    }
+    tile.scrollIntoView?.({ block: "center", behavior: "auto" });
+    tile.focus({ preventScroll: true });
+  }
+
+  export function headingElement(): HTMLElement | null {
+    return heading;
+  }
+
+  export function viewFirst() {
+    const first = photos[0];
+    if (first) openViewer(first, null);
+  }
+
   export async function showCluster(index: number) {
     const target = firstOfCluster(photos, index);
     if (!target) return;
+    if (timeline) { await showClusterInDays(target); return; }
     const needed = days.findIndex((d) => d.day === localDay(target)) + 1;
     expanded = true;
     shownDays = Math.max(shownDays, daysFor(days, 0), needed);
@@ -248,12 +313,24 @@
   });
 
   function view(p: TripPhoto, e: MouseEvent) {
-    opener = e.currentTarget as HTMLElement;
+    openViewer(p, e.currentTarget as HTMLElement);
+  }
+
+  function openViewer(p: TripPhoto, from: HTMLElement | null) {
+    opener = from;
     at = indexOf.get(p.id) ?? 0;
     viewedId = p.id;
     gone = null;
     viewerNote = "";
     viewing = true;
+  }
+
+  async function revealDays() {
+    const next = pastDaysList[FIRST_DAYS];
+    allDays = true;
+    announce = `Showing all ${pastDaysList.length} days`;
+    await tick();
+    if (next) document.getElementById(`photo-day-${next.day}`)?.focus();
   }
 
   $effect(() => {
@@ -353,18 +430,34 @@
 <svelte:window onkeydown={keys} />
 
 {#if signedIn && shows}
-  <section class="mb-6 flex flex-col gap-3" aria-labelledby="trip-photos-title" data-testid="trip-photos">
+  <section class={`flex flex-col gap-3 ${timeline ? "" : "mb-6"}`} aria-labelledby="trip-photos-title" data-testid="trip-photos">
+    {#if timeline && wide && (total || headerEnd)}
+      <div class={`flex items-center gap-3 ${total ? "justify-between" : "justify-start"}`}>
+        <h2 id="trip-photos-title" class={total ? "text-[17px] leading-snug font-semibold tracking-tight outline-none" : "sr-only"} tabindex="-1" bind:this={heading}>Photos by day</h2>
+        <div class="flex items-center gap-2">
+          {#if headerEnd}{@render headerEnd()}{/if}
+          {#if total}<Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>{/if}
+        </div>
+      </div>
+    {:else if timeline}
+      <h2 id="trip-photos-title" class="sr-only" tabindex="-1" bind:this={heading}>Photos by day</h2>
+    {:else}
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 id="trip-photos-title" class="flex items-baseline gap-2 text-heading" tabindex="-1" bind:this={heading}>Photos{#if total}<span class="text-caption text-muted-foreground">{total}</span>{/if}</h2>
-      {#if total}
+      {#if total || hasCard}
         <div class="flex flex-wrap items-center gap-2">
-          {#if ownCount > 0 && !selecting}
-            <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
+          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} bind:open={sharingOpen} />
+          {#if total}
+            {#if ownCount > 0 && !selecting}
+              <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
+            {/if}
+            <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : open(false))}>{expanded ? "Show fewer" : seeAll}</Button>
           {/if}
-          <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : open(false))}>{expanded ? "Show fewer" : seeAll}</Button>
         </div>
       {/if}
     </div>
+    {/if}
+    {#if timeline && wide && belowHeader}{@render belowHeader()}{/if}
     {#if selecting}
       <div class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-[2] flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-background py-2 lg:top-0" data-testid="photo-selection">
         <p class="text-heading" role="status">{selected.size} selected</p>
@@ -389,7 +482,9 @@
       </div>
     {/if}
     {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {#if !(sharingOpen && a.mode === "card")}
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {/if}
       <TripPhotoSharing sharing={a} tripName={trip.name} part="prompt" />
     {/each}
 
@@ -406,10 +501,12 @@
     {:else if empty === "waiting"}
       <p class="text-muted-foreground">{waitingName ? `${waitingName}’s library` : "Your library"} is connected. The first sync finds your photos; then you choose whether, and with whom, to share them on each trip.</p>
     {:else if empty === "nothing"}
-      {#if !asking}<p class="text-muted-foreground">{acting.some((a) => (a.sharing?.removed_count ?? 0) > 0) ? "No photos on this trip." : "No photos on this trip yet."}</p>{/if}
+      {#if !asking && !timeline}<p class="text-muted-foreground">{acting.some((a) => (a.sharing?.removed_count ?? 0) > 0) ? "No photos on this trip." : "No photos on this trip yet."}</p>{/if}
     {:else if total > 0}
       <div id="trip-photos-gallery" bind:this={gallery}>
-        {#if !expanded}
+        {#if timeline && !expanded}
+          {@render daysView()}
+        {:else if !expanded}
           <div class="flex gap-2 overflow-x-auto pb-1" data-testid="photo-strip">
             {#each strip as p (p.id)}
               <div class="w-[92px] shrink-0 desktop:w-[112px]">{@render tile(p, "rounded-xl")}</div>
@@ -445,16 +542,15 @@
         <p class="text-caption text-muted-foreground">{brokenOwners.map((n) => `${n}’s`).join(" and ")} photos can’t be loaded right now. They show again once Waypoint can reach their Immich.</p>
       {/if}
     {/if}
-    {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
-    {/each}
-    {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="card" />
-    {/each}
+    {#if !timeline}
+      {#each acting as a (a.personId)}
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
+      {/each}
+    {/if}
     <p class="sr-only" role="status">{announce}</p>
   </section>
   {#each acting as a (a.personId)}
-    <TripPhotoSharing sharing={a} tripName={trip.name} part="dialog" />
+    <TripPhotoSharing sharing={a} tripName={trip.name} part="dialog" returnTo={() => heading} />
   {/each}
   <PhotoViewer bind:this={viewer} bind:open={viewing} bind:index={at} bind:gone {photos} {people} {segments} returnTo={comeBack} notice={viewerNote} onfail={revalidate}>
     {#snippet actions(p)}
@@ -466,7 +562,42 @@
   </PhotoViewer>
 {/if}
 
-{#snippet tile(p: TripPhoto, round: string)}
+{#snippet daysView()}
+  <div class={`flex flex-col ${wide ? "gap-3.5" : "gap-[22px]"}`} data-testid="photo-days">
+    {#each shownPast as d, n (d.day)}
+      {#if wide}
+        <section class="flex flex-col gap-1.5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
+          <div class="flex items-baseline justify-between gap-3 px-0.5">
+            <h3 id={`photo-day-${d.day}`} class="text-sm leading-snug font-semibold outline-none" tabindex="-1">{d.label}</h3>
+            <span class="text-caption text-muted-foreground">{[d.place, dayPhotoCount(d)].filter(Boolean).join(" · ")}</span>
+          </div>
+          <div class="grid grid-cols-6 gap-[3px] overflow-hidden rounded-[14px]">
+            {#each d.shown as p, i (p.id)}{@render tile(p, "", dayTileName(d, i + 1, i === perDay - 1, p), i === perDay - 1 ? d.more : 0)}{/each}
+          </div>
+        </section>
+      {:else}
+      <section class="relative ml-1.5 flex flex-col gap-2.5 border-l-2 border-border pl-5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
+        <span class="absolute -left-2 top-[3px] size-3.5 rounded-full border-[3px] border-background bg-primary" aria-hidden="true"></span>
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <h3 id={`photo-day-${d.day}`} class="text-[16px] leading-snug font-semibold outline-none" tabindex="-1">{d.label}</h3>
+            <span class="block text-caption text-muted-foreground">{[d.place, dayPhotoCount(d)].filter(Boolean).join(" · ")}</span>
+          </div>
+          <svg class="h-[30px] w-12 shrink-0 rounded-[9px] border border-border bg-card p-[3px]" viewBox="0 0 48 30" aria-hidden="true" data-testid="day-glyph"><path d={GLYPHS[n % GLYPHS.length]} fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </div>
+        <div class="grid grid-cols-3 gap-[3px] overflow-hidden rounded-[14px]">
+          {#each d.shown as p, i (p.id)}{@render tile(p, "", dayTileName(d, i + 1, i === DAY_PHOTOS - 1, p), i === DAY_PHOTOS - 1 ? d.more : 0)}{/each}
+        </div>
+      </section>
+      {/if}
+    {/each}
+    {#if !allDays && pastDaysList.length > FIRST_DAYS}
+      <Button variant="outline" class={wide ? "self-start" : "self-stretch"} onclick={() => void revealDays()}>Show all {pastDaysList.length} days</Button>
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet tile(p: TripPhoto, round: string, name: string | null = null, more = 0)}
   {#if selecting && !broken.has(p.id)}
     {#if mineOf(p)}
       {@const picked = selected.has(p.id)}
@@ -488,8 +619,9 @@
   {:else}
     <button type="button" class={`relative block aspect-square w-full cursor-pointer overflow-hidden bg-surface-3 ${round}`} data-photo={p.id}
       onclick={(e) => view(p, e)}>
-      <span class="sr-only">{tileLabel(p, p.segment_id === null ? undefined : segments.get(p.segment_id), ownerOf(p))}</span>
+      <span class="sr-only">{name ?? tileLabel(p, p.segment_id === null ? undefined : segments.get(p.segment_id), ownerOf(p))}</span>
       <img class="size-full object-cover" src={thumbnailUrl(p.id)} alt="" loading="lazy" decoding="async" draggable="false" onerror={() => lost(p.id)} />
+      {#if more > 0}<span class="absolute inset-0 flex items-center justify-center bg-lightbox/60 text-[15px] font-bold text-foreground" aria-hidden="true">+{more}</span>{/if}
       {#if isFar(p)}<span class="absolute left-[5px] top-[5px] rounded-full bg-status-warn-soft px-1.5 py-[3px] text-[10px] font-semibold leading-none text-status-warn-ink shadow-[0_0_0_1px_rgb(0_0_0/30%)]" aria-hidden="true">Far</span>{/if}
       {#if isInferred(p)}<span class="absolute bottom-[5px] left-[5px] rounded-full bg-lightbox/70 p-[3px]" aria-hidden="true" data-mark="inferred"><span class="block size-2.5 rounded-full border-2 border-map-photo"></span></span>{/if}
       {#if p.kind === "video"}<span class="absolute bottom-[5px] right-[5px] inline-flex items-center rounded-full bg-lightbox/70 p-1 text-foreground" aria-hidden="true" data-mark="video"><Play class="size-2.5 fill-current" /></span>{/if}

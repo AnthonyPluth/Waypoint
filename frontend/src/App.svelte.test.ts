@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,7 +7,8 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ Toaster: vi.fn(), toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
-import { app, route } from "$lib/app.svelte";
+import { app, layout, route } from "$lib/app.svelte";
+import { forgetMapkit, forgetPreload, PRELOAD_MS } from "$lib/mapkit";
 import { state } from "./test/fixtures";
 import App from "./App.svelte";
 
@@ -18,7 +19,7 @@ const go = async (hash: string) => {
 };
 
 beforeEach(async () => { vi.mocked(api).mockReset(); vi.mocked(api).mockResolvedValue({ trips: [], people: [], loyalty: [], guests: [] }); app.state = state(); app.bootError = ""; await go("#upcoming"); });
-afterEach(() => { app.state = null; });
+afterEach(() => { app.state = null; layout.wide = false; });
 
 describe("the shell", () => {
   it("opens Upcoming, with the brand on top and every page reachable from the tab bar and the sidebar", async () => {
@@ -106,6 +107,33 @@ describe("the shell", () => {
     }
   });
 
+  it("keeps the trip route at 48 rem, offline saved trip included, until a finished trip asks for 80 rem; the flight page keeps 60 rem", async () => {
+    vi.mocked(api).mockRejectedValue(new Error("No such trip"));
+    await go("#trip/7");
+    const { container } = render(App);
+    await screen.findByText("No such trip");
+    const wrapper = () => container.querySelector("main > div") as HTMLElement;
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
+    expect(wrapper().className).toContain("max-w-3xl");
+    app.state = null;
+    app.bootError = "Offline";
+    app.offline = true;
+    await screen.findByTestId("nothing-saved");
+    expect(wrapper().className).toContain("max-w-3xl");
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
+    app.offline = false;
+    app.bootError = "";
+    app.state = state();
+    layout.wide = true;
+    await waitFor(() => expect(wrapper().className).toContain("lg:max-w-[80rem]"));
+    await go("#trip/3/flight/7");
+    await waitFor(() => expect(wrapper().className).toContain("lg:max-w-[60rem]"));
+    expect(wrapper().className).not.toContain("lg:max-w-[80rem]");
+    layout.wide = false;
+    await go("#upcoming");
+    await waitFor(() => expect(wrapper().className).toContain("lg:max-w-5xl"));
+  });
+
   it("opens Upcoming for a route it doesn't know (an old Runway bookmark, say)", async () => {
     await go("#budget");
     render(App);
@@ -117,5 +145,57 @@ describe("the shell", () => {
     render(App);
     expect(screen.getByText("Can’t reach Waypoint")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+});
+
+describe("preloading MapKit", () => {
+  const tokenCalls = () => vi.mocked(api).mock.calls.filter(([path]) => path === "/api/mapkit/token");
+  beforeEach(() => {
+    forgetMapkit();
+    forgetPreload();
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("asks once, a few seconds after a signed-in open where the server has MapKit", async () => {
+    app.state = state({ mapkit: true } as never);
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS - 1);
+    expect(tokenCalls()).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(tokenCalls()).toHaveLength(1);
+    app.state = state({ mapkit: true } as never);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    expect(tokenCalls()).toHaveLength(1);
+    unmount();
+  });
+
+  it("asks for nothing when the server has no MapKit, or says nothing about it", async () => {
+    for (const extra of [{ mapkit: false }, {}]) {
+      app.state = state(extra as never);
+      const { unmount } = render(App);
+      await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+      unmount();
+    }
+    expect(tokenCalls()).toHaveLength(0);
+  });
+
+  it("asks for nothing when signed out", async () => {
+    app.state = state({ mapkit: true, user: null } as never);
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    expect(tokenCalls()).toHaveLength(0);
+    unmount();
+  });
+
+  it("asks for nothing while offline", async () => {
+    app.state = state({ mapkit: true } as never);
+    app.offline = true;
+    const { unmount } = render(App);
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 3);
+    app.offline = false;
+    expect(tokenCalls()).toHaveLength(0);
+    unmount();
   });
 });
