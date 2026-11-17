@@ -141,10 +141,12 @@ actor OfflineSync {
         }
         state.began()
         defer { state.ended() }
+        let started = generation
         let outcome = await fetchAndSave()
         switch outcome {
         case .saved: state.setFailed(false)
-        case .failed, .unknownVersion: state.setFailed(true)
+        case .failed, .unknownVersion:
+            if started == generation, settings.isOn { state.setFailed(true) }
         case .off, .noServer, .unauthorized, .superseded: break
         }
         return outcome

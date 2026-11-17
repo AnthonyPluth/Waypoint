@@ -83,6 +83,16 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByRole("link", { name: /open live status/ })).toBeNull();
   });
 
+  it("keeps the full flight card on the trip page, with no compact booking, progress bar or Home card beside it", async () => {
+    render(TripPage);
+    const list = await screen.findByRole("list", { name: "Bookings" });
+    const cards = within(list).getAllByRole("listitem").filter(isCard);
+    expect(within(cards[0]).getByRole("article")).toBeInTheDocument();
+    expect(list.querySelector("[data-flight-booking], [data-flight-home], [data-flight-row]")).toBeNull();
+    expect(within(list).queryByRole("progressbar", { name: "Flight progress" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Flights today" })).toBeNull();
+  });
+
   it("shows a changed single booking’s Changed chip on its flight card", async () => {
     held = trip([{ ...flight, status: "changed" }, stay]);
     render(TripPage);
