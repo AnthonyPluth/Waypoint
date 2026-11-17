@@ -31,6 +31,7 @@ final class OfflineBridgeTests: XCTestCase {
     private var store: OfflineStore!
     private var pages: OfflinePages!
     private var settings: OfflineSettings!
+    private var sync: OfflineSync!
     private var bridge: OfflineBridge!
     private let home = URL(string: "https://waypoint.example.com")!
 
@@ -42,7 +43,7 @@ final class OfflineBridgeTests: XCTestCase {
         store = TripFixtures.store(at: root.appendingPathComponent("trips"))
         pages = OfflinePages(root: root.appendingPathComponent("pages"))
         settings = OfflineSettings(defaults: defaults)
-        let sync = OfflineSync(store: store, settings: settings, pages: pages, server: { [home] in home }, bearer: { nil })
+        sync = OfflineSync(store: store, settings: settings, pages: pages, server: { [home] in home }, bearer: { nil })
         bridge = OfflineBridge(store: store, sync: sync, settings: settings)
     }
 
@@ -63,9 +64,27 @@ final class OfflineBridgeTests: XCTestCase {
     func testStatusWithNothingSaved() async throws {
         let reply = try await ask(["type": "status"])
         XCTAssertEqual(reply["version"] as? Int, 1)
-        XCTAssertEqual(reply["saving"] as? Bool, false)
+        XCTAssertEqual(reply["saving"] as? Bool, true)
+        XCTAssertEqual(reply["syncing"] as? Bool, false)
+        XCTAssertEqual(reply["lastSaveFailed"] as? Bool, false)
         XCTAssertTrue(reply["savedAt"] is NSNull)
         XCTAssertTrue(trips(reply).isEmpty)
+    }
+
+    func testStatusReportsSavingOffAfterItIsSwitchedOff() async throws {
+        let reply = try await ask(["type": "setSaving", "on": false])
+        XCTAssertEqual(reply["saving"] as? Bool, false)
+    }
+
+    func testStatusReportsASyncInProgressAndAFailedSave() async throws {
+        sync.state.began()
+        sync.state.setFailed(true)
+        let reply = try await ask(["type": "status"])
+        XCTAssertEqual(reply["syncing"] as? Bool, true)
+        XCTAssertEqual(reply["lastSaveFailed"] as? Bool, true)
+        sync.state.ended()
+        let after = try await ask(["type": "status"])
+        XCTAssertEqual(after["syncing"] as? Bool, false)
     }
 
     func testStatusListsTheSavedTripsInOrderWithTheSavedAtDate() async throws {
@@ -173,7 +192,7 @@ final class OfflineBridgeTests: XCTestCase {
                 XCTAssertEqual(error as? OfflineBridge.Failure, .unknownRequest)
             }
         }
-        XCTAssertFalse(settings.isOn)
+        XCTAssertTrue(settings.isOn)
     }
 
     func testTheServersOwnPageIsTrusted() {

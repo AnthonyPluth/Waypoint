@@ -10,10 +10,33 @@ struct OfflineSettings: @unchecked Sendable {
         self.defaults = defaults
     }
 
-    var isOn: Bool { defaults.bool(forKey: Self.key) }
+    var isOn: Bool { defaults.object(forKey: Self.key) as? Bool ?? true }
 
     func set(_ on: Bool) {
         defaults.set(on, forKey: Self.key)
+    }
+
+    func reset() {
+        defaults.removeObject(forKey: Self.key)
+    }
+}
+
+final class OfflineSyncState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var running = 0
+    private var failed = false
+
+    var syncing: Bool { locked { running > 0 } }
+    var lastSaveFailed: Bool { locked { failed } }
+
+    func began() { locked { running += 1 } }
+    func ended() { locked { running = max(0, running - 1) } }
+    func setFailed(_ value: Bool) { locked { failed = value } }
+
+    private func locked<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
     }
 }
 
@@ -90,12 +113,14 @@ actor OfflineSync {
     private let currentServer: @Sendable () async -> URL?
     private let currentBearer: @Sendable () async throws -> String?
     private var generation = 0
+    let state: OfflineSyncState
 
     init(store: OfflineStore = .shared,
          settings: OfflineSettings = OfflineSettings(),
          fetching: OfflineFetching = LiveOfflineFetching(),
          pages: OfflinePages = .shared,
          pageFetching: PageFetching = LivePageFetching(),
+         state: OfflineSyncState = OfflineSyncState(),
          server: @escaping @Sendable () async -> URL?,
          bearer: @escaping @Sendable () async throws -> String?) {
         self.store = store
@@ -103,13 +128,29 @@ actor OfflineSync {
         self.fetching = fetching
         self.pages = pages
         self.pageFetching = pageFetching
+        self.state = state
         self.currentServer = server
         self.currentBearer = bearer
     }
 
     @discardableResult
     func sync() async -> Outcome {
-        guard settings.isOn else { return .off }
+        guard settings.isOn else {
+            state.setFailed(false)
+            return .off
+        }
+        state.began()
+        defer { state.ended() }
+        let outcome = await fetchAndSave()
+        switch outcome {
+        case .saved: state.setFailed(false)
+        case .failed, .unknownVersion: state.setFailed(true)
+        case .off, .noServer, .unauthorized, .superseded: break
+        }
+        return outcome
+    }
+
+    private func fetchAndSave() async -> Outcome {
         guard let server = await currentServer() else {
             purge()
             return .noServer
@@ -187,6 +228,7 @@ actor OfflineSync {
 
     func purge() {
         generation += 1
+        state.setFailed(false)
         try? store.purgeAll()
         try? pages.purgeAll()
     }
@@ -197,6 +239,11 @@ actor OfflineSync {
     }
 
     func remove() {
+        purge()
+    }
+
+    func signedOut() {
+        settings.reset()
         purge()
     }
 
