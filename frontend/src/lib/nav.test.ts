@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { flightRoute, initials, inMore, MORE, NAV, navFor, pageFor, TABS } from "./nav";
 
@@ -49,5 +50,20 @@ describe("nav", () => {
     expect(initials("Ada Lovelace")).toBe("AL");
     expect(initials("ada@example.com")).toBe("AE");
     expect(initials("Grace")).toBe("G");
+  });
+
+  it("reaches every page of the user feature map by a URL that opens that page", () => {
+    const map = readFileSync(new URL("../../../.claude/skills/verify-waypoint/references/feature-map.md", import.meta.url), "utf8");
+    const reached: Record<string, string> = {};
+    for (const section of map.split(/^## /m).slice(1)) {
+      const page = /\(`([^`]+)`\)/.exec(section.split("\n")[0])?.[1];
+      const url = /^- \*\*Reach it:\*\*.*?URL `#([^`]+)`/m.exec(section)?.[1];
+      if (page && url) reached[page] = url;
+    }
+    expect(Object.keys(reached)).toContain("flight");
+    for (const [page, url] of Object.entries(reached)) {
+      const [route, , ...rest] = url.replace(/<[^>]+>/g, "7").split("/");
+      expect([page, pageFor(route, rest.join("/"))]).toEqual([page, page]);
+    }
   });
 });

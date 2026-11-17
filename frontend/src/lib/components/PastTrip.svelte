@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { app } from "$lib/app.svelte";
+  import { app, backToTrips } from "$lib/app.svelte";
   import type { Person, Trip, TripPhotos as PhotoReply } from "$lib/api-types";
   import { Button } from "$lib/components/ui/button";
   import { OptionsMenu, type OptionsMenuItem } from "$lib/components/ui/options-menu";
@@ -36,6 +36,7 @@
   let gallery = $state<{ showCluster: (cluster: number) => Promise<void>; viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
   let acting = $state<PersonSharing[]>([]);
   let settled = $state(false);
+  let sharingOpen = $state(false);
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let lost = $state<Set<number>>(new Set());
@@ -73,7 +74,7 @@
 <div class="flex flex-col gap-5" data-testid="past-trip">
   <div class="relative flex items-center justify-between gap-3">
     {#if back}
-      <a class="-ml-1 inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" aria-hidden="true" /> Past trips</a>
+      <a class="-ml-1 inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips" onclick={backToTrips}><ArrowLeft class="size-4" aria-hidden="true" /> Past trips</a>
     {:else}
       <span></span>
     {/if}
@@ -151,7 +152,7 @@
     {/if}
   {/if}
 
-  <TripPhotos bind:this={gallery} onsharing={(next, done) => { acting = next; settled = done; }} onstatus={(next) => (status = next)} timeline {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
+  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next, done) => { acting = next; settled = done; }} onstatus={(next) => (status = next)} timeline {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
 </div>
 
 {#snippet controls()}
@@ -159,7 +160,7 @@
     <div class="flex flex-wrap items-center gap-2">
       {#if viewDrawn}<Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button>{/if}
       {#if hasControl}
-        <TripPhotoSharingMenu {acting} tripName={trip.name} align="start" fallback={() => gallery?.headingElement()} />
+        <TripPhotoSharingMenu {acting} tripName={trip.name} align="start" bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
       {:else if holdSlot}
         <span class="inline-block h-8 w-[84px] phone:h-11" aria-hidden="true" data-testid="sharing-slot"></span>
       {/if}

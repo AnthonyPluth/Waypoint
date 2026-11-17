@@ -153,7 +153,9 @@ describe("the Offline access card inside the iPhone app", () => {
     await open({ trips: [entry(1, "Lisbon in June")], savedAt: NOW });
     shell.replies.set("setSaving", null);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    expect(screen.getByRole("switch")).toBeChecked();
     await user.click(screen.getByRole("switch"));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Couldn’t change saving on this device"));
+    await waitFor(() => expect(screen.getByRole("switch")).toBeChecked());
   });
 });

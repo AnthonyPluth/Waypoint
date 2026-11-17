@@ -51,6 +51,14 @@ Made in chat after seeing the frames and the build side by side (phone and deskt
 - The headline stays a polite live region with the countdown, as drawn.
 - The wording "Updated less than a minute ago" and "Couldn’t refresh. Last updated <time>." is accepted.
 
+## Owner decisions on the build (#716, 2026-11-17)
+
+- The compact booking (a one-line "Flight progress" bar, "Departed 9:46 am", "Lands 10:52 am") goes in the Upcoming booking sheet, where a flight opened from the day-by-day list used to show the full booking card and the `FlightStatus` block, and not on the trip page, which keeps the full flight card from #714 untouched. This is a different screen from the one `c-elsewhere.html` names.
+- "Flights today" is a separate, flights-only list on Upcoming, above the existing day-by-day lists, which stay as they are.
+- The Home card keeps "Next up" (or "In the air"), the confirmation codes, Open trip and the gate-code control as before, and a flight with no live status shows its booked times like the flight card does.
+- The Home flight card no longer shows the check-in countdown, the brand logo, the seat and cabin lines or the "Confirmed" chip (owner, 2026-11-17, after seeing the frames and the build side by side). The full card, with the dropped lines, stays outside the window and after the flight lands, and the trip page keeps its full flight card.
+- The Home flight card keeps Check in / Open in app / Manage booking, Directions, Call, the travellers and the cost (owner, 2026-11-17, after the review asked whether they were meant to go): the card shows them as the old card did, under the drawn footer.
+
 ## Fonts
 
 The pages load Geist and Geist Mono from Google Fonts when you are online and fall back to system fonts otherwise. This is for viewing these design files only; the app bundles its own fonts and loads nothing from outside.

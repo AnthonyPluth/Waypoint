@@ -205,7 +205,7 @@
               <div class="flex min-w-0 flex-wrap justify-end gap-x-1 text-[13px] text-muted-foreground">
                 <span>Seats:</span>
                 <ul aria-label="Seats by traveller" class="flex flex-wrap gap-x-1" role="list">
-                  {#each view.seats as row (row.name)}
+                  {#each view.seats as row (row.id)}
                     <li class="after:content-[','] last:after:content-none">{row.first}{" "}{#if row.seat}{row.seat}{:else}<span aria-hidden="true">—</span><span class="sr-only">Not known yet</span>{/if}</li>
                   {/each}
                 </ul>
@@ -215,7 +215,7 @@
         {:else}
           {#if view.seats.length}
             <ul role="list" aria-label="Seats by traveller" class="overflow-hidden rounded-[18px] border border-border bg-card">
-              {#each view.seats as row (row.name)}
+              {#each view.seats as row (row.id)}
                 <li class="flex items-center gap-3 border-b border-border px-3.5 py-[11px] last:border-b-0">
                   <span class="min-w-0 flex-1"><b class="block truncate text-sm font-semibold">{row.name}</b><span class="text-[13px] text-muted-foreground">{row.seat ? `Seat ${row.seat}` : "Seat not known yet"}{row.cabin ? ` · ${row.cabin}` : ""}</span></span>
                   <SourceDot kind="booking" />

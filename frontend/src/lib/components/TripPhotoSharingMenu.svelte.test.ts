@@ -39,6 +39,7 @@ type Call = { method?: string };
 let mine: PhotoSharing | Error;
 let hers: PhotoSharing | Error;
 let photos: TripPhoto[];
+let failReload = false;
 
 function serve() {
   vi.mocked(api).mockImplementation(async (path: string, opts?: Call) => {
@@ -49,6 +50,10 @@ function serve() {
         return mine as never;
       }
       if (which instanceof Error) throw which;
+      if (failReload && opts?.method === "POST") {
+        mine = new Refusal("The server fell over", 500);
+        return which as never;
+      }
       return which as never;
     }
     if (path === "/api/photo-grants") return { people: [grants(1), grants(3)] } as never;
@@ -70,6 +75,7 @@ beforeEach(() => {
   hers = new Refusal("No such trip", 404);
   photos = [photo(1), photo(2)];
   viewport.phone = false;
+  failReload = false;
   serve();
 });
 afterEach(() => { app.state = null; viewport.phone = false; });
@@ -331,5 +337,51 @@ describe("The bottom sheet on a phone", () => {
     await user.click(within(confirm).getByRole("button", { name: "Keep sharing" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: stopTitle })).toBeNull());
     expect(screen.getByRole("dialog", { name: "Photo sharing for this trip" })).toBeInTheDocument();
+  });
+
+  it("shows why the controls are locked, with Try again, inside the sheet after a reload fails", async () => {
+    mount();
+    await user.click(await button());
+    const sheet = await panel();
+    failReload = true;
+    await user.click(within(sheet).getByRole("radio", { name: /^Only me/ }));
+    const notice = await within(sheet).findByRole("alert");
+    expect(notice).toHaveTextContent("Couldn’t refresh your photo sharing for this trip, so what shows may be out of date.");
+    expect(within(sheet).getByRole("radio", { name: /^Only me/ })).toBeDisabled();
+    expect(within(sheet).getByRole("button", { name: "Stop sharing on this trip" })).toBeDisabled();
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    failReload = false;
+    mine = sharing({ scope: "only_me" });
+    await user.click(within(notice).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(within(sheet).queryByRole("alert")).toBeNull());
+    expect(within(sheet).getByRole("radio", { name: /^Only me/ })).toBeEnabled();
+    expect(within(sheet).getByRole("radio", { name: /^Only me/ })).toBeChecked();
+    expect(screen.getByRole("dialog", { name: "Photo sharing for this trip" })).toBeInTheDocument();
+  });
+
+  it("keeps the one notice on the page once the sheet is closed", async () => {
+    mount();
+    await user.click(await button());
+    const sheet = await panel();
+    failReload = true;
+    await user.click(within(sheet).getByRole("radio", { name: /^Only me/ }));
+    await within(sheet).findByRole("alert");
+    await user.click(within(sheet).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const notice = await screen.findByRole("alert");
+    expect(notice).toHaveTextContent("Couldn’t refresh your photo sharing for this trip");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
+  it("stops sharing from the sheet, closing it and leaving the reminder on the page with focus on the Photos heading", async () => {
+    mount();
+    await user.click(await button());
+    await user.click(within(await panel()).getByRole("button", { name: "Stop sharing on this trip" }));
+    await user.click(within(await screen.findByRole("dialog", { name: stopTitle })).getByRole("button", { name: "Stop sharing" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(vi.mocked(api)).toHaveBeenCalledWith("/api/trips/7/photo-sharing?person_id=1", expect.objectContaining({ method: "DELETE" }));
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+    expect(await screen.findByTestId("photo-reminder")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { level: 2, name: /^Photos/ })).toHaveFocus());
   });
 });

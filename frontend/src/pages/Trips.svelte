@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { errMsg } from "$lib/act";
-  import { app, route, setQuery } from "$lib/app.svelte";
+  import { app, currentEntry, route, setQuery } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
   import { takeEarlyTrips } from "$lib/early";
   import type { Person, Trip, TripCover } from "$lib/api-types";
@@ -21,6 +21,7 @@
   import { panes } from "$lib/panes.svelte";
   import { blankFor } from "$lib/segment-form";
   import { limited } from "$lib/limit";
+  import { take, track } from "$lib/trips-position";
   import { distance as distanceText } from "$lib/stats";
   import { dayIn, inYear, isPast, matchesText, pastByYear, splitTrips, tripYears, viewerZone } from "$lib/trips";
   import TripPane from "./Trip.svelte";
@@ -133,7 +134,10 @@
   const selected = $derived(shown ? (shown.upcoming.find((t) => t.id === tripParam) ?? shown.upcoming[0] ?? null) : null);
   const photoCounts = $derived(new Map([...covers.values()].map((c) => [c.trip_id, c.count])));
   const pastGroups = $derived(shown ? pastByYear(shown.past, photoCounts) : []);
-  let revealed = $state(1);
+  const returning = take(currentEntry());
+  let restoring = returning;
+  let revealed = $state(returning?.revealed ?? 1);
+  let scroller = $state<HTMLElement | null>(null);
   let loadingYear = $state<number | null>(null);
   let loadedNote = $state("");
   let sentinel = $state<HTMLElement | null>(null);
@@ -165,6 +169,22 @@
     const seen = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) untrack(showNextYear); }, { rootMargin: "600px 0px" });
     seen.observe(watched);
     return () => seen.disconnect();
+  });
+  $effect(() => {
+    if (!restoring || shown === null) return;
+    const target = restoring;
+    restoring = null;
+    void tick().then(() => {
+      window.scrollTo(0, target.scroll);
+      scroller?.scrollTo(0, target.inner);
+    });
+  });
+  $effect(() => {
+    const position = { scroll: restoring?.scroll ?? window.scrollY, inner: restoring?.inner ?? 0, revealed };
+    track(position);
+    const note = () => { position.scroll = window.scrollY; position.inner = scroller?.scrollTop ?? 0; };
+    window.addEventListener("scroll", note, { capture: true, passive: true });
+    return () => { window.removeEventListener("scroll", note, { capture: true }); track(null); };
   });
   const reloaded = (movedTo?: number) => {
     if (!movedTo) { void load(); return; }
@@ -296,7 +316,7 @@
   {/snippet}
   {#if panes.two && selected}
     <div class="grid grid-cols-[clamp(16rem,28%,24rem)_minmax(0,1fr)] items-start gap-8">
-      <div class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
+      <div bind:this={scroller} class="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto pr-1">{@render list()}</div>
       <div class="min-w-0" data-testid="trip-pane" aria-label="Selected trip" role="region">{#key selected.id}<TripPane tripId={selected.id} onchanged={reloaded} revision={paneRevision} />{/key}</div>
     </div>
   {:else}

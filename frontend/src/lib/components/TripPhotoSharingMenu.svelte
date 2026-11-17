@@ -7,8 +7,8 @@
   import type { PersonSharing } from "$lib/trip-sharing.svelte";
   import X from "@lucide/svelte/icons/x";
 
-  let { acting, tripName, fallback, button = $bindable(null), align = "end" }: {
-    acting: PersonSharing[]; tripName: string; fallback: () => HTMLElement | null | undefined; button?: HTMLElement | null; align?: "start" | "end";
+  let { acting, tripName, fallback, button = $bindable(null), open = $bindable(false), align = "end" }: {
+    acting: PersonSharing[]; tripName: string; fallback: () => HTMLElement | null | undefined; button?: HTMLElement | null; open?: boolean; align?: "start" | "end";
   } = $props();
 
   const TITLE = "Photo sharing for this trip";
@@ -16,7 +16,6 @@
   const panelId = `photo-sharing-${id}`;
   const cards = $derived(acting.filter((a) => a.mode === "card"));
   const asking = $derived(acting.some((a) => a.dialog));
-  let open = $state(false);
   let opened = $state<Set<number>>(new Set());
   let panel = $state<HTMLElement | null>(null);
   let title = $state<HTMLElement | null>(null);
@@ -94,6 +93,7 @@
 
 {#snippet sections()}
   {#each cards as a, at (a.personId)}
+    <TripPhotoSharing sharing={a} {tripName} part="problem" />
     <TripPhotoSharing sharing={a} {tripName} part="card" panel expanded={expandedFor(a, at)} ontoggle={at === 0 ? undefined : () => toggle(a)} />
   {/each}
 {/snippet}

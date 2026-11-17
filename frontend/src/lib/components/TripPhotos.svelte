@@ -19,10 +19,10 @@
   const NONE: ReadonlySet<number> = new Set();
   const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, leftOut = NONE, onlook, onstatus, onsharing }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false) }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
     timeline?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
-    onsharing?: (acting: PersonSharing[], settled: boolean) => void;
+    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean;
   } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
@@ -437,7 +437,7 @@
       <h2 id="trip-photos-title" class="flex items-baseline gap-2 text-heading" tabindex="-1" bind:this={heading}>Photos{#if total}<span class="text-caption text-muted-foreground">{total}</span>{/if}</h2>
       {#if total || hasCard}
         <div class="flex flex-wrap items-center gap-2">
-          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} />
+          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} bind:open={sharingOpen} />
           {#if total}
             {#if ownCount > 0 && !selecting}
               <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
@@ -472,7 +472,9 @@
       </div>
     {/if}
     {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {#if !(sharingOpen && a.mode === "card")}
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {/if}
       <TripPhotoSharing sharing={a} tripName={trip.name} part="prompt" />
     {/each}
 
