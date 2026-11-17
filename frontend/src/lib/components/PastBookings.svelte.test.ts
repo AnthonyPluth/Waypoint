@@ -67,6 +67,28 @@ describe("PastBookings grouped", () => {
   });
 });
 
+describe("PastBookings changed", () => {
+  const changed = segment({ id: 7, kind: "hotel", origin: "Red Cliff Lodge", destination: "Moab", start_local: "2025-06-12T15:00", end_local: "2025-06-14T11:00", status: "changed", confirmation: "ZQ9X7K" });
+
+  it("shows a Changed chip on the row of a changed booking in the grouped list", () => {
+    render(PastBookings, { segments: [...trip, changed], onopen: vi.fn() });
+    const row = screen.getByRole("button", { name: /Red Cliff Lodge/ });
+    expect(within(row).getByText("Changed")).toHaveAttribute("data-tone", "warn");
+    expect(within(screen.getByRole("button", { name: /Red Rock Lodge/ })).queryByText("Changed")).toBeNull();
+  });
+
+  it("shows it in the flat list too, and not as the cancelled label", () => {
+    render(PastBookings, { segments: [...trip, changed], grouped: false, onopen: vi.fn() });
+    expect(within(screen.getByRole("list", { name: "Bookings" })).getAllByText("Changed")).toHaveLength(1);
+    expect(within(screen.getByRole("button", { name: /Red Cliff Lodge/ })).queryByText(/Cancelled/)).toBeNull();
+  });
+
+  it("shows no chip when nothing changed", () => {
+    render(PastBookings, { segments: trip, onopen: vi.fn() });
+    expect(screen.queryByText("Changed")).toBeNull();
+  });
+});
+
 describe("PastBookings flat", () => {
   it("has no group headings and puts the date in each row", () => {
     render(PastBookings, { segments: trip, grouped: false, onopen: vi.fn() });

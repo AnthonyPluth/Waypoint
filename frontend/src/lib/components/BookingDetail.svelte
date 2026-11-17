@@ -20,7 +20,7 @@
   };
   let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus }: Props = $props();
 
-  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; codes?: string[]; people?: { id: number | null; name: string; seat?: string | null }[] };
+  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; code?: string; codes?: string[]; people?: { id: number | null; name: string; notes: string[] }[] };
 
   const first = $derived(card.lead);
   const name = $derived(first.kind === "flight" || first.kind === "train" ? bookingName(first) : headline(first));
@@ -51,9 +51,10 @@
     const dates = (): Row => ({ label: "Dates", value: bookingSpan(s), strike: struck });
     const rows: Row[] = [];
     if (s.kind === "flight" || s.kind === "train") {
+      const unnamed = seat.split(", ").filter((x) => x && !(shownTravellers && seatsNamed.has(x))).join(", ");
       rows.push(when(START_WORD[s.kind], at(s, s.start_local, s.origin, false)), when(END_WORD[s.kind], at(s, s.end_local, s.destination, false)));
       if (s.kind === "flight") rows.push({ label: "Terminal", value: s.details.terminal });
-      rows.push({ label: "Seat", value: seat }, { label: "Cabin", value: s.details.cabin });
+      rows.push({ label: "Seat", value: unnamed }, { label: "Cabin", value: s.details.cabin });
     } else if (s.kind === "hotel") {
       rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim() }, { label: "Room", value: s.details.room });
     } else if (s.kind === "car") {
@@ -71,18 +72,35 @@
       const from = dayOf(s, s.start_local), to = dayOf(s, s.end_local);
       rows.push({ label: "Dates", value: from === to ? from : `${from} – ${to}`, strike: struck }, { label: "Place", value: headline(s) }, { label: "Notes", value: s.details.notes, lines: true });
     }
-    if (struck && !card.cancelled) rows.push({ label: "Status", value: "Cancelled, so not in the trip’s total" });
+    if (struck && !card.cancelled) rows.push({ label: "Status", value: "Cancelled, so not in the trip’s total", code: s.confirmation ?? undefined });
     return rows.filter((r) => r.value);
   }
 
   const codes = $derived([...new Set(card.segments.map((s) => s.confirmation).filter((c): c is string => !!c))]);
-  const seatOf = (p: { id: number | null; name: string }): string | null =>
-    card.segments.flatMap((s) => s.travelers).find((t) => t.seat && (p.id != null ? t.person_id === p.id : t.person_id == null && t.name.trim().toLowerCase() === p.name.trim().toLowerCase()))?.seat ?? null;
+  const isPerson = (p: { id: number | null; name: string }) => (t: { person_id: number | null; name: string }): boolean =>
+    p.id != null ? t.person_id === p.id : t.person_id == null && t.name.trim().toLowerCase() === p.name.trim().toLowerCase();
+  const split = $derived(!card.cancelled && card.segments.some((s) => s.status === "cancelled"));
+  const combined = $derived(card.segments.length > 1);
   const travellers = $derived(bookingTravellers(card.segments));
+  const shownTravellers = $derived(travellers.people.length > 0 && showBookingTravellers(first, everyone));
+  const people = $derived(travellers.people.map((p) => {
+    const legs = card.segments.flatMap((s) => { const t = s.travelers.find(isPerson(p)); return t ? [{ s, seat: t.seat }] : []; });
+    const live = legs.filter((l) => l.s.status !== "cancelled");
+    const seated = (live.length ? live : legs).filter((l) => l.seat);
+    const tag = (c: string | null) => (combined && c ? ` (${c})` : "");
+    const differ = new Set(seated.map((l) => l.seat)).size > 1;
+    const dead = split ? legs.find((l) => l.s.status === "cancelled") : undefined;
+    return {
+      ...p,
+      seats: seated.map((l) => l.seat as string),
+      notes: [...(differ ? seated.map((l) => `Seat ${l.seat}${tag(l.s.confirmation)}`) : seated.length ? [`Seat ${seated[0].seat}`] : []), ...(dead ? [`On cancelled booking${dead.s.confirmation ? ` ${dead.s.confirmation}` : ""}`] : [])],
+    };
+  }));
+  const seatsNamed = $derived(new Set(people.flatMap((p) => p.seats)));
   const rows = $derived<Row[]>([
     ...card.segments.flatMap(rowsOf),
     ...(codes.length ? [{ label: codes.length > 1 ? "Confirmations" : "Confirmation", codes }] : []),
-    ...(travellers.people.length && showBookingTravellers(first, everyone) ? [{ label: "Travellers", people: travellers.people.map((p) => ({ ...p, seat: seatOf(p) })) }] : []),
+    ...(shownTravellers ? [{ label: "Travellers", people }] : []),
     ...(showCosts ? card.segments.filter((s) => s.price).map((s): Row => ({ label: "Price", value: formatMoney(s.price!.amount_minor, s.price!.currency), strike: s.status === "cancelled" })) : []),
   ]);
 
@@ -116,6 +134,8 @@
         <StatusChip chip={bookingChip("cancelled")} />
         <p class="text-caption text-muted-foreground">Cancelled, so not in the trip’s total</p>
       </div>
+    {:else if card.changed}
+      <StatusChip chip={bookingChip("changed")} />
     {/if}
     {#each notes as note (note)}<p class="text-sm text-signal-ink" role="note">{note}</p>{/each}
     <dl class="border-t border-border">
@@ -127,14 +147,15 @@
               {#each row.codes as code (code)}<span class="flex items-center gap-2"><span class="mono text-[17px] tracking-[0.04em]">{code}</span><CopyButton text={code} name={`Copy confirmation code ${code}`} /></span>{/each}
             {:else if row.people}
               <span class="flex items-center gap-2"><span aria-hidden="true"><AvatarStack people={row.people} /></span>
-                {#if row.people.some((p) => p.seat)}
-                  <span class="flex min-w-0 flex-col items-end">{#each row.people as p, j (j)}<span class="break-words">{p.name}{#if p.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {p.seat}</span>{/if}</span>{/each}</span>
+                {#if row.people.some((p) => p.notes.length)}
+                  <span class="flex min-w-0 flex-col items-end">{#each row.people as p, j (j)}<span class="break-words">{p.name}{#each p.notes as note (note)}{" "}<span class="font-normal text-muted-foreground">· {note}</span>{/each}</span>{/each}</span>
                 {:else}
                   <span class="min-w-0 break-words">{row.people.map((p) => p.name).join(", ")}</span>
                 {/if}
               </span>
             {:else}
               <span class={`min-w-0 break-words ${row.strike ? "text-muted-foreground line-through" : ""}`}>{row.value}</span>
+              {#if row.code}<span class="mono text-muted-foreground">{row.code}</span>{/if}
               {#if row.address}<CopyButton text={row.address} name="Copy address" />{/if}
             {/if}
           </dd>
