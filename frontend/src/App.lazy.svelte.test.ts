@@ -8,7 +8,7 @@ vi.mock("./pages/Stats.svelte", () => { throw new Error("Failed to fetch dynamic
 
 import { api } from "$lib/api";
 import { app } from "$lib/app.svelte";
-import { state } from "./test/fixtures";
+import { segment, state, trip } from "./test/fixtures";
 import App from "./App.svelte";
 
 const go = async (hash: string) => {
@@ -34,6 +34,15 @@ describe("pages that load on demand", () => {
     render(App);
     await go("#people");
     expect(await screen.findByRole("heading", { name: "People" })).toBeInTheDocument();
+  });
+
+  it("opens a flight's live status view from the address of a trip's flight", async () => {
+    const loop = trip([segment({ id: 3, trip_id: 7 })], { id: 7, name: "Four Corners loop" });
+    vi.mocked(api).mockImplementation(async (path) => (path === "/api/trips/7" ? loop : path === "/api/flight-status" ? { enabled: false, month: "", used: 0, limit: 0, paused: null, statuses: [] } : {}) as never);
+    render(App);
+    await go("#trip/7/flight/3");
+    expect(await screen.findByRole("link", { name: "Back to Four Corners loop" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
   });
 
   it("says so, with a way to reload, when a page's file can't be fetched", async () => {

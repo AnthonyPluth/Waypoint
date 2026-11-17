@@ -209,6 +209,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `LANDED`, `+1 day`, `DELAYED 50 MIN`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 1 day before departure`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
 
+#### `flight-status`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `London`, `Back to`.
+- **Expects to see:** `Trips`, `Landing in`, `Not known yet`, `Jane`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-status`; or `poetry run python run.py verify --flow flight-status`.
+
 #### `hotel-address`
 
 - **Starts at:** `#trips`.
@@ -539,6 +548,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
   - Without `--signed-in`, the demo runs as the local user, for whom photos are off: the page then has no hero photos and no days, and shows the route map and its replay in the hero's place.
   - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. Its booking cards sit below the days until the Bookings sheet lands.
   - The route replay plays on its own once it is on the page (the hero when there are no photos, or the replay that Replay trip opens); press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
+
+## flight (`flight`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** URL `#flight`; control `tools/control goto flight`.
+- **Drive it:** `tools/control goto flight`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
 
 ## Stats (`stats`)
 
