@@ -5,7 +5,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 
 import { api } from "$lib/api";
 import { fake, fakeMk } from "../test/fake-mapkit";
-import { forgetMapkit, forgetPreload, LOAD_MS, loadMapkit, PRELOAD_MS, preloadMapkit } from "./mapkit";
+import { forgetMapkit, forgetPreload, LOAD_MS, loadMapkit, PRELOAD_MS, preloadMapkit, RETRY_MS } from "./mapkit";
 
 const SCRIPT = "https://maps.example.test/mapkit.js";
 const on = { enabled: true, token: "signed.token.value", expires: 4102444800, script: SCRIPT };
@@ -212,6 +212,66 @@ describe("preloading MapKit", () => {
     maps?.onFailure(cancelled)();
     await flush();
     expect(cancelled).not.toHaveBeenCalled();
+  });
+
+  it("forgets a failure once a later token refresh succeeds", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = (await pending)!;
+    expect(maps.failed()).toBe(false);
+    fake.emit("error", { status: "Unauthorized" });
+    expect(maps.failed()).toBe(true);
+    const done = vi.fn();
+    fake.inits[0].authorizationCallback(done);
+    await flush();
+    expect(done).toHaveBeenCalledWith("signed.token.value");
+    expect(maps.failed()).toBe(false);
+    const lost = vi.fn();
+    maps.onFailure(lost);
+    await flush();
+    expect(lost).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failure while the token refresh itself fails", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = (await pending)!;
+    vi.mocked(api).mockRejectedValueOnce(new Error("offline"));
+    fake.inits[0].authorizationCallback(vi.fn());
+    await flush();
+    expect(maps.failed()).toBe(true);
+  });
+
+  it("forgets a failure when MapKit reports it initialized again", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = (await pending)!;
+    fake.emit("error", { status: "Unauthorized" });
+    expect(maps.failed()).toBe(true);
+    fake.emit("configuration-change", { status: "Refreshed" });
+    expect(maps.failed()).toBe(true);
+    fake.emit("configuration-change", { status: "Initialized" });
+    expect(maps.failed()).toBe(false);
+  });
+
+  it("forgets a failure after a short backoff, and not before", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = (await pending)!;
+    vi.useFakeTimers();
+    fake.emit("error", { status: "Unauthorized" });
+    vi.advanceTimersByTime(RETRY_MS - 1);
+    expect(maps.failed()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(maps.failed()).toBe(false);
   });
 
   it("does not strand later replays when the token request never settles, as when a page change cancelled it", async () => {
