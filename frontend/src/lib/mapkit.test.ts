@@ -5,7 +5,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 
 import { api } from "$lib/api";
 import { fake, fakeMk } from "../test/fake-mapkit";
-import { forgetMapkit, LOAD_MS, loadMapkit } from "./mapkit";
+import { forgetMapkit, forgetPreload, LOAD_MS, loadMapkit, PRELOAD_MS, preloadMapkit } from "./mapkit";
 
 const SCRIPT = "https://maps.example.test/mapkit.js";
 const on = { enabled: true, token: "signed.token.value", expires: 4102444800, script: SCRIPT };
@@ -13,6 +13,7 @@ let scripts: HTMLScriptElement[] = [];
 
 beforeEach(() => {
   forgetMapkit();
+  forgetPreload();
   fake.reset();
   scripts = [];
   vi.mocked(api).mockReset();
@@ -29,7 +30,7 @@ describe("loading MapKit", () => {
     expect(await loadMapkit()).toBeNull();
     expect(await loadMapkit()).toBeNull();
     expect(api).toHaveBeenCalledTimes(1);
-    expect(api).toHaveBeenCalledWith("/api/mapkit/token");
+    expect(api).toHaveBeenCalledWith("/api/mapkit/token", { keep: true, background: true });
     expect(scripts).toHaveLength(0);
     expect(fake.inits).toHaveLength(0);
   });
@@ -173,6 +174,93 @@ describe("loading MapKit", () => {
     vi.mocked(api).mockResolvedValue(on as never);
     (window as { mapkit?: unknown }).mapkit = fakeMk;
     expect((await loadMapkit())?.mk).toBe(fakeMk);
+    expect(scripts).toHaveLength(0);
+  });
+});
+
+describe("preloading MapKit", () => {
+  it("asks for the token in a way that moving to another page does not cancel", async () => {
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+    await loadMapkit();
+    expect(vi.mocked(api).mock.calls[0][1]).toMatchObject({ keep: true, background: true });
+  });
+
+  it("also asks for the refresh the same way, so a lapsed session shows the banner and does not redirect", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    await pending;
+    const done = vi.fn();
+    fake.inits[0].authorizationCallback(done);
+    await flush();
+    expect(vi.mocked(api).mock.calls.at(-1)?.[1]).toMatchObject({ keep: true, background: true });
+  });
+
+  it("tells a replay that opens after MapKit already failed, at once", async () => {
+    vi.mocked(api).mockResolvedValue(on as never);
+    const pending = loadMapkit();
+    await flush();
+    loaded();
+    const maps = await pending;
+    fake.emit("error", { status: "Unauthorized" });
+    const lost = vi.fn();
+    maps?.onFailure(lost);
+    await flush();
+    expect(lost).toHaveBeenCalledOnce();
+    const cancelled = vi.fn();
+    maps?.onFailure(cancelled)();
+    await flush();
+    expect(cancelled).not.toHaveBeenCalled();
+  });
+
+  it("does not strand later replays when the token request never settles, as when a page change cancelled it", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockReturnValueOnce(new Promise(() => {}) as never);
+    const first = loadMapkit();
+    await vi.advanceTimersByTimeAsync(LOAD_MS);
+    expect(await first).toBeNull();
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+    expect(await loadMapkit()).toBeNull();
+    expect(api).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks once, a few seconds in, when the browser is idle, and not before", async () => {
+    vi.useFakeTimers();
+    const idle = vi.fn((run: () => void) => { run(); return 1; });
+    vi.stubGlobal("requestIdleCallback", idle);
+    vi.stubGlobal("cancelIdleCallback", vi.fn());
+    vi.mocked(api).mockResolvedValue({ enabled: false } as never);
+    preloadMapkit();
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS - 1);
+    expect(api).not.toHaveBeenCalled();
+    expect(idle).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(idle).toHaveBeenCalledOnce();
+    expect(api).toHaveBeenCalledOnce();
+    preloadMapkit();
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS);
+    expect(api).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it("falls back to a timer when the browser has no idle callback, and a failure is not retried", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestIdleCallback", undefined);
+    vi.mocked(api).mockRejectedValue(new Error("offline"));
+    preloadMapkit();
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 5);
+    expect(api).toHaveBeenCalledOnce();
+    expect(scripts).toHaveLength(0);
+    vi.unstubAllGlobals();
+  });
+
+  it("does nothing when it is cancelled first", async () => {
+    vi.useFakeTimers();
+    vi.mocked(api).mockResolvedValue(on as never);
+    preloadMapkit()();
+    await vi.advanceTimersByTimeAsync(PRELOAD_MS * 5);
+    expect(api).not.toHaveBeenCalled();
     expect(scripts).toHaveLength(0);
   });
 });
