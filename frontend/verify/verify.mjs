@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { animationsRunning, auditPage } from "./a11y.mjs";
+import { fakeShellScript, SHELL_STATES } from "./fake-shell.mjs";
 import { planVisits, runPool, summarize, urlsOf } from "./jobs.mjs";
 
 export const PHONE_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
@@ -42,7 +43,7 @@ export const MAPKIT_MODES = ["fake", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", fake_shell: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -242,6 +243,9 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
       if (!t || route.request().method() !== "GET") return route.fallback();
       return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
     });
+  } else if ("fake_shell" in step) {
+    if (!SHELL_STATES.includes(step.fake_shell)) throw new Error(`fake_shell takes one of ${SHELL_STATES.join(", ")}`);
+    await page.addInitScript(fakeShellScript, step.fake_shell);
   } else if ("fake_photo_limit" in step) {
     const limit = step.fake_photo_limit;
     await page.route(/\/api\/trips\/\d+\/photos$/, async (route) => {

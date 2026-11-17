@@ -2,19 +2,22 @@
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
+  import OfflineShellCard from "$lib/components/settings/OfflineShellCard.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import { ago, savedList, WHEN_SAVED } from "$lib/offline";
   import { offline, refreshOffline, removeOffline, switchSaving } from "$lib/offline.svelte";
+  import { inShell } from "$lib/offline-shell";
   import { deviceCheckName } from "$lib/platform";
   import { toast } from "svelte-sonner";
   import { onMount } from "svelte";
 
+  const shell = inShell();
   const check = deviceCheckName();
   let setting = $state(false);
   let asking = $state(false);
   let changing = $state(false);
   let now = $state(Date.now());
-  onMount(() => { void refreshOffline(); now = Date.now(); });
+  onMount(() => { if (!shell) void refreshOffline(); now = Date.now(); });
 
   async function toggle(on: boolean) {
     changing = true;
@@ -28,6 +31,9 @@
   }
 </script>
 
+{#if shell}
+  <OfflineShellCard />
+{:else if !offline.oldApp}
 <section aria-labelledby="offline-title" class="space-y-2">
   <h2 id="offline-title" class="eyebrow px-1">Offline access</h2>
   <div class="rows">
@@ -79,6 +85,7 @@
     {/if}
   </div>
 </section>
+{/if}
 
 <OfflineSetup bind:open={setting} title="Set up offline access" />
 

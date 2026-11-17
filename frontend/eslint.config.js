@@ -17,7 +17,7 @@ const RESTRICTED = {
   },
   storage: {
     selector: "Identifier[name=/^(localStorage|sessionStorage|indexedDB)$/]",
-    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server; the one thing kept on the device is the signed-in person's own copy of their upcoming trips, saved by lib/offline.ts, shown only to them, never sent anywhere else and cleared on sign-out, on a 401 or 403, when saving is turned off and, for each trip, 3 days after it ends, encrypted by lib/offline-vault.ts, which alone writes it to the Cache API (AGENTS.md, \"Waypoint's promises\").",
+    message: "Browser storage outlives sign-out and is readable by anything on the device: keep trips, names, codes and loyalty numbers on the server; the one thing kept on the device is the signed-in person's own copy of their upcoming trips, saved by lib/offline.ts, shown only to them, never sent anywhere else and cleared on sign-out, on a 401 or 403, when saving is turned off and, for each trip, 3 days after it ends; in a browser it is encrypted by lib/offline-vault.ts, which alone writes it to the Cache API, and the iPhone app keeps its own copy natively, never in browser storage (AGENTS.md, \"Waypoint's promises\").",
   },
   cache: {
     selector: "Identifier[name='caches']",

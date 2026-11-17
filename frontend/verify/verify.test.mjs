@@ -106,6 +106,8 @@ describe("flowProblems", () => {
     expect(flowProblems({ ...ok, steps: [{ fake_archive: "400" }] })).toEqual(["step 1: fake_archive takes a number"]);
     expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: 2 }] })).toEqual([]);
     expect(flowProblems({ ...ok, steps: [{ fake_photo_limit: "2" }] })).toEqual(["step 1: fake_photo_limit takes a number"]);
+    expect(flowProblems({ ...ok, steps: [{ fake_shell: "saved" }] })).toEqual([]);
+    expect(flowProblems({ ...ok, steps: [{ fake_shell: true }] })).toEqual(["step 1: fake_shell takes a string"]);
   });
 
   it("makes a made-up archive of the asked size from a trip of the demo, with ids of their own", () => {
