@@ -185,9 +185,7 @@
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
   const unasked = $derived(askable(shown));
   const unaskedElsewhere = $derived(only ? askable(items).length - unasked.length : 0);
-  const aiNote = (n: number) => review?.ai_hosted
-    ? `The text of ${n === 1 ? "this email goes" : `these ${n} emails go`} to OpenRouter, a hosted service, with email addresses and saved loyalty numbers removed.`
-    : `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to your own Ollama server, unredacted.`;
+  const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to your own Ollama server, unredacted.`;
   const askAll = (items: ReviewItem[]) => act(async () => {
     let done = 0;
     try {

@@ -311,12 +311,6 @@ class MustStayInReviewTests(NothingNewCase):
             result = self.scan(now=NOW + 60)
         self.assertEqual((result.review, len(self.kept()), self.fake.requests, self.counted()), (1, 1, [], (0, 0)))
 
-    def test_a_hosted_reading_is_held_to_the_same_comparison_and_attaches_a_repeat_to_its_booking(self):
-        self.turn_on("openrouter")
-        result = self.read_mail(REMINDER, SAME)
-        self.assertEqual((result.state, result.review, self.kept(), self.counted()), ("done", 0, [], (1, 0)))
-        self.assertEqual(self.fake.requests[-1][0], "/api/v1/chat/completions")
-
     def test_asking_by_hand_does_not_dismiss_a_known_booking(self):
         self.turn_on()
         self.add_mail("hand", mail(REMINDER, ident="hand"))

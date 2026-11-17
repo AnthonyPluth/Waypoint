@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Literal, TypedDict
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,29 +20,13 @@ from .. import money, regions
 from . import price
 from .flights import MAX_HOURS
 
-Mode = Literal["off", "local", "openrouter"]
-OFF: Mode = "off"
-LOCAL: Mode = "local"
-OPENROUTER: Mode = "openrouter"
-MODES: tuple[Mode, ...] = (OFF, LOCAL, OPENROUTER)
-KEY_ENV = "OPENROUTER_API_KEY"
-TIMEOUT = 30
-LOCAL_TIMEOUT = 3600
+TIMEOUT = 3600
 MAX_REPLY = 1_000_000
 MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
 NEEDS_AI = "Reading email with AI needs an AI mode (Local or OpenRouter) in Settings → AI."
-
-
-@dataclass(frozen=True)
-class Hosts:
-    openrouter: str = "https://openrouter.ai/api/v1"
-    allow_http: bool = False
-
-
-HOSTS = Hosts()
 
 
 class AiError(Exception):
@@ -88,43 +71,13 @@ class Reading:
 
 @dataclass(frozen=True)
 class Config:
-    mode: Literal["local", "openrouter"]
     model: str
-    url: str = ""
-    key: str = field(default="", repr=False)
-
-
-def saved_key(conn: db.Connection) -> tuple[str | None, Literal["env", "saved"] | None]:
-    env = (os.environ.get(KEY_ENV) or "").strip()
-    if env:
-        return env, "env"
-    saved = (db.get_setting(conn, sk.AI_OPENROUTER_KEY) or "").strip()
-    return (saved, "saved") if saved else (None, None)
-
-
-def mode(conn: db.Connection) -> Mode:
-    chosen = db.get_setting(conn, sk.AI_MODE)
-    return next((m for m in MODES if m == chosen), OFF)
-
-
-def config(conn: db.Connection) -> Config | None:
-    chosen = mode(conn)
-    if chosen == "local":
-        url, model = db.get_setting(conn, sk.AI_OLLAMA_URL), db.get_setting(conn, sk.AI_OLLAMA_MODEL)
-        return Config("local", model, url=url) if url and model else None
-    if chosen == "openrouter":
-        model, key = db.get_setting(conn, sk.AI_OPENROUTER_MODEL), saved_key(conn)[0]
-        return Config("openrouter", model, key=key) if model and key else None
-    return None
+    url: str
 
 
 def mail_config(conn: db.Connection) -> Config | None:
-    return config(conn)
-
-
-def hosted(conn: db.Connection) -> bool:
-    cfg = mail_config(conn)
-    return cfg is not None and cfg.mode == OPENROUTER
+    url, model = db.get_setting(conn, sk.AI_OLLAMA_URL), db.get_setting(conn, sk.AI_OLLAMA_MODEL)
+    return Config(model, url) if url and model else None
 
 
 MODEL_NAME = re.compile(r"[\w.:/@+-]{1,100}")
@@ -205,18 +158,13 @@ MAIL_SYSTEM = SYSTEM + SYSTEM_SEATS
 
 
 def request(cfg: Config, text: str, system: str = SYSTEM, thinking: bool = False,
-            pictures: Sequence[bytes] = ()) -> tuple[str, dict[str, str], dict[str, Any], bool]:
+            pictures: Sequence[bytes] = ()) -> tuple[str, dict[str, str], dict[str, Any]]:
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}, {"role": "user", "content": text}]
-    if cfg.mode == LOCAL:
-        if pictures:
-            messages[1]["images"] = [base64.b64encode(p).decode("ascii") for p in pictures]
-        return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
-                {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": thinking,
-                 "options": {"temperature": 0}}, True)
-    return (HOSTS.openrouter.rstrip("/") + "/chat/completions",
-            {"Content-Type": "application/json", "Authorization": f"Bearer {cfg.key}"},
-            {"model": cfg.model, "messages": messages, "temperature": 0, "response_format": {"type": "json_object"},
-             "provider": {"data_collection": "deny", "zdr": True}}, HOSTS.allow_http)
+    if pictures:
+        messages[1]["images"] = [base64.b64encode(p).decode("ascii") for p in pictures]
+    return (cfg.url.rstrip("/") + "/api/chat", {"Content-Type": "application/json"},
+            {"model": cfg.model, "messages": messages, "stream": False, "format": "json", "think": thinking,
+             "options": {"temperature": 0}})
 
 
 NO_BOOKING = "The AI didn’t find a booking in this message."
@@ -225,7 +173,6 @@ BAD_REPLY = "The AI’s answer wasn’t a booking Waypoint could use, so it was 
 UNREACHABLE = "Waypoint couldn’t reach the AI service."
 REFUSED = "The AI service didn’t accept the key."
 LIMITED = "The AI service is busy or over its limit. Try again later."
-NO_PRIVATE_PROVIDER = "No provider for this model keeps nothing and doesn’t train on it, so nothing was sent. Choose another model."
 FAILED = "The AI service couldn’t answer."
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?")
@@ -388,6 +335,8 @@ def booking(found: dict[str, Any], sent: str, seats: bool = False) -> Suggestion
         raise AiError(BAD_REPLY)
     out: Suggestion = {}
     values = {k: v.strip() for k, v in found.items() if k in FIELDS + OPTIONAL and isinstance(v, str) and v.strip()}
+    if any(REMOVED in v or EMAIL_REMOVED in v for v in values.values()):
+        raise AiError(BAD_REPLY)
     kind = values.get("kind")
     if kind not in KINDS or not values.get("origin"):
         raise AiError(BAD_REPLY)
@@ -476,37 +425,29 @@ def parse(content: Any, sent: str, seats: bool = False) -> Reading:
     return Reading(kept, _left_out(len(kept), len(listed), dropped[0]) if dropped else None, parking=parking)
 
 
-def _answer(cfg: Config, body: Any) -> Any:
+def _answer(body: Any) -> Any:
     if not isinstance(body, dict):
         return None
-    if cfg.mode == LOCAL:
-        message = body.get("message")
-        return message.get("content") if isinstance(message, dict) else None
-    choices = body.get("choices")
-    first = choices[0] if isinstance(choices, list) and choices else None
-    message = first.get("message") if isinstance(first, dict) else None
+    message = body.get("message")
     return message.get("content") if isinstance(message, dict) else None
 
 
-def _wait(cfg: Config, limit: float | None) -> float:
-    own = LOCAL_TIMEOUT if cfg.mode == LOCAL else TIMEOUT
-    return own if limit is None else max(1.0, min(own, limit))
+def _wait(limit: float | None) -> float:
+    return TIMEOUT if limit is None else max(1.0, min(TIMEOUT, limit))
 
 
 def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: float | None = None, thinking: bool = False,
          pictures: Sequence[bytes] = ()) -> Any:
-    url, headers, body, allow_http = request(cfg, text, system, thinking, pictures)
+    url, headers, body = request(cfg, text, system, thinking, pictures)
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
-        with tls.urlopen(req, _wait(cfg, timeout), allow_http=allow_http) as resp:
+        with tls.urlopen(req, _wait(timeout), allow_http=True) as resp:
             raw = resp.read(MAX_REPLY)
     except urllib.error.HTTPError as e:
         if e.code in (401, 403):
             raise AiError(REFUSED) from None
         if e.code == 429:
             raise AiError(LIMITED) from None
-        if e.code == 404 and cfg.mode == OPENROUTER:
-            raise AiError(NO_PRIVATE_PROVIDER) from None
         raise AiError(FAILED) from None
     except (OSError, ValueError):
         raise AiError(UNREACHABLE) from None
@@ -514,7 +455,7 @@ def _ask(cfg: Config, text: str, system: str, bad: str = BAD_REPLY, timeout: flo
         reply = json.loads(raw)
     except ValueError:
         raise AiError(bad) from None
-    return _answer(cfg, reply)
+    return _answer(reply)
 
 
 PICTURE_SYSTEM = (
@@ -526,7 +467,7 @@ MAX_PICTURES = 8
 
 
 def pick_picture(cfg: Config, pictures: Sequence[bytes], timeout: float | None = None) -> int | None:
-    if cfg.mode != LOCAL or not 2 <= len(pictures) <= MAX_PICTURES:
+    if not 2 <= len(pictures) <= MAX_PICTURES:
         return None
     try:
         reply = _ask(cfg, f"Pictures 1 to {len(pictures)} follow, in order.", PICTURE_SYSTEM,
@@ -540,16 +481,12 @@ def pick_picture(cfg: Config, pictures: Sequence[bytes], timeout: float | None =
     return chosen - 1
 
 
-def suggest(cfg: Config, text: str, timeout: float | None = None, known: tuple[str, ...] = ()) -> Reading:
-    if cfg.mode not in (LOCAL, OPENROUTER):
-        raise AiError(NEEDS_AI)
-    if cfg.mode == OPENROUTER:
-        text = redact(text, known)
+def suggest(cfg: Config, text: str, timeout: float | None = None) -> Reading:
     if not text.strip():
         raise AiError(NO_BOOKING)
     began = time.monotonic()
     first = _attempt(cfg, text, timeout)
-    if cfg.mode != LOCAL or not _doubtful(first, text):
+    if not _doubtful(first, text):
         return _reading(first)
     left = None if timeout is None else timeout - (time.monotonic() - began)
     if left is not None and left <= 0:

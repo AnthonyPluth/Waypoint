@@ -149,19 +149,6 @@ class AskAiVerdictTests(VerdictCase):
         [kept] = self.items()
         self.assertEqual(kept["suggestion_error"], ai.UNREACHABLE)
 
-    def test_a_hosted_model_that_calls_the_email_a_promotion_dismisses_nothing_either(self):
-        self.turn_on("openrouter")
-        self.put("promo_ids")
-        self.scan()
-        [item] = self.items()
-        self.fake.reset()
-        self.fake.content = VERDICT
-        with no_leaks(self, BODY, *IDS, database=self.path, sent_ok=True):
-            scan.suggest_now("u-jane", item["id"], NOW)
-        self.assertEqual(len(self.fake.requests), 1)
-        self.assertEqual([i["id"] for i in self.items()], [item["id"]])
-
-
 class AutomaticVerdictTests(VerdictCase):
     def waiting_items(self):
         return self.read(lambda conn: sorted(conn.execute(select(ReviewItem.message_id)).scalars()))

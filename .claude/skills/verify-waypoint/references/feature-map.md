@@ -817,8 +817,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#settings`; goes to: `#settings/mail`.
 - **Widths:** phone, desktop.
-- **Touches:** `Local (Ollama)`, `OpenRouter`.
-- **Expects to see:** `stays on your household’s server and network`, `OpenRouter, a hosted service outside your household`.
+- **Touches:** `Ollama address`, `Model`.
+- **Expects to see:** `Leave it empty to not use AI`, `It stays on your household’s own server`.
 - **Drive it:** `tools/control flow ai-card`; or `poetry run python run.py verify --flow ai-card`.
 
 #### `home-route-replay`

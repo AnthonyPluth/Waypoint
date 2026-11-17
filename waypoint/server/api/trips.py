@@ -256,7 +256,7 @@ def api_trip_destination_suggest(_conn, _q, body: DestinationBody, trip_id) -> D
     draft = _text(body, "name", "name", NAME_LIMIT)
     with db.session() as conn:
         facts = trips.destination_facts(conn, viewer(conn), this, draft)
-        cfg = ai.config(conn)
+        cfg = ai.mail_config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
     if facts is None:
         raise ApiError(NO_TRIP, 404)

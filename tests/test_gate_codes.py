@@ -570,20 +570,12 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.keep_two()
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
 
-    def test_openrouter_and_off_send_no_picture(self):
-        for mode in ("openrouter", "off"):
-            with self.subTest(mode=mode):
-                self.fake.reset()
-                with db.session() as conn:
-                    conn.execute(SegmentCode.__table__.delete())
-                self.turn_on(mode)
-                with db.session() as conn:
-                    db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "m/model")
-                    db.set_setting(conn, sk.AI_OPENROUTER_KEY, "sk-test-key-1234")
-                with no_leaks(self, *CANARIES, database=self.path):
-                    self.keep_two()
-                self.assertEqual(self.fake.requests, [])
-                self.assertEqual(self.state(), ("choose", "2026-10-16"))
+    def test_with_no_ollama_address_saved_no_picture_is_sent(self):
+        self.turn_off()
+        with no_leaks(self, *CANARIES, database=self.path):
+            self.keep_two()
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
     def test_one_candidate_and_a_booking_that_already_has_a_code_send_no_picture(self):
         self.turn_on()
@@ -1018,17 +1010,13 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(ReviewItem)).scalar()), 0)
         time.sleep(1.5)
 
-    def test_openrouter_and_off_send_nothing_whatever_the_review_path(self):
-        for mode in ("openrouter", "off"):
-            self.turn_on(mode)
-            with db.session() as conn:
-                db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "m/model")
-                db.set_setting(conn, sk.AI_OPENROUTER_KEY, "sk-test-key-1234")
-            for name, item, run in self.each():
-                with no_leaks(self, *CANARIES, database=self.path):
-                    run(item)
-                self.assertEqual(self.fake.requests, [], (mode, name))
-                self.assertEqual(self.state(), ("choose", "2026-10-16"))
+    def test_with_no_ollama_address_saved_nothing_is_sent_whatever_the_review_path(self):
+        self.turn_off()
+        for name, item, run in self.each():
+            with no_leaks(self, *CANARIES, database=self.path):
+                run(item)
+            self.assertEqual(self.fake.requests, [], name)
+            self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
     def test_two_parking_bookings_in_the_message_are_left_to_a_person(self):
         other = self.park({**PARKING, "confirmation": "PK30418"})

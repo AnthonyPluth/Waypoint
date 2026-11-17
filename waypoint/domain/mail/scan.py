@@ -17,7 +17,7 @@ from ...providers import gmail, mailimages
 from ...storage import db, gate_codes, stored_mail
 from ...storage.models import Mailbox, ReviewItem, ScannedMessage
 from ...storage.stored_mail import Content
-from .. import airports, loyalty, people, trips, visibility
+from .. import airports, people, trips, visibility
 from ..visibility import Viewer
 from . import ai, autoask, extract, followup, gatecode, glance, ingest, newer, nothing_new, query, review, triage
 from .booking import Passenger
@@ -404,7 +404,7 @@ class Read(NamedTuple):
 
 def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str = "", revises: bool = False) -> Read:
     try:
-        reading = ai.suggest(cfg, text, timeout, _known(cfg))
+        reading = ai.suggest(cfg, text, timeout)
         return Read(reading.bookings, reading.error, False, max(reading.parking, _parking_in(reading.bookings)),
                     nothing_new.signals(text, subject, revises))
     except ai.AiError as e:
@@ -412,13 +412,6 @@ def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str 
     except Exception as e:
         monitoring.report(e, values=False)
         return Read([], SUGGESTION_FAILED, True)
-
-
-def _known(cfg: ai.Config) -> tuple[str, ...]:
-    if cfg.mode != ai.OPENROUTER:
-        return ()
-    with db.session() as conn:
-        return tuple(loyalty.known_numbers(conn))
 
 
 def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
@@ -620,7 +613,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         with db.session() as conn:
             fixed = review.fixed_suggestions(conn, mailbox_id, message_id)
             said = review.keeping_fixed(fixed, read.suggestions)
-            answered = bool(said)
+            answered = bool(read.suggestions)
             filed = _file_ai(conn, mailbox_id, message_id, said or fixed, read.error, None if read.failed or (fixed and not answered) else True, time.time(),
                              read.parking, signals=read.signals, dismiss_known=answered and not fixed, sender=extract.own_sender(raw))
             made, cleared = made + filed.added, cleared + filed.cleared

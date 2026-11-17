@@ -1,17 +1,11 @@
 export interface AiBody {
-  mode: "off" | "local" | "openrouter";
   ollama_url?: string;
   ollama_model?: string;
-  openrouter_model?: string;
-  openrouter_key?: string;
 }
 
 export interface AiSettings {
-  mode: "off" | "local" | "openrouter";
   ollama_url: string;
   ollama_model: string;
-  openrouter_model: string;
-  key: "env" | "saved" | null;
 }
 
 export interface AiSuggestion {
@@ -871,7 +865,6 @@ export interface Review {
   matches: ReviewMatch[];
   who: WhoIsThis[];
   ai: boolean;
-  ai_hosted: boolean;
 }
 
 export interface ReviewBooking {

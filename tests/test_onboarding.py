@@ -6,7 +6,7 @@ from waypoint.server import jobs
 
 
 class LocalStartTests(ServerCase):
-    unset = ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_ALLOWED_EMAILS", "OIDC_ALLOWED_GROUPS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RAPIDAPI_KEY", "OPENROUTER_API_KEY")
+    unset = ("OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_ALLOWED_EMAILS", "OIDC_ALLOWED_GROUPS", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RAPIDAPI_KEY")
 
     def test_a_new_household_can_add_and_read_a_booking_without_accounts_or_connections(self):
         with mock.patch("waypoint.tls.urlopen", side_effect=AssertionError("Local onboarding must not need the network")) as network:

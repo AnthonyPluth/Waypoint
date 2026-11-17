@@ -127,6 +127,7 @@ URL = "https://openrouter.ai/api/v1/chat/completions"
 # ruleid: waypoint-ai-hosts
 LOCAL = "http://127.0.0.1:11434/api/chat"
 # ok: waypoint-ai-hosts
+# ruleid: waypoint-ai-suggest-caller
 suggestion = ai.suggest(conn, item)
 
 # ruleid: waypoint-decrypt

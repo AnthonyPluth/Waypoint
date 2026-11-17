@@ -95,19 +95,27 @@ def fixed_suggestions(conn: db.Connection, mailbox_id: int, message_id: str) -> 
 NOT_VALUES = ("sources", "parsed")
 
 
+def _same_reservation(fixed: ai.Suggestion, said: ai.Suggestion) -> bool:
+    if fixed.get("kind") != said.get("kind"):
+        return False
+    first, second = fixed.get("confirmation"), said.get("confirmation")
+    return not (first and second and first.upper() != second.upper())
+
+
 def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> list[ai.Suggestion]:
-    waiting = list(fixed)
     out: list[ai.Suggestion] = []
+    paired: set[int] = set()
     for suggestion in said:
+        options = [n for n, p in enumerate(fixed) if _same_reservation(p, suggestion)]
+        sure = len(options) == 1 and sum(1 for other in said if _same_reservation(fixed[options[0]], other)) == 1
         merged: dict[str, Any] = dict(suggestion)
-        same = next((p for p in waiting if p.get("kind") == suggestion.get("kind")), None)
-        if same is not None:
-            waiting.remove(same)
-        for key, value in (same or {}).items():
-            if value and key not in NOT_VALUES:
-                merged[key] = value
+        if sure:
+            paired.add(options[0])
+            for key, value in fixed[options[0]].items():
+                if value and key not in NOT_VALUES:
+                    merged[key] = value
         out.append(cast(ai.Suggestion, merged))
-    return out
+    return out + [p for n, p in enumerate(fixed) if n not in paired]
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:

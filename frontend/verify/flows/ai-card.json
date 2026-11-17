@@ -5,13 +5,11 @@
     { "goto": "#settings/mail" },
     { "wait_for": "#ai-title" },
     { "scroll_to": "#ai-title" },
-    { "screenshot": "off" },
-    { "click": "label:has-text('Local (Ollama)')" },
-    { "expect_text": { "selector": "body", "text": "stays on your household’s server and network" } },
-    { "screenshot": "local" },
-    { "click": "label:has-text('OpenRouter')" },
-    { "expect_text": { "selector": "body", "text": "OpenRouter, a hosted service outside your household" } },
-    { "scroll_to": "#ai-title" },
-    { "screenshot": "openrouter" }
+    { "expect_text": { "selector": "body", "text": "Leave it empty to not use AI" } },
+    { "screenshot": "empty-address" },
+    { "fill": { "selector": "label:has-text('Ollama address') input", "text": "http://ollama.local:11434" } },
+    { "fill": { "selector": "label:has-text('Model') input", "text": "llama3.1" } },
+    { "expect_text": { "selector": "body", "text": "It stays on your household’s own server" } },
+    { "screenshot": "with-address" }
   ]
 }

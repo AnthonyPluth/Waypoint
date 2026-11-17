@@ -141,7 +141,7 @@ class PrivacyTests(DbCase):
         loyalty.add(self.c, membership(who, kind="cruise", program="Disney Castaway Club", number=CANARY))
         text = f"Your Castaway Club member {CANARY} sails soon"
         with mock.patch.object(ai, "_ask", return_value=json.dumps({"bookings": []})) as asked, self.assertRaises(ai.AiError):
-            ai.suggest(ai.Config("local", "llama3", url="http://ollama.example:1234"), text)
+            ai.suggest(ai.Config("llama3", "http://ollama.example:1234"), text)
         self.assertEqual(asked.call_args.args[1], text)
 
     def test_a_cruise_number_is_never_logged_or_replied_with_unasked(self):

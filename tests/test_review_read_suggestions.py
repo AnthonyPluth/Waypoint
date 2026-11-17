@@ -43,6 +43,45 @@ class RuleTests(unittest.TestCase):
                 self.assertFalse(ingest.only_the_zone_is_missing(stay(start=start, end=end)))
 
 
+def fixed(code, name, day):
+    return {"kind": "hotel", "confirmation": code, "origin": name, "start_local": f"2027-03-{day:02d}T15:00", "end_local": f"2027-03-{day + 2:02d}T11:00", "parsed": True}
+
+
+def said(code, name, day, zone="Europe/London"):
+    return {"kind": "hotel", "confirmation": code, "origin": name, "start_local": f"2027-03-{day:02d}T15:00", "end_local": f"2027-03-{day + 2:02d}T11:00",
+            "start_zone": zone, "address": f"{name} street"}
+
+
+class KeepingFixedTests(unittest.TestCase):
+    def test_the_readers_values_win_and_the_ai_fills_what_it_left_empty(self):
+        [got] = review.keeping_fixed([{**fixed("AB12", "", 5), "origin": "", "phone": "555"}], [said("AB12", "Harbour Inn", 6)])
+        self.assertEqual((got["confirmation"], got["start_local"], got["phone"], got["origin"], got["start_zone"]),
+                         ("AB12", "2027-03-05T15:00", "555", "Harbour Inn", "Europe/London"))
+        self.assertNotIn("parsed", got)
+
+    def test_two_reservations_answered_in_the_other_order_are_each_paired_with_their_own_by_confirmation(self):
+        one, two = fixed("AB12", "Inn One", 5), fixed("CD34", "Inn Two", 10)
+        first, second = review.keeping_fixed([one, two], [said("CD34", "", 10, "America/Denver"), said("AB12", "", 5)])
+        self.assertEqual((first["confirmation"], first["origin"], first["start_zone"], first["address"]), ("CD34", "Inn Two", "America/Denver", " street"))
+        self.assertEqual((second["confirmation"], second["origin"], second["start_zone"]), ("AB12", "Inn One", "Europe/London"))
+
+    def test_reservations_that_cannot_be_told_apart_are_not_paired_by_position_and_stay_for_a_person(self):
+        one, two = fixed(None, "Inn One", 5), fixed(None, "Inn Two", 10)
+        out = review.keeping_fixed([one, two], [said("CD34", "Inn Two", 10, "America/Denver"), said("AB12", "Inn One", 5)])
+        self.assertEqual([(x.get("confirmation"), x.get("origin"), bool(x.get("parsed"))) for x in out],
+                         [("CD34", "Inn Two", False), ("AB12", "Inn One", False), (None, "Inn One", True), (None, "Inn Two", True)])
+        self.assertEqual([x["start_zone"] for x in out[:2]], ["America/Denver", "Europe/London"])
+
+    def test_a_partial_answer_keeps_the_reservation_the_reader_found_that_the_ai_left_out(self):
+        one, two = fixed("AB12", "Inn One", 5), fixed("CD34", "Inn Two", 10)
+        out = review.keeping_fixed([one, two], [said("AB12", "", 5)])
+        self.assertEqual([(x["confirmation"], bool(x.get("parsed"))) for x in out], [("AB12", False), ("CD34", True)])
+
+    def test_an_answer_with_nothing_keeps_everything_the_reader_found(self):
+        one = fixed("AB12", "Inn One", 5)
+        self.assertEqual(review.keeping_fixed([one], []), [one])
+
+
 class ReadSuggestionTests(ScanAiCase):
     def waiting(self):
         return self.read(lambda conn: list(conn.execute(select(ReviewItem.auto_state)).scalars()))

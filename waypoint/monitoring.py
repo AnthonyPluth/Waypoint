@@ -10,7 +10,7 @@ _USERINFO = re.compile(r"(\b[a-z][a-z0-9+.-]*://)[^/\s@]+@", re.I)
 _QUERY = re.compile(r"(\b[a-z][a-z0-9+.-]*://[^\s?#]*)\?[^\s#]*", re.I)
 _TOKEN = re.compile(r"\b(access|public|link|processor)-(sandbox|development|production)-[0-9a-f-]{8,}", re.I)
 _RAPIDAPI_HEADER = re.compile(r"(x-rapidapi-key['\"]?\s*[:=,]\s*['\"]?)[^\s'\",}]+", re.I)
-SECRET_ENV = ("RAPIDAPI_KEY", "OPENROUTER_API_KEY")
+SECRET_ENV = ("RAPIDAPI_KEY",)
 
 
 def scrub(text):

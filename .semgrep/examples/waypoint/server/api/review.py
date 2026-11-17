@@ -1,5 +1,5 @@
-# The Review API asks for the AI that may read email, which is the household's chosen mode or nothing.
-# ruleid: waypoint-mail-ai-chosen-mode
-chosen = ai.config(conn)
-# ok: waypoint-mail-ai-chosen-mode
-chosen = ai.mail_config(conn)
+# The Review API never asks the AI itself: it goes through the scan's readers.
+# ruleid: waypoint-ai-suggest-caller
+reading = ai.suggest(cfg, text)
+# ok: waypoint-ai-suggest-caller
+scan.suggest_now(owner, item_id, now)

@@ -12,7 +12,7 @@ from tests.test_mail_scan import NOW, eml, plain_mail
 from waypoint import tls
 from waypoint.domain.mail import ai, autoask, ingest, scan
 from waypoint.storage import db
-from waypoint.storage.models import Mailbox, ReviewItem, ScannedMessage, Segment
+from waypoint.storage.models import Mailbox, ReviewItem, ScannedMessage
 
 DATE = b"Sun, 18 Oct 2026 09:10:00 -0400"
 DAYS = {"new": b"Sun, 18 Oct 2026 09:10:00 -0400", "mid": b"Sat, 17 Oct 2026 09:10:00 -0400", "old": b"Fri, 16 Oct 2026 09:10:00 -0400"}
@@ -33,17 +33,17 @@ class AutoCase(ScanAiCase):
         return self.read(lambda conn: conn.execute(select(ReviewItem.auto_tries)).scalar())
 
 
-class ChosenModeTests(AutoCase):
-    def test_a_scan_reaches_the_ai_only_while_an_ai_mode_is_on(self):
-        for mode, asked in (("off", 0), ("local", 1), ("openrouter", 1)):
-            with self.subTest(mode=mode):
+class SavedAddressTests(AutoCase):
+    def test_a_scan_reaches_the_ai_only_while_an_ollama_address_is_saved(self):
+        for saved, asked in ((False, 0), (True, 1)):
+            with self.subTest(saved=saved):
                 self.fake.reset()
                 with db.session() as conn:
                     conn.execute(ReviewItem.__table__.delete())
                     conn.execute(ScannedMessage.__table__.delete())
                 self.turn_off()
-                if mode != "off":
-                    self.turn_on(mode)
+                if saved:
+                    self.turn_on()
                 self.put("no_markup_ids")
                 with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=bool(asked)):
                     result = self.scan()
@@ -52,7 +52,7 @@ class ChosenModeTests(AutoCase):
                 self.assertEqual((self.waiting(), len(self.suggested())), ([], asked))
                 self.assertEqual(scan.summary(self.mailbox).ai_asked, asked)
 
-    def test_with_an_ai_mode_on_a_qualifying_message_gets_its_suggestion_during_the_scan(self):
+    def test_with_an_address_saved_a_qualifying_message_gets_its_suggestion_during_the_scan(self):
         self.turn_on()
         self.put("no_markup_ids")
         self.assertEqual(self.scan().review, 1)
@@ -250,26 +250,18 @@ class PriceAsNameTests(AutoCase):
             result = self.scan()
         self.assertEqual((result.bookings, result.review, self.segments(), self.fake.requests), (0, 1, [], []))
 
-    def test_the_ai_fills_in_the_hotel_for_whichever_mode_is_on_without_any_other_setting(self):
-        for mode in ("local", "openrouter"):
-            with self.subTest(mode=mode):
-                self.fake.reset()
-                with db.session() as conn:
-                    conn.execute(ReviewItem.__table__.delete())
-                    conn.execute(ScannedMessage.__table__.delete())
-                self.turn_on(mode)
-                self.fake.content = json.dumps(self.STAY)
-                self.chase()
-                with no_leaks(self, BODY, database=self.path, sent_ok=True):
-                    self.scan()
-                self.assertEqual(self.items(), [])
-                [stay] = self.segments()
-                self.assertEqual((stay["kind"], stay["origin"], stay["confirmation"], stay["start_local"], stay["end_local"], stay["details"].get("address")),
-                                 ("hotel", "Harbour Hotel", "H88231", "2026-11-21T15:00", "2026-11-24T11:00", "1 Quay Street, London"))
-                self.assertEqual(len(self.fake.requests), 1)
-                self.assertIn("Hotel: $401.30", self.fake.requests[0][2]["messages"][1]["content"])
-                with db.session() as conn:
-                    conn.execute(Segment.__table__.delete())
+    def test_the_ai_fills_in_the_hotel_once_an_address_is_saved_with_no_other_setting(self):
+        self.turn_on()
+        self.fake.content = json.dumps(self.STAY)
+        self.chase()
+        with no_leaks(self, BODY, database=self.path, sent_ok=True):
+            self.scan()
+        self.assertEqual(self.items(), [])
+        [stay] = self.segments()
+        self.assertEqual((stay["kind"], stay["origin"], stay["confirmation"], stay["start_local"], stay["end_local"], stay["details"].get("address")),
+                         ("hotel", "Harbour Hotel", "H88231", "2026-11-21T15:00", "2026-11-24T11:00", "1 Quay Street, London"))
+        self.assertEqual(len(self.fake.requests), 1)
+        self.assertIn("Hotel: $401.30", self.fake.requests[0][2]["messages"][1]["content"])
 
     def test_the_fixed_readers_own_dates_are_kept_when_the_ai_says_otherwise(self):
         self.turn_on()
