@@ -346,7 +346,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Orlando`, `Show 20`, `San Francisco (May 2025)`.
+- **Touches:** `Orlando`, `San Francisco (May 2025)`.
 - **Expects to see:** `Trips`, `Trip to San Francisco`.
 - **Drive it:** `tools/control flow trip-done-manage`; or `poetry run python run.py verify --flow trip-done-manage`.
 
@@ -461,7 +461,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Show 20`, `San Francisco`, `Position along the route`.
+- **Touches:** `San Francisco`, `Position along the route`.
 - **Expects to see:** `Trips`, `State line`.
 - **Drive it:** `tools/control flow trip-state-lines-flight`; or `poetry run python run.py verify --flow trip-state-lines-flight`.
 

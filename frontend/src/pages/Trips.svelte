@@ -134,12 +134,37 @@
   const photoCounts = $derived(new Map([...covers.values()].map((c) => [c.trip_id, c.count])));
   const pastGroups = $derived(shown ? pastByYear(shown.past, photoCounts) : []);
   let revealed = $state(1);
+  let loadingYear = $state<number | null>(null);
+  let loadedNote = $state("");
+  let sentinel = $state<HTMLElement | null>(null);
+  const observes = typeof IntersectionObserver === "function";
   const visibleGroups = $derived(viewport.phone ? pastGroups.slice(0, revealed) : pastGroups);
   const visibleKey = $derived(visibleGroups.flatMap((g) => g.trips.map((t) => t.id)).join(","));
+  function showNextYear() {
+    if (loadingYear !== null || revealed >= pastGroups.length) return;
+    loadingYear = pastGroups[revealed].year;
+    revealed += 1;
+  }
+  function settleYear(year: number | null) {
+    if (year === null || loadingYear !== year) return;
+    const group = pastGroups.find((g) => g.year === loadingYear);
+    loadedNote = group ? `Loaded ${group.year}, ${count(group.trips.length)}` : "";
+    loadingYear = null;
+  }
   $effect(() => {
     const key = visibleKey;
     void resets;
-    if (key) untrack(() => void loadDistances(key.split(",").map(Number), distanceGeneration));
+    if (key) untrack(() => {
+      const year = loadingYear;
+      void loadDistances(key.split(",").map(Number), distanceGeneration).then(() => settleYear(year));
+    });
+  });
+  $effect(() => {
+    const watched = sentinel;
+    if (!watched || !observes || loadingYear !== null) return;
+    const seen = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) untrack(showNextYear); }, { rootMargin: "600px 0px" });
+    seen.observe(watched);
+    return () => seen.disconnect();
   });
   const reloaded = (movedTo?: number) => {
     if (!movedTo) { void load(); return; }
@@ -246,8 +271,16 @@
           </ul>
         </div>
       {/each}
-      {#if viewport.phone && revealed < pastGroups.length}
-        <button type="button" class="self-start rounded-md px-1 py-2 text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" onclick={() => (revealed += 1)}>Show {pastGroups[revealed].year}</button>
+      {#if viewport.phone}
+        <p class="sr-only" role="status" aria-live="polite" aria-label="Past trips loaded">{loadedNote}</p>
+        {#if loadingYear !== null}<p class="px-0.5 text-sm text-muted-foreground">Loading {loadingYear}…</p>{/if}
+        {#if revealed < pastGroups.length}
+          {#if observes}
+            <div bind:this={sentinel} class="h-px" aria-hidden="true" data-testid="past-more"></div>
+          {:else}
+            <button type="button" class="self-start rounded-md px-1 py-2 text-sm font-medium text-primary outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" onclick={showNextYear}>Show more</button>
+          {/if}
+        {/if}
       {/if}
     </div>
   {/snippet}
