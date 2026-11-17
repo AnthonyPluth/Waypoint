@@ -1,13 +1,13 @@
 <script lang="ts">
   import Plane from "@lucide/svelte/icons/plane";
-  import type { FlightStatus, Segment } from "$lib/api-types";
+  import type { FlightStatus, FlightStatusPause, Segment } from "$lib/api-types";
   import { cityNames } from "$lib/cities.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
-  import { bookingTimes, flightCardView } from "$lib/flightcard";
+  import { bookingTimes, flightCardView, pausedWords } from "$lib/flightcard";
   import { viewerZone } from "$lib/trips";
 
-  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; onopen?: () => void };
-  let { segment, status, liveOn = false, now = Date.now(), online = true, onopen }: Props = $props();
+  type Props = { segment: Segment; status?: FlightStatus; liveOn?: boolean; now?: number; online?: boolean; paused?: FlightStatusPause | null; showTimes?: boolean; onopen?: () => void };
+  let { segment, status, liveOn = false, now = Date.now(), online = true, paused = null, showTimes = true, onopen }: Props = $props();
 
   const cities = cityNames(() => [segment.origin, segment.destination, status?.destination]);
   const view = $derived(flightCardView({ segment, status, liveOn, now, online, city: (code) => cities[code] || code }));
@@ -28,8 +28,11 @@
   <div class="h-1.5 overflow-hidden rounded-md bg-surface-3" role="progressbar" aria-label="Flight progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow={percent}>
     <div class="h-full bg-map-route" style={`width: ${percent}%`}></div>
   </div>
-  <div class="mt-2 flex justify-between gap-3" aria-hidden="true">
-    <span class="text-caption text-muted-foreground">{times.left}</span>
-    <b class="text-sm">{times.right}</b>
-  </div>
+  {#if showTimes}
+    <div class="mt-2 flex justify-between gap-3">
+      <span class="text-caption text-muted-foreground">{times.left}</span>
+      <b class="text-sm">{times.right}</b>
+    </div>
+  {/if}
+  {#if paused}<p class="mt-2 text-xs text-muted-foreground" role="status" data-paused>{pausedWords(paused)}</p>{/if}
 </div>

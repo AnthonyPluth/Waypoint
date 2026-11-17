@@ -148,6 +148,17 @@
     : { id: "manual", title: "No trips yet", text: "Add your first booking by hand: a flight, a stay, a rental car." });
 </script>
 
+{#snippet differing(bookings: Segment[])}
+  {#if bookings.length > 1 && timesDiffer(bookings)}
+    <div class="flex w-full flex-col gap-1 text-sm">
+      <span><Badge variant="secondary">Times differ between bookings</Badge></span>
+      {#each bookings as b (b.id)}
+        <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} /></span>
+      {/each}
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet dayBlock(day: Day)}
   {@const parts = dayParts(day.date)}
   {@const isToday = day.date === today}
@@ -277,16 +288,9 @@
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
     {#if homeFlight}
-      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} class="mb-6">
+      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} class="mb-6">
         {#snippet footer()}
-          {#if next.bookings.length > 1 && timesDiffer(next.bookings)}
-            <div class="flex w-full flex-col gap-1 text-sm">
-              <span><Badge variant="secondary">Times differ between bookings</Badge></span>
-              {#each next.bookings as b (b.id)}
-                <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} /></span>
-              {/each}
-            </div>
-          {/if}
+          {@render differing(next.bookings)}
           {#each next.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left font-semibold" />{/each}
           <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button>
         {/snippet}
@@ -411,7 +415,8 @@
     {@const d = detail}
     {#if compactFlight(d.segment)}
       <div class="mb-4 flex flex-col gap-3">
-        <FlightBooking segment={d.segment} status={liveOn ? statusFor(d.segment.id) : undefined} {liveOn} {now} {online} onopen={() => (detail = null)} />
+        <FlightBooking segment={d.segment} status={liveOn ? statusFor(d.segment.id) : undefined} {liveOn} {now} {online} paused={liveOn ? flightStatus.list?.paused : null} showTimes={!(d.bookings.length > 1 && timesDiffer(d.bookings))} onopen={() => (detail = null)} />
+        {@render differing(d.bookings)}
         {#if d.bookings.some((b) => b.confirmation)}<p class="flex flex-wrap gap-x-4">{#each d.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left text-heading font-semibold" />{/each}</p>{/if}
         <span class="flex flex-wrap gap-2"><GateCode segment={d.segment} {now} onchanged={load} /><Button href={`#trip/${d.segment.trip_id}?segment=${d.segment.id}`} variant="outline" size="sm" onclick={() => (detail = null)}>Open trip</Button></span>
       </div>

@@ -1036,7 +1036,7 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     const bar = within(sheet).getByRole("progressbar", { name: "Flight progress" });
     expect(Number(bar.getAttribute("aria-valuenow"))).toBeGreaterThan(90);
     expect(within(sheet).getByText("Departed 7:00 pm EST")).toBeInTheDocument();
-    expect(within(sheet).getByText("Lands 7:10 am GMT")).toBeInTheDocument();
+    expect(within(sheet).getByText("Lands 7:10 am GMT +1 day")).toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: /^AA 101, JFK to LHR, in the air, lands 7:10 am/ })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
     expect(within(sheet).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
     expect(within(sheet).getByRole("link", { name: "Open trip" })).toBeInTheDocument();
@@ -1064,5 +1064,31 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     await screen.findByRole("heading", { name: "Connect Gmail" });
     expect(screen.queryByRole("list", { name: "Flights today" })).toBeNull();
     expect(document.querySelector("[data-flight-home]")).toBeNull();
+  });
+
+  it("keeps the pause warning on the Home card and in the sheet when live updates are paused", async () => {
+    at("2026-11-20T09:09:00-05:00");
+    serveLive({ ...delayed, paused: { reason: "rate", until: "2026-11-20T15:00:00Z" } });
+    render(Upcoming);
+    const home = await card();
+    expect(await within(home).findByText(/^Live updates paused until .* \(rate limit\)$/)).toBeInTheDocument();
+  });
+
+  it("keeps Times differ between bookings, and each booking’s times, in the booking sheet", async () => {
+    viewport.phone = true;
+    at("2026-11-21T02:00:00-05:00");
+    const moved = segment({ id: 10, confirmation: "BBBBBB", start_local: "2026-11-20T21:30", details: { flight_number: "AA 101" } });
+    serve([trip([outbound, moved, stay, home])]);
+    render(Upcoming);
+    const u = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const days = await screen.findByRole("list", { name: /day by day/ });
+    await u.click(within(days).getAllByRole("link", { name: "JFK → LHR" })[0]);
+    const sheet = await screen.findByRole("dialog", { name: "JFK → LHR" });
+    expect(within(sheet).getByText("Times differ between bookings")).toBeInTheDocument();
+    expect(within(sheet).getByText(/^KQ7M2X: departs/)).toHaveTextContent(/departs Fri, Nov 20, 7:00 PM/);
+    expect(within(sheet).getByText(/^BBBBBB: departs/)).toHaveTextContent(/departs Fri, Nov 20, 9:30 PM/);
+    expect(within(sheet).queryByText(/^Departed /)).toBeNull();
+    expect(within(sheet).getByRole("progressbar", { name: "Flight progress" })).toBeInTheDocument();
+    viewport.phone = false;
   });
 });
