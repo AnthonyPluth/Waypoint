@@ -56,7 +56,8 @@ struct OfflineBridge {
             return ["id": id, "name": name]
         }
         let savedAt: Any = copy.map { SavedTrips.milliseconds($0.savedAt) } ?? NSNull()
-        return ["version": Self.version, "saving": settings.isOn, "savedAt": savedAt, "trips": trips]
+        return ["version": Self.version, "saving": settings.isOn, "syncing": sync.state.syncing, "lastSaveFailed": sync.state.lastSaveFailed,
+                "savedAt": savedAt, "trips": trips]
     }
 
     func load(_ server: URL) -> [String: Any] {

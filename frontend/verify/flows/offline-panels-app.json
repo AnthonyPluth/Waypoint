@@ -1,0 +1,20 @@
+{
+  "name": "offline-panels-app",
+  "page": "upcoming",
+  "viewports": ["phone"],
+  "steps": [
+    { "fake_shell": "saved" },
+    { "reload": true },
+    { "wait_for": "[data-testid='offline-pill']" },
+    { "click": "[data-testid='offline-pill']" },
+    { "wait_for": "[data-testid='offline-status-line']:has-text('updated')" },
+    { "screenshot": "upcoming-saved" },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "[data-testid='offline-status-line']" },
+    { "screenshot": "trip-not-saved" },
+    { "fake_shell": "off" },
+    { "reload": true },
+    { "wait_for": "[data-testid='offline-status-line']:has-text('is off')" },
+    { "screenshot": "trip-saving-off" }
+  ]
+}

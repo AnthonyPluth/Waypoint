@@ -1,7 +1,7 @@
 import { clearRouteCache } from "./driving-routes";
 import { onDenied } from "./api";
 import { clearSaved, dropExpired, resumeSaving, saveCurrentTrip, savedInfos, stopSaving, watchExpiry, whenExpired } from "./offline";
-import { inShell, shellRemove, shellSetSaving, shellStatus, type ShellStatus } from "./offline-shell";
+import { inOldShell, inShell, shellRemove, shellSetSaving, shellStatus, type ShellStatus } from "./offline-shell";
 import { isSavingOff, isSetUp, remove, setUp, support, VaultError } from "./offline-vault";
 
 export type KnownTrip = { id: number | null; name: string };
@@ -17,6 +17,8 @@ export const offline = $state({
   reason: "",
   declined: false,
   failed: false,
+  syncing: false,
+  oldApp: false,
   trips: [] as KnownTrip[],
 });
 
@@ -36,7 +38,8 @@ function showShell(status: ShellStatus): void {
   offline.savedAt = status.trips.length ? status.savedAt : null;
   offline.trips = status.trips;
   offline.damaged = false;
-  offline.failed = false;
+  offline.failed = status.lastSaveFailed;
+  offline.syncing = status.syncing;
 }
 
 async function refreshFromShell(): Promise<void> {
@@ -44,6 +47,7 @@ async function refreshFromShell(): Promise<void> {
   catch {
     offline.setUp = false;
     offline.off = false;
+    offline.syncing = false;
     forgetCopy();
     offline.damaged = true;
   }
@@ -54,6 +58,12 @@ async function refreshFromShell(): Promise<void> {
 
 export async function refreshOffline(): Promise<void> {
   if (inShell()) return refreshFromShell();
+  if (inOldShell()) {
+    offline.oldApp = true;
+    offline.supported = false;
+    offline.checked = true;
+    return;
+  }
   const found = await support();
   offline.supported = found.ok;
   offline.reason = found.ok ? "" : found.reason;

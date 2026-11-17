@@ -5,10 +5,12 @@
   import { offline, offlineWorking, refreshOffline, syncSavedTrip } from "$lib/offline.svelte";
   import CloudCheck from "@lucide/svelte/icons/cloud-check";
   import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
+  import { inShell } from "$lib/offline-shell";
   import { onMount } from "svelte";
 
   let { tripId = null, pill = false, open = false, ontoggle }: { tripId?: number | null; pill?: boolean; open?: boolean; ontoggle?: () => void } = $props();
 
+  const shell = inShell();
   let setting = $state(false);
   let retrying = $state(false);
   let now = $state(Date.now());
@@ -36,14 +38,14 @@
       <CloudCheck class="size-4 shrink-0" aria-hidden="true" /><span class="phone:sr-only">Saved for offline</span>
     </button>
   {/if}
-{:else if offline.checked}
+{:else if offline.checked && !offline.oldApp}
   <section class="mt-3 max-w-prose rounded-xl border border-border bg-card p-3 text-sm" aria-label="Offline access" data-testid="offline-status">
     <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <p class="flex min-w-0 items-start gap-2">
         <HardDriveDownload class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         <span class="min-w-0 break-words" data-testid="offline-status-line">
           {#if offline.damaged}
-            <span class="font-medium">The saved trips can’t be read.</span> <a class="underline underline-offset-2" href="#settings/offline">Remove it in Settings</a>, then set up offline access again.
+            <span class="font-medium">The saved trips can’t be read.</span> {#if shell}<a class="underline underline-offset-2" href="#settings/offline">Switch saving off and on in Settings</a> to start afresh.{:else}<a class="underline underline-offset-2" href="#settings/offline">Remove it in Settings</a>, then set up offline access again.{/if}
           {:else if !offline.supported}
             <span class="font-medium">Offline access isn’t available on this device.</span> <span class="text-muted-foreground">{offline.reason}</span>
           {:else if !offline.setUp}
@@ -69,7 +71,7 @@
       {#if offline.supported && !offline.damaged}
         {#if !offline.setUp}
           <Button size="sm" onclick={() => (setting = true)}>Set up offline access</Button>
-        {:else if offline.failed}
+        {:else if offline.failed && !shell}
           <Button size="sm" variant="outline" disabled={retrying} onclick={retry}>{retrying ? "Saving…" : "Try again"}</Button>
         {/if}
       {/if}

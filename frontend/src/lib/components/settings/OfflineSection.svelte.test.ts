@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
+import { installShell } from "../../../test/fake-shell";
 import { installDevice, type Behaviour, type Device } from "../../../test/webauthn";
 import { offline } from "$lib/offline.svelte";
 import { hasSavedTrip, isSavingOff, lock, save, setUp } from "$lib/offline-vault";
@@ -15,7 +16,7 @@ const withDevice = (b: Behaviour = {}) => { device = installDevice(b); };
 
 beforeEach(() => {
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
-  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] });
+  Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, syncing: false, oldApp: false, trips: [] });
   withDevice();
 });
 afterEach(() => { lock(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -95,5 +96,24 @@ describe("Settings → Offline access", () => {
     await user.click(screen.getByRole("button", { name: "Remove from this device" }));
     await user.click(await screen.findByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Set up offline access" })).toBeInTheDocument());
+  });
+
+  it("inside the iPhone app shows the app's card, never the passkey card or the unavailable card", async () => {
+    const shell = installShell({ trips: [{ savedAt: Date.now(), messages: [], trip: { id: 1, name: "Lisbon in June" } }], savedAt: Date.now() });
+    render(OfflineSection);
+    expect(await screen.findByText("On for this device")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Save my upcoming trips" })).toBeChecked();
+    expect(screen.queryByText("Offline access isn’t available on this device")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Set up offline access|Remove/ })).not.toBeInTheDocument();
+    expect(shell.posts.every((p) => p.type === "status")).toBe(true);
+    expect(device.calls.create).toBe(0);
+  });
+
+  it("inside an installed app too old for the bridge shows no Offline access card", async () => {
+    vi.stubGlobal("webkit", { messageHandlers: { waypointUnauthorized: { postMessage: vi.fn() } } });
+    const { container } = render(OfflineSection);
+    await waitFor(() => expect(offline.checked).toBe(true));
+    expect(container.querySelector("section")).toBeNull();
+    expect(screen.queryByText(/Offline access/)).not.toBeInTheDocument();
   });
 });

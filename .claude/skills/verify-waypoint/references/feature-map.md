@@ -74,6 +74,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **What usually breaks:**
   - Phone only: it opens the More menu of the tab bar. At desktop width (`flow more-menu --viewport desktop`) its first step fails, because there is no More button.
 
+#### `offline-panels-app`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-panels-app`; or `poetry run python run.py verify --flow offline-panels-app`.
+
 #### `offline-trip`
 
 - **Starts at:** `#upcoming`; goes to: `#settings/offline`, `#trips`.
@@ -821,6 +828,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#settings`; goes to: `#settings/assistants`.
 - **Widths:** phone, desktop.
 - **Drive it:** `tools/control flow mcp-settings`; or `poetry run python run.py verify --flow mcp-settings`.
+
+#### `offline-card-app`
+
+- **Starts at:** `#settings`.
+- **Widths:** phone.
+- **Touches:** `Show all 10`.
+- **Expects to see:** `Saved 12 min ago: “Lisbon in June”, “Denver offsite”.`, `Saved just now: “Lisbon in June”.`, `and 7 more`, `Show fewer`, `Nothing is saved yet.`, `Saving your trips…`, `Couldn’t save the trips`, `Nothing is saved on this device yet.`, `The saved trips can’t be read`, `Off on this device`, `On for this device`, `REMINDERS AND CALENDAR`.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-card-app`; or `poetry run python run.py verify --flow offline-card-app`.
 
 #### `offline-settings`
 

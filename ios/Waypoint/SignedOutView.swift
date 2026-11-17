@@ -9,7 +9,10 @@ struct SignedOutView: View {
                 Section {
                     Text("You are signed out of Waypoint.")
                 } footer: {
-                    Text("Sign in again to see your trips.")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Sign in again to see your trips.")
+                        Text("Saved trips were removed from this device.")
+                    }
                 }
                 Section {
                     Button("Sign in") { signIn() }

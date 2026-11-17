@@ -8,13 +8,13 @@ import { apiCall } from "./contract";
 import { onDenied } from "./api";
 import { clearSaved } from "./offline";
 import { clearOnDenied, offline, offlineWorking, refreshOffline, removeOffline, switchSaving, syncSavedTrip, turnOnOffline, askAboutOffline } from "./offline.svelte";
-import { inShell, shellBridge, shellLoad, shellStatus } from "./offline-shell";
+import { inOldShell, inShell, shellBridge, shellLoad, shellStatus } from "./offline-shell";
 import { installShell, type FakeShell } from "../test/fake-shell";
 import { segment, trip } from "../test/fixtures";
 
 const copy = (id: number, name: string, savedAt: number) => ({ savedAt, messages: [], trip: { ...trip([segment({ start_local: "2026-11-22T10:00", end_local: "2026-11-22T18:00" })]), id, name } });
 const SAVED_AT = Date.UTC(2026, 10, 20, 7, 0);
-const reset = () => Object.assign(offline, { checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] });
+const reset = () => Object.assign(offline, { syncing: false, oldApp: false, checked: false, setUp: false, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] });
 
 beforeEach(() => { reset(); vi.mocked(apiCall).mockReset(); vi.mocked(onDenied).mockReset(); });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -44,6 +44,23 @@ describe("in the iPhone app", () => {
     expect(offlineWorking()).toBe(true);
     expect(askAboutOffline()).toBe(false);
     expect(apiCall).not.toHaveBeenCalled();
+  });
+
+  it("reads the optional syncing and lastSaveFailed flags, and treats a missing one as false", async () => {
+    shell.syncing = true; shell.lastSaveFailed = true;
+    await refreshOffline();
+    expect(offline).toMatchObject({ syncing: true, failed: true, hasCopy: true });
+    expect(offlineWorking()).toBe(false);
+    shell.replies.set("status", { version: 1, saving: true, savedAt: SAVED_AT, trips: [{ id: 1, name: "Trip to London" }] });
+    await refreshOffline();
+    expect(offline).toMatchObject({ syncing: false, failed: false });
+    expect(await shellStatus()).toMatchObject({ syncing: false, lastSaveFailed: false });
+    shell.replies.set("status", { version: 1, saving: true, syncing: "yes", savedAt: null, trips: [] });
+    await refreshOffline();
+    expect(offline.damaged).toBe(true);
+    shell.replies.set("status", { version: 1, saving: true, lastSaveFailed: 1, savedAt: null, trips: [] });
+    await refreshOffline();
+    expect(offline).toMatchObject({ damaged: true, syncing: false });
   });
 
   it("shows saving switched off, with nothing saved", async () => {
@@ -120,6 +137,23 @@ describe("in the iPhone app", () => {
   });
 });
 
+describe("in an installed app too old for the bridge", () => {
+  it("is recognised by the older app's own handler or Capacitor, and never when the bridge is there", () => {
+    expect(inOldShell({})).toBe(false);
+    expect(inOldShell({ webkit: { messageHandlers: { waypointUnauthorized: {} } } })).toBe(true);
+    expect(inOldShell({ Capacitor: { isNativePlatform: () => true } })).toBe(true);
+    expect(inOldShell({ Capacitor: { isNativePlatform: () => false } })).toBe(false);
+    expect(inOldShell({ webkit: { messageHandlers: { waypointUnauthorized: {}, waypointOffline: { postMessage: () => {} } } } })).toBe(false);
+  });
+
+  it("marks the app as old, keeps the vault untouched and offers nothing", async () => {
+    vi.stubGlobal("webkit", { messageHandlers: { waypointUnauthorized: { postMessage: vi.fn() } } });
+    await refreshOffline();
+    expect(offline).toMatchObject({ checked: true, oldApp: true, supported: false, setUp: false });
+    expect(apiCall).not.toHaveBeenCalled();
+  });
+});
+
 describe("in a browser, with no marker", () => {
   it("leaves the browser path as it was: no bridge call, the vault decides", async () => {
     const post = vi.fn();
@@ -129,6 +163,7 @@ describe("in a browser, with no marker", () => {
     expect(inShell()).toBe(false);
     expect(offline.setUp).toBe(false);
     expect(offline.checked).toBe(true);
+    expect(offline.oldApp).toBe(false);
     await expect(shellStatus()).rejects.toThrow("Not running in the Waypoint app");
   });
 });
