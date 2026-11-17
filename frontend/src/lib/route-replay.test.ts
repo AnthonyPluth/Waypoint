@@ -66,10 +66,30 @@ describe("stopsOf", () => {
       expect(dates(stops)[3]).toEqual(["2025-12-11", "2025-12-11"]);
     });
 
-    it("still makes a stop of a car picked up somewhere the trip has no other booking", () => {
+    it("still makes a stop of a car picked up somewhere the trip has no other booking, on a trip without flights", () => {
       const depot = segment({ id: 6, kind: "car", origin: "Napa", destination: "Napa", start_local: "2025-12-12T09:00", start_zone: la, end_local: "2025-12-12T18:00", end_zone: la });
-      const stops = stopsOf(trip([out, depot]), places);
-      expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Napa"]);
+      const stops = stopsOf(trip([stay, depot]), places);
+      expect(names(stops)).toEqual(["Bayview Inn", "Napa"]);
+      expect(stops.map((s) => s.kind)).toEqual(["stay", "place"]);
+    });
+
+    it("never makes a stop of a car on a trip with a flight, even where nothing else is booked", () => {
+      const depot = segment({ id: 6, kind: "car", origin: "Napa", destination: "Napa", start_local: "2025-12-12T09:00", start_zone: la, end_local: "2025-12-12T18:00", end_zone: la });
+      expect(names(stopsOf(trip([out, depot]), places))).toEqual(["Minneapolis", "San Francisco"]);
+      expect(names(stopsOf(trip([out, stay, depot, back]), places))).toEqual(["Minneapolis", "San Francisco", "Bayview Inn", "San Francisco", "Minneapolis"]);
+    });
+
+    it("keeps the car as the drive between the stops of a trip with a flight", () => {
+      const depot = segment({ id: 6, kind: "car", origin: "Napa", destination: "Napa", start_local: "2025-12-06T09:00", start_zone: la, end_local: "2025-12-06T18:00", end_zone: la });
+      const stops = stopsOf(trip([out, depot, napa, back]), places);
+      expect(names(stops)).toEqual(["Minneapolis", "San Francisco", "Vine Inn", "San Francisco", "Minneapolis"]);
+      expect(legsOf(stops, routeProjection(stops, 960, 520)).map((l) => l.vehicle)).toEqual(["plane", "car", "car", "plane"]);
+    });
+
+    it("counts only a flight that is not cancelled: a trip whose flights are all cancelled keeps its car stop", () => {
+      const depot = segment({ id: 6, kind: "car", origin: "Napa", destination: "Napa", start_local: "2025-12-12T09:00", start_zone: la, end_local: "2025-12-12T18:00", end_zone: la });
+      const called = { ...out, status: "cancelled" as const };
+      expect(names(stopsOf(trip([called, stay, depot]), places))).toEqual(["Bayview Inn", "Napa"]);
     });
   });
 

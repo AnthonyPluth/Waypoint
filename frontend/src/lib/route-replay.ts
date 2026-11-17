@@ -105,6 +105,7 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const countries = byCountries(trip);
   const live = liveOf(trip).filter((s) => s.kind !== "parking" && (s.kind !== "visit" || countries))
     .sort((a, b) => (countries ? dateOrder(a, b) : instant(a.start_local, a.start_zone) - instant(b.start_local, b.start_zone) || a.id - b.id));
+  const flies = live.some((s) => s.kind === "flight");
   const out: Visit[] = [];
   const add = (p: Point | null, from: string, to: string, via: Kind | null, rental = false) => {
     if (p) out.push({ ...p, city: p.city ?? p.name, code: p.code ?? null, kind: p.kind ?? "place", from, to, via, ...(rental ? { rental } : {}) });
@@ -119,7 +120,7 @@ function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
       const found = stay(s, s.destination) ?? city(s.destination);
       add(found && { ...found, kind: "stay", city: found.name, name: head(s.origin ?? "") || found.name }, s.start_local, s.end_local, null);
     } else if (s.kind === "car") {
-      add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null, true);
+      if (!flies) add(stay(s, s.destination ?? s.origin) ?? city(s.destination) ?? city(s.origin), s.start_local, s.end_local, null, true);
     } else if (s.kind === "train") {
       add(city(s.origin), s.start_local, s.start_local, null);
       add(stay(s, s.destination) ?? city(s.destination), s.end_local, s.end_local, "train");
