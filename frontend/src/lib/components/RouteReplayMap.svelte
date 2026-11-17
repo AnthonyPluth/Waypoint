@@ -186,7 +186,7 @@
 <div class="space-y-3" role="presentation" onkeydown={dismiss}>
   <div role={compact ? "group" : undefined} aria-label={compact ? COMPACT_LABEL : undefined} bind:this={mapBox} bind:clientWidth={mapWidth} bind:clientHeight={mapHeight} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
     {#if onMapkit && maps}
-      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {boundaries} {width} {height} {progress} {playing} {calm} more={clusters} onview={showView} label={mapLabel} onfailure={() => { fellBack = true; }} />
+      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {width} {height} {progress} {playing} {calm} more={clusters} onview={showView} label={mapLabel} onfailure={() => { fellBack = true; }} />
     {:else}
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role={compact ? undefined : "img"} aria-label={compact ? undefined : mapLabel} aria-hidden={compact ? "true" : undefined} class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
@@ -291,7 +291,7 @@
     {#if stops.some((s) => s.kind === "home")}<li class="flex items-center gap-2"><svg viewBox="-9 -9 18 16" class="h-3 w-3.5" aria-hidden="true"><path d="M0 -8 L8 -1 L5.5 -1 L5.5 6 L-5.5 6 L-5.5 -1 L-8 -1 Z" class="fill-map-visited" /></svg>Home</li>{/if}
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
-    {#if stateLines.length}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
+    {#if stateLines.length && !onMapkit}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
     {/if}
     {#if pins.length}

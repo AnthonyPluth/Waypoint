@@ -25,13 +25,7 @@
       }
     },
     {
-      "wait_for": "[data-mapkit] polyline[stroke-dasharray]"
-    },
-    {
-      "expect_text": {
-        "selector": "[aria-label='Map key']",
-        "text": "State line"
-      }
+      "wait_for": "[data-mapkit] polyline"
     },
     {
       "screenshot": "state-lines"
