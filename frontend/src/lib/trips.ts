@@ -133,6 +133,53 @@ export function bookingCards(segments: Segment[]): Card[] {
   return cards;
 }
 
+export type BookingGroup = { key: string; heading: string; cards: Card[] };
+
+const wholeTrip = (s: Segment): boolean => s.kind === "car" && !sameDay(s);
+const startDay = (s: Segment): string => s.start_local.slice(0, 10);
+
+export function bookingGroups(segments: Segment[]): BookingGroup[] {
+  const cards = bookingCards(segments).sort((a, b) => a.lead.start_local.localeCompare(b.lead.start_local));
+  const whole = cards.filter((c) => wholeTrip(c.lead));
+  const other = cards.filter((c) => !wholeTrip(c.lead) && c.lead.kind === "parking");
+  const days = new Map<string, Card[]>();
+  for (const card of cards) {
+    if (wholeTrip(card.lead) || card.lead.kind === "parking") continue;
+    days.set(startDay(card.lead), [...(days.get(startDay(card.lead)) ?? []), card]);
+  }
+  return [
+    ...(whole.length ? [{ key: "whole", heading: "Whole trip", cards: whole }] : []),
+    ...[...days].sort(([a], [b]) => a.localeCompare(b)).map(([day, group]) => ({ key: day, heading: dayLabel(`${day}T00:00`), cards: group })),
+    ...(other.length ? [{ key: "other", heading: "Other", cards: other }] : []),
+  ];
+}
+
+export function bookingName(s: Segment): string {
+  if ((s.kind === "flight" || s.kind === "train") && s.origin && s.destination) return `${s.origin} to ${s.destination}`;
+  if (s.kind === "hotel") return [s.origin, s.destination].filter(Boolean).join(", ") || headline(s);
+  return headline(s);
+}
+
+function spanOf(s: Segment): string {
+  const from = dayParts(startDay(s)), to = dayParts(s.end_local.slice(0, 10));
+  const first = `${from.month} ${from.day}`;
+  if (startDay(s) === s.end_local.slice(0, 10)) return first;
+  return `${first}–${from.month === to.month ? "" : `${to.month} `}${to.day}`;
+}
+const timesOf = (s: Segment): string => (untimed(s) ? "time not recorded" : `${clock(s.start_local)} – ${clock(s.end_local)}${dayShift(s.start_local, s.end_local) ? ` ${dayShift(s.start_local, s.end_local)}` : ""}`);
+
+export function bookingDetail(card: Card, dated: boolean): string {
+  const s = card.lead;
+  const nights = nightsLabel(startDay(s), s.end_local.slice(0, 10));
+  const timed = s.kind === "flight" || s.kind === "train" || ((s.kind === "car") && sameDay(s));
+  let detail: string;
+  if (s.kind === "hotel") detail = dated ? [spanOf(s), nights].filter(Boolean).join(" · ") : ["Check in", nights].filter(Boolean).join(" · ");
+  else if (timed) detail = dated ? `${dayLabel(s.start_local)} · ${untimed(s) ? "time not recorded" : clock(s.start_local)}` : timesOf(s);
+  else if (wholeTrip(s)) detail = dated ? `Whole trip · ${spanOf(s)}` : spanOf(s);
+  else detail = s.kind === "visit" ? dayOf(s, s.start_local) : spanOf(s);
+  return card.cancelled ? `${detail} · Cancelled` : detail;
+}
+
 export type Booked = { trip: Trip; segment: Segment; bookings: Segment[] };
 export type NextUp = Booked & { state: "now" | "next"; alongside: Booked[] };
 
