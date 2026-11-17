@@ -46,6 +46,7 @@
   let selected = $state<Set<number>>(new Set());
   let removing = $state(false);
   let heading = $state<HTMLElement | null>(null);
+  let sharingOpen = $state(false);
   let selectButton = $state<HTMLElement | null>(null);
   let broken = $state<Set<number>>(new Set());
   let gallery = $state<HTMLElement | null>(null);
@@ -422,7 +423,7 @@
       <h2 id="trip-photos-title" class="flex items-baseline gap-2 text-heading" tabindex="-1" bind:this={heading}>Photos{#if total}<span class="text-caption text-muted-foreground">{total}</span>{/if}</h2>
       {#if total || hasCard}
         <div class="flex flex-wrap items-center gap-2">
-          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} />
+          <TripPhotoSharingMenu {acting} tripName={trip.name} fallback={() => heading} bind:open={sharingOpen} />
           {#if total}
             {#if ownCount > 0 && !selecting}
               <Button variant="outline" size="sm" bind:ref={selectButton} aria-label="Select your photos to remove" disabled={frozen} onclick={() => void startSelect()}>Select</Button>
@@ -457,7 +458,9 @@
       </div>
     {/if}
     {#each acting as a (a.personId)}
-      <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {#if !(sharingOpen && a.mode === "card" && !timeline)}
+        <TripPhotoSharing sharing={a} tripName={trip.name} part="problem" />
+      {/if}
       <TripPhotoSharing sharing={a} tripName={trip.name} part="prompt" />
     {/each}
 
