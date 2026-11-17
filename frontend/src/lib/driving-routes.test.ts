@@ -118,6 +118,54 @@ describe("the household's stored routes", () => {
     expect(puts()).toHaveLength(1);
   });
 
+  it("stores a row for a second trip over a drive already in memory, once, without asking MapKit again", async () => {
+    const first = drivingRoutes(fakeMk, trip, [drive(0)])[0];
+    await settle();
+    const path = await first;
+    expect(puts().map(([url]) => url)).toEqual(["/api/trips/7/driving-routes"]);
+    const second = Promise.all([drivingRoutes(fakeMk, 8, [drive(0)])[0], drivingRoutes(fakeMk, 8, [drive(0)])[0]]);
+    await settle();
+    expect(await second).toEqual([path, path]);
+    expect(fake.directions.calls).toHaveLength(1);
+    expect(puts().map(([url]) => url)).toEqual(["/api/trips/7/driving-routes", "/api/trips/8/driving-routes"]);
+    expect(puts()[1][1]).toMatchObject({ body: { path } });
+    const third = drivingRoutes(fakeMk, 8, [drive(0)])[0];
+    await settle();
+    await third;
+    expect(puts()).toHaveLength(2);
+  });
+
+  it("stores a row for a second trip that asks for a drive the first is still waiting on", async () => {
+    fake.directions.mode = "slow";
+    const answers = [drivingRoutes(fakeMk, trip, [drive(0)])[0], drivingRoutes(fakeMk, 8, [drive(0)])[0]];
+    await vi.advanceTimersByTimeAsync(300);
+    await Promise.all(answers);
+    expect(fake.directions.calls).toHaveLength(1);
+    expect(puts().map(([url]) => url).sort()).toEqual(["/api/trips/7/driving-routes", "/api/trips/8/driving-routes"]);
+  });
+
+  it("sends a trip's row again after a failed send, and a trip already on the server nothing", async () => {
+    let refuse = true;
+    server.mockImplementation(((_path: string, options?: { method?: string }) => options?.method === "PUT" ? (refuse ? Promise.reject(new Error("refused")) : Promise.resolve({})) : Promise.resolve({ routes: [] })) as never);
+    const first = drivingRoutes(fakeMk, trip, [drive(0)])[0];
+    await settle();
+    await first;
+    refuse = false;
+    const again = drivingRoutes(fakeMk, trip, [drive(0)])[0];
+    await settle();
+    await again;
+    expect(puts()).toHaveLength(2);
+    server.mockClear();
+    server.mockResolvedValue({ routes: [stored(1)] });
+    const stored1 = drivingRoutes(fakeMk, 9, [drive(1)])[0];
+    await settle();
+    await stored1;
+    const reopened = drivingRoutes(fakeMk, 9, [drive(1)])[0];
+    await settle();
+    await reopened;
+    expect(puts()).toHaveLength(0);
+  });
+
   it("only asks the server about what is missing, and only once per replay", async () => {
     server.mockResolvedValue({ routes: [stored(0)] });
     const first = Promise.all(drivingRoutes(fakeMk, trip, [drive(0), drive(1)]));
