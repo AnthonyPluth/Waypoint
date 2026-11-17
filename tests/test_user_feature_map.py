@@ -58,6 +58,46 @@ class Reading(unittest.TestCase):
         self.assertNotIn("goto trip`", signed_in)
 
 
+VERIFY = '''export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='x']"] },
+  flight: { from: "trips", open: "a[href^='#trip/']:has-text('London') >> visible=true", follow: "article[data-kind='flight'] a[data-live-link]", ready: ["[data-testid='flight-live']", "li"] } };
+'''
+
+
+class Followed(unittest.TestCase):
+    def test_opened_pages_are_read_with_their_follow_step(self):
+        opened = ufm.opened_pages(VERIFY)
+        self.assertEqual(sorted(opened), ["flight", "trip"])
+        self.assertEqual(opened["flight"]["from"], "trips")
+        self.assertEqual(opened["flight"]["follow"], "article[data-kind='flight'] a[data-live-link]")
+        self.assertNotIn("follow", opened["trip"])
+        self.assertEqual(ufm.opened_pages(""), {})
+
+    def test_a_followed_page_is_reached_by_its_trip_url_and_the_click_through(self):
+        labels, inside = ufm.nav_labels(NAV), ufm.nav_inside(NAV)
+        text = ufm.reach("flight", labels, ["trips"], [], inside, [], (), ufm.opened_pages(VERIFY))
+        self.assertIn("URL `#trip/<id>/flight/<segment id>`", text)
+        self.assertIn("open a trip from `#trips` and click its flight card", text)
+        self.assertNotIn("goto flight", text)
+
+    def test_rendering_a_followed_page_does_not_tell_you_to_goto_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            text = ufm.render(["flight"], {}, [], [], {}, [], [], {}, Path(tmp), (), ufm.opened_pages(VERIFY))
+        self.assertIn("URL `#trip/<id>/flight/<segment id>`", text)
+        self.assertNotIn("tools/control goto flight", text)
+        self.assertIn('make verify PAGES="flight"', text)
+
+    def test_a_follow_step_without_a_url_here_is_a_problem(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "frontend/verify/flows").mkdir(parents=True)
+            (root / "frontend/src/lib").mkdir(parents=True)
+            (root / "frontend/src/lib/nav.ts").write_text(NAV)
+            (root / "frontend/verify/verify.mjs").write_text(
+                'export const PAGES = ["other"];\n' + VERIFY.replace("flight:", "other:").replace("trip:", "unrelated:"))
+            _, problems = ufm.generate(root)
+        self.assertEqual(len([p for p in problems if "FOLLOWED" in p]), 1)
+
+
 class Gotchas(unittest.TestCase):
     def test_bullets_are_merged_under_their_name(self):
         notes, problems = ufm.gotchas("# T\n\nintro\n\n## trips\n- one\n- two\n\n## trip-edit\n- three\n", {"trips", "trip-edit"})
