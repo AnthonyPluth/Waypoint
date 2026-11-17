@@ -131,7 +131,7 @@ describe("flowProblems", () => {
     expect(fakeArchive([], 5)).toEqual([]);
   });
 
-  it("adds a train, a rental car, parking, a visit and a cancelled stay to a trip, with ids of their own, and leaves a trip with no bookings as it is", () => {
+  it("adds a train, a rental car, parking, a visit, a changed stay and a cancelled stay to a trip, with ids of their own, and leaves a trip with no bookings as it is", () => {
     const model = { id: 4, start_date: "2025-06-12", segments: [{ id: 40, kind: "flight", status: "confirmed", start_local: "2025-06-12T09:00", end_local: "2025-06-12T10:00", travelers: [] }] };
     const made = fakeBookings(model);
     expect(made.segments.map((s) => [s.kind, s.status])).toEqual([["flight", "confirmed"], ["train", "confirmed"], ["car", "confirmed"], ["parking", "confirmed"], ["visit", "confirmed"], ["hotel", "changed"], ["hotel", "cancelled"]]);
