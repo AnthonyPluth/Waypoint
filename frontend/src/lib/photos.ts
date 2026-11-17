@@ -145,16 +145,19 @@ export const firstOfCluster = (photos: TripPhoto[], index: number): TripPhoto | 
 export const unlocated = (photos: TripPhoto[]): number => photos.filter((p) => p.cluster === null).length;
 
 export const HERO_PHOTOS = 3;
+export const HERO_PHOTOS_WIDE = 7;
 export const DAY_PHOTOS = 6;
+export const DAY_PHOTOS_WIDE = 12;
 export const FIRST_DAYS = 3;
 
 export type HeroPhotos = Pick<TripPhotos, "photos" | "best">;
 
-export function heroOf(reply: HeroPhotos | null): number[] {
+export function heroOf(reply: HeroPhotos | null, wide = false): number[] {
   if (!reply) return [];
   const seen = new Set(reply.photos.map((p) => p.id));
-  const ids = [...new Set(reply.best)].filter((id) => seen.has(id)).slice(0, HERO_PHOTOS);
-  return ids.length === HERO_PHOTOS ? ids : [];
+  const ids = [...new Set(reply.best)].filter((id) => seen.has(id));
+  if (wide && ids.length >= HERO_PHOTOS_WIDE) return ids.slice(0, HERO_PHOTOS_WIDE);
+  return ids.length >= HERO_PHOTOS ? ids.slice(0, HERO_PHOTOS) : [];
 }
 
 export const hasGps = (p: Pick<TripPhoto, "latitude" | "longitude" | "location_source">): boolean => p.latitude !== null && p.longitude !== null && !isInferred(p);
@@ -186,10 +189,10 @@ export type PastDay = { day: string; label: string; place: string; photos: TripP
 
 export const dayWords = (day: string): string => dayLabel(`${day}T00:00`, false).replace(/^([^,]+),\s*/, "$1 ");
 
-export function pastDays(photos: TripPhoto[], leftOut: ReadonlySet<number>, segments: Map<number, Segment>): PastDay[] {
+export function pastDays(photos: TripPhoto[], leftOut: ReadonlySet<number>, segments: Map<number, Segment>, perDay = DAY_PHOTOS): PastDay[] {
   return byDay(photos.filter((p) => !leftOut.has(p.id))).map(({ day, photos: list }) => {
     const ordered = leadWithCover(list);
-    return { day, label: dayWords(day), place: dayPlace(list, segments), photos: ordered, shown: ordered.slice(0, DAY_PHOTOS), more: Math.max(0, ordered.length - DAY_PHOTOS) };
+    return { day, label: dayWords(day), place: dayPlace(list, segments), photos: ordered, shown: ordered.slice(0, perDay), more: Math.max(0, ordered.length - perDay) };
   });
 }
 
