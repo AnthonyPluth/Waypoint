@@ -74,6 +74,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **What usually breaks:**
   - Phone only: it opens the More menu of the tab bar. At desktop width (`flow more-menu --viewport desktop`) its first step fails, because there is no More button.
 
+#### `offline-panels-app`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-panels-app`; or `poetry run python run.py verify --flow offline-panels-app`.
+
 #### `offline-trip`
 
 - **Starts at:** `#upcoming`; goes to: `#settings/offline`, `#trips`.
@@ -201,6 +208,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `London`.
 - **Expects to see:** `Trips`, `LANDED`, `+1 day`, `DELAYED 50 MIN`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 1 day before departure`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
+
+#### `flight-status`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `London`, `Back to`.
+- **Expects to see:** `Trips`, `Landing in`, `Not known yet`, `Jane`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-status`; or `poetry run python run.py verify --flow flight-status`.
 
 #### `hotel-address`
 
@@ -543,6 +559,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-sharing-button`; or `poetry run python run.py verify --flow photos-sharing-button`.
 
+## flight (`flight`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** URL `#flight`; control `tools/control goto flight`.
+- **Drive it:** `tools/control goto flight`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
+
 ## Stats (`stats`)
 
 - **What exists:** What Waypoint counts for a person or the household (flights, distance, airlines, hotel nights, rental days, cruises, parking days, places), and what it leaves out. Docs: [Travel stats](../../../../docs/src/content/docs/start/stats.md).
@@ -816,6 +838,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#settings`; goes to: `#settings/assistants`.
 - **Widths:** phone, desktop.
 - **Drive it:** `tools/control flow mcp-settings`; or `poetry run python run.py verify --flow mcp-settings`.
+
+#### `offline-card-app`
+
+- **Starts at:** `#settings`.
+- **Widths:** phone.
+- **Touches:** `Show all 10`.
+- **Expects to see:** `Saved 12 min ago: “Lisbon in June”, “Denver offsite”.`, `Saved just now: “Lisbon in June”.`, `and 7 more`, `Show fewer`, `Nothing is saved yet.`, `Saving your trips…`, `Couldn’t save the trips`, `Nothing is saved on this device yet.`, `The saved trips can’t be read`, `Off on this device`, `On for this device`, `REMINDERS AND CALENDAR`.
+- **Fakes (the demo server can't):** `fake_shell`.
+- **Drive it:** `tools/control flow offline-card-app`; or `poetry run python run.py verify --flow offline-card-app`.
 
 #### `offline-settings`
 

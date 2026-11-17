@@ -97,7 +97,7 @@ actor ServerSession {
         Keychain.remove(Self.openKey)
         Keychain.remove(Self.serverKey)
         webSessionExpiresAt = nil
-        await offline.purge()
+        await offline.signedOut()
         Task { await retryPendingRevocations() }
         await Self.clearWebData(host: host)
     }

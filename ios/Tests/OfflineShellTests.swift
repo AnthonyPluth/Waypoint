@@ -239,7 +239,9 @@ final class OfflineShellTests: XCTestCase {
         let post = "return await window.webkit.messageHandlers.waypointOffline.postMessage"
         let status = try await webView.callAsyncJavaScript("\(post)({ type: 'status' })", contentWorld: .page) as? [String: Any]
         XCTAssertEqual(status?["version"] as? Int, 1)
-        XCTAssertEqual(status?["saving"] as? Bool, false)
+        XCTAssertEqual(status?["saving"] as? Bool, true)
+        XCTAssertEqual(status?["syncing"] as? Bool, false)
+        XCTAssertEqual(status?["lastSaveFailed"] as? Bool, false)
         XCTAssertEqual((status?["trips"] as? [[String: Any]])?.first?["name"] as? String, "Lisbon")
         let load = try await webView.callAsyncJavaScript("\(post)({ type: 'load' })", contentWorld: .page) as? [String: Any]
         let trip = (load?["trips"] as? [[String: Any]])?.first

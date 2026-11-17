@@ -16,14 +16,15 @@ export async function refreshState(background = false): Promise<void> {
   app.state = await api<AppState>("/api/state", background ? { keep: true, background } : { keep: true });
 }
 
-export const route = $state({ page: "upcoming", sub: "" as string, query: "" as string });
+export const route = $state({ page: "upcoming", sub: "" as string, rest: "" as string, query: "" as string });
 
 function readHash(): void {
   const [path, query = ""] = (location.hash || "#upcoming").slice(1).split(/\?(.*)/s);
-  const [page, sub = ""] = path.split("/");
+  const [page, sub = "", ...rest] = path.split("/");
   if ((page || "upcoming") !== route.page) { newPage(); dropEarly(); }
   route.page = page || "upcoming";
   route.sub = sub;
+  route.rest = rest.join("/");
   route.query = query;
 }
 

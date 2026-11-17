@@ -17,6 +17,10 @@
     const element = host;
     void moreKey;
     if (!element) return;
+    if (maps.failed()) {
+      onfailure();
+      return;
+    }
     const css = getComputedStyle(document.documentElement);
     const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
     const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay), border: color("--map-border", DEFAULT_PALETTE.border) };

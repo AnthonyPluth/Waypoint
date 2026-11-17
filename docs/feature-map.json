@@ -228,6 +228,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -252,6 +253,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -260,6 +262,7 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip",
       "web": [
+        "frontend/src/pages/FlightStatus.svelte",
         "frontend/src/pages/Trip.svelte"
       ],
       "tests": [
@@ -279,6 +282,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -378,6 +382,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -400,6 +405,7 @@
         "tests/test_trips.py"
       ],
       "docs": [
+        "contributing/design",
         "start/trips"
       ]
     },
@@ -1029,6 +1035,7 @@
         "tests/test_mail_scan.py",
         "tests/test_mcp.py",
         "tests/test_mcp_routes.py",
+        "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trips.py"
       ],

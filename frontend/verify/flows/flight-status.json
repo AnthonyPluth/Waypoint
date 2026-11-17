@@ -1,0 +1,23 @@
+{
+  "name": "flight-status",
+  "page": "trips",
+  "steps": [
+    { "clock": "2026-06-19T14:35:00Z" },
+    { "fake_flight_status": "in-the-air" },
+    { "reload": true },
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "wait_for": "article[data-state='in-the-air'] a[data-live-link]" },
+    { "press": { "selector": "article[data-state='in-the-air'] a[data-live-link]", "key": "Enter" } },
+    { "wait_for": "[data-testid='flight-live'][data-state='in-the-air']" },
+    { "expect_text": { "selector": "h1", "text": "Landing in" } },
+    { "wait_for": "[role='progressbar'][aria-label='Flight progress']" },
+    { "wait_for": "[aria-label='Flight timeline'] li" },
+    { "wait_for": "[data-facts] [role='img'][aria-label='From live status']" },
+    { "expect_text": { "selector": "[data-facts]", "text": "Not known yet" } },
+    { "expect_text": { "selector": "[aria-label='Seats by traveller']", "text": "Jane" } },
+    { "screenshot": "in-the-air" },
+    { "click": "a[aria-label^='Back to']" },
+    { "wait_for": "article[data-state='in-the-air']" }
+  ]
+}

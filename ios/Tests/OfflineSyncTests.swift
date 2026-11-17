@@ -13,6 +13,10 @@ private final class FakeFetching: OfflineFetching, @unchecked Sendable {
     }
 }
 
+private final class SyncingProbe: @unchecked Sendable {
+    var value = false
+}
+
 final class OfflineSyncTests: XCTestCase {
     private var root: URL!
     private var defaults: UserDefaults!
@@ -76,8 +80,66 @@ final class OfflineSyncTests: XCTestCase {
         store.tripNames(server: home)
     }
 
-    func testSavingStartsOff() {
+    func testSavingStartsOn() {
+        XCTAssertTrue(OfflineSettings(defaults: defaults).isOn)
+    }
+
+    func testAnUntouchedInstallSavesAtTheFirstSync() async {
+        answer(["Lisbon"])
+        let sync = OfflineSync(store: store, settings: OfflineSettings(defaults: defaults), fetching: fetching,
+                               server: { [home] in home }, bearer: { "wpa_token" })
+        let outcome = await sync.sync()
+        XCTAssertEqual(outcome, .saved)
+        XCTAssertEqual(savedNames(), ["Lisbon"])
+    }
+
+    func testSigningInAgainFindsSavingOnAfterItWasSwitchedOff() async {
+        let sync = makeSync()
+        await sync.setSaving(false)
         XCTAssertFalse(OfflineSettings(defaults: defaults).isOn)
+        await sync.signedOut()
+        XCTAssertTrue(OfflineSettings(defaults: defaults).isOn)
+    }
+
+    func testSyncingIsTrueOnlyWhileAFetchRuns() async {
+        answer(["Lisbon"])
+        let sync = makeSync()
+        XCTAssertFalse(sync.state.syncing)
+        let during = SyncingProbe()
+        fetching.onFetch = { during.value = sync.state.syncing }
+        await sync.sync()
+        XCTAssertTrue(during.value)
+        XCTAssertFalse(sync.state.syncing)
+    }
+
+    func testAFailedSaveSetsLastSaveFailedAndTheNextSuccessClearsIt() async {
+        answer(["Lisbon"])
+        let sync = makeSync()
+        await sync.sync()
+        XCTAssertFalse(sync.state.lastSaveFailed)
+        answer([], status: 500)
+        await sync.sync()
+        XCTAssertTrue(sync.state.lastSaveFailed)
+        XCTAssertEqual(savedNames(), ["Lisbon"])
+        answer(["Lisbon", "Oslo"])
+        await sync.sync()
+        XCTAssertFalse(sync.state.lastSaveFailed)
+    }
+
+    func testAnUnknownVersionCountsAsAFailedSave() async {
+        answer(["Lisbon"], version: 2)
+        let sync = makeSync()
+        await sync.sync()
+        XCTAssertTrue(sync.state.lastSaveFailed)
+    }
+
+    func testSwitchingSavingOffClearsLastSaveFailed() async {
+        answer([], status: 500)
+        let sync = makeSync()
+        await sync.sync()
+        XCTAssertTrue(sync.state.lastSaveFailed)
+        await sync.setSaving(false)
+        XCTAssertFalse(sync.state.lastSaveFailed)
     }
 
     func testSyncSavesTheReplyWithTheBearerToken() async {

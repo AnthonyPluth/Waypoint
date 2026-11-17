@@ -75,6 +75,14 @@ describe("Trip", () => {
     expect(within(cards[1]).queryByText(/Updated /)).toBeNull();
   });
 
+  it("opens the flight’s live status view from its card, and from no other booking", async () => {
+    render(TripPage);
+    const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
+    const link = await within(cards[0]).findByRole("link", { name: /, open live status$/ });
+    expect(link).toHaveAttribute("href", "#trip/1/flight/1");
+    expect(within(cards[1]).queryByRole("link", { name: /open live status/ })).toBeNull();
+  });
+
   it("shows a changed single booking’s Changed chip on its flight card", async () => {
     held = trip([{ ...flight, status: "changed" }, stay]);
     render(TripPage);

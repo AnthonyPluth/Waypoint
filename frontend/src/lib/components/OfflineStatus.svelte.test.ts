@@ -7,11 +7,12 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 vi.mock("$lib/offline.svelte", async (importOriginal) => ({ ...(await importOriginal<typeof import("$lib/offline.svelte")>()), refreshOffline: vi.fn(), syncSavedTrip: vi.fn() }));
 
 import { offline, syncSavedTrip } from "$lib/offline.svelte";
+import { installShell } from "../../test/fake-shell";
 import OfflineStatus from "./OfflineStatus.svelte";
 
-const reset = { checked: true, setUp: true, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, trips: [] };
+const reset = { checked: true, setUp: true, hasCopy: false, savedAt: null, off: false, damaged: false, supported: true, reason: "", declined: false, failed: false, syncing: false, oldApp: false, trips: [] };
 beforeEach(() => { Object.assign(offline, reset); vi.mocked(syncSavedTrip).mockReset(); });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 const line = () => screen.getByTestId("offline-status-line");
 
@@ -96,5 +97,29 @@ describe("OfflineStatus", () => {
   it("says nothing is saved yet when set up with no copy", () => {
     render(OfflineStatus, { tripId: 1 });
     expect(line()).toHaveTextContent("Nothing is saved yet. Your trips under way or starting within a week, and your next upcoming trip, are saved when you open Waypoint online.");
+  });
+
+  it("inside the app, sends a copy that can't be read to switching saving off and on, and never offers Try again", () => {
+    installShell({ lastSaveFailed: true });
+    Object.assign(offline, { damaged: true, setUp: false });
+    const { unmount } = render(OfflineStatus, { tripId: 1 });
+    expect(line()).toHaveTextContent("The saved trips can’t be read. Switch saving off and on in Settings to start afresh.");
+    unmount();
+    Object.assign(offline, { damaged: false, setUp: true, failed: true, hasCopy: false });
+    render(OfflineStatus, { tripId: 1 });
+    expect(line()).toHaveTextContent("Couldn’t save the trips on this device. Nothing is saved yet.");
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
+
+  it("keeps Try again in a browser", () => {
+    Object.assign(offline, { failed: true });
+    render(OfflineStatus, { tripId: 1 });
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+  });
+
+  it("shows nothing inside an installed app too old for the bridge", () => {
+    Object.assign(offline, { oldApp: true, supported: false });
+    render(OfflineStatus, { tripId: 1 });
+    expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument();
   });
 });

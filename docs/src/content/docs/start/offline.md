@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you, never sent anywhere else, always encrypted on the device, and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. Nothing is saved in the clear.
+Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you and never sent anywhere else. In a browser they are always encrypted on the device and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. The iPhone app keeps its own copy and works differently (see [In the iPhone app](#in-the-iphone-app)).
 
 ## Setting it up
 
@@ -14,6 +14,12 @@ The first time a trip loads online on a device that isn’t set up, Waypoint off
 Setting up creates a passkey for this site, whose only job is unlocking the saved trips. Signing in still goes through your identity provider, and nothing about the passkey is sent to the server. On an iPhone, add Waypoint to the Home Screen first (Share → Add to Home Screen): Safari clears the stored data of sites you haven’t visited for a while, and an installed app is exempt.
 
 The device must be able to make a passkey with the PRF extension from its built-in authenticator, with user verification. One that can’t never saves anything, and **Offline access** in Settings says why.
+
+## In the iPhone app
+
+The [iPhone app](/Waypoint/start/ios/) saves trips itself, with no passkey, no setup sheet and no Face ID. **Save my upcoming trips** is on by default on a new install, and the first save happens when you open Waypoint online after signing in. To change it, open **Settings → Offline & notifications → Offline access**: the card says **On for this device** or **Off on this device**, names the saved trips and when they were saved, and has the one switch. Switching it off deletes the saved trips at once, with no confirmation, and it is the only way to delete them: there is no **Remove** button. Signing in again turns saving back on. The card says **Saving your trips…** while the app is fetching, **Couldn’t save the trips** when a save failed (the older copy is kept, and saving is tried again each time you open Waypoint online), and, if the saved copy can’t be read, to switch saving off and on again to start afresh. An installed app too old to offer this shows no Offline access card.
+
+Where the copy is kept: in the app’s own private storage on the phone (its sandbox), as files protected by iOS Data Protection, so they are readable only while the phone is unlocked. Other apps and websites can’t read them. Waypoint adds no encryption of its own, and opening saved trips needs no Face ID: the phone’s lock is the gate. The files are included in the phone’s iCloud and computer backups when those are on. They are deleted at the same moments as in a browser (below), and also when the server address changes.
 
 ## What is saved
 
@@ -42,7 +48,7 @@ The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in toke
 
 ## Checking before you travel
 
-Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again**.
+Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again** in a browser. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
 
 ## Using it with no connection
 
@@ -61,7 +67,7 @@ Every saved copy is removed:
 
 - when you sign out;
 - when any request answers that you’re no longer signed in or allowed (401 or 403) while you’re online;
-- when you turn off **Save my upcoming trips on this device** or choose **Remove from this device**, in **Settings → Offline & notifications → Offline access**;
+- when you turn off **Save my upcoming trips on this device** or choose **Remove from this device** (in the iPhone app, only the switch **Save my upcoming trips** exists), in **Settings → Offline & notifications → Offline access**;
 - 3 days after its trip ends, on the device’s clock, even if you never open it again;
 - when the next online load no longer includes a trip, or finds you can’t see it.
 

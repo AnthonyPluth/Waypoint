@@ -31,9 +31,10 @@ export type Mk = {
   Style: new (options: Record<string, unknown>) => object;
   Directions?: { new (options?: Record<string, unknown>): MkDirections; Transport: { Automobile: unknown } };
 };
-export type Maps = { mk: Mk; onFailure(listener: () => void): () => void };
+export type Maps = { mk: Mk; failed(): boolean; onFailure(listener: () => void): () => void };
 
 export const LOAD_MS = 6000;
+export const RETRY_MS = 30000;
 
 declare global {
   interface Window { mapkit?: Mk }
@@ -66,25 +67,28 @@ async function start(): Promise<{ maps: Maps | null; remember: boolean }> {
   const mk = window.mapkit ?? (await scriptAt(first.script, LOAD_MS));
   if (!mk) return { maps: null, remember: false };
   const listeners = new Set<() => void>();
-  let failed = false;
-  const fail = () => { failed = true; for (const l of [...listeners]) l(); };
+  let failedAt: number | null = null;
+  const failed = () => failedAt !== null && Date.now() - failedAt < RETRY_MS;
+  const fail = () => { failedAt = Date.now(); for (const l of [...listeners]) l(); };
+  const recover = () => { failedAt = null; };
   try {
     mk.init({
       authorizationCallback: (done) => {
         apiCall<"GET /api/mapkit/token">("/api/mapkit/token", { keep: true, background: true }).then(
-          (next) => { if (next?.enabled === true && next.token) done(next.token); else fail(); },
+          (next) => { if (next?.enabled === true && next.token) { recover(); done(next.token); } else fail(); },
           fail,
         );
       },
       language: typeof navigator !== "undefined" ? navigator.language : undefined,
     });
     mk.addEventListener("error", fail);
+    mk.addEventListener("configuration-change", (event) => { if (event.status === "Initialized") recover(); });
   } catch {
     return { maps: null, remember: false };
   }
-  return { maps: { mk, onFailure: (l) => {
+  return { maps: { mk, failed, onFailure: (l) => {
     listeners.add(l);
-    if (failed) queueMicrotask(() => { if (listeners.has(l)) l(); });
+    if (failed()) queueMicrotask(() => { if (listeners.has(l)) l(); });
     return () => { listeners.delete(l); };
   } }, remember: true };
 }

@@ -1,13 +1,13 @@
 import { vi } from "vitest";
 import type { ShellRequest } from "../lib/offline-shell";
 
-export type FakeShell = { posts: ShellRequest[]; saving: boolean; trips: unknown[]; savedAt: number | null; replies: Map<string, unknown>; uninstall: () => void };
+export type FakeShell = { posts: ShellRequest[]; saving: boolean; syncing: boolean; lastSaveFailed: boolean; trips: unknown[]; savedAt: number | null; replies: Map<string, unknown>; uninstall: () => void };
 
 const names = (trips: unknown[]) => trips.map((c) => { const t = (c as { trip: { id: number; name: string } }).trip; return { id: t.id, name: t.name }; });
 
-export function installShell(initial: { saving?: boolean; trips?: unknown[]; savedAt?: number | null } = {}): FakeShell {
-  const shell: FakeShell = { posts: [], saving: initial.saving ?? true, trips: initial.trips ?? [], savedAt: initial.savedAt ?? null, replies: new Map(), uninstall: () => {} };
-  const status = () => ({ version: 1, saving: shell.saving, savedAt: shell.trips.length ? shell.savedAt : null, trips: names(shell.trips) });
+export function installShell(initial: { saving?: boolean; syncing?: boolean; lastSaveFailed?: boolean; trips?: unknown[]; savedAt?: number | null } = {}): FakeShell {
+  const shell: FakeShell = { posts: [], saving: initial.saving ?? true, syncing: initial.syncing ?? false, lastSaveFailed: initial.lastSaveFailed ?? false, trips: initial.trips ?? [], savedAt: initial.savedAt ?? null, replies: new Map(), uninstall: () => {} };
+  const status = () => ({ version: 1, saving: shell.saving, syncing: shell.syncing, lastSaveFailed: shell.lastSaveFailed, savedAt: shell.trips.length ? shell.savedAt : null, trips: names(shell.trips) });
   const postMessage = vi.fn(async (message: ShellRequest) => {
     shell.posts.push(message);
     if (shell.replies.has(message.type)) return shell.replies.get(message.type);

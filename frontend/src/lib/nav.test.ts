@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { initials, inMore, MORE, NAV, navFor, pageFor, TABS } from "./nav";
+import { flightRoute, initials, inMore, MORE, NAV, navFor, pageFor, TABS } from "./nav";
 
 describe("nav", () => {
   it("has Upcoming first, which is where an unknown route goes", () => {
@@ -23,6 +23,19 @@ describe("nav", () => {
     expect(navFor("trip")).toBe("trips");
     expect(navFor("people")).toBe("people");
     expect(navFor("budget")).toBe("upcoming");
+  });
+
+  it("opens a flight's live status view from a trip's address, and only for a flight number", () => {
+    expect(flightRoute("flight/34")).toBe(34);
+    expect(flightRoute("flight/")).toBeNull();
+    expect(flightRoute("flight/x")).toBeNull();
+    expect(flightRoute("flight/34/more")).toBeNull();
+    expect(flightRoute("")).toBeNull();
+    expect(pageFor("trip", "flight/34")).toBe("flight");
+    expect(pageFor("trip", "")).toBe("trip");
+    expect(pageFor("trips", "flight/34")).toBe("trips");
+    expect(pageFor("flight")).toBe("upcoming");
+    expect(navFor("trip")).toBe("trips");
   });
 
   it("shows what's waiting on Review, and nothing on the other pages", () => {
