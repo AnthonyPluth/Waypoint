@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v3.0.0 (plugins/fleet/skills/design-signoff/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v4.0.0 (plugins/fleet/skills/design-signoff/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-design-signoff
 description: Use before changing anything a person sees in the frontend - layout, a flow, visual style, theme tokens or copy a design fixed. No frontend design change ships without the owner's sign-off; this says what counts, how to show the change (make verify images at phone and desktop width, beside the signed-off designs) and what to do when the work would depart from the design.
 ---
@@ -30,7 +30,7 @@ Stop. Don't ship the deviation, and don't pick an alternative yourself:
 
 1. Raise it in the pull request: what the design shows, what you would change and why (it doesn't fit at phone width, a state it doesn't cover, a conflict with another page).
 2. Raise it on the issue where the design is being signed off, with the same images.
-3. Keep the rest of the change to the design, or leave the pull request as a draft until the owner answers.
+3. Keep the rest of the change to the design, and add the `keep-draft` label until the owner answers, saying in the pull request what it waits on: the merge gate would otherwise mark the draft ready once its checks pass (`AGENTS.md`'s "Git and PRs" has the commands). Whoever answers removes the label.
 
 ## Tokens
 
