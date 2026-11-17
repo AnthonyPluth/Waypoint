@@ -64,6 +64,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Fakes (the demo server can't):** `fake_first_run`.
 - **Drive it:** `tools/control flow first-run-scanning`; or `poetry run python run.py verify --flow first-run-scanning`.
 
+#### `flight-rows`
+
+- **Starts at:** `#upcoming`.
+- **Widths:** phone, desktop.
+- **Touches:** `LHR → JFK`.
+- **Expects to see:** `Upcoming`, `IN THE AIR`, `Landing in`, `Departed`.
+- **Fakes (the demo server can't):** `fake_flight_status`.
+- **Drive it:** `tools/control flow flight-rows`; or `poetry run python run.py verify --flow flight-rows`.
+
 #### `more-menu`
 
 - **Starts at:** `#upcoming`.
@@ -562,8 +571,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 ## flight (`flight`)
 
 - **What exists:** No docs page of its own.
-- **Reach it:** URL `#flight`; control `tools/control goto flight`.
-- **Drive it:** `tools/control goto flight`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
+- **Reach it:** not in the navigation; open a trip from `#trips` and click its flight card; URL `#trip/<id>/flight/<segment id>`; control `tools/control goto trips`, then `click` a trip and `click` its flight card.
+- **Drive it:** reach it as above, then `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
 
 ## Stats (`stats`)
 

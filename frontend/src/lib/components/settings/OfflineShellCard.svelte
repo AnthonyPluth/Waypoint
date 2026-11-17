@@ -42,13 +42,15 @@
   );
   const showBackups = $derived(!offline.damaged && !offline.syncing && !offline.failed);
 
-  async function toggle(on: boolean) {
+  async function toggle(input: HTMLInputElement) {
+    const on = input.checked;
     changing = true;
     try {
       await switchSaving(on);
       if (on) waiting = 3;
     } catch {
       toast.error("Couldn’t change saving on this device");
+      input.checked = !on;
       await refreshOffline();
     } finally {
       changing = false;
@@ -93,7 +95,7 @@
           {/if}
         </div>
         <label class="flex min-h-11 shrink-0 cursor-pointer items-center gap-2.5 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60">
-          <input type="checkbox" role="switch" class="peer sr-only" checked={!offline.off} disabled={changing || offline.syncing} onchange={(e) => toggle(e.currentTarget.checked)} />
+          <input type="checkbox" role="switch" class="peer sr-only" checked={!offline.off} disabled={changing || offline.syncing} onchange={(e) => toggle(e.currentTarget)} />
           <span class="relative h-7 w-[46px] flex-none rounded-full bg-input after:absolute after:left-[3px] after:top-[3px] after:size-[22px] after:rounded-full after:bg-foreground peer-checked:bg-primary peer-checked:after:left-[21px] peer-checked:after:bg-primary-foreground peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50" aria-hidden="true"></span>
           Save my upcoming trips
         </label>

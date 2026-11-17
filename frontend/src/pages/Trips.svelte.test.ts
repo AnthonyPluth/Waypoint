@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { Person, Trip } from "$lib/api-types";
-import { app, route } from "$lib/app.svelte";
+import { app, backToTrips, route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { segment, state, trip } from "../test/fixtures";
@@ -1227,5 +1227,139 @@ describe("trip cards on a phone and in two panes", () => {
     expect(first.className).not.toContain("border-primary/35");
     expect(within(first).queryByTestId("pill")).toBeNull();
     expect(link("Trip to Auckland")).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("going back to the list", () => {
+  const flown = (id: number, name: string, start: string, end: string) =>
+    trip([segment({ id: id * 10, trip_id: id, start_local: `${start}T09:00`, end_local: `${end}T10:00` })], { id, name, destination: "Nags Head, NC" });
+  const years = () => [flown(1, "Beach", "2026-08-08", "2026-08-15"), flown(3, "New Year", "2025-12-29", "2026-01-03"), flown(4, "Old", "2024-06-01", "2024-06-02")];
+  const scrolled = (y: number) => {
+    Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+    window.dispatchEvent(new Event("scroll"));
+  };
+  let scrollTo: ReturnType<typeof vi.fn>;
+  const onPage = (page: string) => waitFor(() => expect(route.page).toBe(page));
+
+  beforeEach(async () => {
+    viewport.phone = true;
+    scrollTo = vi.fn();
+    window.scrollTo = scrollTo as never;
+    serve(years());
+    await onPage("trips");
+  });
+  afterEach(async () => {
+    scrolled(0);
+    location.hash = "#upcoming";
+    await onPage("upcoming");
+  });
+
+  async function leaveFor(entry: string) {
+    const first = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    await user().click(screen.getByRole("button", { name: "Show more" }));
+    await screen.findByRole("list", { name: "Past trips in 2025" });
+    scrolled(640);
+    location.hash = entry;
+    await onPage("trip");
+    first.unmount();
+  }
+
+  it("comes back to the same scroll position with the years that were loaded", async () => {
+    await leaveFor("#trip/3");
+    history.back();
+    await onPage("trips");
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+  });
+
+  it("starts at the top, with one year, when the Trips tab is tapped from the trip", async () => {
+    await leaveFor("#trip/3");
+    location.hash = "#trips";
+    await onPage("trips");
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("starts at the top on a fresh visit after the saved position was left behind", async () => {
+    await leaveFor("#trip/3");
+    history.back();
+    await onPage("trips");
+    history.back();
+    await onPage("upcoming");
+    location.hash = "#trips";
+    await onPage("trips");
+    render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    expect(screen.queryByRole("list", { name: "Past trips in 2025" })).toBeNull();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it("puts the list column of two panes back where it was scrolled to", async () => {
+    panes.two = true;
+    viewport.phone = false;
+    const everyTrip = [london, auckland, ...years()];
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (numbers(path)) return numbers(path) as never;
+      if (path === "/api/people") return { people: [jane, sam] };
+      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
+      if (path === "/api/photos/trip-covers") return { trips: [] } as never;
+      const one = /^\/api\/trips\/(\d+)$/.exec(path);
+      if (one) return everyTrip.find((t) => t.id === Number(one[1]));
+      return { trips: everyTrip };
+    });
+    const first = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    const column = screen.getByRole("list", { name: "Past trips in 2026" }).closest(".overflow-y-auto") as HTMLElement;
+    Object.defineProperty(column, "scrollTop", { value: 300, configurable: true });
+    column.dispatchEvent(new Event("scroll"));
+    location.hash = "#trip/3";
+    await onPage("trip");
+    first.unmount();
+    history.back();
+    await onPage("trips");
+    const columnScroll = vi.spyOn(Element.prototype, "scrollTo").mockImplementation(() => {});
+    render(Trips);
+    await waitFor(() => expect(columnScroll).toHaveBeenCalledWith(0, 300));
+    columnScroll.mockRestore();
+  });
+
+  it("keeps the first list's position when a second visit to Trips is made and left in between", async () => {
+    await leaveFor("#trip/3");
+    location.hash = "#trips";
+    await onPage("trips");
+    const second = render(Trips);
+    await screen.findByRole("list", { name: "Past trips in 2026" });
+    scrolled(90);
+    location.hash = "#trip/1";
+    await onPage("trip");
+    second.unmount();
+    history.back();
+    await onPage("trips");
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trip/3"));
+    history.back();
+    await waitFor(() => expect(location.hash).toBe("#trips"));
+    await waitFor(() => expect(route.page).toBe("trips"));
+    render(Trips);
+    expect(await screen.findByRole("list", { name: "Past trips in 2025" })).toBeInTheDocument();
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+  });
+
+  it("takes the in-app back link as going back, and leaves it a plain link when there is nothing to go back to", async () => {
+    await leaveFor("#trip/3");
+    const click = new MouseEvent("click", { cancelable: true, button: 0 });
+    backToTrips(click);
+    expect(click.defaultPrevented).toBe(true);
+    await onPage("trips");
+    render(Trips);
+    await waitFor(() => expect(scrollTo).toHaveBeenCalledWith(0, 640));
+    const plain = new MouseEvent("click", { cancelable: true, button: 0 });
+    backToTrips(plain);
+    expect(plain.defaultPrevented).toBe(false);
   });
 });
