@@ -96,11 +96,29 @@ jobs:
           cp "$RUNNER_TEMP/profile.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/$profile_uuid.mobileprovision"
           rm -f "$RUNNER_TEMP/profile.mobileprovision"
           echo "PROFILE_NAME=$profile_name" >> "$GITHUB_ENV"
+      - name: Find the latest release version
+        id: version
+        # Read now, after the environment's approval, so a release cut while the run waited counts. Releases are cut by docker.yml.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          tag=$(gh api "repos/$REPO/releases/latest" --jq .tag_name) || {
+            echo "::error::Could not read the latest GitHub Release, so the TestFlight version is unknown. The build stops rather than use a made-up version."
+            exit 1
+          }
+          if [[ ! "$tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::The latest GitHub Release's tag is not vX.Y.Z, so it cannot be the TestFlight version (Apple needs three dot-separated integers). The build stops rather than use a made-up version."
+            exit 1
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "TestFlight version ${tag#v}, build $GITHUB_RUN_NUMBER"
       - name: Archive the app
         working-directory: ios
         env:
           DEVELOPMENT_TEAM: ${{ vars.DEVELOPMENT_TEAM }}
           WAYPOINT_BUNDLE_ID: ${{ vars.WAYPOINT_BUNDLE_ID }}
+          MARKETING_VERSION: ${{ steps.version.outputs.version }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           xcodebuild archive \
@@ -112,6 +130,7 @@ jobs:
             -derivedDataPath build \
             DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
             WAYPOINT_BUNDLE_ID="$WAYPOINT_BUNDLE_ID" \
+            MARKETING_VERSION="$MARKETING_VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
