@@ -56,6 +56,7 @@ Made in chat after seeing the frames and the build side by side (phone and deskt
 - The compact booking (a one-line "Flight progress" bar, "Departed 9:46 am", "Lands 10:52 am") goes in the Upcoming booking sheet, where a flight opened from the day-by-day list used to show the full booking card and the `FlightStatus` block, and not on the trip page, which keeps the full flight card from #714 untouched. This is a different screen from the one `c-elsewhere.html` names.
 - "Flights today" is a separate, flights-only list on Upcoming, above the existing day-by-day lists, which stay as they are.
 - The Home card keeps "Next up" (or "In the air"), the confirmation codes, Open trip and the gate-code control as before, and a flight with no live status shows its booked times like the flight card does.
+- The Home flight card no longer shows the check-in countdown, the brand logo, the seat and cabin lines or the "Confirmed" chip (owner, 2026-11-17, after seeing the frames and the build side by side). The full card, with them, stays outside the window and after the flight lands, and the trip page keeps its full flight card.
 
 ## Fonts
 
