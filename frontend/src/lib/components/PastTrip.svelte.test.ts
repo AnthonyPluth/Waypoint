@@ -799,6 +799,7 @@ describe("PastTrip on desktop", () => {
       await userEvent.click(grid.querySelector("[data-photo]") as HTMLElement);
       expect(within(await screen.findByRole("dialog")).getByText(/^Photo \d+ of 30$/)).toBeTruthy();
       await userEvent.keyboard("{Escape}");
+      await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
       await userEvent.click(screen.getByRole("button", { name: "Close gallery" }));
       await waitFor(() => expect(screen.getByRole("button", { name: "Open gallery" })).toBeTruthy());
     });
