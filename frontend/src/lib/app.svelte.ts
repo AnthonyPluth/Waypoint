@@ -17,6 +17,8 @@ export async function refreshState(background = false): Promise<void> {
   app.state = await api<AppState>("/api/state", background ? { keep: true, background } : { keep: true });
 }
 
+export const layout = $state({ wide: false });
+
 export const route = $state({ page: "upcoming", sub: "" as string, rest: "" as string, query: "" as string });
 
 function readHash(from?: number): void {

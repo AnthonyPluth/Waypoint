@@ -25,7 +25,6 @@
     {"screenshot": "stop"},
     {"click": "role=button[name='Keep sharing']"},
     {"goto": "#trip/7"},
-    {"reload": true},
     {"expect_text": {"selector": "h1", "text": "Denver"}},
     {"wait_for": "role=button[name='Sharing']"},
     {"click": "role=button[name='Sharing']"},

@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { Person, Trip } from "$lib/api-types";
-import { app, backToTrips, route } from "$lib/app.svelte";
+import { app, backToTrips, layout, route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { segment, state, trip } from "../test/fixtures";
@@ -219,6 +219,16 @@ describe("two panes", () => {
       return { trips: all };
     });
   }
+
+  it("keeps the selected trip in the pane at its own width, never the finished-trip page's 80 rem", async () => {
+    panes.two = true;
+    serveTrips();
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    expect(layout.wide).toBe(false);
+    expect(pane.firstElementChild?.className).toContain("max-w-3xl");
+  });
 
   it("shows the first trip beside the list on a wide screen, and the one you pick", async () => {
     panes.two = true;

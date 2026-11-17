@@ -10,6 +10,7 @@ import { api } from "$lib/api";
 import type { Person, PhotoGrantPerson, PhotoSharing, TripPhoto, TripPhotos as Reply } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { viewport } from "$lib/phone.svelte";
+import type { PersonSharing } from "$lib/trip-sharing.svelte";
 import { segment, state, trip } from "../../test/fixtures";
 import TripPhotos from "./TripPhotos.svelte";
 
@@ -63,7 +64,7 @@ function serve() {
   });
 }
 
-const mount = (extra: { timeline?: boolean; people?: Person[]; trip?: typeof road } = {}) => render(TripPhotos, { trip: extra.trip ?? { ...road, people: [1] }, people: extra.people ?? [ada], now: after, timeline: extra.timeline });
+const mount = (extra: { timeline?: boolean; people?: Person[]; trip?: typeof road; onsharing?: (acting: PersonSharing[], settled: boolean) => void } = {}) => render(TripPhotos, { trip: extra.trip ?? { ...road, people: [1] }, people: extra.people ?? [ada], now: after, timeline: extra.timeline, onsharing: extra.onsharing });
 const button = () => screen.findByRole("button", { name: "Sharing" });
 const panel = () => screen.findByRole("dialog", { name: "Photo sharing for this trip" });
 const stopTitle = "Stop sharing your photos on this trip?";
@@ -122,8 +123,9 @@ describe("The Sharing button", () => {
   });
 
   it("is left to the past trip's page on a timeline, which draws no card and no button itself", async () => {
-    mount({ timeline: true });
-    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith("/api/trips/7/photo-sharing?person_id=1", { keep: true }));
+    const onsharing = vi.fn();
+    mount({ timeline: true, onsharing });
+    await waitFor(() => expect(onsharing).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ mode: "card" })]), true));
     expect(screen.queryByTestId("your-photos")).toBeNull();
     expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
   });
