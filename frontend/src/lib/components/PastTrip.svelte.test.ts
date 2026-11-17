@@ -423,8 +423,7 @@ describe("PastTrip Sharing", () => {
   const sharingButton = () => screen.findByRole("button", { name: "Sharing" });
   const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
-  it("sits alone in the row under a photo hero when View photos isn't drawn, with the card only in the panel", async () => {
-    viewport.phone = false;
+  it("sits alone in the row under a photo hero on a phone when View photos isn't drawn, with the card only in the panel", async () => {
     photos = many(6);
     best = [1, 2, 3];
     sharingReply = async () => sharing();
@@ -437,8 +436,52 @@ describe("PastTrip Sharing", () => {
     await userEvent.click(button);
     const panel = await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
     expect(within(panel).getByRole("region", { name: "Your photos on this trip" })).toBeTruthy();
-    expect(panel.className).toContain("left-[-6px]");
     expect(screen.queryByRole("button", { name: "Select your photos to remove" })).toBeNull();
+  });
+
+  it("sits beside Open gallery in the Photos by day header on desktop, with the popover opening leftward to stay on screen", async () => {
+    viewport.phone = false;
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing();
+    show();
+    const button = await sharingButton();
+    const open = screen.getByRole("button", { name: "Open gallery" });
+    const heading = screen.getByRole("heading", { level: 2, name: "Photos by day" });
+    expect(heading.parentElement?.contains(button)).toBe(true);
+    expect(before(button, open)).toBe(true);
+    expect(before(screen.getByTestId("trip-hero"), button)).toBe(true);
+    expect(screen.queryByRole("button", { name: "View photos" })).toBeNull();
+    await userEvent.click(button);
+    const panel = await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    expect(panel.className).toContain("right-[-6px]");
+  });
+
+  it("puts the reminder directly under the Photos by day header on desktop", async () => {
+    viewport.phone = false;
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing({ state: "declined", scope: null });
+    show();
+    const reminder = await screen.findByTestId("photo-reminder");
+    const heading = screen.getByRole("heading", { level: 2, name: "Photos by day" });
+    expect(heading.parentElement?.nextElementSibling).toBe(reminder);
+    expect(before(reminder, days()[0])).toBe(true);
+    expect(screen.queryByRole("button", { name: "Sharing" })).toBeNull();
+  });
+
+  it("holds a blank slot in the header on desktop while the sharing state loads", async () => {
+    viewport.phone = false;
+    photos = many(6);
+    best = [1, 2, 3];
+    let release: (value: PhotoSharing) => void = () => {};
+    sharingReply = () => new Promise((resolve) => { release = resolve; });
+    show();
+    const slot = await screen.findByTestId("sharing-slot");
+    expect(screen.getByRole("heading", { level: 2, name: "Photos by day" }).parentElement?.contains(slot)).toBe(true);
+    release(sharing());
+    await sharingButton();
+    expect(screen.queryByTestId("sharing-slot")).toBeNull();
   });
 
   it("sits beside View photos when the hero takes every photo", async () => {

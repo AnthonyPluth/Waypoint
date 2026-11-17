@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { tick, untrack, type Snippet } from "svelte";
   import { app } from "$lib/app.svelte";
   import type { Person, PhotoSource, Trip, TripPhoto, TripPhotos } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
@@ -19,10 +19,10 @@
   const NONE: ReadonlySet<number> = new Set();
   const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false) }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), headerEnd = null, belowHeader = null }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
     timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
-    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean;
+    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; headerEnd?: Snippet | null; belowHeader?: Snippet | null;
   } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
@@ -431,10 +431,13 @@
 
 {#if signedIn && shows}
   <section class={`flex flex-col gap-3 ${timeline ? "" : "mb-6"}`} aria-labelledby="trip-photos-title" data-testid="trip-photos">
-    {#if timeline && wide && total}
-      <div class="flex items-center justify-between gap-3">
-        <h2 id="trip-photos-title" class="text-[17px] leading-snug font-semibold tracking-tight outline-none" tabindex="-1" bind:this={heading}>Photos by day</h2>
-        <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>
+    {#if timeline && wide && (total || headerEnd)}
+      <div class={`flex items-center gap-3 ${total ? "justify-between" : "justify-start"}`}>
+        <h2 id="trip-photos-title" class={total ? "text-[17px] leading-snug font-semibold tracking-tight outline-none" : "sr-only"} tabindex="-1" bind:this={heading}>Photos by day</h2>
+        <div class="flex items-center gap-2">
+          {#if headerEnd}{@render headerEnd()}{/if}
+          {#if total}<Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>{/if}
+        </div>
       </div>
     {:else if timeline}
       <h2 id="trip-photos-title" class="sr-only" tabindex="-1" bind:this={heading}>Photos by day</h2>
@@ -454,6 +457,7 @@
       {/if}
     </div>
     {/if}
+    {#if timeline && wide && belowHeader}{@render belowHeader()}{/if}
     {#if selecting}
       <div class="sticky top-[calc(env(safe-area-inset-top)+4rem)] z-[2] flex flex-wrap items-center justify-between gap-x-3 gap-y-2 bg-background py-2 lg:top-0" data-testid="photo-selection">
         <p class="text-heading" role="status">{selected.size} selected</p>

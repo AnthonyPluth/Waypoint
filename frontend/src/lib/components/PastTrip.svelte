@@ -195,23 +195,31 @@
 </div>
 
 {#snippet controls()}
-  {#if controlRow}
+  {#if !wide && controlRow}
     <div class="flex flex-wrap items-center gap-2">
       {#if viewDrawn}<Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button>{/if}
-      {#if hasControl}
-        <TripPhotoSharingMenu {acting} tripName={trip.name} align="start" bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
-      {:else if holdSlot}
-        <span class="inline-block h-8 w-[84px] phone:h-11" aria-hidden="true" data-testid="sharing-slot"></span>
-      {/if}
+      {@render sharingButton()}
     </div>
   {/if}
+  {#if !wide}{@render reminders()}{/if}
+{/snippet}
+
+{#snippet sharingButton()}
+  {#if hasControl}
+    <TripPhotoSharingMenu {acting} tripName={trip.name} align={wide ? "end" : "start"} bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
+  {:else if holdSlot}
+    <span class="inline-block h-8 w-[84px] phone:h-11" aria-hidden="true" data-testid="sharing-slot"></span>
+  {/if}
+{/snippet}
+
+{#snippet reminders()}
   {#each acting as a (a.personId)}
     <TripPhotoSharing sharing={a} tripName={trip.name} part="reminder" />
   {/each}
 {/snippet}
 
 {#snippet photos()}
-  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next, done) => { acting = next; settled = done; }} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
+  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next, done) => { acting = next; settled = done; }} headerEnd={wide && (hasControl || holdSlot) ? sharingButton : null} belowHeader={wide ? reminders : null} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
 {/snippet}
 
 {#snippet total()}
