@@ -343,7 +343,7 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(dst.sa.exec_driver_sql("SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'waypoint_restore_%%'").scalar(), 0)
         src.close(); dst.close()
 
-    def test_a_backup_from_before_ai_was_local_only_comes_back_without_the_hosted_settings_and_with_no_address_that_was_switched_off(self):
+    def test_a_backup_from_before_ai_was_local_only_comes_back_without_the_hosted_settings_and_with_no_address_or_model_that_were_switched_off(self):
         src = self.fill(self.a)
         raw = backup.dump(src)
         src.close()
@@ -360,7 +360,7 @@ class BackupTests(unittest.TestCase):
                 backup.restore(dst, data)
                 dst.commit()
                 got = {k: v for k, v in dst.execute(select(Setting.key, Setting.value)).fetchall() if k.startswith("ai_")}
-                self.assertEqual(got, {"ai_ollama_model": "llama3", **({"ai_ollama_url": address} if address else {})})
+                self.assertEqual(got, {"ai_ollama_model": "llama3", "ai_ollama_url": address} if address else {})
                 dst.close()
 
     def test_a_backup_without_a_revision_is_refused(self):

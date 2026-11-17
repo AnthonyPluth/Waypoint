@@ -538,7 +538,7 @@ class MigrationTests(unittest.TestCase):
             command.downgrade(db.alembic_config(c), "0047")
         self.assertNotIn("driving_routes", shape(self.path))
 
-    def test_0049_drops_the_hosted_ai_and_the_mode_and_clears_an_ollama_address_that_was_not_switched_on(self):
+    def test_0049_drops_the_hosted_ai_and_the_mode_and_clears_the_ollama_address_and_model_that_were_not_switched_on(self):
         from alembic import command
         legacy = {"ai_openrouter_key": "enc:v1:x", "ai_openrouter_model": "some/model", "ai_auto": "2"}
         for n, (mode, keeps) in enumerate((("local", True), ("off", False), ("openrouter", False), ("bogus", False), (None, False))):
@@ -554,7 +554,7 @@ class MigrationTests(unittest.TestCase):
                     command.upgrade(db.alembic_config(c), "head")
                     got = dict(c.execute(select(schema.settings.c.key, schema.settings.c.value)).fetchall())
                 self.assertEqual(got, {"ai_ollama_url": "http://ollama.example:11434", "ai_ollama_model": "llama3", "distance_unit": "mi"} if keeps
-                                 else {"ai_ollama_model": "llama3", "distance_unit": "mi"})
+                                 else {"distance_unit": "mi"})
 
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)

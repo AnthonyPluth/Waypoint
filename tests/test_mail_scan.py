@@ -2873,7 +2873,7 @@ class MailScanApiTests(GoogleCase):
         self.assertFalse(self.call("ana", "GET", "/api/review")[1]["ai"])
         self.assertNotIn("ai_hosted", self.call("ana", "GET", "/api/review")[1])
         status, body = self.call("ana", "POST", f"/api/review/{item['id']}/suggest", {})
-        self.assertEqual((status, body["error"]), (400, ai.NEEDS_AI))
+        self.assertEqual((status, body["error"]), (400, "Reading email with AI needs an Ollama address and model in Settings → AI."))
         self.assertEqual(self.call("ben", "POST", f"/api/review/{item['id']}/suggest", {})[0], 404)
         self.assertEqual(self.call("ana", "POST", "/api/review/9999/suggest", {})[0], 404)
         self.share()

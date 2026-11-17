@@ -14,7 +14,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     mode = conn.execute(sa.select(settings.c.value).where(settings.c.key == 'ai_mode')).scalar()
     if mode != 'local':
-        conn.execute(sa.delete(settings).where(settings.c.key == 'ai_ollama_url'))
+        conn.execute(sa.delete(settings).where(settings.c.key.in_(('ai_ollama_url', 'ai_ollama_model'))))
     conn.execute(sa.delete(settings).where(settings.c.key.in_(LEGACY)))
 
 

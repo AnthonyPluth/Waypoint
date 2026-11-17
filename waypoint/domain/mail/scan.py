@@ -5,7 +5,7 @@ import json
 import threading
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal, NamedTuple
@@ -488,7 +488,8 @@ class Filed(NamedTuple):
 
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
              auto: bool | None, now: float, parking: int = 0,
-             signals: nothing_new.Signals | None = None, dismiss_known: bool = False, sender: str | None = None) -> Filed:
+             signals: nothing_new.Signals | None = None, dismiss_known: bool = False, sender: str | None = None,
+             hold: Sequence[ai.Suggestion] = ()) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id).with_for_update(of=ReviewItem)).fetchone()
@@ -506,7 +507,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
             conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
                          .values(outcome=BOOKING, scanned=now, segment_id=kept[0]))
             return Filed(cleared=1, segments=tuple(kept), known="older_copy" if all(r == "older_copy" for r in reasons) else "already_known")
-    pending: list[ai.Suggestion] = []
+    pending: list[ai.Suggestion] = list(hold)
     touched: list[int] = []
     held: list[ingest.Held] = []
     added = 0
@@ -612,10 +613,10 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
             fixed = review.fixed_suggestions(conn, mailbox_id, message_id)
-            said = review.keeping_fixed(fixed, read.suggestions)
+            said, held = review.keeping_fixed(fixed, read.suggestions)
             answered = bool(read.suggestions)
-            filed = _file_ai(conn, mailbox_id, message_id, said or fixed, read.error, None if read.failed or (fixed and not answered) else True, time.time(),
-                             read.parking, signals=read.signals, dismiss_known=answered and not fixed, sender=extract.own_sender(raw))
+            filed = _file_ai(conn, mailbox_id, message_id, said, read.error, None if read.failed or (fixed and not answered) else True, time.time(),
+                             read.parking, signals=read.signals, dismiss_known=answered and not fixed, sender=extract.own_sender(raw), hold=held)
             made, cleared = made + filed.added, cleared + filed.cleared
             if filed.known:
                 known[filed.known] += 1

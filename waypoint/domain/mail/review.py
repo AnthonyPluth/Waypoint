@@ -102,8 +102,9 @@ def _same_reservation(fixed: ai.Suggestion, said: ai.Suggestion) -> bool:
     return not (first and second and first.upper() != second.upper())
 
 
-def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> list[ai.Suggestion]:
+def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> tuple[list[ai.Suggestion], list[ai.Suggestion]]:
     out: list[ai.Suggestion] = []
+    held: list[ai.Suggestion] = []
     paired: set[int] = set()
     for suggestion in said:
         options = [n for n, p in enumerate(fixed) if _same_reservation(p, suggestion)]
@@ -114,8 +115,12 @@ def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> list
             for key, value in fixed[options[0]].items():
                 if value and key not in NOT_VALUES:
                     merged[key] = value
-        out.append(cast(ai.Suggestion, merged))
-    return out + [p for n, p in enumerate(fixed) if n not in paired]
+        found = cast(ai.Suggestion, merged)
+        if sure or not any(p.get("kind") == suggestion.get("kind") for p in fixed):
+            out.append(found)
+        else:
+            held.append(found)
+    return out, held + [p for n, p in enumerate(fixed) if n not in paired]
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:

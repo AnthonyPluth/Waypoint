@@ -207,13 +207,20 @@ rules:
     message: >-
       Email text is asked of the AI in one place, scan._read, which the scan and Ask AI both go through, and only the
       household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server"). Call scan's readers
-      instead of ai.suggest().
+      instead of ai.suggest(), and don't import suggest or ai under another name.
     severity: ERROR
     languages: [python]
-    pattern: ai.suggest(...)
+    pattern-either:
+      - patterns:
+          - pattern: ai.suggest(...)
+          - pattern-not-inside: |
+              def _read(...):
+                  ...
+      - pattern-regex: \bfrom\s+\S+\s+import\s+[^\n]*\bsuggest\b
+      - pattern-regex: \bimport\s+\S*\bai\s+as\s+\w+|\bfrom\s+\S+\s+import\s+[^\n]*\bai\s+as\s+\w+
     paths:
       include: ["/waypoint/"]
-      exclude: ["/waypoint/domain/mail/ai.py", "/waypoint/domain/mail/scan.py"]
+      exclude: ["/waypoint/domain/mail/ai.py"]
 
   - id: waypoint-message-body
     message: >-

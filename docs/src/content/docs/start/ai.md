@@ -29,6 +29,8 @@ With an Ollama address saved, a scan asks the AI about a message by itself only 
 
 A message a reader did turn into a booking is also sent when that booking lacks a detail the AI can read, such as a flight’s cabin, a hotel’s address or phone, a cruise’s ship, or the total. The AI only fills in what is missing: it never changes a time, place or code a reader found, and never adds a booking. Messages with nothing missing aren’t sent.
 
+When the AI’s reading of a booking a reader already found can’t be matched to it (it picked a different confirmation code, or two bookings of that kind can’t be told apart), Waypoint adds nothing by itself: both readings wait in Review for you to choose.
+
 There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about and how many emails it attached to their bookings as nothing new, counts only.
 
 What is sent and where it goes are exactly as for **Ask AI**. The item in Review shows the suggestion with a **read automatically** label, and a complete result is added to your trips by itself.
