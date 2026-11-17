@@ -1,13 +1,14 @@
 <script lang="ts">
   import AvatarStack from "$lib/components/AvatarStack.svelte";
   import AirportCode from "$lib/components/AirportCode.svelte";
+  import FlightCard from "$lib/components/FlightCard.svelte";
   import KindTile from "$lib/components/KindTile.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import RouteLine from "$lib/components/RouteLine.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { bookingChip, liveChip } from "$lib/status";
   import { instant } from "$lib/trips";
-  import type { Segment } from "$lib/api-types";
+  import type { FlightStatus, Segment } from "$lib/api-types";
 
   const flight: Segment = {
     id: 1, trip_id: 1, kind: "flight", status: "confirmed", confirmation: "K7Q2ZM", provider: "Example Air",
@@ -24,6 +25,34 @@
   const flightNow = instant("2026-11-20T07:05", "America/Chicago") - 3 * 3_600_000;
   const underWayNow = instant("2026-11-20T07:05", "America/Chicago") + 90 * 60_000;
   const stayNow = instant("2026-11-20T08:00", "America/Los_Angeles");
+
+  const flightEA: Segment = {
+    ...flight, id: 3, confirmation: "EA2140", provider: "Example Air", origin: "DEN", destination: "GJT",
+    start_local: "2025-06-12T09:40", start_zone: "America/Denver", end_local: "2025-06-12T10:52", end_zone: "America/Denver",
+    details: { flight_number: "EA 214", cabin: "Economy" }, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12A" }],
+  };
+  const at = (local: string) => instant(local, "America/Denver");
+  const minutesBefore = (now: number, minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const status = (now: number, minutes: number, extra: Partial<FlightStatus>): FlightStatus => ({
+    segment_id: 3, state: "scheduled", origin: "DEN", destination: "GJT", dep_scheduled: "2025-06-12T09:40", dep_estimated: null, dep_actual: null, dep_zone: "America/Denver",
+    dep_terminal: null, dep_gate: null, arr_scheduled: "2025-06-12T10:52", arr_estimated: null, arr_actual: null, arr_zone: "America/Denver", arr_terminal: null, arr_gate: null,
+    delay_minutes: null, fetched_at: minutesBefore(now, minutes), ...extra,
+  });
+  const cardNow = {
+    scheduled: at("2025-06-09T08:00"), boarding: at("2025-06-12T09:15"), delayed: at("2025-06-12T08:50"), air: at("2025-06-12T10:14"),
+    landed: at("2025-06-12T10:55"), cancelled: at("2025-06-12T08:30"), diverted: at("2025-06-12T10:20"), none: at("2025-06-02T08:00"),
+  };
+  const flightCards: { name: string; now: number; status?: FlightStatus; segment: Segment }[] = [
+    { name: "Scheduled", now: cardNow.scheduled, status: status(cardNow.scheduled, 4, { dep_terminal: "B" }), segment: flightEA },
+    { name: "Boarding", now: cardNow.boarding, status: status(cardNow.boarding, 2, { dep_terminal: "B", dep_gate: "B14" }), segment: flightEA },
+    { name: "Delayed", now: cardNow.delayed, status: status(cardNow.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", dep_terminal: "B", dep_gate: "B14", delay_minutes: 35 }), segment: flightEA },
+    { name: "In the air", now: cardNow.air, status: status(cardNow.air, 1, { state: "departed", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:52", arr_terminal: "1", arr_gate: "A3" }), segment: flightEA },
+    { name: "Landed", now: cardNow.landed, status: status(cardNow.landed, 1, { state: "landed", dep_actual: "2025-06-12T09:46", arr_actual: "2025-06-12T10:49", arr_terminal: "1", arr_gate: "A3" }), segment: flightEA },
+    { name: "Cancelled", now: cardNow.cancelled, status: status(cardNow.cancelled, 12, { state: "cancelled" }), segment: flightEA },
+    { name: "Diverted", now: cardNow.diverted, status: status(cardNow.diverted, 3, { state: "diverted", destination: "MTJ", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:41" }), segment: flightEA },
+    { name: "Scheduled, no live status", now: cardNow.none, segment: flightEA },
+    { name: "Scheduled, Premium Economy", now: cardNow.scheduled, status: status(cardNow.scheduled, 4, { dep_terminal: "B" }), segment: { ...flightEA, details: { ...flightEA.details, cabin: "Premium Economy" } } },
+  ];
 
   const tileKinds = ["flight", "hotel", "train", "car", "cruise", "parking", "visit"] as const;
   const crew = ["Jane Doe", "Mia Doe", "Sam Roe", "Lee Poe", "Ann Coe", "Bob Foe"].map((name, i) => ({ id: i + 1, name }));
@@ -97,6 +126,16 @@
     <div class="grid gap-4">
       <PassCard segment={flight} now={flightNow} boarding eyebrow="Next up" tripName="Trip to Minneapolis" />
       <PassCard segment={flight} now={underWayNow} boarding eyebrow="Under way" tripName="Trip to Minneapolis" pulse />
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-flight-card">
+    <h2 id="design-flight-card" class="text-heading">Flight card</h2>
+    <p class="text-caption text-muted-foreground">The flight on the trip page, in its eight states. A fact is marked as from live status (a filled dot) or from the booking (a ring), and a dash is a fact not known yet.</p>
+    <div class="grid gap-4 lg:grid-cols-2">
+      {#each flightCards as c (c.name)}
+        <FlightCard segment={c.segment} status={c.status} liveOn now={c.now} />
+      {/each}
     </div>
   </section>
 
