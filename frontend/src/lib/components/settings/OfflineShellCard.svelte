@@ -64,7 +64,7 @@
       <div class="row"><p class="text-sm text-muted-foreground">Checking this device…</p></div>
     {:else}
       <div class="row">
-        <div class="min-w-0 space-y-1">
+        <div class="min-w-0 flex-[1_1_220px] space-y-1">
           <p class="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium">{title}{#if chip}<StatusChip {chip} small />{/if}</p>
           {#if offline.damaged}
             <p class="text-sm text-muted-foreground">Switch saving off to delete them, then switch it on again to save your trips afresh.</p>
@@ -92,8 +92,9 @@
             <p class="text-sm text-muted-foreground">The first save happens when you open Waypoint online after signing in.</p>
           {/if}
         </div>
-        <label class="flex min-h-11 shrink-0 items-center gap-2 text-sm">
-          <input type="checkbox" role="switch" class="size-5 accent-primary" checked={!offline.off} disabled={changing || offline.syncing} onchange={(e) => toggle(e.currentTarget.checked)} />
+        <label class="flex min-h-11 shrink-0 cursor-pointer items-center gap-2.5 text-sm has-[:disabled]:cursor-default has-[:disabled]:opacity-60">
+          <input type="checkbox" role="switch" class="peer sr-only" checked={!offline.off} disabled={changing || offline.syncing} onchange={(e) => toggle(e.currentTarget.checked)} />
+          <span class="relative h-7 w-[46px] flex-none rounded-full bg-input after:absolute after:left-[3px] after:top-[3px] after:size-[22px] after:rounded-full after:bg-foreground peer-checked:bg-primary peer-checked:after:left-[21px] peer-checked:after:bg-primary-foreground peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50" aria-hidden="true"></span>
           Save my upcoming trips
         </label>
       </div>

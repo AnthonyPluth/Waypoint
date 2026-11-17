@@ -165,7 +165,7 @@
       "screenshot": "card-damaged"
     },
     {
-      "click": "[data-testid='offline-shell-card'] [role='switch']"
+      "click": "[data-testid='offline-shell-card'] label"
     },
     {
       "expect_text": {
@@ -177,7 +177,7 @@
       "screenshot": "card-off"
     },
     {
-      "click": "[data-testid='offline-shell-card'] [role='switch']"
+      "click": "[data-testid='offline-shell-card'] label"
     },
     {
       "expect_text": {
