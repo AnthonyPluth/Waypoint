@@ -36,9 +36,17 @@ def run_step(gh_body: str) -> tuple[int, str, str]:
             "GITHUB_RUN_NUMBER": "87",
         }
         done = subprocess.run(
-            ["bash", "-eo", "pipefail", "-c", version_script()], env=env, capture_output=True, text=True, check=False
+            ["bash", "-eo", "pipefail", "-c", version_script()],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        return done.returncode, output.read_text(encoding="utf-8"), done.stdout + done.stderr
+        return (
+            done.returncode,
+            output.read_text(encoding="utf-8"),
+            done.stdout + done.stderr,
+        )
 
 
 class IosTestflightVersion(unittest.TestCase):
@@ -48,12 +56,22 @@ class IosTestflightVersion(unittest.TestCase):
         self.assertEqual(output, "version=3.49.0\n")
 
     def test_it_reads_the_latest_release_of_this_repository(self):
-        code, output, _ = run_step('[ "$1 $2" = "api repos/owner/repo/releases/latest" ] && echo v10.0.12')
+        code, output, _ = run_step(
+            '[ "$1 $2" = "api repos/owner/repo/releases/latest" ] && echo v10.0.12'
+        )
         self.assertEqual(code, 0)
         self.assertEqual(output, "version=10.0.12\n")
 
     def test_anything_but_vx_y_z_stops_the_build(self):
-        for tag in ["", "v3.49", "3.49.0", "v3.49.0-rc1", "v3.49.0.1", "vx.y.z", "v3.49.0 "]:
+        for tag in [
+            "",
+            "v3.49",
+            "3.49.0",
+            "v3.49.0-rc1",
+            "v3.49.0.1",
+            "vx.y.z",
+            "v3.49.0 ",
+        ]:
             with self.subTest(tag=tag):
                 code, output, text = run_step(f"echo '{tag}'")
                 self.assertNotEqual(code, 0)
@@ -73,7 +91,9 @@ class IosTestflightVersion(unittest.TestCase):
         archive = text.index("- name: Archive the app")
         self.assertLess(find, archive)
         archive_step = text[archive : text.index("- name: Export the .ipa")]
-        self.assertIn("MARKETING_VERSION: ${{ steps.version.outputs.version }}", archive_step)
+        self.assertIn(
+            "MARKETING_VERSION: ${{ steps.version.outputs.version }}", archive_step
+        )
         self.assertIn('MARKETING_VERSION="$MARKETING_VERSION"', archive_step)
         self.assertIn('CURRENT_PROJECT_VERSION="$BUILD_NUMBER"', archive_step)
 
