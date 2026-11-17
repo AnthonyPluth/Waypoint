@@ -207,6 +207,20 @@ describe("a flight in the air", () => {
     expect(words(steps[2])).toContain("Scheduled 7:10 am 7:05 am");
   });
 
+  it("shows the arrival's later day beside its time on the phone timeline too", async () => {
+    const overseas = segment({
+      id: 3, trip_id: 7, provider: "Example Air", origin: "JFK", destination: "LHR", start_local: "2025-06-12T19:00", start_zone: "America/New_York", end_local: "2025-06-13T07:10", end_zone: "Europe/London",
+      details: { flight_number: "EA 100" }, travelers: [],
+    });
+    const now = instant("2025-06-12T19:00", "America/New_York") + 3 * 3_600_000;
+    viewport.phone = true;
+    open(now, listOf([]), trip([overseas], { id: 7, name: "Four Corners loop" }));
+    await headline();
+    const steps = within(screen.getByRole("list", { name: "Flight timeline" })).getAllByRole("listitem");
+    expect(words(steps[2])).toContain("+1 day, 1 day later on the calendar than departure");
+    expect(words(steps[0])).not.toContain("+1 day");
+  });
+
   it("shows the arrival facts as a definition list with source markers and a dash for the belt", async () => {
     open(NOW.air, listOf([inTheAir(NOW.air)]));
     await headline();
@@ -263,6 +277,13 @@ describe("seats", () => {
     open(NOW.air, listOf([inTheAir(NOW.air)]), trip([unseated], { id: 7, name: "Four Corners loop" }));
     await headline();
     expect(words(within(screen.getByRole("list", { name: "Seats by traveller" })).getAllByRole("listitem")[0])).toBe("Ada BrookSeat not known yet · Economy");
+  });
+
+  it("uses the booking's own seat for a single traveller with no seat of their own", async () => {
+    const solo = segment({ ...booked, details: { ...booked.details, seat: "14C" }, travelers: [{ id: 1, person_id: null, name: "Ada Brook", seat: null }] });
+    open(NOW.air, listOf([inTheAir(NOW.air)]), trip([solo], { id: 7, name: "Four Corners loop" }));
+    await headline();
+    expect(words(within(screen.getByRole("list", { name: "Seats by traveller" })).getAllByRole("listitem")[0])).toBe("Ada BrookSeat 14C · Economy");
   });
 
   it("has no seat list when the booking names no traveller", async () => {
@@ -327,6 +348,31 @@ describe("the page", () => {
     open(NOW.air, listOf([], { enabled: false }));
     await headline();
     expect(screen.queryByRole("button", { name: /Refresh/ })).toBeNull();
+  });
+});
+
+describe("connectivity", () => {
+  it("stops trusting a cached estimate when the browser goes offline, and trusts it again when it is back", async () => {
+    const onLine = vi.spyOn(navigator, "onLine", "get");
+    onLine.mockReturnValue(true);
+    open(NOW.air, listOf([inTheAir(NOW.air, { arr_estimated: "2025-06-12T11:10" })]));
+    expect(await headline()).toBe("Landing in 56 minutes");
+    onLine.mockReturnValue(false);
+    window.dispatchEvent(new Event("offline"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Landing in 38 minutes"));
+    onLine.mockReturnValue(true);
+    window.dispatchEvent(new Event("online"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Landing in 56 minutes"));
+    onLine.mockRestore();
+  });
+
+  it("stops listening when the page is gone", async () => {
+    const remove = vi.spyOn(window, "removeEventListener");
+    const { unmount } = open(NOW.air, listOf([inTheAir(NOW.air)]));
+    await headline();
+    unmount();
+    expect(remove.mock.calls.map(([name]) => name)).toEqual(expect.arrayContaining(["online", "offline"]));
+    remove.mockRestore();
   });
 });
 

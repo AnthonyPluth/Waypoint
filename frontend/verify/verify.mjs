@@ -16,10 +16,11 @@ export const contextOptions = (viewport, { reducedMotion = "no-preference", phon
 export const prepareContext = (ctx, now) => ctx.clock.setFixedTime(now);
 export const SETTLE_MS = 300;
 export const FROZEN_NOW = "2026-06-15T12:00:00Z";
-export const PAGES = ["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"];
+export const PAGES = ["upcoming", "trips", "trip", "flight", "stats", "people", "review", "settings", "design", "oauth-approve"];
 export const OWN_PAGES = ["oauth-approve"];
 export const SIGNED_PAGES = ["trip"];
-export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='trip-hero'] img", "[data-testid='trip-summary']", "[data-testid='photo-days'] [data-photo] img", "[data-testid='your-photos']"] } };
+export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='trip-hero'] img", "[data-testid='trip-summary']", "[data-testid='photo-days'] [data-photo] img", "[data-testid='your-photos']"] },
+  flight: { from: "trips", open: "a[href^='#trip/']:has-text('London') >> visible=true", follow: "article[data-kind='flight'] a[data-live-link]", ready: ["[data-testid='flight-live']", "[aria-label='Flight timeline'] li", "[role='progressbar'][aria-label='Flight progress']"] } };
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
   const root = env.PLAYWRIGHT_BROWSERS_PATH || "/opt/pw-browsers";
@@ -485,6 +486,10 @@ async function openPage(page, base, name) {
   await page.goto(`${base}/#${opened ? opened.from : name}`, { waitUntil: "networkidle" });
   if (!opened) return;
   await page.locator(opened.open).first().click();
+  if (opened.follow) {
+    const href = await page.locator(opened.follow).first().getAttribute("href", { timeout: 30000 });
+    await page.evaluate((hash) => { globalThis.location.hash = hash; }, href);
+  }
   for (const ready of opened.ready) await page.locator(ready).first().waitFor({ timeout: 30000 });
   if (opened.still) await page.locator(opened.still).first().press("End");
   await page.evaluate("document.activeElement?.blur?.()");

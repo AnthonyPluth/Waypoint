@@ -39,7 +39,13 @@
   const liveOn = $derived(list?.enabled === true);
   const status = $derived(segment ? statusFor(segment.id) : undefined);
   const paused = $derived(liveOn ? list?.paused ?? null : null);
-  const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
+  let online = $state(typeof navigator === "undefined" || navigator.onLine !== false);
+  $effect(() => {
+    const set = () => (online = navigator.onLine !== false);
+    window.addEventListener("online", set);
+    window.addEventListener("offline", set);
+    return () => { window.removeEventListener("online", set); window.removeEventListener("offline", set); };
+  });
   const cities = cityNames(() => [segment?.origin, segment?.destination, liveOn ? status?.destination : null]);
   const view = $derived(segment ? flightLiveView({ segment, status: liveOn ? status : undefined, liveOn, now, online, city: (code) => cities[code] || code }) : null);
   const canRefresh = $derived(liveOn && !paused && !!segment && (!!status || now <= endAt(segment) + AFTER_LANDING));
@@ -168,7 +174,7 @@
             <li class="flex items-start gap-3 border-b border-border py-2.5 last:border-b-0" data-dot={step.dot}>
               <i aria-hidden="true" class={`mt-1.5 size-2.5 flex-none rounded-full ${step.dot === "done" ? "bg-status-ok-ink" : step.dot === "now" ? "bg-status-info-ink shadow-[0_0_0_4px_color-mix(in_srgb,var(--status-info-ink)_20%,transparent)]" : "border-2 border-muted-foreground"}`}></i>
               <span class="min-w-0"><b class="block text-sm font-semibold">{step.title}</b><span class="block text-[13px] text-muted-foreground">{step.note}</span></span>
-              {#if step.when}<span class="ml-auto text-right font-mono text-[15px] font-semibold">{#if step.at}<time datetime={step.at}>{step.when}</time>{:else}{step.when}{/if}</span>{/if}
+              {#if step.when}<span class="ml-auto text-right font-mono text-[15px] font-semibold">{#if step.at}<time datetime={step.at}>{step.when}</time>{:else}{step.when}{/if}{#if step.later && phone}<span class="block text-[11px] font-normal text-muted-foreground">{step.later}<span class="sr-only">, {step.laterWords}</span></span>{/if}</span>{/if}
             </li>
           {/each}
         </ul>

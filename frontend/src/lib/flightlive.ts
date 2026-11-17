@@ -7,7 +7,7 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 export type Dot = "done" | "now" | "next";
-export type Step = { title: string; note: string; when: string; at: string; dot: Dot };
+export type Step = { title: string; note: string; when: string; at: string; dot: Dot; later?: string; laterWords?: string };
 export type SeatRow = { name: string; first: string; seat: string; cabin: string };
 
 export type FlightLiveView = {
@@ -44,9 +44,9 @@ export function timeLeft(ms: number): string {
 
 function seatRows(s: Segment): SeatRow[] {
   const cabin = s.details.cabin?.trim() ?? "";
-  return s.travelers
-    .filter((t) => t.name)
-    .map((t) => ({ name: t.name, first: t.name.split(/\s+/)[0], seat: t.seat?.trim() ?? "", cabin }));
+  const named = s.travelers.filter((t) => t.name);
+  const booked = s.details.seat?.trim() ?? "";
+  return named.map((t) => ({ name: t.name, first: t.name.split(/\s+/)[0], seat: t.seat?.trim() || (named.length === 1 ? booked : ""), cabin }));
 }
 
 export function flightLiveView(input: FlightCardInput): FlightLiveView {
@@ -91,7 +91,7 @@ export function flightLiveView(input: FlightCardInput): FlightLiveView {
   const detailDesktop = airborne ? [departed, expectedLate].filter(Boolean).join(" ") : detailPhone;
 
   const departStep = (title: string, dot: Dot): Step => ({ title, note: `Scheduled ${scheduledDepart}`, when: card.depart.time, at: card.depart.local, dot });
-  const landStep = (title: string, dot: Dot): Step => ({ title, note: `Scheduled ${scheduledArrive}`, when: card.arrive.time, at: card.arrive.local, dot });
+  const landStep = (title: string, dot: Dot): Step => ({ title, note: `Scheduled ${scheduledArrive}`, when: card.arrive.time, at: card.arrive.local, dot, later: card.arrive.later, laterWords: card.arrive.laterWords });
   const inTheAir = (): Step => ({ title: "In the air", note: toLand >= MINUTE_MS ? `${timeLeft(toLand)} flight time left` : "Landing now", when: "now", at: "", dot: "now" });
   const steps: Step[] = (() => {
     switch (state) {

@@ -542,6 +542,12 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
   - The page opens the road trip, which is over, so it is the completed trip page: a photo hero, the facts line and the photos day by day. Its booking cards sit below the days until the Bookings sheet lands.
   - The route replay plays on its own once it is on the page (the hero when there are no photos, or the replay that Replay trip opens); press `End` on "Position along the route" before a screenshot, as make verify does, so the picture is the same every time.
 
+## flight (`flight`)
+
+- **What exists:** No docs page of its own.
+- **Reach it:** URL `#flight`; control `tools/control goto flight`.
+- **Drive it:** `tools/control goto flight`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="flight"`.
+
 ## Stats (`stats`)
 
 - **What exists:** What Waypoint counts for a person or the household (flights, distance, airlines, hotel nights, rental days, cruises, parking days, places), and what it leaves out. Docs: [Travel stats](../../../../docs/src/content/docs/start/stats.md).

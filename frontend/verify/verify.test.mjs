@@ -169,12 +169,15 @@ describe("flowProblems", () => {
     expect(flowProblems(ok)).toEqual([]);
   });
 
-  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "trip", "stats", "people", "review", "settings", "design", "oauth-approve"]));
+  it("has the app's pages", () => expect(PAGES).toEqual(["upcoming", "trips", "trip", "flight", "stats", "people", "review", "settings", "design", "oauth-approve"]));
 
   it("opens the trip page on the signed-in server, from the trips list", () => {
     expect(SIGNED_PAGES).toEqual(["trip"]);
     expect(OPENED_PAGES.trip.from).toBe("trips");
     expect(OPENED_PAGES.trip.ready).toContain("[data-testid='trip-hero'] img");
+    expect(OPENED_PAGES.flight.from).toBe("trips");
+    expect(OPENED_PAGES.flight.follow).toBe("article[data-kind='flight'] a[data-live-link]");
+    expect(OPENED_PAGES.flight.ready).toContain("[data-testid='flight-live']");
     expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trip")).toBe("http://b");
     expect(pageBase({ base: "http://a", signedBase: "http://b" }, "trips")).toBe("http://a");
     expect(() => pageBase({ base: "http://a" }, "trip")).toThrow("page trip needs the signed-in demo server");
