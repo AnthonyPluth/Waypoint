@@ -202,9 +202,9 @@
     </div>
 
     <div class="flex min-w-0 flex-col gap-5 border-t-2 border-dashed border-border p-5 desktop:border-l-2 desktop:border-t-0 md:p-6" data-stub>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-4 phone:grid-cols-4">
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-4 phone:flex phone:flex-wrap phone:justify-between">
         {#if hasCode}
-          <div class={`col-span-2 min-w-0 ${longCode ? "phone:col-span-4" : "phone:col-span-1"}`}>
+          <div class={`col-span-2 min-w-0 ${longCode ? "phone:basis-full" : ""}`}>
             <dt class="eyebrow"><span class="phone:hidden">{codes.length > 1 ? "Confirmations" : "Confirmation"}</span><span class="desktop:hidden">Code</span></dt>
             <dd class="mt-1 flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full min-w-0 break-all text-left text-title font-semibold phone:text-heading" />{/each}</dd>
           </div>
