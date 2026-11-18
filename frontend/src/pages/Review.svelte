@@ -112,12 +112,10 @@
     const seen = new Set<number>();
     for (const one of all) {
       if (seen.has(one.pick)) continue;
-      const same = all.filter((x) => x.s.kind === one.s.kind);
-      const email = same.filter((x) => x.s.parsed);
-      const said = same.filter((x) => !x.s.parsed);
-      const [first] = email;
-      const [second] = said;
-      if (first && second && email.length === 1 && said.length === 1) {
+      const mark = one.s.alternative;
+      const beside = mark === undefined ? [] : all.filter((x) => x.s.alternative === mark);
+      const [first, second] = [beside.find((x) => x.s.parsed), beside.find((x) => !x.s.parsed)];
+      if (first && second && beside.length === 2 && first.s.kind === second.s.kind) {
         seen.add(first.pick);
         seen.add(second.pick);
         out.push({ main: first, other: second });
@@ -247,7 +245,7 @@
     drafts = [];
     joining = null;
     if (open && picks.length) void act(async () => {
-      await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${picks.map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
+      await apiCall<"DELETE /api/review/{id}">(`/api/review/${open.item.id}?${[...picks].sort((x, y) => x - y).map((n) => `suggestion=${n}`).join("&")}`, { method: "DELETE" });
       await settle();
     });
   };

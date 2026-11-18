@@ -919,9 +919,9 @@ describe("Review: a booking Waypoint read but couldn’t place", () => {
 
 describe("Review: a stay read two ways", () => {
   const email = { kind: "parking" as const, provider: "SpotHero", confirmation: "100200300", origin: "Example Plaza Garage", start_local: "2027-03-05T15:00:00",
-    end_local: "2027-03-09T15:00:00", address: "1 Example Avenue", sources: {}, parsed: true } as unknown as ReviewItem["suggestions"][number];
+    end_local: "2027-03-09T15:00:00", address: "1 Example Avenue", sources: {}, parsed: true, alternative: 1 } as unknown as ReviewItem["suggestions"][number];
   const said = { kind: "parking" as const, provider: "SpotHero", confirmation: "555000111", origin: "Example Plaza Garage", start_local: "2027-03-05T15:00",
-    end_local: "2027-03-09T15:00", start_zone: "America/Chicago", address: "1 Example Avenue", sources: {} } as unknown as ReviewItem["suggestions"][number];
+    end_local: "2027-03-09T15:00", start_zone: "America/Chicago", address: "1 Example Avenue", sources: {}, alternative: 1 } as unknown as ReviewItem["suggestions"][number];
 
   it("offers the email’s reading and the AI’s as alternatives for one booking, not as two bookings", async () => {
     held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
@@ -969,6 +969,25 @@ describe("Review: a stay read two ways", () => {
     await userEvent.click(screen.getByRole("button", { name: "AI suggestion" }));
     await userEvent.click(screen.getByRole("button", { name: "Read from the email" }));
     expect(screen.getByLabelText("Confirmation code")).toHaveValue("100200300X");
+  });
+
+  it("pairs readings only when the server marked them as two readings of one booking, never by their shape", async () => {
+    const unmarked = { ...said, alternative: undefined } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, unmarked] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    expect(screen.queryByRole("group", { name: "Which reading is right?" })).toBeNull();
+    expect(screen.queryByText("Read two ways")).toBeNull();
+  });
+
+  it("keeps a second reading of the reader’s as its own booking beside a marked pair of the same kind", async () => {
+    const another = { ...email, confirmation: "100200999", alternative: undefined } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [another, email, said] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    expect(screen.getAllByRole("group", { name: "Which reading is right?" })).toHaveLength(1);
   });
 
   it("still lists readings of different kinds as separate bookings", async () => {

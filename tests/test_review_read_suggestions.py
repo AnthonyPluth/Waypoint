@@ -82,6 +82,21 @@ class KeepingFixedTests(unittest.TestCase):
         self.assertEqual([(x["confirmation"], bool(x.get("parsed"))) for x in filable + held], [("AB12", False), ("CD34", True)])
         self.assertEqual([x["confirmation"] for x in held], ["CD34"])
 
+    def test_a_reading_the_ai_could_not_pair_is_marked_as_the_other_reading_of_the_readers_only_stay(self):
+        one = fixed("AB12", "Inn One", 5)
+        filable, held = review.keeping_fixed([one], [said("ZZ99", "Inn One", 5)])
+        self.assertEqual(filable, [])
+        self.assertEqual([(x["confirmation"], bool(x.get("parsed")), x.get("alternative")) for x in held], [("ZZ99", False, 1), ("AB12", True, 1)])
+
+    def test_nothing_is_marked_when_it_is_not_clear_which_reading_stands_beside_which(self):
+        one, two = fixed("AB12", "Inn One", 5), fixed("CD34", "Inn Two", 10)
+        filable, held = review.keeping_fixed([one, two], [said("ZZ99", "Inn One", 5)])
+        self.assertEqual([x.get("alternative") for x in filable + held], [None, None, None])
+        filable, held = review.keeping_fixed([one, two], [said("AB12", "", 5)])
+        self.assertEqual([x.get("alternative") for x in filable + held], [None, None])
+        filable, held = review.keeping_fixed([fixed("AB12", "Inn One", 5)], [said("ZZ99", "Inn One", 5), said("YY88", "Inn Two", 9)])
+        self.assertEqual([x.get("alternative") for x in filable + held], [None, None, None])
+
     def test_an_answer_with_nothing_keeps_everything_the_reader_found(self):
         one = fixed("AB12", "Inn One", 5)
         self.assertEqual(review.keeping_fixed([one], []), ([], [one]))
@@ -150,6 +165,7 @@ class ReadSuggestionTests(ScanAiCase):
         [item] = self.items()
         self.assertEqual(item["reason"], "incomplete")
         self.assertEqual(sorted((s["confirmation"], bool(s.get("parsed"))) for s in item["suggestions"]), [("100200300", True), ("555000111", False)])
+        self.assertEqual([s.get("alternative") for s in item["suggestions"]], [1, 1])
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(Segment)).scalar()), 0)
 
     def test_an_ai_reading_of_a_kind_the_reader_did_not_find_is_filed_beside_the_readers_stay(self):
