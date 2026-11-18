@@ -58,7 +58,7 @@ Nothing else is stored anywhere. No private key exists for the demo under this p
 This is the wiring the build issue proposes (draft in the design). None of it exists yet.
 
 - Only the Docs workflow’s build on `main` runs in the `demo-maps` environment. It passes `DEMO_MAPKIT_JS_TOKEN` to `npm run build:demo` as an environment variable. It never echoes the value or writes it to a file in the workspace other than the built bundle.
-- The demo build puts the token in the bundle’s stand-in for `GET /api/mapkit/token` and reports MapKit as configured in its `/api/state` reply. It widens the demo page’s Content-Security-Policy for Apple’s hosts only in a build that has a token.
+- The demo build puts the token in the bundle’s stand-in for the app’s MapKit token route and reports MapKit as configured in its stand-in for the app’s state reply (`frontend/demo/api.ts`). It widens the demo page’s Content-Security-Policy for Apple’s hosts only in a build that has a token.
 - A build without the token (every pull request, a fork, a local `npm run build:demo`) is exactly today’s demo with no maps.
 - `demo/verify.mjs` still answers every request to Apple’s hosts with the stand-in and still fails on any request that leaves the page. CI never sends the token to Apple.
 - The only place the token exists outside GitHub’s secret store is the published demo and its Pages artifact, which hold the same files.
