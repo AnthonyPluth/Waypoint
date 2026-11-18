@@ -50,6 +50,11 @@ struct TripAnswerService {
 enum IntentRuntime {
     static var service = TripAnswerService.live
     static var pages = PendingPage.shared
+    /// Tells a running shell to open the page now held. The shell otherwise looks only when the app comes to the foreground or a page
+    /// loads, so an app already in front would say "opening" and stay where it was. The page stays held until the shell applies it.
+    static var openHeldPage: @Sendable () async -> Void = {
+        await MainActor.run { NotificationCenter.default.post(name: .openSavedPage, object: nil) }
+    }
 }
 
 struct NextFlightIntent: AppIntent {
@@ -107,6 +112,7 @@ struct OpenParkingIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let answer = await IntentRuntime.service.answer(.parking)
         IntentRuntime.pages.hold(answer.page)
+        if answer.page != nil { await IntentRuntime.openHeldPage() }
         return .result(dialog: "\(answer.spoken)")
     }
 }

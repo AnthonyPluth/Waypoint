@@ -111,6 +111,23 @@ private final class FailingProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+private final class OpenCalls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var seen: [String?] = []
+
+    var pages: [String?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return seen
+    }
+
+    func record(_ page: String?) {
+        lock.lock()
+        seen.append(page)
+        lock.unlock()
+    }
+}
+
 final class TripAnswersTests: XCTestCase {
     private var root: URL!
     private let home = URL(string: "https://waypoint.example.com")!
@@ -851,15 +868,21 @@ final class TripAnswersTests: XCTestCase {
             IntentRuntime.service = before
             IntentRuntime.pages = pages
         }
+        let opener = IntentRuntime.openHeldPage
+        defer { IntentRuntime.openHeldPage = opener }
         let held = PendingPage()
         IntentRuntime.pages = held
+        let asked = OpenCalls()
+        IntentRuntime.openHeldPage = { [held] in asked.record(held.peek()) }
         try save([AnswerFixtures.trip(7, "Grand Junction", denverGJ + [lotExample])])
         IntentRuntime.service = service(server: home)
         _ = try await OpenParkingIntent().perform()
+        XCTAssertEqual(asked.pages, ["#trip/7"], "the shell is asked to open the page only once it is held, and keeps it")
         XCTAssertEqual(held.take(), "#trip/7")
         try save([AnswerFixtures.trip(7, "Grand Junction", denverGJ)])
         _ = try await OpenParkingIntent().perform()
         XCTAssertNil(held.take(), "no parking opens no page")
+        XCTAssertEqual(asked.pages.count, 1, "no page, no request to the shell")
     }
 }
 
