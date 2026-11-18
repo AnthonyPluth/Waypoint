@@ -334,10 +334,17 @@ class OfflinePicture(TypedDict):
     data: str
 
 
+class OfflineAirport(TypedDict):
+    code: str
+    latitude: float
+    longitude: float
+
+
 class OfflineTrip(TypedDict):
     trip: Trip
     messages: list[OfflineMessages]
     cities: dict[str, str]
+    airports: NotRequired[list[OfflineAirport]]
     codes: NotRequired[list[OfflinePicture]]
 
 

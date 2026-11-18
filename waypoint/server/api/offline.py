@@ -4,13 +4,14 @@ from datetime import date
 
 from ...domain import offline
 from ..common import _current
-from ..contract import Offline, OfflineMessages, OfflinePicture, OfflineTrip, StoredEmail
+from ..contract import Offline, OfflineAirport, OfflineMessages, OfflinePicture, OfflineTrip, StoredEmail
 from .trips import _trip, viewer
 
 
 def _saved(c: offline.SavedTrip, with_codes: bool) -> OfflineTrip:
     messages = [OfflineMessages(segment_id=m["segment_id"], emails=[StoredEmail(**e) for e in m["emails"]]) for m in c["messages"]]
-    saved = OfflineTrip(trip=_trip(c["trip"]), messages=messages, cities=c["cities"])
+    saved = OfflineTrip(trip=_trip(c["trip"]), messages=messages, cities=c["cities"],
+                       airports=[OfflineAirport(**a) for a in c["airports"]])
     if with_codes:
         saved["codes"] = [OfflinePicture(**p) for p in c["codes"]]
     return saved
