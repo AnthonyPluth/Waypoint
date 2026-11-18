@@ -116,6 +116,23 @@ describe("PastTrip hero", () => {
     expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
   });
 
+  it("draws no photo pins, no Photos key entry and no stops list on the route map, whatever the photos' places", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    photos = [shot(1), shot(2, 2)];
+    best = [1, 2];
+    clusters = [{ latitude: 39.7, longitude: -105, count: 2, first: "2026-03-01T08:00", last: "2026-03-02T18:00", cover: 1, inferred: false }];
+    const { container } = show({ trip: flown });
+    await screen.findByRole("region", { name: "Route replay" });
+    await settled();
+    expect(container.querySelector("[data-pin]")).toBeNull();
+    expect(container.querySelector("[data-testid=photo-pins]")).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Map key" })).queryByText("Photos")).toBeNull();
+    expect(screen.queryByRole("list", { name: "Stops in order" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Stops list" })).toBeNull();
+    expect(screen.getByRole("slider", { name: "Position along the route" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "Map of the route, stop by stop" })).toBeTruthy();
+  });
+
   it("is the route map with no quiet line when the library has one or two photos, which stay in the days", async () => {
     photos = [shot(1), shot(2, 2)];
     best = [1, 2];
@@ -894,7 +911,8 @@ describe("PastTrip on desktop", () => {
       show({ trip: flown });
       await userEvent.click(await within(column()).findByRole("button", { name: "Replay trip" }));
       const slider = await within(column()).findByRole("slider", { name: "Position along the route" });
-      expect(within(column()).getByRole("region", { name: "Stops list" })).toBeTruthy();
+      expect(within(column()).queryByRole("region", { name: "Stops list" })).toBeNull();
+      expect(within(column()).queryByRole("list", { name: "Stops in order" })).toBeNull();
       expect(within(column()).queryByRole("button", { name: "Hide replay" })).toBeNull();
       fireEvent.input(slider, { target: { value: "50" } });
       expect(within(column()).queryByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeNull();
