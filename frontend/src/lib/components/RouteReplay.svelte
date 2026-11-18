@@ -18,7 +18,11 @@
   const year = $derived(Number(today.slice(0, 4)));
   let connected = $state(typeof navigator === "undefined" || navigator.onLine !== false);
   $effect(() => {
-    const set = () => { connected = navigator.onLine !== false; };
+    const set = () => {
+      const held = holdsFocus();
+      connected = navigator.onLine !== false;
+      if (held && !connected) void restoreFocus();
+    };
     set();
     window.addEventListener("online", set);
     window.addEventListener("offline", set);
@@ -64,16 +68,26 @@
     loadMapkit().then((found) => { if (askedFor === id) maps = found && !found.failed() ? found : null; });
   });
 
-  async function failed() {
-    if (lost) return;
-    if (!appeared) { maps = null; return; }
+  const holdsFocus = () => {
     const active = document.activeElement;
-    const inside = (!!section && section.contains(active)) || (!!wrapId && active?.getAttribute("aria-controls") === wrapId);
-    lost = true;
-    appeared = false;
-    if (!inside) return;
+    return (!!section && section.contains(active)) || (!!wrapId && active?.getAttribute("aria-controls") === wrapId);
+  };
+  async function restoreFocus() {
     await tick();
     fallbackFocus?.()?.focus();
+  }
+
+  async function failed() {
+    if (lost) return;
+    const inside = holdsFocus();
+    if (!appeared) {
+      maps = null;
+      if (inside) await restoreFocus();
+      return;
+    }
+    lost = true;
+    appeared = false;
+    if (inside) await restoreFocus();
   }
 
   let latest = 0;

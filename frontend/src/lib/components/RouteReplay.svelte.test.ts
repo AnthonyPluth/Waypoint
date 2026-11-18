@@ -337,13 +337,22 @@ describe("RouteReplay when the map fails after it showed", () => {
 
 describe("RouteReplay when the connection or MapKit changes while it is waiting", () => {
   it("stops being offered when the shared MapKit session fails while the replay is hidden", async () => {
+    const facts = document.createElement("dl");
+    facts.tabIndex = -1;
+    const replayButton = document.createElement("button");
+    replayButton.setAttribute("aria-controls", "past-trip-replay");
+    document.body.append(facts, replayButton);
     const onstops = vi.fn();
-    render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
+    render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops, wrapId: "past-trip-replay", fallbackFocus: () => facts });
     await waitFor(() => expect(onstops.mock.calls.at(-1)?.[0]).toBeGreaterThan(1));
+    replayButton.focus();
     maps.fail();
     await waitFor(() => expect(onstops).toHaveBeenLastCalledWith(0));
+    await waitFor(() => expect(document.activeElement).toBe(facts));
     expect(fake.maps).toHaveLength(0);
     expect(screen.queryByText(LINE)).toBeNull();
+    facts.remove();
+    replayButton.remove();
   });
 
   it("shows only one quiet line, not none, when it fails while shown", async () => {
@@ -357,12 +366,18 @@ describe("RouteReplay when the connection or MapKit changes while it is waiting"
 
   it("goes when the browser goes offline, and comes back when it is online again", async () => {
     vi.mocked(api).mockImplementation((async (path: string) => (path === "/api/state" ? state({ mapkit: true }) : places)) as never);
+    const facts = document.createElement("dl");
+    facts.tabIndex = -1;
+    document.body.append(facts);
     const onstops = vi.fn();
-    render(RouteReplay, { trip: trip([there, home]), now: after, onstops });
+    render(RouteReplay, { trip: trip([there, home]), now: after, onstops, fallbackFocus: () => facts });
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    (await screen.findByRole("button", { name: "Pause" })).focus();
     vi.stubGlobal("navigator", { ...navigator, onLine: false, language: "en-US" });
     window.dispatchEvent(new Event("offline"));
     await waitFor(() => expect(region()).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(facts));
+    facts.remove();
     expect(onstops).toHaveBeenLastCalledWith(0);
     vi.stubGlobal("navigator", { ...navigator, onLine: true, language: "en-US" });
     window.dispatchEvent(new Event("online"));
