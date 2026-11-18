@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Siri answers: next flight and tonight's stay</title>
+<title>Siri answers for the iPhone app</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
 <style>
@@ -105,31 +105,38 @@ ul, ol { padding: 0; list-style: none; }
 .tile.stay { background: linear-gradient(160deg, #1f9e80, #136150); }
 .tile svg { width: 24px; height: 24px; }
 .sc .muted { color: #8e8e93; font-size: 13px; }
+.city { font-size: 13px; color: var(--muted-foreground); margin-top: 4px; }
+.opening { background: rgb(28 31 40 / 82%); backdrop-filter: blur(24px); border-radius: 22px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted-foreground); box-shadow: 0 0 0 1px rgb(255 255 255 / 6%); }
+.opening .appic { width: 34px; height: 34px; border-radius: 9px; }
+.opening .appic svg { width: 22px; height: 22px; }
+.opening b { color: var(--foreground); font-weight: 600; display: block; }
+.tile.park { background: linear-gradient(160deg, #8a5bd6, #5a3596); }
+.tile.trip { background: linear-gradient(160deg, #c47a1c, #87500e); }
 </style>
 </head>
 <body>
 <main class="doc">
 <header class="dochead">
-  <h1>Siri answers: next flight and tonight's stay</h1>
-  <p>Mock frames for the two intents <a href="README.md">the write-up</a> recommends building first (<a href="https://github.com/AnthonyPluth/Waypoint/issues/820">#820</a>). Phone width only, dark only. Every flight, hotel and time is made up. Everything here comes from the trips saved on the phone: no request goes to the server.</p>
-  <p class="proposed">Proposed, not signed off. The owner picks the intents, the phrases and the wording in chat on #820.</p>
+  <h1>Siri answers for the iPhone app</h1>
+  <p>Mock frames for the four intents the owner chose on 2026-11-18 (<a href="README.md">the write-up</a>, <a href="https://github.com/AnthonyPluth/Waypoint/issues/820">#820</a>): next flight, tonight's stay, parking code and open my trip. Phone width only, dark only. Every flight, hotel, lot and time is made up. Everything here comes from the trips saved on the phone: no request goes to the server.</p>
+  <p class="proposed">The intents and the spoken form (city names) are the owner's decisions. The look of these frames, the phrases and the wording are not signed off yet.</p>
 </header>
 <section class="sec">
   <div class="sechead"><span class="letter">A</span><h2>Next flight</h2></div>
-  <p class="lede">Spoken: the flight number, the day and time, and the zone's name. On the card: the route as airport codes, the booked wall-clock times with each airport's zone, the trip and how old the saved copy is. Never a confirmation code, gate, seat or traveller's name. Tap opens the flight in the app.</p>
+  <p class="lede">Spoken: the cities, the day and the time at the departure airport (the owner chose city names over the flight number). On the card: the route as codes and cities, the booked wall-clock times with each airport's zone, the flight number, the trip and how old the saved copy is. Never a confirmation code, gate, seat or traveller's name. Tap opens the flight in the app.</p>
   <div class="frames"><figure class="fig"><figcaption>A1 · later this week</figcaption><div class="dev">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
   <div class="sys">
     <p class="bubble">“When is my next flight in Waypoint”</p>
-    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 214, leaves Thursday at 7:40 am, Denver time.</span></p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time.</span></p>
     <section class="wcard" aria-label="Next flight, EA 214, Denver to Grand Junction">
       <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Thu Jun 12</span><b>EA 214</b></span><span class="chip quiet">Booked times</span></div>
       <div class="route">
-        <div><div class="code">DEN</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div><div class="code">DEN</div><div class="city">Denver</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
         <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
-        <div class="r"><div class="code">GJT</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+        <div class="r"><div class="code">GJT</div><div class="city">Grand Junction</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
       </div>
       <div class="ft"><span>Trip: Grand Junction</span><span>Saved 2 hours ago</span></div>
     </section>
@@ -141,13 +148,13 @@ ul, ol { padding: 0; list-style: none; }
   <div class="glow" aria-hidden="true"></div>
   <div class="sys">
     <p class="bubble">“Waypoint next flight”</p>
-    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your flight, EA 214, leaves today at 7:40 am, Denver time, in 3 hours.</span></p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your flight leaves Denver for Grand Junction today at 7:40 am, local time, in 3 hours.</span></p>
     <section class="wcard" aria-label="Next flight, EA 214, Denver to Grand Junction">
       <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Today</span><b>EA 214</b></span><span class="chip info">In 3 h</span></div>
       <div class="route">
-        <div><div class="code">DEN</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div><div class="code">DEN</div><div class="city">Denver</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
         <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
-        <div class="r"><div class="code">GJT</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+        <div class="r"><div class="code">GJT</div><div class="city">Grand Junction</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
       </div>
       <div class="ft"><span>Trip: Grand Junction</span><span>Saved 20 min ago</span></div>
     </section>
@@ -159,24 +166,24 @@ ul, ol { padding: 0; list-style: none; }
   <div class="glow" aria-hidden="true"></div>
   <div class="sys">
     <p class="bubble">“When do I fly in Waypoint”</p>
-    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 88, leaves Monday at 6:05 pm, Denver time.</span></p>
-    <section class="wcard" aria-label="Next flight, EA 88, Denver to New York JFK">
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight leaves Denver for New York on Monday at 6:05 pm, local time.</span></p>
+    <section class="wcard" aria-label="Next flight, EA 88, Denver to New York">
       <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Mon Jun 16</span><b>EA 88</b></span><span class="chip quiet">Booked times</span></div>
       <div class="route">
-        <div><div class="code">DEN</div><div class="tm">6:05 pm <span class="zn">MDT</span></div></div>
+        <div><div class="code">DEN</div><div class="city">Denver</div><div class="tm">6:05 pm <span class="zn">MDT</span></div></div>
         <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
-        <div class="r"><div class="code">JFK</div><div class="tm">11:52 pm <span class="zn">EDT</span></div></div>
+        <div class="r"><div class="code">JFK</div><div class="city">New York</div><div class="tm">11:52 pm <span class="zn">EDT</span></div></div>
       </div>
       <div class="ft"><span>Trip: Grand Junction</span><span>Saved 2 hours ago</span></div>
     </section>
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
 </div></figure></div>
-  <div class="spec"><div><h3>Spoken</h3><ul><li><q>Your next flight, EA 214, leaves Thursday at 7:40 am, Denver time.</q> The day is <q>today</q>, <q>tomorrow</q> or the weekday within a week, else the date.</li><li>Today adds <q>in 3 hours</q> (or <q>in 40 minutes</q>).</li><li>The zone's name comes from the departure's IANA zone (<code>America/Denver</code> → Denver). Never converted to the phone's zone.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Next flight · Thu Jun 12</q>, the flight number, a chip: <q>Booked times</q>, or <q>In 3 h</q> on the day.</li><li>Codes in Geist Mono 28 px; times 13 px with the zone abbreviation of each airport.</li><li>Footer: the trip's name, and <q>Saved 2 hours ago</q> from the copy's <code>savedAt</code>.</li></ul></div><div><h3>Not shown</h3><ul><li>Confirmation code, gate, terminal, seat, cabin, travellers, live status.</li><li>City names: the saved copy has airport codes only (open question 5).</li></ul></div></div>
+  <div class="spec"><div><h3>Spoken</h3><ul><li><q>Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time.</q> The day is <q>today</q>, <q>tomorrow</q> or the weekday within a week, else the date.</li><li>Today adds <q>in 3 hours</q> (or <q>in 40 minutes</q>).</li><li>The cities come from the saved copy's airport cities (a server change before this ships). The time is the departure airport's wall-clock time, never converted; <q>local time</q> is the default for the open zone question.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Next flight · Thu Jun 12</q>, the flight number, a chip: <q>Booked times</q>, or <q>In 3 h</q> on the day.</li><li>Codes in Geist Mono 28 px, the city under each, times 13 px with the zone abbreviation of each airport.</li><li>Footer: the trip's name, and <q>Saved 2 hours ago</q> from the copy's <code>savedAt</code>.</li></ul></div><div><h3>Never shown or spoken</h3><ul><li>Confirmation code, gate, seat, room, loyalty number, other travellers' names, live status.</li><li>Whose flight: anyone's on a trip you're on, as on Upcoming (owner's decision).</li></ul></div></div>
 </section>
 <section class="sec">
   <div class="sechead"><span class="letter">B</span><h2>Tonight's stay, and check-out</h2></div>
-  <p class="lede">One intent behind two phrases. Spoken: the hotel's name and city, and the check-out day and time. On the card, never spoken: the street address. Never a room number, confirmation code or phone number.</p>
+  <p class="lede">One intent behind two phrases. Spoken: the hotel's name and city, and the check-out day and time. On the card, never spoken: the street address (the default for the open address question). Never a room number, confirmation code or phone number.</p>
   <div class="frames"><figure class="fig"><figcaption>B1 · where am I staying tonight</figcaption><div class="dev">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -211,19 +218,73 @@ ul, ol { padding: 0; list-style: none; }
   <div class="spec"><div><h3>Rules</h3><ul><li>Tonight is today in the hotel's own zone; the stay covers it when check-in is on or before today and check-out after it.</li><li>No stay tonight: <q>You have no stay tonight. Your next stay is Hotel Example, from Thursday.</q> with the same card.</li><li>Times are the hotel's wall-clock times.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Tonight</q> (or <q>Check-out Sunday</q>), the hotel's name, a chip <q>Night 2 of 3</q>.</li><li>The address from <code>details.address</code>; check-in and check-out; footer with the zone and the copy's age.</li></ul></div></div>
 </section>
 <section class="sec">
-  <div class="sechead"><span class="letter">C</span><h2>In the Shortcuts app</h2></div>
-  <p class="lede">Two actions, no more. They show under Waypoint in Shortcuts and in Spotlight as actions; no trip is ever indexed.</p>
-  <div class="frames"><figure class="fig"><figcaption>C1 · Shortcuts, App Shortcuts for Waypoint</figcaption><div class="dev short"><div class="sc">
+  <div class="sechead"><span class="letter">C</span><h2>Parking code</h2></div>
+  <p class="lede">Opens the app at the parking booking, where its <q>Show QR code</q> button already is. Siri never speaks or shows the code or the confirmation; the code comes from the server once the app is open, as today, so with no connection the booking opens without it.</p>
+  <div class="frames"><figure class="fig"><figcaption>C1 · show my parking code</figcaption><div class="dev short">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Show my parking code in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Opening your parking at Lot Example.</span></p>
+    <div class="opening"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Opening Waypoint</b>Lot Example · Thu Jun 12 to Sun Jun 15</span></div>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>C2 · no parking saved</figcaption><div class="dev short">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Show my parking code in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>There's no parking in the trips saved on this iPhone.</span></p>
+    
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure></div>
+  <div class="spec"><div><h3>Rules</h3><ul><li>The current parking booking (entry passed, exit not yet), else the next one, not cancelled, from the saved copy.</li><li>Spoken: the lot's name only (the booking's headline). Never the code, the confirmation or the space.</li><li>The phone must be unlocked first, like every intent.</li></ul></div></div>
+</section>
+<section class="sec">
+  <div class="sechead"><span class="letter">D</span><h2>Open my trip to a place</h2></div>
+  <p class="lede">Opens the app at a saved trip named by its destination or name. For the place to be heard in one phrase, the saved trips' places are given to the system's phrase list on the phone, and replaced on every save and cleared on every purge.</p>
+  <div class="frames"><figure class="fig"><figcaption>D1 · open my trip to a place</figcaption><div class="dev short">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Open my trip to Grand Junction in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Opening your trip to Grand Junction.</span></p>
+    <div class="opening"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Opening Waypoint</b>Grand Junction · Jun 12 to 15</span></div>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>D2 · place not in the saved trips</figcaption><div class="dev short">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Open my trip to Lisbon in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>There's no trip to Lisbon saved on this iPhone. Opening Waypoint.</span></p>
+    <div class="opening"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><b>Opening Waypoint</b>Upcoming</span></div>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure></div>
+  <div class="spec"><div><h3>Rules</h3><ul><li>The place matches a saved trip's destination or name. Two matches: Siri asks which, naming the trips' dates.</li><li>No match: the app opens on Upcoming, and Siri says so.</li><li>The places given to the system are the saved trips' only; a sign-out, saving off or any purge clears them.</li></ul></div></div>
+</section>
+<section class="sec">
+  <div class="sechead"><span class="letter">E</span><h2>In the Shortcuts app</h2></div>
+  <p class="lede">Four actions. They show under Waypoint in Shortcuts and in Spotlight as actions; no trip is ever indexed.</p>
+  <div class="frames"><figure class="fig"><figcaption>E1 · Shortcuts, App Shortcuts for Waypoint</figcaption><div class="dev short"><div class="sc">
   <div class="status" aria-hidden="true" style="position:absolute;top:0;left:0;right:0"><span>9:41</span><span>5G</span></div>
   <h3>Shortcuts</h3>
   <div class="approw"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Waypoint</div>
   <div class="tiles">
     <div class="tile"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg><span>Next flight</span></div>
     <div class="tile stay"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 20V6M2 16h20v4M22 16v-4a3 3 0 0 0-3-3h-8v7M6.5 12.5a1.5 1.5 0 1 0 0-.01"/></svg><span>Tonight's stay</span></div>
+    <div class="tile park"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg><span>Parking code</span></div>
+    <div class="tile trip"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Open trip</span></div>
   </div>
   <p class="muted">Say “When is my next flight in Waypoint” or “Where am I staying tonight in Waypoint”.</p>
 </div><p class="syslabel">The Shortcuts app is the system's</p></div></figure></div>
-  <div class="spec"><div><h3>Why two</h3><ul><li>The owner doesn't want clutter: check-out is a phrase of the stay intent, not a third tile.</li><li>Parking, open my trip and live status are left out of the first set (see the write-up).</li></ul></div></div>
+  <div class="spec"><div><h3>Why four</h3><ul><li>The owner chose A, B, C and D on 2026-11-18. Check-out is a phrase of the stay intent, not a fifth tile.</li><li>Live status (E in the write-up) is not built.</li></ul></div></div>
 </section>
 </main>
 </body>

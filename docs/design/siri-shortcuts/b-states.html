@@ -105,19 +105,26 @@ ul, ol { padding: 0; list-style: none; }
 .tile.stay { background: linear-gradient(160deg, #1f9e80, #136150); }
 .tile svg { width: 24px; height: 24px; }
 .sc .muted { color: #8e8e93; font-size: 13px; }
+.city { font-size: 13px; color: var(--muted-foreground); margin-top: 4px; }
+.opening { background: rgb(28 31 40 / 82%); backdrop-filter: blur(24px); border-radius: 22px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--muted-foreground); box-shadow: 0 0 0 1px rgb(255 255 255 / 6%); }
+.opening .appic { width: 34px; height: 34px; border-radius: 9px; }
+.opening .appic svg { width: 22px; height: 22px; }
+.opening b { color: var(--foreground); font-weight: 600; display: block; }
+.tile.park { background: linear-gradient(160deg, #8a5bd6, #5a3596); }
+.tile.trip { background: linear-gradient(160deg, #c47a1c, #87500e); }
 </style>
 </head>
 <body>
 <main class="doc">
 <header class="dochead">
   <h1>Siri answers: when they can't answer</h1>
-  <p>The same two intents (<a href="README.md">write-up</a>, <a href="https://github.com/AnthonyPluth/Waypoint/issues/820">#820</a>) when the phone is locked, no one is signed in, saving is off, nothing is saved, nothing is found, or the copy is old. None of these answers holds any trip data, except the old copy, which is the normal answer with its age.</p>
-  <p class="proposed">Proposed, not signed off. The wording is for the owner to choose.</p>
+  <p>The same intents (<a href="README.md">write-up</a>, <a href="https://github.com/AnthonyPluth/Waypoint/issues/820">#820</a>) when the phone is locked, no one is signed in, saving is off, nothing is saved, nothing is found, or the copy is old. None of these answers holds any trip data, except the old copy, which is the normal answer with its age.</p>
+  <p class="proposed">The look of these frames and their wording are not signed off yet.</p>
 </header>
 <section class="sec">
-  <div class="sechead"><span class="letter">D</span><h2>Phone locked</h2></div>
+  <div class="sechead"><span class="letter">F</span><h2>Phone locked</h2></div>
   <p class="lede">Every intent asks for an unlock first (<code>authenticationPolicy = .requiresAuthentication</code>); Siri shows the system's prompt and Waypoint says nothing until the phone is unlocked. The saved trips can't be read while it is locked anyway (<code>.complete</code> file protection).</p>
-  <div class="frames"><figure class="fig"><figcaption>D1 · locked, before Waypoint runs</figcaption><div class="dev">
+  <div class="frames"><figure class="fig"><figcaption>F1 · locked, before Waypoint runs</figcaption><div class="dev">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -127,7 +134,7 @@ ul, ol { padding: 0; list-style: none; }
     <section class="wcard" style="align-items:center;text-align:center;padding:22px 16px;background:rgb(28 31 40 / 82%)"><span style="color:var(--muted-foreground)"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="width:34px;height:34px"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span><b>Unlock iPhone to continue</b><span class="eyebrow" style="letter-spacing:.06em;text-transform:none">Face ID · drawn by iOS</span></section>
   </div>
   <p class="syslabel">All of this frame is the system's</p>
-</div></figure><figure class="fig"><figcaption>D2 · the read failed as if locked</figcaption><div class="dev short">
+</div></figure><figure class="fig"><figcaption>F2 · the read failed as if locked</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -138,12 +145,12 @@ ul, ol { padding: 0; list-style: none; }
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
 </div></figure></div>
-  <div class="spec"><div><h3>Notes</h3><ul><li>D1's wording is Apple's, not ours; confirm on a device.</li><li>D2 is Waypoint's fallback if a read fails at the moment of locking. No trip, no hotel, no time.</li><li>With AirPods or CarPlay and the phone locked: D1. A HomePod gets nothing.</li></ul></div></div>
+  <div class="spec"><div><h3>Notes</h3><ul><li>F1's wording is Apple's, not ours; confirm on a device.</li><li>F2 is Waypoint's fallback if a read fails at the moment of locking. No trip, no hotel, no time.</li><li>With AirPods or CarPlay and the phone locked: F1. A HomePod gets nothing.</li></ul></div></div>
 </section>
 <section class="sec">
-  <div class="sechead"><span class="letter">E</span><h2>Nothing to answer from</h2></div>
+  <div class="sechead"><span class="letter">G</span><h2>Nothing to answer from</h2></div>
   <p class="lede">Short spoken answers with no card. Each says what to do, in the app.</p>
-  <div class="frames"><figure class="fig"><figcaption>E1 · not signed in</figcaption><div class="dev short">
+  <div class="frames"><figure class="fig"><figcaption>G1 · not signed in</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -153,7 +160,7 @@ ul, ol { padding: 0; list-style: none; }
     
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
-</div></figure><figure class="fig"><figcaption>E2 · saving switched off</figcaption><div class="dev short">
+</div></figure><figure class="fig"><figcaption>G2 · saving switched off</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -163,7 +170,7 @@ ul, ol { padding: 0; list-style: none; }
     
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
-</div></figure><figure class="fig"><figcaption>E3 · nothing saved yet</figcaption><div class="dev short">
+</div></figure><figure class="fig"><figcaption>G3 · nothing saved yet</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -173,7 +180,7 @@ ul, ol { padding: 0; list-style: none; }
     
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
-</div></figure><figure class="fig"><figcaption>E4 · the copy can't be read</figcaption><div class="dev short">
+</div></figure><figure class="fig"><figcaption>G4 · the copy can't be read</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -184,12 +191,12 @@ ul, ol { padding: 0; list-style: none; }
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
 </div></figure></div>
-  <div class="spec"><div><h3>Rules</h3><ul><li>E1: no server in the session, or no saved copy for it (sign-out deletes the copy).</li><li>E2: <code>offlineSaving</code> is off.</li><li>E3: saving is on and nothing is saved.</li><li>E4: a copy whose version or shape the app doesn't know.</li><li>None of them calls the server.</li></ul></div></div>
+  <div class="spec"><div><h3>Rules</h3><ul><li>G1: no server in the session, or no saved copy for it (sign-out deletes the copy).</li><li>G2: <code>offlineSaving</code> is off.</li><li>G3: saving is on and nothing is saved.</li><li>G4: a copy whose version or shape the app doesn't know.</li><li>None of them calls the server.</li></ul></div></div>
 </section>
 <section class="sec">
-  <div class="sechead"><span class="letter">F</span><h2>Nothing found, and an old copy</h2></div>
+  <div class="sechead"><span class="letter">H</span><h2>Nothing found, and an old copy</h2></div>
   <p class="lede">When the saved trips hold no flight or stay, the answer says <q>saved on this iPhone</q>, because a trip further out isn't saved. An old copy answers as usual and says its age on the card.</p>
-  <div class="frames"><figure class="fig"><figcaption>F1 · no flight saved</figcaption><div class="dev short">
+  <div class="frames"><figure class="fig"><figcaption>H1 · no flight saved</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -199,7 +206,7 @@ ul, ol { padding: 0; list-style: none; }
     
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
-</div></figure><figure class="fig"><figcaption>F2 · no stay saved</figcaption><div class="dev short">
+</div></figure><figure class="fig"><figcaption>H2 · no stay saved</figcaption><div class="dev short">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
@@ -209,26 +216,44 @@ ul, ol { padding: 0; list-style: none; }
     
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
-</div></figure><figure class="fig"><figcaption>F3 · copy 3 days old</figcaption><div class="dev">
+</div></figure><figure class="fig"><figcaption>H3 · copy 3 days old</figcaption><div class="dev">
   <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
   <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="glow" aria-hidden="true"></div>
   <div class="sys">
     <p class="bubble">“When is my next flight in Waypoint”</p>
-    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 214, leaves Thursday at 7:40 am, Denver time.</span></p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time.</span></p>
     <section class="wcard" aria-label="Next flight, EA 214, Denver to Grand Junction">
       <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Thu Jun 12</span><b>EA 214</b></span><span class="chip warn">Old copy</span></div>
       <div class="route">
-        <div><div class="code">DEN</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div><div class="code">DEN</div><div class="city">Denver</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
         <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
-        <div class="r"><div class="code">GJT</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+        <div class="r"><div class="code">GJT</div><div class="city">Grand Junction</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
       </div>
       <div class="ft"><span>Trip: Grand Junction</span><span>Saved 3 days ago · open Waypoint to update</span></div>
     </section>
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>H4 · copy saved before city names</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“When is my next flight in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 214, leaves Thursday at 7:40 am, local time.</span></p>
+    <section class="wcard" aria-label="Next flight, EA 214,  to ">
+      <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Thu Jun 12</span><b>EA 214</b></span><span class="chip quiet">Booked times</span></div>
+      <div class="route">
+        <div><div class="code">DEN</div><div class="city"></div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+        <div class="r"><div class="code">GJT</div><div class="city"></div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+      </div>
+      <div class="ft"><span>Trip: Grand Junction</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
 </div></figure></div>
-  <div class="spec"><div><h3>Old copy</h3><ul><li>After a day without an online open, the chip turns to <q>Old copy</q> and the footer says to open Waypoint.</li><li>Whether the spoken answer says so too (<q>as of Monday</q>) is open question 7.</li></ul></div></div>
+  <div class="spec"><div><h3>Old copy</h3><ul><li>After a day without an online open, the chip turns to <q>Old copy</q> and the footer says to open Waypoint.</li><li>Whether the spoken answer says so too (<q>as of Monday</q>) is still open; the default is the card only.</li><li>H4: a copy saved before the server sent city names speaks the flight number instead, until the next online open replaces it.</li></ul></div></div>
 </section>
 </main>
 </body>
