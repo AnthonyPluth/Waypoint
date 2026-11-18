@@ -484,9 +484,9 @@ class SignedInTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             seed = os.path.join(root, "seed")
             os.mkdir(seed)
+            execed: dict[str, dict[str, str]] = {}
             for flags, keyed in (([], True), (["--no-key"], False)):
                 data = os.path.join(root, f"data-{len(flags)}")
-                execed = {}
                 with mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), mock.patch.object(verify, "die_with_parent"), \
                         mock.patch("signal.signal"), mock.patch("os.dup2"), mock.patch("os.chdir"), mock.patch("os.execve", side_effect=lambda c, a, e: execed.update(env=e)):
                     verify.serve(["--parent", "1", "--seed", seed, "--data", data, "--port", "9345", *flags])
