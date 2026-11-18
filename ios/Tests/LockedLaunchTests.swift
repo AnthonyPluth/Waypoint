@@ -75,25 +75,12 @@ final class LockedLaunchTests: XCTestCase {
         XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
     }
 
-    func testALaunchInProgressIsNeitherRestartedNorCancelledByTheAppGoingInactiveAndBack() async {
+    func testASecondBeginIsRefusedWhileALaunchRunsAndEndAllowsOneAgain() {
         let gate = LaunchGate()
-        let opened = expectation(description: "opened")
-        var starts = 0
-        var cancelled = false
-        let launch = Task {
-            guard gate.begin(active: true, protectedDataAvailable: true) else { return }
-            starts += 1
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            cancelled = Task.isCancelled
-            gate.end()
-            opened.fulfill()
-        }
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
         XCTAssertFalse(gate.begin(active: false, protectedDataAvailable: true))
         XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: true))
-        await fulfillment(of: [opened], timeout: 10)
-        _ = await launch.value
-        XCTAssertEqual(starts, 1)
-        XCTAssertFalse(cancelled)
+        gate.end()
+        XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
     }
 }

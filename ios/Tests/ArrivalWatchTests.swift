@@ -720,14 +720,4 @@ final class ArrivalWatchTests: XCTestCase {
         await sync.arrivalSettled()
         XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1", "arrival-3"])
     }
-
-    func testTheArrivalFileIsLeftOutOfBackupsEvenAfterASave() async throws {
-        let phone = await watching()
-        func excluded() throws -> Bool? {
-            try phone.arrivalFile.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup
-        }
-        XCTAssertEqual(try excluded(), true)
-        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.rental(), ArrivalFixtures.hotel()])
-        XCTAssertEqual(try excluded(), true)
-    }
 }

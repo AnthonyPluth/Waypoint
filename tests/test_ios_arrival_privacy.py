@@ -12,6 +12,10 @@ LOCATION_FIXES = re.compile(
     r"|startRangingBeacons|CLLocationUpdate|CLServiceSession|CLMonitor)\b"
 )
 LOCATION_PROPERTY = re.compile(r"\.location\b")
+ARRIVAL_RECORD_DENIALS = re.compile(
+    r"(where (you|the person|they) (was|were)|when (you|they) arrived|arrivals?)[^.;:]{0,40}\b(not|never)\b[^.;:]{0,20}\b(recorded|kept)\b"
+    r"|(sent|logged)(, sent)? or kept|kept or logged|sent, kept|never kept|no place the person was at"
+)
 NETWORK = re.compile(r"\b(URLSession|ServerClient|ServerAPI|URLRequest|NWConnection|WKWebView)\b")
 LOGGING = re.compile(r"\b(os_log|Logger|NSLog|OSLog)\b|\bprint\s*\(|\bdebugPrint\s*\(|\bdump\s*\(")
 
@@ -68,8 +72,20 @@ class ArrivalPrivacyTests(unittest.TestCase):
             text = (root / name).read_text()
             self.assertIn("when its alert last fired", text, name)
             self.assertIn("issue #849 comment", text, name)
-            for denied in ("sent or kept", "never kept", "kept or logged", "is not recorded", "never recorded", "when they arrived is not"):
-                self.assertNotIn(denied, text, f"{name} says {denied!r}, which the arrival file's alert time contradicts")
+        for path in [root / "AGENTS.md", root / "SECURITY.md", root / ".github/agent-review/invariants.md", root / "docs/src/content/docs/start/ios.md",
+                     DESIGN.parent / "README.md", *sorted((IOS / "Waypoint").glob("Arrival*.swift"))]:
+            text = path.read_text()
+            for match in ARRIVAL_RECORD_DENIALS.finditer(text):
+                self.fail(f"{path.name} says {match.group(0)!r}: the arrival file keeps when each alert last fired, so arrivals are not unrecorded")
+
+    def test_the_signed_off_phrase_about_the_location_is_allowed_and_the_denial_of_arrivals_is_not(self):
+        allowed = "Your location is never sent anywhere and is not recorded."
+        self.assertIsNone(ARRIVAL_RECORD_DENIALS.search(allowed))
+        plist = plistlib.loads((IOS / "Waypoint" / "Info.plist").read_bytes())
+        self.assertIn(allowed, plist["NSLocationAlwaysAndWhenInUseUsageDescription"])
+        for denial in ("where you were or when you arrived is not recorded", "arrivals are never kept", "its arrivals are never logged, sent or kept",
+                       "never sent, kept or logged", "when they arrived is not recorded", "no place the person was at"):
+            self.assertIsNotNone(ARRIVAL_RECORD_DENIALS.search(denial), denial)
 
     def test_the_launch_opens_only_through_the_launch_guard(self):
         app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()

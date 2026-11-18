@@ -253,8 +253,9 @@ protocol ArrivalWatching: Sendable {
 /// Region monitoring for the places `ArrivalPlaces` found, the permission asks that make it possible and the arrival notification (design
 /// `docs/design/arrival-codes/`, points 2 to 6). There is no switch: iOS's own permissions are the opt-in.
 ///
-/// The phone's location never leaves the phone and is never kept: the only inputs are iOS's region-entry events and the authorization
-/// status, and the only outputs are regions, a local notification and the arrival file (ids, kind, window, centre and radius). Nothing here
+/// The phone's location never leaves the phone and is never stored: the only inputs are iOS's region-entry events and the authorization
+/// status, and the only outputs are regions, a local notification and the arrival file (ids, kind, window, circle centre and radius, and
+/// when each alert last fired). Nothing here
 /// makes a request or logs; `tests/test_ios_arrival_privacy.py` holds that. A wake-up reads the arrival file only, never the saved trips,
 /// which iOS keeps unreadable while the phone is locked.
 actor ArrivalWatch: ArrivalWatching {

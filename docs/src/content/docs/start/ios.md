@@ -57,7 +57,7 @@ When you get near a parking lot, rental pickup or hotel on your saved trips, the
 | Sign out, a 401 or 403, a changed server address, no server | Everything | The arrival file and the coordinates, with the saved trips |
 | **Save my upcoming trips** off | Everything | The saved copy, and with it the arrival file and the coordinates |
 
-Turning location back on in iOS Settings resumes watching the next time the app is opened or saves your trips, with no new ask. The app keeps an arrival file beside the saved trips so iOS can wake it for a place while the phone is locked: for each watched booking only its ids, kind, window, circle and when its alert last fired, never a name, address or code, readable after the first unlock since the phone started, and left out of iCloud and computer backups. The permission texts iOS shows are the two in the app's `Info.plist`. Region monitoring's wake-up while the phone is locked, its behaviour with Precise Location off and how late it fires have not been confirmed on a phone.
+Turning location back on in iOS Settings resumes watching the next time the app is opened or saves your trips, with no new ask. The app keeps an arrival file beside the saved trips so iOS can wake it for a place while the phone is locked: for each watched booking only its ids, kind, window, circle and when its alert last fired, never a name, address or code, readable after the first unlock since the phone started, and, like the saved trips, can be part of your iCloud and computer backups. The permission texts iOS shows are the two in the app's `Info.plist`. Region monitoring's wake-up while the phone is locked, its behaviour with Precise Location off and how late it fires have not been confirmed on a phone.
 
 ## Siri and Shortcuts
 

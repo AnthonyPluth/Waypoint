@@ -148,9 +148,8 @@ final class OfflineStore: @unchecked Sendable {
         let folder = folder(for: server)
         guard files.fileExists(atPath: folder.path) else { return }
         do {
-            let file = folder.appendingPathComponent(Self.arrivalFile)
-            try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-            Self.excludeFromBackup(file)
+            try data.write(to: folder.appendingPathComponent(Self.arrivalFile),
+                           options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
         } catch {
             throw OfflineStoreError.cannotWrite
         }
@@ -214,9 +213,8 @@ final class OfflineStore: @unchecked Sendable {
             }
             if let earlier = try? Data(contentsOf: folder.appendingPathComponent(Self.arrivalFile)),
                let carried = Self.arrivalKept(earlier, trips: trips) {
-                let file = staging.appendingPathComponent(Self.arrivalFile)
-                try carried.write(to: file, options: .completeFileProtectionUntilFirstUserAuthentication)
-                Self.excludeFromBackup(file)
+                try carried.write(to: staging.appendingPathComponent(Self.arrivalFile),
+                                  options: .completeFileProtectionUntilFirstUserAuthentication)
             }
             if files.fileExists(atPath: folder.path) {
                 _ = try files.replaceItemAt(folder, withItemAt: staging)
@@ -261,13 +259,6 @@ final class OfflineStore: @unchecked Sendable {
         guard !kept.isEmpty else { return nil }
         object["watched"] = kept
         return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-    }
-
-    private static func excludeFromBackup(_ file: URL) {
-        var values = URLResourceValues()
-        values.isExcludedFromBackup = true
-        var target = file
-        try? target.setResourceValues(values)
     }
 
     private func discardLeftoverStaging() {
