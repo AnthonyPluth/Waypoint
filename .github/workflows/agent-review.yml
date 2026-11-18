@@ -35,7 +35,7 @@ jobs:
       pull-requests: write     # the comment (and the pull request's commits and comments)
       statuses: write          # the "Second review" status (and "Agent review" when the first review is on)
       actions: write           # start the merge gate
-    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@e326a1614665a19fbe4d32207d9f4c6d7397c77b   # v7.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@bf386593387dcbb56303dcb11f16c93dcc59a5d9   # v7.1.0
     with:
       # Left out of the diff the reviewer reads (still listed for it): the generated API contract and feature map.
       generated: |
