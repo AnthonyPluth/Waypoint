@@ -23,7 +23,7 @@ def api_state(conn, _q, _b) -> State:
         "last_backup": with_offset(db.get_setting(conn, sk.LAST_BACKUP)),
         "review_count": review.count(conn, owner()) + trips.unmatched_count(conn, viewer(conn)),
         "person_id": viewer(conn).person_id,
-        "ai": ai.config(conn) is not None,
+        "ai": ai.mail_config(conn) is not None,
         "show_costs": shows_costs(conn),
         "mapkit": maps.enabled(),
     }

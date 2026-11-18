@@ -283,8 +283,7 @@ class Replies(DbCase):
 
     def test_ai(self):
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
-        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "local", "ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
-        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"mode": "openrouter", "openrouter_model": "some/model", "openrouter_key": "sk-or-test-1234567"}))
+        self.check("POST /api/ai", ai_api.api_ai_save(self.c, {}, {"ollama_url": "http://ollama.example:1234", "ollama_model": "llama3"}))
         self.check("GET /api/ai", ai_api.api_ai(self.c, {}, {}))
 
     def test_people(self):
@@ -463,7 +462,7 @@ class Replies(DbCase):
                                                         "end_zone": "Europe/London", "start_local": "2026-06-02T15:00",
                                                         "end_local": "2026-06-08T10:00", "trip_id": made["id"]})
         self.check("POST /api/trips/{id}/split", trips_api.api_trip_split(self.c, {}, {"segment_ids": [other["id"]]}, str(made["id"])))
-        for key, value in ((sk.AI_MODE, "local"), (sk.AI_OLLAMA_URL, "http://ollama.example:1234"), (sk.AI_OLLAMA_MODEL, "llama3")):
+        for key, value in ((sk.AI_OLLAMA_URL, "http://ollama.example:1234"), (sk.AI_OLLAMA_MODEL, "llama3")):
             db.set_setting(self.c, key, value)
         self.c.commit()
         with mock.patch.object(trips_api.ai, "destination", return_value="Colorado & Texas"):

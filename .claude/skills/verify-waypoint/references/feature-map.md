@@ -813,13 +813,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 ### Flows on Settings
 
-#### `ai-automatic-setting`
+#### `ai-card`
 
 - **Starts at:** `#settings`; goes to: `#settings/mail`.
 - **Widths:** phone, desktop.
-- **Touches:** `Local (Ollama)`, `Read unreadable mail with AI automatically`.
-- **Expects to see:** `without asking each time`.
-- **Drive it:** `tools/control flow ai-automatic-setting`; or `poetry run python run.py verify --flow ai-automatic-setting`.
+- **Touches:** `Ollama address`, `Model`.
+- **Expects to see:** `Leave it empty to not use AI`, `It stays on your household’s own server`.
+- **Drive it:** `tools/control flow ai-card`; or `poetry run python run.py verify --flow ai-card`.
 
 #### `home-route-replay`
 

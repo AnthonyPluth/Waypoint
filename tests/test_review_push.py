@@ -225,7 +225,7 @@ class WhenItDoesNotTests(PushCase):
 
     def test_ask_ai_does_not_notify(self):
         self.device()
-        self.turn_on(auto=False)
+        self.turn_on()
         self.put("no_markup_ids")
         with mock.patch.object(reminders, "review_due") as due:
             self.scan()

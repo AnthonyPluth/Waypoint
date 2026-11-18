@@ -311,15 +311,8 @@ class MustStayInReviewTests(NothingNewCase):
             result = self.scan(now=NOW + 60)
         self.assertEqual((result.review, len(self.kept()), self.fake.requests, self.counted()), (1, 1, [], (0, 0)))
 
-    def test_hosted_mode_never_reads_the_email_so_nothing_is_dismissed(self):
-        self.turn_on("openrouter")
-        self.add_mail("hosted", mail(REMINDER, ident="hosted"))
-        with no_leaks(self, *CANARIES, database=self.path):
-            result = self.scan(now=NOW + 60)
-        self.assertEqual((result.review, self.fake.requests, self.counted()), (1, [], (0, 0)))
-
     def test_asking_by_hand_does_not_dismiss_a_known_booking(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.add_mail("hand", mail(REMINDER, ident="hand"))
         self.scan(now=NOW + 60)
         [item] = self.kept()

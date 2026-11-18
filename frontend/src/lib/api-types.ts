@@ -1,19 +1,11 @@
 export interface AiBody {
-  mode: "off" | "local" | "openrouter";
   ollama_url?: string;
   ollama_model?: string;
-  openrouter_model?: string;
-  openrouter_key?: string;
-  auto?: boolean;
 }
 
 export interface AiSettings {
-  mode: "off" | "local" | "openrouter";
   ollama_url: string;
   ollama_model: string;
-  openrouter_model: string;
-  key: "env" | "saved" | null;
-  auto: boolean;
 }
 
 export interface AiSuggestion {

@@ -5,7 +5,7 @@ import json
 import threading
 import time
 from collections import Counter
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal, NamedTuple
@@ -331,7 +331,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
                    parking=_parking_in(message.bookings))
         if read:
             review.set_read_suggestions(conn, mailbox_id, message_id, read)
-        if not usable and (strong or message.markup or message.bookings) and autoask.switched_on(conn):
+        if not usable and (strong or message.markup or message.bookings) and autoask.active(conn):
             autoask.wait(conn, mailbox_id, message_id)
         queued = 1
     elif held:
@@ -342,7 +342,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
 SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
-NO_AI = ai.NEEDS_LOCAL
+NO_AI = ai.NEEDS_AI
 
 
 class NoAi(Exception):
@@ -488,7 +488,8 @@ class Filed(NamedTuple):
 
 def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions: list[ai.Suggestion], error: str | None,
              auto: bool | None, now: float, parking: int = 0,
-             signals: nothing_new.Signals | None = None, dismiss_known: bool = False, sender: str | None = None) -> Filed:
+             signals: nothing_new.Signals | None = None, dismiss_known: bool = False, sender: str | None = None,
+             hold: Sequence[ai.Suggestion] = ()) -> Filed:
     row = conn.execute(select(ReviewItem.id, ReviewItem.sender_domain, ReviewItem.received, ReviewItem.matches, Mailbox.owner_sub)
                        .join(Mailbox, Mailbox.id == ReviewItem.mailbox_id)
                        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id).with_for_update(of=ReviewItem)).fetchone()
@@ -506,7 +507,7 @@ def _file_ai(conn: db.Connection, mailbox_id: int, message_id: str, suggestions:
             conn.execute(update(ScannedMessage).where(ScannedMessage.mailbox_id == mailbox_id, ScannedMessage.message_id == message_id)
                          .values(outcome=BOOKING, scanned=now, segment_id=kept[0]))
             return Filed(cleared=1, segments=tuple(kept), known="older_copy" if all(r == "older_copy" for r in reasons) else "already_known")
-    pending: list[ai.Suggestion] = []
+    pending: list[ai.Suggestion] = list(hold)
     touched: list[int] = []
     held: list[ingest.Held] = []
     added = 0
@@ -555,7 +556,7 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     for message_id in message_ids:
         with db.session() as conn:
             cfg = ai.mail_config(conn)
-            if cfg is None or not autoask.fills_gaps(conn):
+            if cfg is None:
                 return asked
         left = BUDGET - (_clock() - started)
         if left <= 0:
@@ -590,7 +591,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
     while True:
         with db.session() as conn:
             cfg = ai.mail_config(conn)
-            if cfg is None or not autoask.chosen(conn):
+            if cfg is None:
                 return asked, made, cleared
             message_id = autoask.next_waiting(conn, mailbox_id, passed)
         if message_id is None:
@@ -611,8 +612,11 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         subject, revises = extract.guard(raw)
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
-            filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, None if read.failed else True, time.time(),
-                             read.parking, signals=read.signals, dismiss_known=True, sender=extract.own_sender(raw))
+            fixed = review.fixed_suggestions(conn, mailbox_id, message_id)
+            said, held = review.keeping_fixed(fixed, read.suggestions)
+            answered = bool(read.suggestions)
+            filed = _file_ai(conn, mailbox_id, message_id, said, read.error, None if read.failed or (fixed and not answered) else True, time.time(),
+                             read.parking, signals=read.signals, dismiss_known=answered and not fixed, sender=extract.own_sender(raw), hold=held)
             made, cleared = made + filed.added, cleared + filed.cleared
             if filed.known:
                 known[filed.known] += 1
@@ -648,7 +652,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
     known: Counter[str] = Counter()
     gaps: list[str] = []
     with db.session() as conn:
-        filling = not again and not backfill and autoask.fills_gaps(conn)
+        filling = not again and not backfill and autoask.active(conn)
     started = _clock()
     forced: set[str] = set()
     strong = True

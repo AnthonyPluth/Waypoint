@@ -1,0 +1,15 @@
+{
+  "name": "ai-card",
+  "page": "settings",
+  "steps": [
+    { "goto": "#settings/mail" },
+    { "wait_for": "#ai-title" },
+    { "scroll_to": "#ai-title" },
+    { "expect_text": { "selector": "body", "text": "Leave it empty to not use AI" } },
+    { "screenshot": "empty-address" },
+    { "fill": { "selector": "label:has-text('Ollama address') input", "text": "http://ollama.local:11434" } },
+    { "fill": { "selector": "label:has-text('Model') input", "text": "llama3.1" } },
+    { "expect_text": { "selector": "body", "text": "It stays on your household’s own server" } },
+    { "screenshot": "with-address" }
+  ]
+}

@@ -531,7 +531,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW)
 
     def test_local_with_several_candidates_and_a_vision_model_makes_the_picked_picture_the_code(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer('{"picture": 2}')
         with no_leaks(self, CANARY_TEXT, database=self.path, sent_ok=True):
             self.keep_two()
@@ -543,7 +543,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertNotIn("PK30417", json.dumps(body["messages"]))
 
     def test_a_reminder_with_several_candidates_is_settled_the_same_way(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer('{"picture": 1}')
         self.add_mail("m-reminder", mail("Your parking reservation: QR code reminder", {"a": QR, "b": OTHER_QR},
                                          f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Mon, 19 Oct 2026 09:00:00 +0100"))
@@ -553,7 +553,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertNotIn(CANARY_TEXT, json.dumps(self.fake.requests[0][2]))
 
     def test_an_error_a_timeout_a_text_only_model_and_an_unusable_answer_leave_the_picker_as_it_is(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         for content, status in (("{}", 500), ("{}", 400), ("I can only read text.", 200), ('{"picture": 0}', 200), ('{"picture": 3}', 200),
                                 ('{"picture": "1"}', 200), ('{"picture": true}', 200), ("[1]", 200), ("", 200)):
             with self.subTest(content=content, status=status):
@@ -564,29 +564,21 @@ class PickedByAiTests(ScanAiCase, Kept):
                 self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
 
     def test_a_connection_that_fails_leaves_the_picker_as_it_is(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         with db.session() as conn:
             db.set_setting(conn, sk.AI_OLLAMA_URL, "http://127.0.0.1:1")
         self.keep_two()
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
 
-    def test_openrouter_and_off_send_no_picture(self):
-        for mode in ("openrouter", "off"):
-            with self.subTest(mode=mode):
-                self.fake.reset()
-                with db.session() as conn:
-                    conn.execute(SegmentCode.__table__.delete())
-                self.turn_on(mode, auto=False)
-                with db.session() as conn:
-                    db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "m/model")
-                    db.set_setting(conn, sk.AI_OPENROUTER_KEY, "sk-test-key-1234")
-                with no_leaks(self, *CANARIES, database=self.path):
-                    self.keep_two()
-                self.assertEqual(self.fake.requests, [])
-                self.assertEqual(self.state(), ("choose", "2026-10-16"))
+    def test_with_no_ollama_address_saved_no_picture_is_sent(self):
+        self.turn_off()
+        with no_leaks(self, *CANARIES, database=self.path):
+            self.keep_two()
+        self.assertEqual(self.fake.requests, [])
+        self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
     def test_one_candidate_and_a_booking_that_already_has_a_code_send_no_picture(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         scan._keep_quietly(self.mailbox, "m-one", raw_of("Your parking reservation", {"a": QR}), [self.segment], NOW)
         self.assertEqual(self.fake.requests, [])
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW + 1)
@@ -594,7 +586,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
 
     def test_a_picture_chosen_by_a_person_is_never_overwritten_by_the_ai(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.assertTrue(self.read(lambda conn: gate_codes.choose(conn, self.segment, 0, 0, NOW)))
@@ -618,7 +610,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.addCleanup(patcher.stop)
 
     def test_a_choice_committed_after_the_reads_is_not_overwritten_by_the_ai(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
@@ -627,7 +619,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
 
     def test_a_newer_single_picture_email_committed_after_the_reads_is_not_overwritten_by_the_ai(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
@@ -637,7 +629,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-17"), {"type": "image/png", "data": png(410, 410, b"NEWER-X")}))
 
     def test_a_segment_that_stops_being_parking_before_the_write_gets_no_code(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
@@ -651,7 +643,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual(self.image(), None)
 
     def test_pictures_settled_while_a_choice_commits_during_the_pick_never_replace_it(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
@@ -673,13 +665,13 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("ready", "2026-10-20"), picture))
 
     def test_more_pictures_than_the_limit_are_not_sent(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         many = {f"p{n}": png(200 + n, 200 + n, bytes([n]) * 9) for n in range(ai.MAX_PICTURES + 1)}
         scan._keep_quietly(self.mailbox, "m-many", raw_of("Your parking reservation", many), [self.segment], NOW)
         self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")))
 
     def test_a_failure_inside_the_pick_is_reported_without_values_and_never_stops_the_scan(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError(CANARY_TEXT)), mock.patch.object(gatecode.monitoring, "report") as report:
             self.keep_two()
         report.assert_called_once()
@@ -687,7 +679,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
 
     def test_a_busy_database_is_not_swallowed(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         with mock.patch.object(ai, "pick_picture", side_effect=RuntimeError("busy")), mock.patch.object(gatecode.db, "is_busy", return_value=True):
@@ -695,7 +687,7 @@ class PickedByAiTests(ScanAiCase, Kept):
                 gatecode.settle(self.segment, self.mailbox, "m-two", NOW)
 
     def test_settling_does_nothing_without_a_choice_waiting_or_enough_candidates(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.assertFalse(gatecode.settle(self.segment, self.mailbox, "m-two", NOW))
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}], None, NOW))
         self.assertFalse(gatecode.settle_pictures(self.segment, self.mailbox, [{"type": "image/png", "data": QR}] * 2, None, NOW))
@@ -707,7 +699,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual(self.fake.requests, [])
 
     def test_an_older_reminder_settled_by_the_ai_never_replaces_a_newer_choice_still_waiting(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.add_mail("m-new", mail("Your parking reservation: QR code reminder", {"a": QR, "b": OTHER_QR},
                                     f"Show this at the gate. Reservation PK30417. {CANARY_TEXT}", day="Mon, 19 Oct 2026 09:00:00 +0100"))
@@ -721,7 +713,7 @@ class PickedByAiTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
 
     def test_a_message_linked_while_the_ai_is_thinking_never_changes_which_picture_is_saved(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         self.keep_two()
         self.answer('{"picture": 2}')
@@ -769,7 +761,7 @@ class AiFiledTests(ScanAiCase, Kept):
 
     def test_a_booking_filed_by_ask_ai_is_settled_after_it_commits(self):
         self.waiting_item()
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answers('{"picture": 1}')
         scan._ask(self.mailbox, "m-ai", "Reservation PK30417 is confirmed.", NOW)
         [segment] = self.parking()
@@ -838,7 +830,7 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
         self.fake.content, self.fake.status = content, status
 
     def test_only_the_pictures_of_the_message_that_reopened_the_choice_are_sent(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW)
         self.fake.reset()
@@ -852,7 +844,7 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
         self.assertEqual(self.read(lambda conn: gate_codes.states(conn, [self.segment])[self.segment]), ("ready", "2026-10-19"))
 
     def test_two_parking_bookings_in_one_message_are_left_to_a_person(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         other = self.park({**PARKING, "confirmation": "PK30418"})
         self.answer('{"picture": 1}')
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment, other], NOW)
@@ -860,27 +852,27 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
         self.assertEqual([(self.state(n), self.image(n)) for n in (self.segment, other)], [(("choose", "2026-10-16"), None)] * 2)
 
     def test_one_filed_parking_booking_beside_an_unresolved_one_is_left_to_a_person(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer('{"picture": 1}')
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, parked=2)
         self.assertEqual(self.fake.requests, [])
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
 
     def test_exactly_one_parking_booking_in_the_message_still_settles(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer('{"picture": 1}')
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, parked=1)
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
 
     def test_a_stay_beside_one_parking_booking_does_not_stop_the_pick(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         stay = self.park(STAY)
         self.answer('{"picture": 1}')
         scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment, stay], NOW)
         self.assertEqual(self.image(), {"type": "image/png", "data": QR})
 
     def test_the_ordinary_scan_paths_send_no_picture_when_the_scan_has_no_time_left(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer('{"picture": 1}')
         with mock.patch.object(scan, "_clock", return_value=float(scan.BUDGET)):
             scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, 0.0)
@@ -889,7 +881,7 @@ class OneMessageOnlyTests(ScanAiCase, Kept):
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-19"), None))
 
     def test_the_ordinary_scan_paths_cap_the_picture_wait_by_the_time_left(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         self.answer("{}", 500)
         with mock.patch.object(scan, "_clock", return_value=100.0), mock.patch.object(ai, "pick_picture", wraps=ai.pick_picture) as picked:
             scan._keep_quietly(self.mailbox, "m-two", self.TWO, [self.segment], NOW, 0.0)
@@ -905,7 +897,7 @@ class ReviewPathTests(ScanAiCase, Kept):
 
     def setUp(self):
         super().setUp()
-        self.turn_on(auto=False)
+        self.turn_on()
         self.fake.content = '{"picture": 2}'
 
     def fresh(self, held=None, suggestions=None, reason="no_markup", raw=None, parking=None) -> int:
@@ -1018,17 +1010,13 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(ReviewItem)).scalar()), 0)
         time.sleep(1.5)
 
-    def test_openrouter_and_off_send_nothing_whatever_the_review_path(self):
-        for mode in ("openrouter", "off"):
-            self.turn_on(mode, auto=False)
-            with db.session() as conn:
-                db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "m/model")
-                db.set_setting(conn, sk.AI_OPENROUTER_KEY, "sk-test-key-1234")
-            for name, item, run in self.each():
-                with no_leaks(self, *CANARIES, database=self.path):
-                    run(item)
-                self.assertEqual(self.fake.requests, [], (mode, name))
-                self.assertEqual(self.state(), ("choose", "2026-10-16"))
+    def test_with_no_ollama_address_saved_nothing_is_sent_whatever_the_review_path(self):
+        self.turn_off()
+        for name, item, run in self.each():
+            with no_leaks(self, *CANARIES, database=self.path):
+                run(item)
+            self.assertEqual(self.fake.requests, [], name)
+            self.assertEqual(self.state(), ("choose", "2026-10-16"))
 
     def test_two_parking_bookings_in_the_message_are_left_to_a_person(self):
         other = self.park({**PARKING, "confirmation": "PK30418"})
@@ -1230,7 +1218,7 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.assertEqual((self.fake.requests, self.state()), ([], ("choose", "2026-10-16")))
 
     def test_a_follow_up_with_the_same_day_does_not_reopen_the_choice_and_a_newer_one_does(self):
-        self.turn_on(auto=False)
+        self.turn_on()
         scan.keep_message(self.mailbox, "m-open", self.two(), [self.segment], NOW)
         self.fake.reset()
         scan.keep_code(self.mailbox, self.segment, self.two(), NOW + 1)

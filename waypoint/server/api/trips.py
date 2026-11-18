@@ -26,7 +26,7 @@ NO_TRIP = "No such trip"
 NO_SEGMENT = "No such segment"
 NO_CODE = NO_IMAGE
 MAX_PICTURE_POSITION = 999
-NO_AI = "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail & review."
+NO_AI = "Suggestions need an Ollama address and model in Settings → AI."
 NO_PLACES = "Add a booking to this trip first, so there are places to describe."
 TEXTS = {"confirmation": ("confirmation code", 50), "provider": ("provider", 100), "origin": ("origin", 100),
          "destination": ("destination", 100), "start_zone": ("start time zone", 64), "end_zone": ("end time zone", 64)}
@@ -256,7 +256,7 @@ def api_trip_destination_suggest(_conn, _q, body: DestinationBody, trip_id) -> D
     draft = _text(body, "name", "name", NAME_LIMIT)
     with db.session() as conn:
         facts = trips.destination_facts(conn, viewer(conn), this, draft)
-        cfg = ai.config(conn)
+        cfg = ai.mail_config(conn)
         known = tuple(loyalty.known_numbers(conn)) if cfg else ()
     if facts is None:
         raise ApiError(NO_TRIP, 404)

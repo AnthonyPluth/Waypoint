@@ -359,17 +359,14 @@ class SuggestRouteTests(RouteCase):
         self.fake.content = json.dumps({"destination": "Colorado & Texas"})
         env = mock.patch.dict(os.environ)
         env.start()
-        os.environ.pop(ai.KEY_ENV, None)
         self.addCleanup(env.stop)
         self.addCleanup(self.set_mode, "off")
         self.set_mode("off")
 
     def set_mode(self, mode):
         with db.session() as conn:
-            db.set_setting(conn, sk.AI_MODE, mode)
-            db.set_setting(conn, sk.AI_OLLAMA_URL, self.fake.url)
-            db.set_setting(conn, sk.AI_OLLAMA_MODEL, "llama3")
-            db.set_setting(conn, sk.AI_OPENROUTER_MODEL, "vendor/model")
+            db.set_setting(conn, sk.AI_OLLAMA_URL, self.fake.url if mode == "local" else None)
+            db.set_setting(conn, sk.AI_OLLAMA_MODEL, "llama3" if mode == "local" else None)
 
     def trip(self):
         first = self.book("ana", leg("JFK", "DEN", 1, confirmation="CANARYC0DE9", provider="CANARYAIR", manage_url="https://air.example.com/m?c=CANARYC0DE9",
@@ -391,7 +388,7 @@ class SuggestRouteTests(RouteCase):
     def test_it_refuses_while_the_ai_fallback_is_off_and_asks_nothing(self):
         trip_id = self.trip()
         status, got = self.suggest("ana", trip_id)
-        self.assertEqual((status, got), (400, {"error": "Suggestions need the AI fallback, which is off. Turn it on under Settings, in Mail & review."}))
+        self.assertEqual((status, got), (400, {"error": "Suggestions need an Ollama address and model in Settings → AI."}))
         self.assertEqual(self.fake.requests, [])
 
     def test_a_trip_with_no_places_is_refused_before_anything_is_sent(self):
@@ -485,16 +482,6 @@ class SuggestRouteTests(RouteCase):
         self.ok("ana", "POST", f"/api/segments/{gone['id']}", {"status": "cancelled"})
         self.suggest("ana", first["trip_id"])
         self.assertNotIn("Washington", json.dumps(self.fake.requests[0][2]))
-
-    def test_openrouter_is_asked_with_the_same_data_protection_as_the_mail_path(self):
-        os.environ[ai.KEY_ENV] = "sk-or-test-key-7f3a91c2b8"
-        self.set_mode("openrouter")
-        trip_id = self.trip()
-        with mock.patch.object(ai, "HOSTS", ai.Hosts(self.fake.url + "/api/v1", allow_http=True)):
-            self.assertEqual(self.suggest("ana", trip_id), (200, {"suggestion": "Colorado & Texas"}))
-        path, headers, body = self.fake.requests[0]
-        self.assertEqual((path, body["provider"], body["response_format"]), ("/api/v1/chat/completions", {"data_collection": "deny", "zdr": True}, {"type": "json_object"}))
-        self.assertEqual(headers["Authorization"], "Bearer sk-or-test-key-7f3a91c2b8")
 
     def test_a_reply_that_is_not_a_short_plain_subtitle_is_refused_and_the_person_sees_why(self):
         self.set_mode("local")

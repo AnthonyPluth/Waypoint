@@ -348,21 +348,13 @@ class Matched(TypedDict):
 
 
 class AiSettings(TypedDict):
-    mode: Literal["off", "local", "openrouter"]
     ollama_url: str
     ollama_model: str
-    openrouter_model: str
-    key: Literal["env", "saved"] | None
-    auto: bool
 
 
 class AiBody(TypedDict):
-    mode: Literal["off", "local", "openrouter"]
     ollama_url: NotRequired[str]
     ollama_model: NotRequired[str]
-    openrouter_model: NotRequired[str]
-    openrouter_key: NotRequired[str]
-    auto: NotRequired[bool]
 
 
 class Person(TypedDict):

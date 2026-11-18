@@ -4175,71 +4175,29 @@
       "AiBody": {
         "type": "object",
         "properties": {
-          "mode": {
-            "enum": [
-              "off",
-              "local",
-              "openrouter"
-            ]
-          },
           "ollama_url": {
             "type": "string"
           },
           "ollama_model": {
             "type": "string"
-          },
-          "openrouter_model": {
-            "type": "string"
-          },
-          "openrouter_key": {
-            "type": "string"
-          },
-          "auto": {
-            "type": "boolean"
           }
         },
-        "required": [
-          "mode"
-        ],
+        "required": [],
         "additionalProperties": false
       },
       "AiSettings": {
         "type": "object",
         "properties": {
-          "mode": {
-            "enum": [
-              "off",
-              "local",
-              "openrouter"
-            ]
-          },
           "ollama_url": {
             "type": "string"
           },
           "ollama_model": {
             "type": "string"
-          },
-          "openrouter_model": {
-            "type": "string"
-          },
-          "key": {
-            "enum": [
-              "env",
-              "saved",
-              null
-            ]
-          },
-          "auto": {
-            "type": "boolean"
           }
         },
         "required": [
-          "mode",
           "ollama_url",
-          "ollama_model",
-          "openrouter_model",
-          "key",
-          "auto"
+          "ollama_model"
         ],
         "additionalProperties": false
       },

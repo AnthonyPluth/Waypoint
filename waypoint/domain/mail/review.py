@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Collection
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, TypedDict, cast
 
 from sqlalchemy import and_, delete, or_, select, update
 
@@ -85,6 +85,42 @@ def set_read_suggestions(conn: db.Connection, mailbox_id: int, message_id: str, 
     held = conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
     if all(x.get("parsed") for x in suggestions_of(held)):
         set_suggestions(conn, mailbox_id, message_id, suggestions, None)
+
+
+def fixed_suggestions(conn: db.Connection, mailbox_id: int, message_id: str) -> list[ai.Suggestion]:
+    held = suggestions_of(conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar())
+    return held if all(x.get("parsed") for x in held) else []
+
+
+NOT_VALUES = ("sources", "parsed")
+
+
+def _same_reservation(fixed: ai.Suggestion, said: ai.Suggestion) -> bool:
+    if fixed.get("kind") != said.get("kind"):
+        return False
+    first, second = fixed.get("confirmation"), said.get("confirmation")
+    return not (first and second and first.upper() != second.upper())
+
+
+def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> tuple[list[ai.Suggestion], list[ai.Suggestion]]:
+    out: list[ai.Suggestion] = []
+    held: list[ai.Suggestion] = []
+    paired: set[int] = set()
+    for suggestion in said:
+        options = [n for n, p in enumerate(fixed) if _same_reservation(p, suggestion)]
+        sure = len(options) == 1 and sum(1 for other in said if _same_reservation(fixed[options[0]], other)) == 1
+        merged: dict[str, Any] = dict(suggestion)
+        if sure:
+            paired.add(options[0])
+            for key, value in fixed[options[0]].items():
+                if value and key not in NOT_VALUES:
+                    merged[key] = value
+        found = cast(ai.Suggestion, merged)
+        if sure or not any(p.get("kind") == suggestion.get("kind") for p in fixed):
+            out.append(found)
+        else:
+            held.append(found)
+    return out, held + [p for n, p in enumerate(fixed) if n not in paired]
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:

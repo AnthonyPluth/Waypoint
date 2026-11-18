@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time
 from zoneinfo import ZoneInfo
 
+from .. import money
 from . import labels, when, words
 from .places import zone_of
 from .parsers._text import lines
@@ -179,8 +180,15 @@ def confirmation(found: list[Hit]) -> tuple[str, str] | None:
     return next(((c, h.label) for h in found if (c := code(h.value))), None)
 
 
+AMOUNT_NOISE = re.compile(r"\b[A-Za-z]{1,3}(?=\s?[$€£¥₩₹])|[$€£¥₩₹]|\b(?:" + "|".join(sorted(money.KNOWN)) + r")\b|[\d.,'\s+()-]", re.IGNORECASE)
+
+
+def amount_only(text: str) -> bool:
+    return any(c.isdigit() for c in text) and not AMOUNT_NOISE.sub("", text)
+
+
 def named(found: list[Hit], limit: int) -> tuple[str, str] | None:
-    return next(((text[:limit], h.label) for h in found if (text := clean(h.value))), None)
+    return next(((text[:limit], h.label) for h in found if (text := clean(h.value)) and not amount_only(text)), None)
 
 
 def place_of(found: list[Hit]) -> Place:

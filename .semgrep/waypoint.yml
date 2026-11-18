@@ -194,8 +194,8 @@ rules:
 
   - id: waypoint-ai-hosts
     message: >-
-      Only waypoint/domain/mail/ai.py may send anything to an AI service, and only when the household turned the AI
-      fallback on (AGENTS.md, "Email stays on the server").
+      Only waypoint/domain/mail/ai.py may send anything to an AI service, and only to the household's own Ollama server
+      once they saved its address (AGENTS.md, "Email stays on the server").
     severity: ERROR
     languages: [python]
     pattern-regex: (openrouter\.ai|api\.anthropic\.com|api\.openai\.com|/api/chat\b|/api/generate\b|11434)
@@ -203,20 +203,23 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/domain/mail/ai.py"]
 
-  - id: waypoint-mail-ai-local-only
+  - id: waypoint-ai-suggest-caller
     message: >-
-      Email reaches an AI only in Local (Ollama) mode, the household's own server. Mail code and the Review API get
-      their AI config from ai.mail_config(), which is None unless the mode is Local; ai.config() can also return the
-      hosted OpenRouter config, which is for the trip-destination button alone (AGENTS.md, "Email stays on the server").
+      Email text is asked of the AI in one place, scan._read, which the scan and Ask AI both go through, and only the
+      household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server"). Call scan's readers
+      instead of ai.suggest(), and don't import suggest or ai under another name.
     severity: ERROR
     languages: [python]
     pattern-either:
-      - pattern: ai.config(...)
-      - pattern: ai.config
-      - pattern: ai.Config("openrouter", ...)
-      - pattern-regex: \bfrom\s+[.\w]*\bai\s+import\b[^\n]*\bconfig\b
+      - patterns:
+          - pattern: ai.suggest(...)
+          - pattern-not-inside: |
+              def _read(...):
+                  ...
+      - pattern-regex: \bfrom\s+\S+\s+import\s+[^\n]*\bsuggest\b
+      - pattern-regex: \bimport\s+\S*\bai\s+as\s+\w+|\bfrom\s+\S+\s+import\s+[^\n]*\bai\s+as\s+\w+
     paths:
-      include: ["/waypoint/domain/mail/", "/waypoint/server/api/review.py"]
+      include: ["/waypoint/"]
       exclude: ["/waypoint/domain/mail/ai.py"]
 
   - id: waypoint-message-body

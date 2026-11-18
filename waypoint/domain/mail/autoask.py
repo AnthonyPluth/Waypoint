@@ -3,39 +3,23 @@ from __future__ import annotations
 from sqlalchemy import select, update
 
 from ...storage import db
-from ...storage import settings_keys as sk
 from ...storage.models import ReviewItem
-from . import ai
+from . import ai, review
 
 TRIES = 3
 WAITING = "waiting"
 READ = "read"
-ON = "1"
-GAPS = "2"
 
 
-def chosen(conn: db.Connection) -> bool:
-    return db.get_setting(conn, sk.AI_AUTO) in (ON, GAPS)
-
-
-def fills_gaps(conn: db.Connection) -> bool:
-    return ai.mail_config(conn) is not None and db.get_setting(conn, sk.AI_AUTO) == GAPS
-
-
-def save_choice(conn: db.Connection, on: bool) -> None:
-    if not on:
-        db.set_setting(conn, sk.AI_AUTO, None)
-    elif not chosen(conn):
-        db.set_setting(conn, sk.AI_AUTO, GAPS)
-
-
-def switched_on(conn: db.Connection) -> bool:
-    return ai.mail_config(conn) is not None and chosen(conn)
+def active(conn: db.Connection) -> bool:
+    return ai.mail_config(conn) is not None
 
 
 def wait(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
-    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id,
-                                          ReviewItem.suggestion.is_(None))
+    held = conn.execute(select(ReviewItem.suggestion).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar()
+    if held is not None and not review.fixed_suggestions(conn, mailbox_id, message_id):
+        return
+    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
                  .values(auto_state=WAITING, auto_tries=0))
 
 

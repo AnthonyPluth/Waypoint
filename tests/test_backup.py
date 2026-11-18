@@ -343,6 +343,26 @@ class BackupTests(unittest.TestCase):
             self.assertEqual(dst.sa.exec_driver_sql("SELECT count(*) FROM pg_namespace WHERE nspname LIKE 'waypoint_restore_%%'").scalar(), 0)
         src.close(); dst.close()
 
+    def test_a_backup_from_before_ai_was_local_only_comes_back_without_the_hosted_settings_and_with_no_address_or_model_that_were_switched_off(self):
+        src = self.fill(self.a)
+        raw = backup.dump(src)
+        src.close()
+        for mode, address in (("off", None), ("openrouter", None), (None, None), ("local", "http://ollama.example:11434")):
+            with self.subTest(mode=mode):
+                data = backup.load(raw)
+                data["revision"] = "0048"
+                cols = data["tables"]["settings"]["columns"]
+                old = {"ai_ollama_url": "http://ollama.example:11434", "ai_ollama_model": "llama3", "ai_openrouter_model": "m/x",
+                       "ai_openrouter_key": "enc:v1:x", "ai_auto": "2", **({"ai_mode": mode} if mode else {})}
+                rows = [r for r in data["tables"]["settings"]["rows"] if not str(r[cols.index("key")]).startswith("ai_")]
+                data["tables"]["settings"]["rows"] = rows + [[k if c == "key" else v if c == "value" else None for c in cols] for k, v in old.items()]
+                dst = db.connect(self.b)
+                backup.restore(dst, data)
+                dst.commit()
+                got = {k: v for k, v in dst.execute(select(Setting.key, Setting.value)).fetchall() if k.startswith("ai_")}
+                self.assertEqual(got, {"ai_ollama_model": "llama3", "ai_ollama_url": address} if address else {})
+                dst.close()
+
     def test_a_backup_without_a_revision_is_refused(self):
         src = self.fill(self.a)
         data = backup.load(backup.dump(src))

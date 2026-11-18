@@ -27,6 +27,11 @@ LABELLED = ("<p>Your rental car is booked.</p><p>Confirmation number: 7733-AB</p
 
 
 class CarReaderTests(unittest.TestCase):
+    def test_a_company_that_is_only_a_price_is_no_company(self):
+        [b] = read(LABELLED.replace("Rental company: Example Rentals", "Rental company: $89.99"))[0].bookings
+        self.assertIsNone(b.provider)
+        self.assertNotIn("provider", dict(b.generic))
+
     def test_labelled_lines_give_a_rental_at_its_places_wall_clock_times(self):
         with no_leaks(self, *CANARIES):
             parsed, why = read(LABELLED + "<p>CANARY-BODY-CAR-EN-3K7M</p>")

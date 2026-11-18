@@ -227,7 +227,6 @@ PHOTO_SOURCES_LABEL = "Immich library keys (enter them again in Settings → Pho
 
 SECRET_LABELS = {
     sk.VAPID_PRIVATE_KEY: "notifications' signing key (devices sign up for notifications again)",
-    sk.AI_OPENROUTER_KEY: "OpenRouter key (enter it again in Settings → AI)",
 }
 
 
