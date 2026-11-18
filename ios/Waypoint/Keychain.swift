@@ -1,6 +1,22 @@
 import Foundation
 import Security
 
+/// A Keychain read is not only found or missing: before the first unlock after a restart the items cannot be read at all, and that is not
+/// "signed out".
+enum KeychainRead: Equatable {
+    case found(Data)
+    case missing
+    case unavailable
+}
+
+protocol KeychainReading: Sendable {
+    func read(_ key: String) -> KeychainRead
+}
+
+struct LiveKeychainReader: KeychainReading {
+    func read(_ key: String) -> KeychainRead { Keychain.read(key) }
+}
+
 enum Keychain {
     private static let service = "com.anthonypluth.waypoint"
 
@@ -18,13 +34,20 @@ enum Keychain {
         SecItemAdd(add as CFDictionary, nil)
     }
 
-    static func get(_ key: String) -> Data? {
+    static func read(_ key: String) -> KeychainRead {
         var q = query(key)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
         var out: CFTypeRef?
-        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess else { return nil }
-        return out as? Data
+        let status = SecItemCopyMatching(q as CFDictionary, &out)
+        if status == errSecItemNotFound { return .missing }
+        guard status == errSecSuccess, let data = out as? Data else { return .unavailable }
+        return .found(data)
+    }
+
+    static func get(_ key: String) -> Data? {
+        if case .found(let data) = read(key) { return data }
+        return nil
     }
 
     static func remove(_ key: String) {

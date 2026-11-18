@@ -1,6 +1,21 @@
 import XCTest
 @testable import Waypoint
 
+private final class SwitchableKeychain: KeychainReading, @unchecked Sendable {
+    var available = false
+    let items: [String: Data]
+
+    init(items: [String: Data]) {
+        self.items = items
+    }
+
+    func read(_ key: String) -> KeychainRead {
+        guard available else { return .unavailable }
+        if let data = items[key] { return .found(data) }
+        return .missing
+    }
+}
+
 final class LockedLaunchTests: XCTestCase {
     private var root: URL!
     private var store: OfflineStore!
@@ -82,5 +97,57 @@ final class LockedLaunchTests: XCTestCase {
         XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: true))
         gate.end()
         XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
+    }
+
+    private func offlineSync() -> OfflineSync {
+        OfflineSync(store: store, settings: OfflineSettings(defaults: UserDefaults(suiteName: "locked-\(UUID().uuidString)")!), pages: pages,
+                    server: { nil }, bearer: { nil })
+    }
+
+    func testAKeychainThatCannotBeReadAtInitIsNotKeptAsNoServerAndTheSavedTripsStay() async throws {
+        try saveCopy()
+        let tokens = Tokens(accessToken: "wpa_held", refreshToken: "wpr_held", expiresAt: Date().addingTimeInterval(3600))
+        let keychain = SwitchableKeychain(items: ["server": Data(home.absoluteString.utf8), "tokens": try JSONEncoder().encode(tokens)])
+        let session = ServerSession(offline: offlineSync(), keychain: keychain)
+        let before = await session.standing()
+        XCTAssertEqual(before, .unknown)
+        let none = await session.server
+        XCTAssertNil(none)
+        XCTAssertNotNil(store.load(server: home))
+        keychain.available = true
+        let after = await session.standing()
+        XCTAssertEqual(after, .connected)
+        let found = await session.server
+        XCTAssertEqual(found, home)
+        XCTAssertNotNil(store.load(server: home))
+    }
+
+    func testOnlyAReadableKeychainWithNothingInItIsNotConnected() async {
+        let keychain = SwitchableKeychain(items: [:])
+        let session = ServerSession(offline: offlineSync(), keychain: keychain)
+        let locked = await session.standing()
+        XCTAssertEqual(locked, .unknown)
+        keychain.available = true
+        let readable = await session.standing()
+        XCTAssertEqual(readable, .notConnected)
+    }
+
+    func testTheWatchKeepsItsRegionsWhileTheCredentialsCannotBeReadAndClearsThemOnceKnownWithNoServer() async {
+        let phone = ArrivalRig()
+        phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot]
+        phone.save([ArrivalFixtures.parking()])
+        await phone.watch.saved(server: phone.home)
+        XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1"])
+        let known = ArrivalFlag(false)
+        let blind = ArrivalWatch(store: phone.store, places: phone.places, locations: phone.locations, notifications: phone.notifications,
+                                 asks: ArrivalAsks(defaults: phone.defaults), settings: OfflineSettings(defaults: phone.defaults),
+                                 server: { nil }, credentialsKnown: { known.value })
+        await blind.handle(.authorizationChanged)
+        await blind.activated()
+        XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1"])
+        known.value = true
+        await blind.handle(.authorizationChanged)
+        XCTAssertEqual(phone.locations.monitoredIds, [])
+        phone.cleanUp()
     }
 }

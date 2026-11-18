@@ -87,7 +87,7 @@ class ArrivalPrivacyTests(unittest.TestCase):
                        "never sent, kept or logged", "when they arrived is not recorded", "no place the person was at"):
             self.assertIsNotNone(ARRIVAL_RECORD_DENIALS.search(denial), denial)
 
-    def test_the_launch_opens_only_through_the_launch_guard(self):
+    def test_the_launch_opens_only_through_the_launch_gate(self):
         app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
         self.assertNotIn("task { await open() }", app)
         self.assertNotIn("task(id:", app)

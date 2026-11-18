@@ -78,7 +78,9 @@ struct WaypointApp: App {
     @MainActor
     private func open() async {
         Task { await ServerSession.shared.retryPendingRevocations() }
-        guard await ServerSession.shared.isConnected else {
+        let standing = await ServerSession.shared.standing()
+        if standing == .unknown { return }
+        guard standing == .connected else {
             await OfflineSync.shared.purge()
             phase = .connect
             return

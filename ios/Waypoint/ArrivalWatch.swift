@@ -272,6 +272,7 @@ actor ArrivalWatch: ArrivalWatching {
             locations: live,
             notifications: LiveArrivalNotifications(),
             server: { await ServerSession.shared.server },
+            credentialsKnown: { await ServerSession.shared.standing() != .unknown },
             protectedDataAvailable: { await MainActor.run { UIApplication.shared.isProtectedDataAvailable } })
         live.onEvent = { event in
             Task { await watch.handle(event) }
@@ -297,6 +298,7 @@ actor ArrivalWatch: ArrivalWatching {
     private let asks: ArrivalAsks
     private let settings: OfflineSettings
     private let currentServer: @Sendable () async -> URL?
+    private let credentialsKnown: @Sendable () async -> Bool
     private let protectedDataAvailable: @Sendable () async -> Bool
     private let now: @Sendable () -> Date
     private var foreground = false
@@ -314,6 +316,7 @@ actor ArrivalWatch: ArrivalWatching {
          asks: ArrivalAsks = ArrivalAsks(),
          settings: OfflineSettings = OfflineSettings(),
          server: @escaping @Sendable () async -> URL?,
+         credentialsKnown: @escaping @Sendable () async -> Bool = { true },
          protectedDataAvailable: @escaping @Sendable () async -> Bool = { true },
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.store = store
@@ -323,6 +326,7 @@ actor ArrivalWatch: ArrivalWatching {
         self.asks = asks
         self.settings = settings
         self.currentServer = server
+        self.credentialsKnown = credentialsKnown
         self.protectedDataAvailable = protectedDataAvailable
         self.now = now
         self.lastSeen = ArrivalStanding(authorization: locations.authorization, precise: locations.hasPreciseLocation)
@@ -339,7 +343,7 @@ actor ArrivalWatch: ArrivalWatching {
     func activated() async {
         foreground = true
         guard let server = await currentServer() else {
-            await cleared()
+            if await credentialsKnown() { await cleared() }
             return
         }
         await askIfNeeded(server: server)
@@ -417,7 +421,7 @@ actor ArrivalWatch: ArrivalWatching {
         let changed = standing != lastSeen
         lastSeen = standing
         guard let server = await currentServer() else {
-            await cleared()
+            if await credentialsKnown() { await cleared() }
             return
         }
         if changed {
