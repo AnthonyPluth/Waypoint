@@ -4,7 +4,7 @@ Exploration for [#820](https://github.com/AnthonyPluth/Waypoint/issues/820). Not
 
 | Screen | File | What it shows |
 | --- | --- | --- |
-| a | [a-answers.html](a-answers.html) | The four chosen intents on an unlocked phone: next flight (later this week, today, across zones), tonight's stay and its check-out phrase, parking code (opens the booking; none saved), open my trip (a saved trip; a place with no saved trip), and the four actions in the Shortcuts app |
+| a | [a-answers.html](a-answers.html) | The four chosen intents on an unlocked phone: next flight (later this week, today, across zones), tonight's stay and its check-out phrase (including check-out morning), parking code (opens the booking; none saved), open my trip (a saved trip; a place with no saved trip), and the four actions in the Shortcuts app |
 | b | [b-states.html](b-states.html) | What the intents say when they can't answer: phone locked, not signed in, saving switched off, nothing saved yet, a copy that can't be read, no flight or stay in the saved trips, a saved copy that is days old, and a copy saved before it carried city names |
 
 Owner context (2026-11-18): interested in Siri; no Live Activities; doesn't want clutter.
@@ -57,7 +57,7 @@ Apple's way in is App Intents. Each intent below is an `AppIntent` in the app ta
 | Intent | Saved copy alone | Needs the server |
 | --- | --- | --- |
 | A Next flight | Yes, once the copy carries the airports' cities ({{OFFLINE-CITIES}}): the next timed, not-cancelled flight in the saved trips, anyone's on a trip the person is on, from its booked times (the same rule as Upcoming's next flight). Untimed flights (`details.time_unknown`) are skipped. A flight in a trip further out than the saved window isn't seen, so the answer says "in the trips saved on this iPhone" when there is none. A copy saved before the cities were added speaks the flight number instead, until the next online open replaces it. | The cities, once, in the saved copy (`GET /api/offline`), not at the moment of asking. |
-| B Tonight's stay | Yes: a not-cancelled hotel whose nights include tonight (tonight is today in the hotel's own zone); check-out is its `end_local`. With no stay tonight it names the next saved stay. | Nothing. |
+| B Tonight's stay | Yes. The two phrases select differently. **Tonight:** a not-cancelled hotel whose nights include tonight (tonight is today in the hotel's own zone: check-in day on or before today, check-out day after it), else the next saved stay. **Check-out:** the not-cancelled stay under way now, from its check-in time until its check-out time (`start_local` to `end_local`, wall-clock in the hotel's zone). So at 8 am on check-out morning it is still that stay, until 11 am. With two under way it is the one that checks out first; past the check-out time, or with none under way, it is the next saved stay. | Nothing. |
 | C Parking code | Finding the parking booking: yes. | The QR code itself, as today, once the app is open. |
 | D Open my trip | Yes: the saved trips' names and destinations. A trip outside the saved window can't be named by voice (the app could still open it online). | Nothing. |
 | E Live status | No: live status is never saved, and the gate is never in the copy. | `GET /api/flight-status` with the app's token, a native request the app doesn't make today. It sends nothing new to the server (the server already holds the booking and the status), but it is a new request at a new moment, which the issue rules out ("nothing new is sent to the server") unless the owner decides otherwise. |
@@ -97,7 +97,8 @@ Per intent:
 **Unit tests (CI can run these)**, in `ios/Tests/TripAnswersTests.swift`, with fixtures like `TripFixtures` in `OfflineBridgeTests.swift` (made-up trips, a fixed `now`, a fixed calendar):
 
 - Next flight: the next timed flight, skipping cancelled, untimed and past ones; a flight today versus later this week; times read as wall-clock times in the flight's own zone (a fixture where the phone's zone differs, and one across a date line), never converted; the departure and arrival cities in the spoken text; a copy without `cities` falling back to the flight number; a flight with other travellers on a trip the person is on still counts.
-- Tonight's stay: tonight inside the stay, the last night, check-out morning, no stay tonight with a later one, none at all; the check-out phrase's answer.
+- Tonight's stay: tonight inside the stay, the last night, no stay tonight with a later one, none at all.
+- Check-out: for a stay checking out Sunday at 11 am in its own zone, asking at 8 am that Sunday answers "You check out of Hotel Example today at 11 am" (that hotel, not the next one, and not "no stay"). Asking at 11:01 am answers with the next saved stay, or none. A stay ending today and another starting today answers with the one ending. The phone's zone differs from the hotel's in one fixture.
 - The empty states: no session, saving off, nothing saved, an unreadable copy, a copy for another server, a read that fails as if locked: each answers its fixed text and holds no trip data.
 - Parking and open my trip: the current or next parking booking; a trip matched by destination or name, two matches, none; the phrase parameters replaced on save and emptied on purge.
 - No leaks: fixtures carry canary values in `confirmation`, `details.seat`, `details.room`, `details.phone`, `details.terminal`, `travelers` and an email's text; no spoken text or card field contains any of them (the Swift twin of `tests/privacy.py`'s `no_leaks`).
@@ -173,7 +174,10 @@ On #820 the owner chose these intents. The design is in `docs/design/siri-shortc
 - `ios/Waypoint/TripAnswers.swift`: pure functions returning an `Answer` (spoken text, card fields, page to open) for "next flight" and "tonight's stay". It also returns the fixed answers for: not signed in, saving off, nothing saved, saved copy unreadable, nothing found, and read failed (locked). The wording is exactly as in the frames.
   - **Times:** the booking's wall-clock time in its own zone, spoken as "local time" after the departure city, never converted.
   - **Next flight:** the next flight on any saved trip (anyone's, the Upcoming rule) that has a time, isn't cancelled and hasn't departed. It is spoken with the departure and arrival cities from `cities`. When a city is missing (a copy saved before {{OFFLINE-CITIES}}), the flight number is spoken instead.
-  - **Tonight's stay:** a hotel that isn't cancelled whose nights include today in the hotel's zone, else the next saved stay. The street address is on the card, never spoken.
+  - **Tonight's stay**, for the tonight phrase: a hotel that isn't cancelled whose nights include today in the hotel's zone (check-in day on or before today, check-out day after it), else the next saved stay.
+  - **Check-out**, for the check-out phrase: the stay under way now, from its check-in time until its check-out time, as wall-clock times in the hotel's zone. So on check-out morning it is still that stay until the check-out time. With two under way it is the one that checks out first; past the check-out time, or with none under way, it is the next saved stay.
+  - **Both:** the street address is on the card, never spoken.
+  - **Telling the phrases apart:** the stay intent takes an `AppEnum` parameter (`tonight`, `checkOut`), and each phrase is bound to its case, so Shortcuts keeps one tile. Confirm in Xcode that an App Shortcut phrase can carry a fixed case. If it can't, use two intents that share `TripAnswers`, and ask the owner about the second tile.
   - **The card** says how old the copy is ("saved 2 hours ago"). The spoken answer doesn't.
 - `ios/Waypoint/WaypointIntents.swift`: `NextFlightIntent` and `TonightStayIntent`. Each is an `AppIntent` with `authenticationPolicy = .requiresAuthentication`, returning a dialog and `TripAnswerCard`. `WaypointShortcuts: AppShortcutsProvider` holds the phrases from the design (section 1) unless the owner changes them on #820. Tapping the card opens the app at `#trip/{id}/flight/{segmentId}` or `#trip/{id}`.
 - `ios/Waypoint/TripAnswerCard.swift`: the SwiftUI card as the frames show it, once the owner signs it off.
@@ -186,6 +190,7 @@ Parking code ({{SIRI-PARKING}}), open my trip ({{SIRI-OPEN-TRIP}}), live flight 
 **Acceptance criteria**
 - [ ] "iOS build and tests" passes, including the new tests.
 - [ ] A test puts canary values in `confirmation`, seats, rooms, phone, terminal, travellers and email text, and finds none of them in any spoken text or card field.
+- [ ] A test asks the check-out question at 8 am on check-out morning (check-out at 11 am, hotel's zone) and gets that hotel: "You check out of Hotel Example today at 11 am". At 11:01 am it gets the next saved stay, or none. The tonight question keeps its own rule.
 - [ ] A test with a failing `URLProtocol` shows that running both intents makes no request.
 - [ ] A test reads `authenticationPolicy` as `.requiresAuthentication` for both intents.
 - [ ] The card matches the frames the owner signed off on #820. Any change to layout, wording or style needs the owner's sign-off before merge.

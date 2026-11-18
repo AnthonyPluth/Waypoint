@@ -214,8 +214,23 @@ ul, ol { padding: 0; list-style: none; }
     </section>
   </div>
   <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>B3 · check-out morning, 8 am Sunday</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“When do I check out in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>You check out of Hotel Example today at 11 am.</span></p>
+    <section class="wcard" aria-label="Tonight's stay, Hotel Example, Grand Junction">
+      <div class="hd"><span class="kind stay"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 20V6M2 16h20v4M22 16v-4a3 3 0 0 0-3-3h-8v7M6.5 12.5a1.5 1.5 0 1 0 0-.01"/></svg></span><span class="grow"><span class="eyebrow">Check-out today</span><b>Hotel Example</b></span><span class="chip info">Check-out day</span></div>
+      <p class="addr">100 Example Avenue, Grand Junction</p>
+      <dl class="facts"><div><dt>Check-in</dt><dd>Thu Jun 12<br>3:00 pm</dd></div><div><dt>Check-out</dt><dd>Sun Jun 15<br>11:00 am</dd></div></dl>
+      <div class="ft"><span>MDT, the hotel's time</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
 </div></figure></div>
-  <div class="spec"><div><h3>Rules</h3><ul><li>Tonight is today in the hotel's own zone; the stay covers it when check-in is on or before today and check-out after it.</li><li>No stay tonight: <q>You have no stay tonight. Your next stay is Hotel Example, from Thursday.</q> with the same card.</li><li>Times are the hotel's wall-clock times.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Tonight</q> (or <q>Check-out Sunday</q>), the hotel's name, a chip <q>Night 2 of 3</q>.</li><li>The address from <code>details.address</code>; check-in and check-out; footer with the zone and the copy's age.</li></ul></div></div>
+  <div class="spec"><div><h3>Rules</h3><ul><li>Tonight's stay: tonight is today in the hotel's own zone; a stay covers it when its check-in day is on or before today and its check-out day after it.</li><li>Check-out: the stay under way now, from its check-in time until its check-out time (wall-clock times in the hotel's zone), so on check-out morning it is still that stay until the check-out time (B3). If two are under way, the one that checks out first. Past the check-out time, or with none under way, the next saved stay.</li><li>No stay tonight: <q>You have no stay tonight. Your next stay is Hotel Example, from Thursday.</q> with the same card.</li><li>Times are the hotel's wall-clock times.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Tonight</q> (or <q>Check-out Sunday</q>), the hotel's name, a chip <q>Night 2 of 3</q>.</li><li>The address from <code>details.address</code>; check-in and check-out; footer with the zone and the copy's age.</li></ul></div></div>
 </section>
 <section class="sec">
   <div class="sechead"><span class="letter">C</span><h2>Parking code</h2></div>
