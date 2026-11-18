@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import itertools
-import json
-import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date, timedelta
@@ -12,7 +10,7 @@ from typing import TypedDict
 from sqlalchemy import select
 
 from ..storage import db, geocode, reference
-from ..storage.models import Airport, DrivingRoute, Segment
+from ..storage.models import Airport, Segment
 from . import driving_routes, photos, place_zones, route_warming, stats, tripmap, trips, visibility
 from .visibility import Viewer
 
@@ -106,15 +104,15 @@ def _path_km(path: list[list[float]]) -> float:
     return sum(stats.distance_km((a[0], a[1]), (b[0], b[1])) for a, b in itertools.pairwise(path))
 
 
-def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int) -> tuple[float, bool]:
+def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int, now: float) -> tuple[float, bool]:
     trip, places = trips.get(conn, viewer, trip_id), tripmap.places(conn, viewer, trip_id)
     if trip is None or places is None:
         return 0.0, False
-    stored = {(r.from_lat, r.from_lon, r.to_lat, r.to_lon): r for r in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id, DrivingRoute.stored > time.time() - driving_routes.REPLACE_AFTER_SECONDS))}
+    drives = route_warming.drives_of(trip, places)
+    stored = driving_routes.paths_for(conn, viewer, trip_id, {route_warming.key_of(d) for d in drives}, now) or {}
     total, estimated = 0.0, False
-    for drive in route_warming.drives_of(trip, places):
-        row = stored.get(route_warming.key_of(drive))
-        path = json.loads(row.path) if row is not None else None
+    for drive in drives:
+        path = stored.get(route_warming.key_of(drive))
         if path:
             total += _path_km(path)
         else:
@@ -188,14 +186,14 @@ def _kinds(live: Sequence[Segment]) -> KindCounts:
             "cruise": found["cruise"], "parking": found["parking"], "visit": found["visit"]}
 
 
-def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | None:
+def summary(conn: db.Connection, viewer: Viewer, trip_id: int, now: float) -> TripSummary | None:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return None
     booked = visibility.visible_segments(conn, viewer, [trip_id])
     live = [s for s in booked if s.status != "cancelled"]
     flight_km, airport_countries = _flight_km(conn, live)
-    road_km, estimated = _road_km(conn, viewer, trip_id)
+    road_km, estimated = _road_km(conn, viewer, trip_id, now)
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
     return {"days": _days(trip.start_date, trip.end_date) if live or not booked else 0, "nights": _nights(live),

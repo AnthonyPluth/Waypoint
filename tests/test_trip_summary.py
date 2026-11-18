@@ -36,6 +36,20 @@ class TripSummaryRouteTests(RouteCase):
         self.assertGreater(got["road_km"], straight["road_km"])
         self.assertEqual(got["distance_km"], got["road_km"])
 
+    def test_a_road_stored_on_another_trip_for_the_same_drive_is_never_counted(self):
+        ana_first = self.book("ana", DENVER)
+        self.book("ana", SALT_LAKE, trip_id=ana_first["trip_id"])
+        ben_first = self.book("ben", DENVER)
+        self.book("ben", SALT_LAKE, trip_id=ben_first["trip_id"])
+        places = self.ok("ben", "GET", f"/api/trips/{ben_first['trip_id']}/places")
+        start, end = ({"latitude": round(p["latitude"], 4), "longitude": round(p["longitude"], 4)} for p in places["stays"][:2])
+        path = [[start["latitude"], start["longitude"]], [40.0, -108.0], [41.0, -110.0], [end["latitude"], end["longitude"]]]
+        self.assertEqual(self.ok("ben", "PUT", f"/api/trips/{ben_first['trip_id']}/driving-routes", {"start": start, "end": end, "path": path}), {"stored": True})
+        theirs, mine = self.summary(ben_first["trip_id"], "ben"), self.summary(ana_first["trip_id"])
+        self.assertFalse(theirs["road_estimated"])
+        self.assertTrue(mine["road_estimated"])
+        self.assertLess(mine["road_km"], theirs["road_km"])
+
     def test_flights_count_their_distance_and_countries(self):
         first = self.book("ana", OUT)
         self.book("ana", BACK, trip_id=first["trip_id"])

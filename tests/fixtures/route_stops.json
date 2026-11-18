@@ -53,12 +53,7 @@
      "longitude": -97.0
     }
    ],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [
@@ -150,12 +145,7 @@
      "longitude": -97.0
     }
    ],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [
@@ -243,12 +233,7 @@
      "longitude": -97.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -311,12 +296,7 @@
      "longitude": -97.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -379,12 +359,7 @@
      "longitude": -100.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -465,12 +440,7 @@
      "longitude": -100.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -586,12 +556,7 @@
      "longitude": -95.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -690,12 +655,7 @@
      "longitude": -97.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -820,12 +780,7 @@
      "longitude": -97.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -909,12 +864,7 @@
     }
    ],
    "cities": [],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [
@@ -988,12 +938,7 @@
      "longitude": -100.0,
      "precision": "street"
     }
-   ],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   ]
   },
   "today": "2026-06-02",
   "stops": [
@@ -1101,12 +1046,7 @@
      "longitude": -97.0
     }
    ],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [
@@ -1201,12 +1141,7 @@
      "longitude": -97.0
     }
    ],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [
@@ -1288,12 +1223,7 @@
      "longitude": -97.0
     }
    ],
-   "stays": [],
-   "roads": {
-    "legs": [],
-    "interstates": []
-   },
-   "boundaries": []
+   "stays": []
   },
   "today": "2026-06-02",
   "stops": [

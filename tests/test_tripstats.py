@@ -61,7 +61,7 @@ class TripSummaryCase(Household):
             self.c.execute(insert(PhotoExclusion).values(person_id=person, asset_id=f"asset-{self.asset}", trip_id=trip_id, created=1.0))
 
     def summary(self, trip_id, who=None):
-        got = tripstats.summary(self.c, who or self.jane, trip_id)
+        got = tripstats.summary(self.c, who or self.jane, trip_id, time.time())
         assert got is not None
         return got
 
@@ -168,7 +168,7 @@ class TripSummaryTests(TripSummaryCase):
         self.assertGreater(got["road_km"], before["road_km"])
         self.assertEqual(got["distance_km"], got["road_km"])
 
-    def test_a_stored_road_past_its_thirty_days_is_ignored_like_the_replay_ignores_it(self):
+    def test_an_expired_stored_road_is_ignored_like_the_replay_ignores_it(self):
         trip = self.mine(DENVER)["trip_id"]
         self.mine(SALT_LAKE_DRIVE, trip)
         drive, _ = self.stored_road(trip, (40.2, -108.0), (40.9, -110.0), now=time.time() - driving_routes.REPLACE_AFTER_SECONDS - 60)
@@ -256,8 +256,8 @@ class TripSummaryTests(TripSummaryCase):
 
     def test_someone_not_on_the_trip_gets_nothing(self):
         trip = self.add(self.jane, DENVER, None, self.on(self.jane.person_id))["trip_id"]
-        self.assertIsNone(tripstats.summary(self.c, self.sam, trip))
-        self.assertIsNone(tripstats.summary(self.c, self.jane, 99999))
+        self.assertIsNone(tripstats.summary(self.c, self.sam, trip, time.time()))
+        self.assertIsNone(tripstats.summary(self.c, self.jane, 99999, time.time()))
 
 
 if __name__ == "__main__":
