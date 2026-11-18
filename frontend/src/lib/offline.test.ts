@@ -6,6 +6,7 @@ vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 import { apiCall } from "./contract";
 import { api } from "./api";
 import { clearRouteCache, drivingRoute } from "./driving-routes";
+import * as snapshotsModule from "./map-snapshots";
 import { fake, fakeMk } from "../test/fake-mapkit";
 import { ignoreFailure } from "./act";
 import { ago, clearSaved, expiryOf, isSavedCopy, savedList } from "./offline";
@@ -173,6 +174,18 @@ describe("clearing", () => {
       await api("/api/trips").catch(ignoreFailure);
       await ask();
       expect(fake.directions.calls).toHaveLength(2);
+    });
+  }
+
+  for (const status of [401, 403]) {
+    it(`forgets the map addresses it holds when a request answers ${status}`, async () => {
+      const forget = vi.spyOn(snapshotsModule, "clearSnapshots");
+      clearOnDenied();
+      vi.stubGlobal("fetch", vi.fn(() => reply(status)));
+      vi.stubGlobal("location", { href: "", pathname: "/", hash: "" });
+      await api("/api/trips").catch(ignoreFailure);
+      await vi.waitFor(() => expect(forget).toHaveBeenCalled());
+      forget.mockRestore();
     });
   }
 

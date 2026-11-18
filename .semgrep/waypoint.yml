@@ -437,13 +437,13 @@ rules:
       Waypoint draws no map of its own: every map on screen is Apple's MapKit (AGENTS.md, "You see the trips you're on"), so the
       web app does not project or draw land with d3's geoPath. The one exception is the Year in Review card image, which becomes a
       downloadable image and is drawn in frontend/src/lib/review-map.ts, never contacting Apple (the owner's decision on #838,
-      2026-11-18); frontend/src/lib/components/RouteTileMap.svelte stays until #837 removes it, and this exemption goes with it.
+      2026-11-18).
     severity: ERROR
     languages: [generic]
     pattern-regex: \bgeoPath\s*\(
     paths:
       include: ["/frontend/src/"]
-      exclude: ["/frontend/src/lib/review-map.ts", "/frontend/src/lib/components/RouteTileMap.svelte"]
+      exclude: ["/frontend/src/lib/review-map.ts"]
 
   - id: waypoint-no-bundled-map-outlines
     message: >-

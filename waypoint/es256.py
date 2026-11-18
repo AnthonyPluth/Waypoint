@@ -13,8 +13,12 @@ def b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
+def sign_text(key: ec.EllipticCurvePrivateKey, text: str) -> str:
+    r, s = decode_dss_signature(key.sign(text.encode(), ec.ECDSA(hashes.SHA256())))
+    return b64(r.to_bytes(32, "big") + s.to_bytes(32, "big"))
+
+
 def sign_jwt(key: ec.EllipticCurvePrivateKey, header: dict[str, Any], claims: dict[str, Any]) -> str:
     head = b64(json.dumps(header, separators=(",", ":")).encode())
     body = b64(json.dumps(claims, separators=(",", ":")).encode())
-    r, s = decode_dss_signature(key.sign(f"{head}.{body}".encode(), ec.ECDSA(hashes.SHA256())))
-    return f"{head}.{body}.{b64(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+    return f"{head}.{body}.{sign_text(key, f'{head}.{body}')}"

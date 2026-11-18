@@ -11,6 +11,7 @@ import { api } from "$lib/api";
 import { app, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import * as drivingModule from "$lib/driving-routes";
+import * as snapshotsModule from "$lib/map-snapshots";
 import * as offlineModule from "$lib/offline";
 import { state } from "../test/fixtures";
 import Settings from "./Settings.svelte";
@@ -75,6 +76,16 @@ describe("Settings account", () => {
 
   it("forgets the drive routes held in this tab before the session ends", async () => {
     const forget = vi.spyOn(drivingModule, "clearRouteCache");
+    vi.stubGlobal("location", { href: "" });
+    vi.mocked(api).mockResolvedValue({ redirect: "/auth/signed-out" });
+    render(Settings);
+    await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    await waitFor(() => expect(forget).toHaveBeenCalled());
+    vi.unstubAllGlobals();
+  });
+
+  it("forgets the map addresses held in this tab before the session ends", async () => {
+    const forget = vi.spyOn(snapshotsModule, "clearSnapshots");
     vi.stubGlobal("location", { href: "" });
     vi.mocked(api).mockResolvedValue({ redirect: "/auth/signed-out" });
     render(Settings);

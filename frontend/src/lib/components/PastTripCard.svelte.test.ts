@@ -7,7 +7,8 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 
 import { api } from "$lib/api";
 import type { TripPlaces } from "$lib/api-types";
-import { segment, trip } from "../../test/fixtures";
+import { app } from "$lib/app.svelte";
+import { segment, state, trip } from "../../test/fixtures";
 import PastTripCard from "./PastTripCard.svelte";
 
 const TODAY = "2026-10-05";
@@ -16,7 +17,7 @@ const lisbon = trip([segment({ id: 1, trip_id: 9, start_local: "2026-09-03T09:00
 const card = () => screen.getByRole("link");
 
 beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(api).mockRejectedValue(new Error("down")); });
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => { vi.useRealTimers(); app.state = null; });
 
 describe("PastTripCard", () => {
   it("is one link to the trip's page, named by its dates, nights, distance, photos and people", () => {
@@ -86,22 +87,75 @@ describe("PastTripCard", () => {
     expect(within(card()).getByTestId("route-tile")).toBeInTheDocument();
   });
 
-  it("shows the trip's route on a small map when it has no photos and the route can be placed", async () => {
-    const places: TripPlaces = { home: null, airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LHR", city: "London", latitude: 51.47, longitude: -0.45 }], cities: [], stays: [] };
-    vi.mocked(api).mockImplementation(async (path) => { if (path === "/api/trips/9/places") return places as never; throw new Error("down"); });
-    const flown = trip([segment({ id: 1, trip_id: 9, origin: "JFK", destination: "LHR", start_local: "2026-09-03T19:00", end_local: "2026-09-04T07:00" })], { id: 9, name: "Out and back", start_date: "2026-09-03", end_date: "2026-09-10" });
+  it("shows the trip's route on Apple's map when it has no photos, MapKit is on and the route can be placed", async () => {
+    app.state = state({ mapkit: true });
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 358 });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 168 });
+    const places: TripPlaces = { home: null, airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LGA", city: "New York", latitude: 40.77, longitude: -73.87 }], cities: [], stays: [] };
+    const snapshot = { trip_id: 9, url: "https://maps.example/snapshot?x", center: { latitude: 40.7, longitude: -73.8 }, zoom: 10, width: 352, height: 168 };
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (path === "/api/trips/9/places") return places as never;
+      if (String(path).startsWith("/api/map-snapshots")) return { snapshots: [snapshot] } as never;
+      throw new Error("down");
+    });
+    const flown = trip([segment({ id: 1, trip_id: 9, origin: "JFK", destination: "LGA", start_local: "2026-09-03T19:00", end_local: "2026-09-04T07:00" })], { id: 9, name: "Out and back", start_date: "2026-09-03", end_date: "2026-09-10" });
     render(PastTripCard, { trip: flown, today: TODAY });
-    expect(await within(card()).findByTestId("route-tile")).toHaveAttribute("data-drawn", "true");
+    await vi.waitFor(() => expect(card().querySelector("img")).not.toBeNull());
+    await fireEvent.load(card().querySelector("img")!);
+    expect(within(card()).getByTestId("route-tile")).toHaveAttribute("data-drawn", "true");
     expect(card().querySelector("svg path.stroke-map-route")).not.toBeNull();
     expect(screen.queryByTestId("photo-pill")).toBeNull();
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
   });
 
   it("keeps the plain tile with the trip's kinds when the route can't be placed", async () => {
+    app.state = state({ mapkit: true });
     render(PastTripCard, { trip: lisbon, today: TODAY });
     const tile = within(card()).getByTestId("route-tile");
     await vi.waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/9/places", expect.anything()));
     expect(tile).toHaveAttribute("data-drawn", "false");
     expect(within(tile).getByTestId("trip-kinds")).toBeInTheDocument();
+    expect(vi.mocked(api).mock.calls.some(([path]) => String(path).startsWith("/api/map-snapshots"))).toBe(false);
+  });
+
+  it("keeps the plain tile and asks for nothing at all when MapKit is off", async () => {
+    app.state = state({ mapkit: false });
+    render(PastTripCard, { trip: lisbon, today: TODAY });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(api).not.toHaveBeenCalled();
+    expect(within(within(card()).getByTestId("route-tile")).getByTestId("trip-kinds")).toBeInTheDocument();
+  });
+
+  it("asks Apple for nothing for a card with photo coverage even when every thumbnail fails to load", async () => {
+    app.state = state({ mapkit: true });
+    render(PastTripCard, { trip: lisbon, today: TODAY, photos: 3, covers: [11, 12, 13] });
+    for (const img of [...card().querySelectorAll("img")]) await fireEvent.error(img);
+    expect(card().querySelectorAll("img")).toHaveLength(0);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(api).not.toHaveBeenCalled();
+    expect(within(card()).getByTestId("route-tile")).toHaveAttribute("data-drawn", "false");
+    expect(within(card()).getByTestId("trip-kinds")).toBeInTheDocument();
+  });
+
+  it("waits to look up a route until the list knows which cards have photos", async () => {
+    app.state = state({ mapkit: true });
+    const { rerender } = render(PastTripCard, { trip: lisbon, today: TODAY, coversKnown: false });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(api).not.toHaveBeenCalled();
+    await rerender({ trip: lisbon, today: TODAY, coversKnown: true });
+    await vi.waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/9/places", expect.anything()));
+  });
+
+  it("makes no snapshot request for a card with photos, or for a trip with fewer than two stops", async () => {
+    app.state = state({ mapkit: true });
+    const { unmount } = render(PastTripCard, { trip: lisbon, today: TODAY, photos: 5, covers: [1, 2] });
+    await new Promise((r) => setTimeout(r, 80));
+    unmount();
+    const one = trip([segment({ id: 1, trip_id: 9, kind: "hotel", origin: "Inn", destination: "Denver", start_local: "2026-09-03T15:00", end_local: "2026-09-05T10:00" })], { id: 9, start_date: "2026-09-03", end_date: "2026-09-05" });
+    render(PastTripCard, { trip: one, today: TODAY });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(vi.mocked(api).mock.calls.some(([path]) => String(path).startsWith("/api/map-snapshots"))).toBe(false);
   });
 
   it("doesn't look up a route for a trip that has none to draw", () => {
@@ -111,6 +165,7 @@ describe("PastTripCard", () => {
   });
 
   it("shares one limit of four /places requests across every card on the page", async () => {
+    app.state = state({ mapkit: true });
     let inFlight = 0, peak = 0, asked = 0;
     const waiting: (() => void)[] = [];
     vi.mocked(api).mockImplementation((path) => {

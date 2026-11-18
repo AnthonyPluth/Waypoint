@@ -340,6 +340,28 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow past-trip-saved-route`; or `poetry run python run.py verify --flow past-trip-saved-route`.
 
+#### `past-trips-list-map-failed`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Console errors it expects:** `net::ERR_BLOCKED_BY_CLIENT`.
+- **Drive it:** `tools/control flow past-trips-list-map-failed`; or `poetry run python run.py verify --flow past-trips-list-map-failed`.
+
+#### `past-trips-list-no-key`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2025`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow past-trips-list-no-key`; or `poetry run python run.py verify --flow past-trips-list-no-key`.
+
+#### `past-trips-list-wide`
+
+- **Starts at:** `#trips`; goes to: `#trips?year=2024`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow past-trips-list-wide`; or `poetry run python run.py verify --flow past-trips-list-wide`.
+
 #### `past-trips-list`
 
 - **Starts at:** `#trips`; goes to: `#trips?year=2025`, `#trips?year=2026&q=Orlando`.

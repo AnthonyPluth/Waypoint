@@ -12,6 +12,8 @@
     { "screenshot": "with-pane" },
     { "goto": "#trips?year=2025" },
     { "wait_for": "ul[aria-label='Past trips in 2025'] a >> visible=true" },
+    { "scroll_to": "ul[aria-label='Past trips in 2025']" },
+    { "wait_for": "ul[aria-label='Past trips in 2025'] [data-testid='route-tile'][data-drawn='true']" },
     { "expect_text": { "selector": "ul[aria-label='Past trips in 2025']", "text": "Oct 8–15" } },
     { "screenshot": "no-photos" },
     { "goto": "#trips?year=2026&q=Orlando" },

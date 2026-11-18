@@ -36,6 +36,13 @@ Images of each page at phone and desktop width were rendered with Playwright for
 
 The inventory, privacy statement, wording changes and build plan below are written against `main` at `ec2271e` plus the open pull request #823 (`feat/warm-driving-routes`), which lands first.
 
+## Accepted departures from frame a (#837, owner decisions on #866, 2026-11-18)
+
+- The card title overlaps Apple's attribution, as drawn in frame a.
+- Airport stops use `--map-airport`, other stops `--map-stay`.
+- Apple's snapshot zoom is at least 3. A trip that doesn't fit the card at zoom 3 is drawn from a larger image (up to 640 px a side) at zoom 3 shown scaled down; a trip wider still gets a 640 px zoom-3 image centred on the route (across the date line when that is shorter) with its ends clipped at the image's edge. Only fewer than two placeable stops, no key or a failure show the kinds tile.
+- A road trip's card area always includes Home, as the replay's does.
+
 ## Contents
 
 1. [Owner decisions on #833](#owner-decisions-on-833-2026-11-18) and [what #823 adds](#what-823-adds)
