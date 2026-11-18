@@ -36,7 +36,7 @@ describe("laterTrips", () => {
 });
 
 describe("usablePlaces", () => {
-  const whole = { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] };
+  const whole = { home: null, airports: [], cities: [], stays: [] };
 
   it("accepts a reply with every collection", () => {
     expect(usablePlaces(whole)).toBe(true);
@@ -44,8 +44,6 @@ describe("usablePlaces", () => {
 
   it("rejects a reply missing any collection, or not an object", () => {
     expect(usablePlaces({ ...whole, stays: undefined })).toBe(false);
-    expect(usablePlaces({ ...whole, roads: undefined })).toBe(false);
-    expect(usablePlaces({ ...whole, boundaries: null })).toBe(false);
     expect(usablePlaces(null)).toBe(false);
     expect(usablePlaces("nope")).toBe(false);
   });

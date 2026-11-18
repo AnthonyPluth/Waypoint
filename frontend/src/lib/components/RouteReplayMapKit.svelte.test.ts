@@ -24,8 +24,6 @@ const places: TripPlaces = {
   ],
   cities: [],
   stays: [],
-  roads: { legs: [], interstates: [] },
-  boundaries: [],
 };
 const flights = [
   segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" }),
@@ -351,20 +349,5 @@ describe("a map with no route", () => {
   it("does not use a handle it is given for a map with no route", () => {
     const { container } = render(RouteReplayMap, { stops: [], year: 2025, maps: fakeMaps() });
     expect(container.querySelector("[data-mapkit]")).toBeNull();
-  });
-});
-
-describe("state lines and Apple's map", () => {
-  it("draws no state lines on Apple's map and lists none in its key, and the flat map's lines and key entry come back when MapKit fails", async () => {
-    vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mapkit/token" ? token : { ...places, boundaries: [{ points: [[37.0, -109.05], [41.0, -109.05]] }] }) as never);
-    const { container } = render(RouteReplay, { trip: trip(flights), now: after });
-    await loadScript();
-    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeTruthy());
-    expect([...fake.last().overlays].filter((o) => (o as { options: { style?: { options: { lineDash?: unknown } } } }).options.style?.options.lineDash)).toHaveLength(0);
-    expect(screen.getByLabelText("Map key").textContent).not.toContain("State line");
-    fake.emit("error", { status: "Unauthorized" });
-    await waitFor(() => expect(container.querySelector("[data-mapkit]")).toBeNull());
-    expect(container.querySelectorAll("[data-testid='state-lines'] path")).toHaveLength(1);
-    expect(screen.getByLabelText("Map key").textContent).toContain("State line");
   });
 });

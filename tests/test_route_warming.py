@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives import serialization
 from tests.privacy import no_leaks
 from tests.test_mapkit import KEY_ID, PEM, PRIVATE, TEAM_ID, parts, verifies
 from tests.test_route_cache import RouteCacheCase
-from tests.test_trip_roads import BOULDER, DENVER, SALT_LAKE
+from tests.test_trips import BOULDER, DENVER, SALT_LAKE
 from waypoint import monitoring, tls
 from waypoint.domain import driving_routes, home, maps, route_warming, tripmap
 from waypoint.domain import trips as trip_domain
@@ -84,13 +84,13 @@ class WarmingCase(RouteCacheCase):
 
 
 class FillingTests(WarmingCase):
-    def test_the_stops_without_the_road_work_are_the_ones_the_map_shows(self):
+    def test_the_places_the_job_works_from_are_the_stops_alone_and_a_stranger_gets_none(self):
         trip = self.road_trip(DENVER, SALT_LAKE)
         with db.session() as conn:
-            full = tripmap.places(conn, route_warming.HOUSEHOLD, trip)
-            bare = tripmap.stop_places(conn, route_warming.HOUSEHOLD, trip)
-            self.assertEqual({k: v for k, v in full.items() if k not in ("roads", "boundaries")}, {k: v for k, v in bare.items() if k not in ("roads", "boundaries")})
-            self.assertIsNone(tripmap.stop_places(conn, driving_routes.Viewer(None), trip))
+            found = tripmap.places(conn, route_warming.HOUSEHOLD, trip)
+            self.assertEqual(sorted(found), ["airports", "cities", "home", "stays"])
+            self.assertEqual(len(found["stays"]), 2)
+            self.assertIsNone(tripmap.places(conn, driving_routes.Viewer(None), trip))
 
     def test_a_missing_drive_is_fetched_and_stored_for_its_trip_and_a_cached_one_is_not_asked_again(self):
         trip = self.road_trip(DENVER, SALT_LAKE)
@@ -123,7 +123,7 @@ class FillingTests(WarmingCase):
         self.road_trip(SALT_LAKE)
         with db.session() as conn:
             out = trip_domain.get(conn, route_warming.HOUSEHOLD, trip_domain.listing(conn, route_warming.HOUSEHOLD)[0]["id"])
-            places = tripmap.stop_places(conn, route_warming.HOUSEHOLD, out["id"])
+            places = tripmap.places(conn, route_warming.HOUSEHOLD, out["id"])
             self.assertEqual(len(route_warming.drives_of(out, places)), 2)
         fetch = Fetcher()
         self.assertEqual(run(fetch).fetched, 0)
@@ -140,7 +140,7 @@ class FillingTests(WarmingCase):
         trip = self.road_trip(DENVER, flight, SALT_LAKE)
         with db.session() as conn:
             out = trip_domain.get(conn, route_warming.HOUSEHOLD, trip)
-            places = tripmap.stop_places(conn, route_warming.HOUSEHOLD, trip)
+            places = tripmap.places(conn, route_warming.HOUSEHOLD, trip)
             stays = [(s["latitude"], s["longitude"]) for s in places["stays"]]
             drives = route_warming.drives_of(out, places)
         self.assertEqual(len(drives), 2)
@@ -283,8 +283,7 @@ class JobTests(WarmingCase):
     def test_the_thread_starts_with_the_others_and_waits_for_the_night_instead_of_running_at_startup(self):
         stop = threading.Event()
         stop.set()
-        with mock.patch.object(jobs, "warm_map_data"), mock.patch.object(jobs.flightstatus, "forget_key_pause"), \
-                mock.patch.object(jobs, "warm_driving_routes") as ran:
+        with mock.patch.object(jobs.flightstatus, "forget_key_pause"), mock.patch.object(jobs, "warm_driving_routes") as ran:
             started = jobs.start(stop)
             for t in started:
                 t.join(5)
@@ -320,13 +319,6 @@ class JobTests(WarmingCase):
             with mock.patch.dict(os.environ, {route_warming.HOUR_ENV: value}):
                 self.assertEqual(route_warming.hour(), want)
 
-    def test_a_pass_never_works_out_a_trips_roads_or_state_lines(self):
-        self.two_drives()
-        with mock.patch.object(tripmap, "places", side_effect=AssertionError("roads worked out")), \
-                mock.patch.object(tripmap, "road_legs", side_effect=AssertionError("roads worked out")), \
-                mock.patch.object(tripmap, "state_lines", side_effect=AssertionError("lines worked out")):
-            self.assertEqual(run(Fetcher(), delay=0.0).fetched, 2)
-
 
 def seg(id, kind, origin=None, destination=None, start="2026-06-01T10:00", end="2026-06-01T11:00", itinerary=(), status="confirmed"):
     return {"id": id, "kind": kind, "status": status, "origin": origin, "destination": destination, "start_local": start, "end_local": end,
@@ -336,7 +328,7 @@ def seg(id, kind, origin=None, destination=None, start="2026-06-01T10:00", end="
 def places_of(airports=(), cities=(), stays=(), home=None):
     return {"home": home, "airports": [{"code": c, "city": n, "latitude": a, "longitude": b} for c, n, a, b in airports],
             "cities": [{"city": n, "latitude": a, "longitude": b} for n, a, b in cities],
-            "stays": [{"segment_id": i, "latitude": a, "longitude": b, "precision": "street"} for i, a, b in stays], "roads": {"legs": [], "interstates": []}, "boundaries": []}
+            "stays": [{"segment_id": i, "latitude": a, "longitude": b, "precision": "street"} for i, a, b in stays]}
 
 
 def stops(segments, places):

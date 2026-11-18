@@ -62,6 +62,5 @@ export const dateTile = (trip: Trip): { month: string; day: string } => {
 
 export const usablePlaces = (found: unknown): found is TripPlaces => {
   const p = found as Partial<TripPlaces> | null | undefined;
-  return !!p && Array.isArray(p.airports) && Array.isArray(p.cities) && Array.isArray(p.stays)
-    && Array.isArray(p.roads?.legs) && Array.isArray(p.roads?.interstates) && Array.isArray(p.boundaries);
+  return !!p && Array.isArray(p.airports) && Array.isArray(p.cities) && Array.isArray(p.stays);
 };

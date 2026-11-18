@@ -56,6 +56,6 @@
 
 {#if shown && stops.length >= 2}
   <section class={compact ? "" : "mb-6"} aria-label="Route replay">
-    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined} still={compact ? true : null} {compact} {onreplay} {onended} maps={compact ? null : (maps ?? null)} {stopList} />{/key}
+    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={NO_ROADS} boundaries={NO_BOUNDARIES} autoplay={maps !== undefined} still={compact ? true : null} {compact} {onreplay} {onended} maps={compact ? null : (maps ?? null)} {stopList} />{/key}
   </section>
 {/if}

@@ -140,6 +140,23 @@ def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], 
     return out
 
 
+Key = tuple[int, int, int, int]
+
+
+def paths_for(conn: db.Connection, viewer: Viewer, trip_id: int, keys: set[Key], now: float) -> dict[Key, list[list[float]]] | None:
+    stops = tripmap.stop_points(conn, viewer, trip_id)
+    if stops is None:
+        return None
+    if not keys:
+        return {}
+    out: dict[Key, list[list[float]]] = {}
+    for row in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id, DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)):
+        key = (row.from_lat, row.from_lon, row.to_lat, row.to_lon)
+        if key in keys and _on_trip(stops, (row.from_lat / SCALE, row.from_lon / SCALE, row.to_lat / SCALE, row.to_lon / SCALE)):
+            out[key] = json.loads(row.path)
+    return out
+
+
 def store(conn: db.Connection, viewer: Viewer, trip_id: int, start: Any, end: Any, raw_path: Any, now: float) -> bool | None:
     stops = tripmap.stop_points(conn, viewer, trip_id)
     if stops is None:

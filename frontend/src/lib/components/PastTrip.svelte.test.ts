@@ -29,7 +29,7 @@ const places: TripPlaces = {
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
   ],
-  cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [],
+  cities: [], stays: [],
 };
 const summary: TripSummary = { days: 8, nights: 7, distance_km: 1996, flight_km: 0, road_km: 1996, road_estimated: false, states: ["Utah"], countries: ["United States"], photos: { total: 214, inferred: 3 }, kinds: { flight: 0, hotel: 1, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
 

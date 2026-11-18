@@ -272,7 +272,7 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
       const [, id, places] = /\/api\/trips\/(\d+)(\/places)?$/.exec(new URL(route.request().url()).pathname) ?? [];
       const t = made.get(id);
       if (!t || route.request().method() !== "GET") return route.fallback();
-      return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } : t });
+      return route.fulfill({ json: places ? { home: null, airports: [], cities: [], stays: [] } : t });
     });
   } else if ("fake_bookings" in step) {
     await page.route(/\/api\/trips\/\d+$/, async (route) => {

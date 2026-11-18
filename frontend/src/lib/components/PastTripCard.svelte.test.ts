@@ -87,7 +87,7 @@ describe("PastTripCard", () => {
   });
 
   it("shows the trip's route on a small map when it has no photos and the route can be placed", async () => {
-    const places: TripPlaces = { home: null, airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LHR", city: "London", latitude: 51.47, longitude: -0.45 }], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] };
+    const places: TripPlaces = { home: null, airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LHR", city: "London", latitude: 51.47, longitude: -0.45 }], cities: [], stays: [] };
     vi.mocked(api).mockImplementation(async (path) => { if (path === "/api/trips/9/places") return places as never; throw new Error("down"); });
     const flown = trip([segment({ id: 1, trip_id: 9, origin: "JFK", destination: "LHR", start_local: "2026-09-03T19:00", end_local: "2026-09-04T07:00" })], { id: 9, name: "Out and back", start_date: "2026-09-03", end_date: "2026-09-10" });
     render(PastTripCard, { trip: flown, today: TODAY });
@@ -116,7 +116,7 @@ describe("PastTripCard", () => {
     vi.mocked(api).mockImplementation((path) => {
       if (!String(path).endsWith("/places")) return Promise.reject(new Error("down"));
       asked++; inFlight++; peak = Math.max(peak, inFlight);
-      return new Promise((resolve) => { waiting.push(() => { inFlight--; resolve({ home: null, airports: [], cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [] } as never); }); });
+      return new Promise((resolve) => { waiting.push(() => { inFlight--; resolve({ home: null, airports: [], cities: [], stays: [] } as never); }); });
     });
     const many = Array.from({ length: 10 }, (_, i) => trip([segment({ id: 100 + i, trip_id: 100 + i, start_local: "2026-09-03T09:00", end_local: "2026-09-10T10:00" })], { id: 100 + i, name: `Trip ${i}`, start_date: "2026-09-03", end_date: "2026-09-10" }));
     for (const t of many) render(PastTripCard, { trip: t, today: TODAY });

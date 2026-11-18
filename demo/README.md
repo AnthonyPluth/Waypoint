@@ -31,3 +31,7 @@ The browser verification:
 The main-only `Docs` workflow (fleet's reusable docs workflow, which runs `make docs-site`) builds the documentation and the demo, then copies the demo output under `docs/dist/demo/`. One artifact serves the documentation at `/Waypoint/` and the demo at `/Waypoint/demo/`. Frontend and docs changes both trigger the workflow; pull requests build both without publishing.
 
 Pages Source must be **GitHub Actions**, and the `github-pages` environment only needs to allow `main`. Publishing needs a merge and a successful Docs deployment from `main`; preparing or pushing code is not publication.
+
+## Apple's maps
+
+The static demo shows no maps and no route replay, and no Apple token or key is made for it: the owner decided this on [#834](https://github.com/AnthonyPluth/Waypoint/issues/834#issuecomment-6982585262) (option C, 2026-11-18), and the MapKit-only renderer ([#836](https://github.com/AnthonyPluth/Waypoint/issues/836)) builds it. See [Maps in the demo](../docs/src/content/docs/contributing/demo-maps.md) and [the options that were weighed](../docs/design/demo-maps/README.md).

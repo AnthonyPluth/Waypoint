@@ -16,18 +16,3 @@ and Canadian and British postal-code areas and the cities of 15,000 people or mo
 (https://www.geonames.org/, files GB.zip, CA.zip and cities15000.zip), which is licensed under Creative Commons
 Attribution 4.0, https://creativecommons.org/licenses/by/4.0/. The names and coordinates were rounded and combined; the
 file is shared here under the same licence.
-
-Highways: waypoint/storage/roads.tsv.gz is derived from the National Highway System shapefile (version 2025-08-08,
-nhs_2025-08-08.zip) published by the Federal Highway Administration, U.S. Department of Transportation
-(https://www.fhwa.dot.gov/planning/national_highway_system/nhs_maps/), keeping the features signed and classed as
-Interstate routes, and the numbered US and state routes classed as freeways, expressways or principal arterials. This is US government data; its metadata states "Access Constraints: None" and that the NHS database,
-or any portion of it, can be freely distributed as long as its metadata entry is included. The file combines the pieces
-of each route into a network of junctions, simplifies their shapes to about 100 metres and rounds the coordinates; the
-FHWA gives no warranty for it, and neither does Waypoint.
-
-State lines: waypoint/storage/states.tsv.gz is derived from the 2024 Cartographic Boundary File for States and Equivalent
-Entities for the United States at 1:5,000,000 (cb_2024_us_state_5m.zip) published by the U.S. Census Bureau, U.S. Department
-of Commerce (https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html). This is US
-government data; its metadata states "Access constraints: None". The file keeps only the lines two states share, joins them
-from one tripoint to the next, simplifies their shapes to about a kilometre and rounds the coordinates; the Census Bureau
-gives no warranty for it, and neither does Waypoint.
