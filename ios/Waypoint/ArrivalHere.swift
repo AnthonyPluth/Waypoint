@@ -22,7 +22,7 @@ protocol ArrivalFixing: Sendable {
 
 enum ArrivalHereRules {
     /// The bookings whose window is open at `now`.
-    static func open(_ places: [ArrivalPlace], at now: Date) -> [ArrivalPlace] {
+    static func windowOpen(_ places: [ArrivalPlace], at now: Date) -> [ArrivalPlace] {
         places.filter { $0.opens <= now && now < $0.closes }
     }
 
@@ -39,7 +39,7 @@ enum ArrivalHereRules {
 
     /// The booking whose window opened last among those whose circle holds the point (design A3: one card at a time).
     static func place(among places: [ArrivalPlace], at point: PlacePoint, now: Date) -> ArrivalPlace? {
-        open(places, at: now)
+        windowOpen(places, at: now)
             .filter { metres(from: point, to: PlacePoint(latitude: $0.latitude, longitude: $0.longitude)) <= $0.radius }
             .max { ($0.opens, $0.segmentId) < ($1.opens, $1.segmentId) }
     }
@@ -249,7 +249,7 @@ actor ArrivalHere: ArrivalHereAnswering {
     private func look(server: URL) async -> Outcome {
         guard settings.isOn, fix.isAllowed, await protectedDataAvailable() else { return .notReady }
         let found = await places.places(server: server)
-        guard !ArrivalHereRules.open(found, at: now()).isEmpty else { return .notReady }
+        guard !ArrivalHereRules.windowOpen(found, at: now()).isEmpty else { return .notReady }
         guard let point = await fix.current(), !Task.isCancelled else { return .checked(nil) }
         guard let place = ArrivalHereRules.place(among: found, at: point, now: now()) else { return .checked(nil) }
         return .checked(ArrivalHereAnswer(segmentId: place.segmentId, tripId: place.tripId))

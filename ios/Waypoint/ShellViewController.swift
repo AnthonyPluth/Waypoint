@@ -16,6 +16,7 @@ final class ShellViewController: CAPBridgeViewController {
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
+        descriptor.handleApplicationNotifications = false
         if let url = Self.serverURL {
             descriptor.serverURL = url.absoluteString
             // A tap on a Siri card that launched the app: open the page it names (only `#trip/...` routes pass).
@@ -29,6 +30,7 @@ final class ShellViewController: CAPBridgeViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        ArrivalTapHandler.install()
         NotificationCenter.default.addObserver(self, selector: #selector(openSavedPage(_:)), name: .openSavedPage, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(arrivalTapped(_:)), name: .openArrival, object: nil)
     }
