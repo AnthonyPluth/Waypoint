@@ -1,17 +1,17 @@
 <script lang="ts">
   import { geoPath } from "d3-geo";
   import { landFor } from "$lib/land.svelte";
-  import { legsOf, NO_ROADS, positions, routeProjection, type Roads, type Stop } from "$lib/route-replay";
+  import { legsOf, positions, routeProjection, type Stop } from "$lib/route-replay";
 
-  let { stops, roads = NO_ROADS }: { stops: Stop[]; roads?: Roads } = $props();
+  let { stops }: { stops: Stop[] } = $props();
 
   const WIDTH = 400;
   const HEIGHT = 200;
 
-  const projection = $derived(routeProjection(stops, WIDTH, HEIGHT, { x: 44, y: 44 }, roads));
+  const projection = $derived(routeProjection(stops, WIDTH, HEIGHT, { x: 44, y: 44 }));
   const path = $derived(geoPath(projection));
-  const legs = $derived(legsOf(stops, projection, roads));
   const spots = $derived(positions(stops, projection));
+  const legs = $derived(legsOf(stops, projection));
   const terrain = landFor(() => ({ projection, width: WIDTH, height: HEIGHT }));
   const land = $derived(terrain.features.map((c) => path(c) ?? ""));
   const sphere = $derived(path({ type: "Sphere" }) ?? "");

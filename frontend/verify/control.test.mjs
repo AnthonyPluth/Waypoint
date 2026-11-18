@@ -19,6 +19,8 @@ describe("parseArgs", () => {
     expect(c.parseArgs(["start", "--text"]).text).toBe(true);
     expect(c.parseArgs(["start", "--signed-in", "jane"]).options).toMatchObject({ "signed-in": "jane" });
     expect(c.parseArgs(["start"]).options["signed-in"]).toBeUndefined();
+    expect(c.parseArgs(["start", "--no-key"]).options).toMatchObject({ "no-key": true });
+    expect(c.parseArgs(["start"]).options["no-key"]).toBeUndefined();
   });
 
   it("passes everything after -- as arguments", () => {

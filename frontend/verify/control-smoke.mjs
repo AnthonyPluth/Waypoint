@@ -97,6 +97,11 @@ outside.close();
 r = control("flow", "open-trip", "--viewport", "desktop");
 expect(r.code === 0 && r.json?.steps?.every((s) => s.ok) && r.json.files.length === 2, "flow: open-trip passes, step by step, with its 2 images");
 
+r = control("flow", "trip-route-replay-mapkit", "--viewport", "desktop");
+expect(r.code === 0 && r.json?.steps?.every((s) => s.ok), "flow: a flow with maps runs on the session's own MapKit key and the stand-in for Apple's script");
+r = control("flow", "trip-route-replay-no-key", "--viewport", "desktop");
+expect(r.code === 1 && r.json?.error?.code === "needs_no_key" && r.json.error.hint.includes("start --no-key"), "flow: a flow that needs no key is refused on a session that has one, and says how to start one without");
+
 control("reset");
 r = control("flow", "offline-trip", "--viewport", "desktop");
 if (r.code !== 0) {

@@ -11,7 +11,7 @@
     { "wait_for": "[data-label='New York'][data-visible='true']" },
     { "screenshot": "replay-start" },
     { "fill": { "selector": "input[aria-label='Position along the route']", "text": "2000" } },
-    { "wait_for": "svg[data-zoomed='true']" },
+    { "wait_for": "[data-mapkit][data-zoomed='true']" },
     { "screenshot": "replay-zoomed" },
     { "press": { "selector": "input[aria-label='Position along the route']", "key": "End" } },
     { "wait_for": "section[aria-label='Route replay'] button:has-text('Replay')" },

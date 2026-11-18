@@ -5,10 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
+vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn() }));
 
 import { api } from "$lib/api";
 import type { Person, PhotoCluster, PhotoSharing, PhotoSource, TripPhoto, TripPhotos as Reply, TripPlaces, TripSummary } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
+import { loadMapkit } from "$lib/mapkit";
+import { fake, fakeMaps } from "../../test/fake-mapkit";
 import { viewport } from "$lib/phone.svelte";
 import { SCRUB_STEPS } from "$lib/route-replay";
 import { segment, state, trip } from "../../test/fixtures";
@@ -71,10 +74,15 @@ const show = (extra: Record<string, unknown> = {}) => render(PastTrip, { trip: r
 const settled = () => screen.findByRole("region", { name: /^Photos/ });
 const days = () => screen.getAllByRole("region").filter((r) => r.hasAttribute("data-day"));
 
+let maps: ReturnType<typeof fakeMaps>;
 beforeEach(() => {
   vi.mocked(api).mockReset();
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-  app.state = state();
+  fake.reset();
+  maps = fakeMaps();
+  vi.mocked(loadMapkit).mockReset();
+  vi.mocked(loadMapkit).mockImplementation(async () => maps);
+  app.state = state({ mapkit: true });
   photos = [];
   best = [];
   clusters = [];
@@ -85,7 +93,7 @@ beforeEach(() => {
   sharingReply = async () => NO_SHARING;
   serve();
 });
-afterEach(() => { app.state = null; viewport.phone = false; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { app.state = null; app.offline = false; viewport.phone = false; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("PastTrip hero", () => {
   it("is a mosaic of the first three of best, with the trip's name as the page's h1 and the images decorative", async () => {
@@ -114,6 +122,7 @@ describe("PastTrip hero", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Spring loop" })).toBeTruthy();
     expect(screen.getByRole("button", { name: /^(Play|Pause|Resume|Replay)$/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+    expect(screen.getByTestId("no-photos").className).toContain("-mt-3");
   });
 
   it("draws no photo pins, no Photos key entry and no stops list on the route map, whatever the photos' places", async () => {
@@ -204,7 +213,7 @@ describe("PastTrip facts", () => {
     photos = [1, 2, 3, 4].map((id) => shot(id));
     best = [1, 2, 3];
     show({ trip: { ...roadTrip, costs: { totals: [{ currency: "USD", amount_minor: 431200 }], priced: 1, bookings: 1 } } });
-    const facts = await screen.findByRole("list", { name: "Trip summary" }).catch(() => screen.findByTestId("trip-summary"));
+    const facts = await screen.findByTestId("trip-summary").catch(() => screen.findByTestId("trip-summary"));
     await waitFor(() => expect(within(facts).getByText("Days", { selector: "dt" })).toBeTruthy());
     expect([...facts.querySelectorAll("dt")].map((d) => d.textContent)).toEqual(["Days", "Nights away", "Distance", "Photos"]);
     expect([...facts.querySelectorAll("dd")].map((d) => d.textContent)).toEqual(["8 days", "7 nights", "1,240 mi", "214 photos"]);
@@ -947,5 +956,123 @@ describe("PastTrip on desktop", () => {
       expect(within(column()).queryByRole("group", { name: "Trip map" })).toBeNull();
       expect(column().querySelector("[data-pin]")).toBeNull();
     });
+  });
+});
+
+describe("PastTrip with no map", () => {
+  const stage = () => screen.getByTestId("past-trip");
+  const emptyBlocks = () => [...stage().children].filter((c) => c.tagName === "DIV" && c.childElementCount === 0 && !c.textContent);
+
+  beforeEach(() => {
+    app.state = state({ mapkit: false });
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  });
+
+  it("on a phone with fewer than three photos is the title, the dates, No photos yet and the facts, with no map and no Replay trip", async () => {
+    show({ trip: flown });
+    expect(await screen.findByTestId("no-photos")).toHaveTextContent("No photos yet");
+    expect(screen.getByRole("heading", { level: 1, name: "Spring loop" })).toBeTruthy();
+    expect(screen.getByText("Mar 1, 2026 – Mar 8, 2026 · Utah")).toBeTruthy();
+    expect(await screen.findByTestId("trip-summary")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+    expect(screen.queryByRole("img", { name: /Map of the route/ })).toBeNull();
+    expect(screen.queryByTestId("replay-map")).toBeNull();
+    expect(screen.getByTestId("no-photos").className).not.toContain("-mt-3");
+    expect(emptyBlocks()).toEqual([]);
+    expect(loadMapkit).not.toHaveBeenCalled();
+    expect(fake.maps).toHaveLength(0);
+  });
+
+  it("on a phone with three or more photos is the mosaic and the facts, with no Replay trip", async () => {
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    await screen.findByTestId("trip-hero");
+    await screen.findByTestId("trip-summary");
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+    expect(emptyBlocks()).toEqual([]);
+  });
+
+  it("on desktop has no map block and no Replay trip in the left column", async () => {
+    viewport.phone = false;
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    const column = await screen.findByTestId("trip-column");
+    await within(column).findByTestId("trip-summary");
+    expect(within(column).queryByRole("group", { name: "Trip map" })).toBeNull();
+    expect(within(column).queryByRole("button", { name: "Replay trip" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+  });
+
+  it("makes no request to load a map for a viewer who is offline, and shows none", async () => {
+    app.state = state({ mapkit: true });
+    app.offline = true;
+    show({ trip: flown });
+    expect(await screen.findByTestId("no-photos")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+    expect(loadMapkit).not.toHaveBeenCalled();
+  });
+
+  it("shows no map when Apple's map doesn't load, and offers no Replay trip", async () => {
+    app.state = state({ mapkit: true });
+    vi.mocked(loadMapkit).mockResolvedValue(null);
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    await screen.findByTestId("trip-hero");
+    await waitFor(() => expect(loadMapkit).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+  });
+});
+
+describe("PastTrip when the map fails after the replay showed", () => {
+  beforeEach(() => {
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  });
+
+  it("on a phone puts a quiet line where the map was, and moves focus from the replay's controls to the facts", async () => {
+    show({ trip: flown });
+    const pause = await screen.findByRole("button", { name: /^(Play|Pause|Resume|Replay)$/ });
+    pause.focus();
+    maps.fail();
+    expect(await screen.findByText("The map couldn’t load")).toBeTruthy();
+    expect(screen.getByText("The map couldn’t load")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+    expect(screen.getByTestId("no-photos").className).not.toContain("-mt-3");
+    const facts = await screen.findByTestId("trip-summary");
+    await waitFor(() => expect(document.activeElement).toBe(facts));
+  });
+
+  it("on desktop does the same for the column's map, and takes Replay trip away", async () => {
+    viewport.phone = false;
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    const column = await screen.findByTestId("trip-column");
+    const replay = await within(column).findByRole("button", { name: "Replay trip" });
+    replay.focus();
+    maps.fail();
+    expect(await within(column).findByText("The map couldn’t load")).toBeTruthy();
+    expect(within(column).queryByRole("button", { name: "Replay trip" })).toBeNull();
+    const facts = within(column).getByTestId("trip-summary");
+    await waitFor(() => expect(document.activeElement).toBe(facts));
+  });
+
+  it("on a phone with photos takes Replay trip away once the map has failed", async () => {
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    const replay = await screen.findByRole("button", { name: "Replay trip" });
+    await userEvent.click(replay);
+    await screen.findByRole("region", { name: "Route replay" });
+    replay.focus();
+    maps.fail();
+    expect(await screen.findByText("The map couldn’t load")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("trip-summary")));
   });
 });

@@ -4,12 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
-vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn(async () => null) }));
+vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn() }));
 
 import { api } from "$lib/api";
 import type { TripPlaces } from "$lib/api-types";
 import { app } from "$lib/app.svelte";
 import { loadMapkit } from "$lib/mapkit";
+import { fake, fakeMaps } from "../../test/fake-mapkit";
 import { segment, state, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 
@@ -28,46 +29,62 @@ const after = Date.parse("2026-01-15T12:00:00Z");
 beforeEach(() => {
   vi.mocked(api).mockReset();
   vi.mocked(api).mockResolvedValue(places as never);
-  vi.mocked(loadMapkit).mockClear();
+  fake.reset();
+  vi.mocked(loadMapkit).mockReset();
+  vi.mocked(loadMapkit).mockImplementation(async () => fakeMaps());
   app.state = state({ mapkit: true } as never);
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
 });
 afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("RouteReplay when it is not shown", () => {
-  it("reports how many stops it can place and draws nothing, and asks for no Apple script itself", async () => {
+  it("reports how many stops it can place and draws nothing and builds no map", async () => {
     const onstops = vi.fn();
     render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
     await waitFor(() => expect(Math.max(...onstops.mock.calls.map(([n]) => n))).toBeGreaterThanOrEqual(2));
     expect(screen.queryByRole("region")).toBeNull();
     expect(screen.queryByRole("application")).toBeNull();
-    expect(loadMapkit).not.toHaveBeenCalled();
+    expect(fake.maps).toHaveLength(0);
   });
 
-  it("draws the map, and asks for Apple's script, once it is shown", async () => {
-    const { rerender } = render(RouteReplay, { trip: trip([there, home]), now: after, shown: false });
+  it("draws the map once it is shown, from the one MapKit session the app shares", async () => {
+    const shared = trip([there, home]);
+    const { rerender } = render(RouteReplay, { trip: shared, now: after, shown: false });
     await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
-    expect(loadMapkit).not.toHaveBeenCalled();
-    await rerender({ trip: trip([there, home]), now: after, shown: true });
+    expect(fake.maps).toHaveLength(0);
+    await rerender({ shown: true });
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    expect(fake.maps.length).toBeGreaterThanOrEqual(1);
     expect(loadMapkit).toHaveBeenCalledOnce();
   });
 
-  it("draws the compact trip map without asking for Apple's script or drawing a MapKit map, however long it stays", async () => {
-    const { rerender } = render(RouteReplay, { trip: trip([there, home]), now: after, shown: true, compact: true });
+  it("draws the compact trip map on Apple's map, and lets it go on to the full replay", async () => {
+    const shared = trip([there, home]);
+    const { rerender } = render(RouteReplay, { trip: shared, now: after, shown: true, compact: true });
     expect(await screen.findByRole("group", { name: "Trip map" })).toBeTruthy();
-    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
-    await new Promise((r) => setTimeout(r, 30));
-    expect(loadMapkit).not.toHaveBeenCalled();
-    expect(document.querySelector("[data-mapkit]")).toBeNull();
-    await rerender({ trip: trip([there, home]), now: after, shown: true, compact: false });
-    await waitFor(() => expect(loadMapkit).toHaveBeenCalledOnce());
+    expect(document.querySelector("[data-mapkit]")).toBeTruthy();
+    expect(fake.maps).toHaveLength(1);
+    await rerender({ shown: true, compact: false });
+    await waitFor(() => expect(document.querySelector("[data-mapkit]")!.getAttribute("role")).toBe("img"));
   });
 
-  it("asks for Apple's script from the first draw of a replay that is not compact", async () => {
-    render(RouteReplay, { trip: trip([there, home]), now: after, shown: true });
-    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
-    await waitFor(() => expect(loadMapkit).toHaveBeenCalledOnce());
+  it("reports no stops, and offers nothing, when there is no key, however many stops the trip has", async () => {
+    app.state = state({ mapkit: false });
+    const onstops = vi.fn();
+    render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(Math.max(0, ...onstops.mock.calls.map(([n]) => n))).toBe(0);
+    expect(loadMapkit).not.toHaveBeenCalled();
+  });
+
+  it("reports no stops once Apple's map is known not to load", async () => {
+    vi.mocked(loadMapkit).mockResolvedValue(null);
+    const onstops = vi.fn();
+    render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
+    await waitFor(() => expect(loadMapkit).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 30));
+    expect(onstops.mock.calls.at(-1)?.[0]).toBe(0);
   });
 
   it("reports no stops for a trip with nothing to place", async () => {

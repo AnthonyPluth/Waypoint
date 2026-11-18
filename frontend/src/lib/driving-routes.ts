@@ -1,7 +1,7 @@
 import { ignoreFailure } from "./act";
 import { apiCall } from "./contract";
 import type { Mk, MkDirections, MkRoute } from "./mapkit";
-import { driveKey, type Roads, type SavedLeg, type Stop } from "./route-replay";
+import { driveKey, type Stop } from "./route-replay";
 
 export type LatLon = { latitude: number; longitude: number };
 export type RoutePath = number[][];
@@ -252,14 +252,4 @@ export function savedRoutes(trip: number): Promise<SavedRoutes> {
   });
   forCards.set(trip, job);
   return job;
-}
-
-export function savedRoads(stops: Stop[], saved: SavedRoutes): Roads {
-  const legs: SavedLeg[] = [];
-  for (let i = 1; i < stops.length; i++) {
-    const key = keyOf(stops[i - 1], stops[i]);
-    const path = isDrive(stops[i - 1], stops[i]) ? saved.get(key) : undefined;
-    if (path) legs.push({ from_segment_id: 0, to_segment_id: 0, points: path, refs: [], key });
-  }
-  return { legs, interstates: [] };
 }
