@@ -84,7 +84,7 @@ Under the library cards, **Settings → Photos** has a **Photo sharing** section
 
 Sharing at the **Everyone on this trip** scope, on one trip or on all, always sends the count it was shown (the count token), so Waypoint can refuse a confirmation whose count is out of date. The same goes for your libraries: a confirmation carries the libraries its count covered, so if you connect, pause or resume a library (on another device, say) before you confirm, Waypoint refuses it, shows the new count and asks again. If Settings can’t reload the list after a change, it says so, with **Try again**, and holds the controls until it can show the list as it is.
 
-Only you can share, remove or stop sharing your own photos. A person without a sign-in of their own (a child) is shared for by the member who connected their library, on the trips that member can see. Nobody else, the trip’s organiser included, can remove or hide someone else’s photo, and nothing on a trip tells anyone that photos they can’t see exist: counts, pins, the map’s extent and the summary only ever count the photos the viewer may see.
+Only you can share, remove or stop sharing your own photos. A person without a sign-in of their own (a child) is shared for by the member who connected their library, on the trips that member can see. Nobody else, the trip’s organiser included, can remove or hide someone else’s photo, and nothing on a trip tells anyone that photos they can’t see exist: counts, clusters and the summary only ever count the photos the viewer may see.
 
 ## On a trip
 
@@ -96,9 +96,9 @@ Tap a photo to open the viewer: the photo or the video's still (with **Play vide
 
 With no library connected, a trip that has started points you to **Connect a library in Settings**; while your library has not synced yet the section says so, and a trip with no photos says **No photos on this trip yet.**
 
-For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one cluster, with its count, its first and last time, and a cover photo. A cluster whose every photo was placed from the itinerary is marked as such. Waypoint no longer draws clusters as pins on the trip’s map (decided 2026-11-18, see [Past trips](/Waypoint/start/trips/#past-trips)). A very long trip keeps at most 400 clusters by merging the smallest into their nearest neighbours.
+For the map, the photos are grouped into clusters: photos taken within a few kilometres of each other form one cluster, with its count, its first and last time, and a cover photo. A cluster whose every photo was placed from the itinerary is marked as such in the data. Waypoint no longer draws clusters as pins on the trip’s map (decided 2026-11-18, see [Past trips](/Waypoint/start/trips/#past-trips)). A very long trip keeps at most 400 clusters by merging the smallest into their nearest neighbours.
 
-Waypoint works out each past trip's best photos from the photos you may see on it, ready for the Past trips list and the top of a trip's page; the web app doesn't show them yet. They are chosen automatically: the cover of each pin, the pin with the most photos first, then more photos from the biggest pins, then photos with no place, oldest first. Videos are never chosen, and a trip with no photos you can see has none.
+Waypoint works out each past trip's best photos from the photos you may see on it, ready for the Past trips list and the top of a trip's page; the web app doesn't show them yet. They are chosen automatically: the cover of each cluster, the cluster with the most photos first, then more photos from the biggest clusters, then photos with no place, oldest first. Videos are never chosen, and a trip with no photos you can see has none.
 
 ## Needs a look
 

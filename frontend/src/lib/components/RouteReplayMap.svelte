@@ -12,10 +12,11 @@
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
   let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, stopList = true, tripId, compact = false, onreplay = null, onended = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; stopList?: boolean; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
+  const replayable = $derived(stops.length >= 2);
   const COMPACT_LABEL = "Trip map";
   const mapLabel = $derived(stopList ? "Map of the route, stop by stop; the stops are listed below" : "Map of the route, stop by stop");
   let fellBack = $state(false);
-  const onMapkit = $derived(maps !== null && !fellBack);
+  const onMapkit = $derived(maps !== null && !fellBack && replayable);
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -46,7 +47,7 @@
   let touched = false;
   $effect(() => { if (calm) { progress = 1; playing = false; started = false; touched = false; } });
   $effect(() => {
-    if (!autoplay || calm || started) return;
+    if (!autoplay || calm || started || !replayable) return;
     started = true;
     if (touched) return;
     progress = 0;
@@ -182,7 +183,7 @@
       </g>
     </svg>
     {/if}
-    {#if compact && onreplay && !observed}
+    {#if compact && onreplay && replayable && !observed}
       <Button class="absolute bottom-3 left-3" variant="secondary" size="sm" aria-label="Replay trip" aria-expanded="false" onclick={onreplay}><Play class="size-3.5" aria-hidden="true" /> Replay trip</Button>
     {/if}
     {#if !compact}
@@ -199,6 +200,7 @@
   </div>
   {#if !compact}
   <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key">
+    {#if replayable}
     <li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>
     {#if stops.some((s) => s.kind === "stay")}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 rounded-[2px] bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
     {#if stops.some((s) => s.kind === "home")}<li class="flex items-center gap-2"><svg viewBox="-9 -9 18 16" class="h-3 w-3.5" aria-hidden="true"><path d="M0 -8 L8 -1 L5.5 -1 L5.5 6 L-5.5 6 L-5.5 -1 L-8 -1 Z" class="fill-map-visited" /></svg>Home</li>{/if}
@@ -206,9 +208,10 @@
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
     {#if stateLines.length && !onMapkit}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
+    {/if}
   </ul>
   {/if}
-  {#if !calm && !compact}
+  {#if !calm && replayable && !compact}
     <div class="flex items-center gap-3">
       <Button variant="outline" onclick={toggle}>
         {#if progress >= 1}<RotateCcw />{:else if playing}<Pause />{:else}<Play />{/if}{buttonLabel}
@@ -218,7 +221,7 @@
         aria-valuetext={stopLine(stops[now], year)} class="h-11 min-w-0 flex-1 accent-primary" />
     </div>
   {/if}
-  {#if stopList && !compact}
+  {#if stopList && replayable && !compact}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div bind:this={listBox} use:quiet class="relative max-h-[24rem] overflow-y-auto overscroll-contain rounded-xl" tabindex="0" role="region" aria-label="Stops list">
     <ol class="text-sm" aria-label="Stops in order" data-testid="stop-list">

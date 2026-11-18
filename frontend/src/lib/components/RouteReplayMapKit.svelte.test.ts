@@ -347,6 +347,13 @@ describe("a route replay and Apple's map", () => {
   });
 });
 
+describe("a map with no route", () => {
+  it("does not use a handle it is given for a map with no route", () => {
+    const { container } = render(RouteReplayMap, { stops: [], year: 2025, maps: fakeMaps() });
+    expect(container.querySelector("[data-mapkit]")).toBeNull();
+  });
+});
+
 describe("state lines and Apple's map", () => {
   it("draws no state lines on Apple's map and lists none in its key, and the flat map's lines and key entry come back when MapKit fails", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/mapkit/token" ? token : { ...places, boundaries: [{ points: [[37.0, -109.05], [41.0, -109.05]] }] }) as never);

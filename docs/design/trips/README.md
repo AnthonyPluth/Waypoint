@@ -13,7 +13,7 @@ Each page says what it replaces: the Past list in `frontend/src/pages/Trips.svel
 
 ## Removed from the completed trip page (owner decision, 2026-11-18)
 
-The owner looked at a completed trip on a phone and decided to remove three things the signed-off designs draw. Where a frame below still shows one, this decision wins.
+The owner looked at a completed trip on a phone and decided, in chat on 2026-11-18 (a chat decision with no issue; the owner then signed it off in chat the same day: "All fine, signed off"), to remove three things the signed-off designs draw. Where a frame below still shows one, this decision wins.
 
 - **Photo pins.** The numbered white circles on the route replay map (one per cluster of photos, with the count inside, the hollow and far variants, the callout with **Show these photos**, the label card during the replay) and the **Photos**, **Photos placed from the itinerary** and **Far from every booking** entries of the map key are gone, on the bundled map and on Apple's alike. The map is the route alone and is fitted to the stops alone. Frames c (pins, tapped pin, replay passing a cluster) and d (a trip with no placeable booking drawn as pins only) are superseded; a trip with photos but no route to replay now shows no map. The `--map-photo` token stays in the theme for now: nothing uses it, and a token changes only on the owner's say.
 - **The stops list.** The numbered, scrolling list of stops under the Replay controls (phone and desktop) is gone from the completed trip page. The older trip page for the static demo keeps it. The map still labels each stop as the replay reaches it and the slider reads out the stop it is on.
