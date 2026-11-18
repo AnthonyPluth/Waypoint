@@ -2,4 +2,6 @@
 # ruleid: waypoint-driving-route-rows
 rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id))
 # ok: waypoint-driving-route-rows
-known = driving_routes.paths_for(conn, viewer, trip_id, keys, now)
+known = driving_routes.paths_for(conn, viewer, trip_id, keys)
+# ruleid: waypoint-driving-route-rows
+fresh = select(DrivingRoute).where(DrivingRoute.stored > now - MONTH)

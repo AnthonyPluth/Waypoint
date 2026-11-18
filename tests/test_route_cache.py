@@ -102,23 +102,19 @@ class StoringAndReadingTests(RouteCacheCase):
         self.ok("ana", "DELETE", f"/api/trips/{again['trip_id']}")
         self.assertEqual(self.rows(), [])
 
-    def test_a_stored_path_is_kept_until_it_is_old_enough_to_be_asked_for_again_and_replaced(self):
+    def test_a_stored_path_is_kept_and_never_replaced_however_old_it_is(self):
         trip, drive = self.trip_with_a_drive()
         now = time.time()
+        year = 400 * 24 * 3600
         with at(now):
             self.assertEqual(self.put("ana", trip, drive, line(drive, ((40.0, -108.0),)))[1], {"stored": True})
-        with at(now + driving_routes.REPLACE_AFTER_SECONDS - 1):
-            self.assertEqual(self.put("ana", trip, drive, line(drive, ((41.0, -109.0),)))[1], {"stored": False})
-        with at(now + driving_routes.REPLACE_AFTER_SECONDS - 1):
+        with at(now + year):
             self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive, ((40.0, -108.0),)))
-        with at(now + driving_routes.REPLACE_AFTER_SECONDS):
-            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"], [])
-            self.assertEqual(self.put("ana", trip, drive, line(drive, ((41.0, -109.0),)))[1], {"stored": True})
-        with at(now + driving_routes.REPLACE_AFTER_SECONDS):
-            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive, ((41.0, -109.0),)))
+            self.assertEqual(self.put("ana", trip, drive, line(drive, ((41.0, -109.0),)))[1], {"stored": False})
+            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"][0]["path"], line(drive, ((40.0, -108.0),)))
         self.assertEqual(len(self.rows()), 1)
 
-    def test_an_expired_row_and_the_row_of_a_drive_the_trip_no_longer_makes_are_ignored_but_never_deleted_until_the_trip_goes(self):
+    def test_the_row_of_a_drive_the_trip_no_longer_makes_is_ignored_but_never_deleted_until_the_trip_goes(self):
         first = self.book("ana", DENVER)
         second = self.book("ana", SALT_LAKE, trip_id=first["trip_id"])
         trip = first["trip_id"]
@@ -126,8 +122,8 @@ class StoringAndReadingTests(RouteCacheCase):
         now = time.time()
         with at(now):
             self.assertEqual(self.put("ana", trip, drive)[1], {"stored": True})
-        with at(now + driving_routes.REPLACE_AFTER_SECONDS * 2):
-            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"], [])
+        with at(now + 400 * 24 * 3600):
+            self.assertEqual(len(self.look_up("ana", trip, drive)[1]["routes"]), 1)
         self.assertEqual(len(self.rows()), 1)
         self.ok("ana", "DELETE", f"/api/segments/{second['id']}")
         self.assertEqual(self.look_up("ana", trip, drive), (200, {"routes": []}))
@@ -347,7 +343,7 @@ class BatchedLookupTests(RouteCacheCase):
         self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
         self.assertEqual(len(self.batch("ben", trip)[1]["trips"]), 1)
 
-    def test_an_old_route_is_left_out_and_a_long_path_is_thinned_keeping_both_ends(self):
+    def test_an_old_route_is_still_returned_and_a_long_path_is_thinned_keeping_both_ends(self):
         trip, drive = self.trip_with_a_drive()
         long = line(drive, [(40.0 + i / 100000, -108.0) for i in range(2000)])
         now = time.time()
@@ -357,8 +353,8 @@ class BatchedLookupTests(RouteCacheCase):
             path = self.batch("ana", trip)[1]["trips"][0]["routes"][0]["path"]
         self.assertEqual(len(path), driving_routes.CARD_POINTS)
         self.assertEqual((path[0], path[-1]), (long[0], long[-1]))
-        with mock.patch("waypoint.server.api.driving_routes.time", mock.Mock(time=lambda: now + driving_routes.REPLACE_AFTER_SECONDS)):
-            self.assertEqual(self.batch("ana", trip), (200, {"trips": []}))
+        with mock.patch("waypoint.server.api.driving_routes.time", mock.Mock(time=lambda: now + 400 * 24 * 3600)):
+            self.assertEqual(self.batch("ana", trip)[1]["trips"][0]["routes"][0]["path"], path)
 
     def shared_trip_with_a_stored_drive(self):
         first = self.book("ana", DENVER)
