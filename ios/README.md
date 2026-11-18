@@ -65,6 +65,11 @@ One-time setup:
 | `OfflinePages.swift` | The cache of the server's public build files for the cached page: one folder per server address in Application Support, `.complete` file protection, replaced as a whole (staged, then swapped in), tagged with the build (the hash of the app shell). Also the list of what is kept (the same files `sw.js` keeps) and the content types. |
 | `OfflineBridge.swift` | The Swift side of the offline bridge: the four requests answered from `OfflineStore` and `OfflineSync`, the origin check, and the `waypointOffline` message handler. |
 | `OfflinePageHandler.swift` | The cached page: the gate (saved trips and a saved page), the rule for when the server counts as unreachable, the `waypoint-offline` scheme handler that serves the saved files, the wrapper around Capacitor's navigation delegate, and the check that brings the web view back to the server. |
+| `SavedTripsReader.swift` | A `Decodable` read model of the saved copy for Siri and Shortcuts, read through `SavedTrips.read` like the bridge. It decodes only the trip's `id`, `name`, dates, `destination` and `cities`, and each booking's `id`, `kind`, `status`, times and zones, `origin`, `destination`, `provider`, `details.flight_number`, `details.address` and `details.time_unknown`. It never decodes `confirmation`, `manage_url`, `travelers`, any other `details` key or `messages`. |
+| `TripAnswers.swift` | Pure functions from that model, the clock and the phone's time zone to an `Answer` (spoken text, card fields, page to open): the next flight, tonight's stay and the check-out, plus the fixed answers (locked, not signed in, saving off, nothing saved, unreadable, nothing found). No network, no Keychain. |
+| `WaypointIntents.swift` | `NextFlightIntent`, `TonightStayIntent` and `CheckOutIntent` (each `.requiresAuthentication`), `WaypointShortcuts` with their phrases, and `TripAnswerService`, which checks the phone is unlocked, a session exists and saving is on before it reads the saved trips. |
+| `TripAnswerCard.swift` | The SwiftUI card shown under the spoken answer, as the frames in `docs/design/siri-shortcuts/` show it. |
+| `PendingPage.swift` | The page a tapped card opens (`#trip/{id}` or `#trip/{id}/flight/{segmentId}`), held in memory for two minutes and used once. |
 | `Keychain.swift`, `PKCE.swift` | Helpers. |
 | `Tests/WaypointTests.swift` | PKCE (RFC 7636 vector), address normalising, sign-in reply checks. |
 | `Tests/OfflineStoreTests.swift` | Save and load, replace not merge, per-server separation, expiry, purge, file protection. |
@@ -74,6 +79,7 @@ One-time setup:
 | `Tests/OfflineBridgeTests.swift` | The four bridge requests, the reply shapes, unknown requests refused, which origins are answered. |
 | `Tests/WebLaunchTests.swift` | The launch with a fake `ServerAPI`: no connection with and without saved trips, a slow request, 401 and 403 signing out and purging, errors that aren't a lost connection, and renewing the web session on the way back to the server. |
 | `Tests/OfflineShellTests.swift` | The gate, when the cached page is shown, the scheme handler, the bridge from a real web view, and the shell with a remote server address that cannot be reached. |
+| `Tests/TripAnswersTests.swift` | The Siri and Shortcuts answers: the read model, the next flight, tonight's stay and the check-out rules (8 am and 11:01 am on check-out morning), the zones, a copy saved before `cities`, the fixed answers, canary values that must never be spoken or shown, no network request, `.requiresAuthentication`, and the page a card opens. |
 
 ## Offline bridge
 
@@ -92,7 +98,7 @@ How the web app reads saved trips from the shell (offline epic #734; the web sid
 
 **Status reply:** `{ "version": 1, "saving": Bool, "syncing": Bool, "lastSaveFailed": Bool, "savedAt": Number | null, "trips": [{ "id": Number, "name": String }] }`. `saving` is the setting, which is on for a new install. `syncing` is true while a fetch of `GET /api/offline` is running (the settings card shows "Saving your trips…" and the web app asks again until it is false). `lastSaveFailed` is true after a failed fetch or save that kept the older copy (a network or server error, or a `version` the app does not know) and false after the next success, after a purge and when saving is switched off. The two flags are optional for the web app, and missing means false, so `version` stays 1. `savedAt` is milliseconds since the epoch of the last save (`null` when nothing is saved); `trips` lists the saved trips' ids and names in the order the server sent them (empty when nothing is saved).
 
-**Load reply:** `{ "version": 1, "trips": [Trip] }`, each `Trip` being one element of the `GET /api/offline` reply's `trips` (`{ "trip": ..., "messages": [...] }`, exactly as saved) plus `"savedAt"`, the same milliseconds since the epoch. Nothing else is added or changed, and the shell never decrypts anything (there is no app-level encryption; see the epic's owner decisions).
+**Load reply:** `{ "version": 1, "trips": [Trip] }`, each `Trip` being one element of the `GET /api/offline` reply's `trips` (`{ "trip": ..., "messages": [...], "cities": { "DEN": "Denver", ... } }`, exactly as saved; `cities` maps the airport codes of the trip's flights to their cities, and a copy saved before it existed has none) plus `"savedAt"`, the same milliseconds since the epoch. Nothing else is added or changed, and the shell never decrypts anything (there is no app-level encryption; see the epic's owner decisions).
 
 **Errors and versions.** A reply with a `version` other than 1, or one that does not match the shapes above, is treated by the web app as an unreadable copy: it shows the offline screen's "can't be opened" state and never invents trips. Reject a request the handler does not know by failing the promise (reply with an error). The web app does not retry on its own. `version` is the same 1 as in `GET /api/offline`; change it only together with the web app.
 
@@ -121,8 +127,13 @@ Offline epic #734, issue #739. WKWebView has no service worker here, so native c
 4. While the web app is showing, a `401` from its own `/api/` ends the session: the shell signs out (revoking the refresh token) and shows "You are signed out of Waypoint." with a **Sign in** button back to the connect screen. It does not try to renew, so there is no renewal loop.
 5. Each launch, `POST /auth/app-session` with the access token gives the web view its normal session cookie. With no connection and a saved copy, the launch skips this and opens the cached page (see "Cached page").
 
+## Siri and Shortcuts
+
+Intents A and B of [#820](https://github.com/AnthonyPluth/Waypoint/issues/820) (design: `docs/design/siri-shortcuts/`), built in #841: "next flight", "tonight's stay" and "check-out", answered from the saved trips on the phone alone, with no network request. Each intent is `.requiresAuthentication` (Siri asks for the unlock first; the saved trips are `.complete` file protected), and `TripAnswerService` answers "Unlock your iPhone to see your trips in Waypoint." without reading if protected data is unavailable. The spoken answer never holds a confirmation code, gate, loyalty number, seat, room, phone number, street address or another traveller's name (the read model doesn't decode them); the card shows the stay's street address and how old the copy is. Nothing is given to Spotlight, donations, `NSUserActivity` or Apple Intelligence schemas. Tapping the card brings the app forward and `PendingPage` opens the booking's page.
+
 ## Not built yet
 
+- Siri and Shortcuts: parking code (#842), "open my trip to a place" (#843) and live flight status (not chosen). The device checks for the next flight and stay intents (design section 4) have not been run: Siri hearing each phrase, the unlock prompt (phone in hand, AirPods, CarPlay), the card's look, the actions in Shortcuts and Spotlight and nothing else of Waypoint's, empty answers after sign-out, and a tap on the card opening the right page.
 - Local reminders, and a Face ID lock on the app or the saved trips (the saved trips open with the phone's own lock only).
 - Share extension (Mail, Safari, Files) and its server route.
 - Push notifications and the relay.

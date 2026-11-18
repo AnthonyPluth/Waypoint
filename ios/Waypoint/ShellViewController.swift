@@ -18,11 +18,23 @@ final class ShellViewController: CAPBridgeViewController {
         let descriptor = super.instanceDescriptor()
         if let url = Self.serverURL {
             descriptor.serverURL = url.absoluteString
+            // A tap on a Siri card that launched the app: open the page it names (only `#trip/...` routes pass).
+            if let page = PendingPage.shared.take() { descriptor.serverURL = url.absoluteString + page }
             if let host = url.host {
                 descriptor.allowedNavigationHostnames = [host, OfflinePageAddress.host]
             }
         }
         return descriptor
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        NotificationCenter.default.addObserver(self, selector: #selector(openSavedPage(_:)), name: .openSavedPage, object: nil)
+    }
+
+    @objc private func openSavedPage(_ note: Notification) {
+        guard !showingCachedPage, let page = note.userInfo?["page"] as? String, PendingPage.isValid(page), let webView else { return }
+        webView.evaluateJavaScript("window.location.hash = '\(page)'", completionHandler: nil)
     }
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
