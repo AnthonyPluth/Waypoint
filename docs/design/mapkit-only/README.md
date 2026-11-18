@@ -1,6 +1,6 @@
-# MapKit only: design for sign-off (#828)
+# MapKit only: the design (#828)
 
-This is phase 1 of [#828](https://github.com/AnthonyPluth/Waypoint/issues/828): the design for showing every map in Waypoint on Apple's MapKit, removing the bundled SVG renderer and the server's road and state-line code and data. **Nothing here is signed off yet**, and nothing is built until the owner signs it off in chat. The owner has already decided three things (2026-11-18, in chat, recorded on #828):
+This is phase 1 of [#828](https://github.com/AnthonyPluth/Waypoint/issues/828): the design for showing every map in Waypoint on Apple's MapKit, removing the bundled SVG renderer and the server's road and state-line code and data. **Signed off by the owner on 2026-11-18** (the frames and the privacy statement; the sign-off is recorded in [this comment on #833](https://github.com/AnthonyPluth/Waypoint/pull/833#issuecomment-6980482363)). The build follows the plan below, one issue per pull request. The owner has already decided three things (2026-11-18, in chat, recorded on #828):
 
 1. The Trips list cards and the Stats world map load Apple's maps too, instead of the bundled SVG.
 2. With no MapKit key, or when Apple's map fails to load, the map and the replay are hidden. There is no fallback renderer.
@@ -10,14 +10,19 @@ The owner answered more questions on this design's pull request (#833) on 2026-1
 
 ## Owner decisions on #833 (2026-11-18)
 
-Given in chat on 2026-11-18 while reviewing #833. These are decisions on the questions this design asked, not a sign-off of the design: the privacy statement and the frames' look are still open.
+Given in chat on 2026-11-18 while reviewing #833. These answered the questions this design asked; the sign-off of the frames and the privacy statement followed (items 5 to 8).
 
 1. **Cards: Apple's static snapshot, with Waypoint's route drawn on top** (option A). The rest as proposed: only cards near the screen load (lazy), photo cards and one-stop cards never ask Apple, and with no key a card shows today's kinds tile. The new server route that signs snapshot addresses, and Apple's options (the parameters, `expires`, and whether Waypoint may draw on top of a snapshot), stay marked **to confirm with Apple first** in the cards' build issue.
 2. **A drive with no road from Apple yet is a straight line. A trip's road distance** is the length of Apple's stored road where there is one, otherwise the straight-line distance, marked "about".
 3. **Stats keeps the visited countries and states shading.** The bundled outline data (`world-atlas`, `us-atlas`) stays, and the Stats map is one MapKit map with the visited regions drawn from it as polygon overlays, plus the arcs, dots and pins as before (reworked in [Stats world map](#stats-world-map-frame-b) and frame b).
 4. **The demo and docs screenshots: a real MapKit key, stored securely, for the demo** is tracked in [#834](https://github.com/AnthonyPluth/Waypoint/issues/834). Until #834 decides otherwise, the static demo shows no maps and the docs screenshots show the grid stand-in.
 
-Still open, with this design's recommended defaults used until the owner answers: the Settings "Maps" row (drawn, proposed), the live region on a failure during a replay (drawn), the city-level cap on a card's map (zoom 12), and the privacy statement and the frames' look (**not signed off**).
+Later the same day the owner signed off the design and answered the last questions (recorded in [the sign-off comment on #833](https://github.com/AnthonyPluth/Waypoint/pull/833#issuecomment-6980482363)):
+
+5. **The frames are signed off**: a (Trips cards), b (the Stats map with the visited shading) and c (the replay with no key).
+6. **The privacy statement is signed off as written**, including that Apple sees each no-photo trip's city-level area as the list scrolls (so a card's map is never closer than city level, zoom 12) and that Apple's script is handed the visited countries' and states' outlines, which are bundled and never fetched from Apple.
+7. **Settings → Travel gets the read-only "Maps" row** (frame c4).
+8. **A map failing during a replay shows a short "The map couldn't load" message**: a quiet line where the replay was, also announced politely (frame c3).
 
 The frames are self-contained HTML pages in the style of the other `docs/design/` pages: vector only, Waypoint's tokens from `frontend/src/app.css`, dark only, made-up names and places, and a toggle for phone (390 px) and desktop (1280 px) widths. Apple's map is drawn as a stylised stand-in, because a real tile can't be committed.
 
@@ -25,7 +30,7 @@ The frames are self-contained HTML pages in the style of the other `docs/design/
 | --- | --- | --- |
 | a | [a-trip-cards.html](a-trip-cards.html) | Past trips list cards on Apple's snapshot (decided on #833): a card's map loaded, loading, failed and with no key; the photo card that never asks Apple; how many maps load on a long list; the options that were weighed |
 | b | [b-stats-map.html](b-stats-map.html) | The Stats world map on one live MapKit map with the visited countries and states shaded from the bundled outlines (decided on #833): loaded, zoomed into the states, a tapped airport and a tapped state, loading, and the section with no key or a failed map |
-| c | [c-replay-no-key.html](c-replay-no-key.html) | A completed trip's page with and without a key (phone and desktop), the replay failing after it started, and the proposed Settings line that says maps need a key |
+| c | [c-replay-no-key.html](c-replay-no-key.html) | A completed trip's page with and without a key (phone and desktop), the replay failing after it started ("The map couldn't load"), and the Settings → Travel "Maps" row that says maps need a key |
 
 Images of each page at phone and desktop width were rendered with Playwright for the owner's review in chat; they are not committed, as the other design pages' images aren't (the pages are vector only).
 
@@ -120,7 +125,7 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `components/RouteReplayMapKit.svelte.test.ts`, `lib/replay-mapkit.test.ts`, `lib/mapkit.test.ts`, `lib/driving-routes.test.ts`, `App.svelte.test.ts` ("preloading MapKit") | Keep; change the "keeps the bundled line" cases to "draws a straight line" | 2 |
 | `components/RouteTile.svelte.test.ts`, `PastTripCard.svelte.test.ts`, `PastTrip.svelte.test.ts`, `pages/Trips.svelte.test.ts`, `pages/Trip.svelte.test.ts`, `pages/Upcoming.svelte.test.ts`, `lib/side-column.test.ts`, `components/TripSummary.svelte.test.ts` | Change (places fixtures lose `roads`/`boundaries`; cards on MapKit) | 1, 2, 3 |
 | `lib/map.test.ts` | Change: keep the outline, visited and state-source cases; drop the projection, zoom and pan cases | 4 |
-| `pages/Settings.svelte.test.ts` | Change if the Settings line is built (open question 1) | 5 |
+| `pages/Settings.svelte.test.ts` | Change: the "Maps" row (decided on #833) | 5 |
 
 ### Python tests
 
@@ -240,12 +245,12 @@ With no key, or when MapKit fails before the replay starts:
 - **Phone, fewer than three photos** (the map hero, owner decision of 2026-11-16): the title and dates, then the quiet line "No photos yet", then the facts line. No map and no Replay trip.
 - **Phone, three or more photos**: the mosaic hero and the facts line, without Replay trip.
 - **Desktop**: the left column is the facts and the bookings list; the map block and Replay trip are not there.
-- **MapKit fails during a replay**: the replay's block closes (its controls go with it), focus moves to the facts line's heading if it was inside the replay, and a polite live region says "The map couldn't load". Nothing else is announced, and nothing is shown for a failure before the map appeared.
+- **MapKit fails during a replay**: the replay's block closes (its controls go with it), focus moves to the facts line's heading if it was inside the replay, and a short quiet line, "The map couldn't load", takes its place, in a polite live region (decided on #833). Nothing else is announced, and nothing is shown for a failure before the map appeared.
 
 ### Where it says maps need a key (frame c, c4)
 
 - **Docs**: "Trips" and "Stats" each open their map section with "Maps need a MapKit key on the server. Without one Waypoint shows no maps or route replays", linking to "Apple's map" in the Trips page.
-- **Settings (proposed, still open: question 1 below)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings.
+- **Settings (decided on #833)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings.
 
 ## Privacy: what Apple learns
 
@@ -322,14 +327,14 @@ Listed in the [inventory](#user-docs-docssrccontentdocs). The new sentence each 
 
 ## Build plan
 
-Five pull requests, in this order, each leaving `main` green (`make check`, CI, `make verify`). Steps 3 and 4 can be built in parallel once 2 has merged. The keys `{{MAPKIT-SERVER}}` and so on stand for the issues' numbers until they are created.
+Five pull requests, in this order, each leaving `main` green (`make check`, CI, `make verify`). Steps 3 and 4 can be built in parallel once 2 has merged. The issues were created on 2026-11-18 from the drafts below: #835, #836, #837, #838 and #839; the issues are the source of truth from now on. The demo's real MapKit key is #834, outside this plan.
 
 Waypoint's `CLAUDE.md` routes build work to Sonnet, including the security- and privacy-sensitive work, held by the checks and Codex's review; Opus only after Sonnet misses or for a design decision left open. Every decision a step needs is settled here or in the owner's answers, so each issue names Sonnet. The vendored `fleet-agent-task` skill says Opus by default; Waypoint's `CLAUDE.md` overrides it.
 
-### Step 1: `{{MAPKIT-SERVER}}` Remove the server's road routing and state lines
+### Step 1 (#835): Remove the server's road routing and state lines
 
 **Context**
-The owner decided on #828 (2026-11-18) to remove the bundled road routing and highway and state-line data and the code that serves them (design: `docs/design/mapkit-only/README.md`, signed off on #828). Today `waypoint/domain/tripmap.py`'s `places` adds `road_legs` (routing over `waypoint/storage/roads.tsv.gz` via `storage/roads.py`) and `state_lines` (`storage/states.tsv.gz` via `storage/states.py`) to `GET /api/trips/{id}/places`, about 24 s for a 112-stay trip (#826). `domain/tripstats.py`'s `_road_km` sums `tripmap.drives` for a trip's distance. `server/jobs.py` preloads both files. #823 added `tripmap.stop_places`, the stops without roads, which the warming job uses.
+The owner decided on #828 (2026-11-18) to remove the bundled road routing and highway and state-line data and the code that serves them (design: `docs/design/mapkit-only/README.md`, signed off on #833). Today `waypoint/domain/tripmap.py`'s `places` adds `road_legs` (routing over `waypoint/storage/roads.tsv.gz` via `storage/roads.py`) and `state_lines` (`storage/states.tsv.gz` via `storage/states.py`) to `GET /api/trips/{id}/places`, about 24 s for a 112-stay trip (#826). `domain/tripstats.py`'s `_road_km` sums `tripmap.drives` for a trip's distance. `server/jobs.py` preloads both files. #823 added `tripmap.stop_places`, the stops without roads, which the warming job uses.
 
 **Scope**
 - Delete `waypoint/storage/roads.py`, `storage/roads.tsv.gz`, `storage/states.py`, `storage/states.tsv.gz`, `tools/roads.py`, `tools/states.py`.
@@ -342,7 +347,7 @@ The owner decided on #828 (2026-11-18) to remove the bundled road routing and hi
 - AGENTS.md and `invariants.md` 4: replace the bundled-data sentence and the removed tests in the checks lists as `docs/design/mapkit-only/README.md` ("AGENTS.md, You see the trips you're on", first and last items) says; nothing else in the promise changes in this step.
 
 **Out of scope**
-The web app's renderer ({{MAPKIT-FRONTEND}}), the cards ({{MAPKIT-CARDS}}), Stats ({{MAPKIT-STATS}}), the rest of the wording ({{MAPKIT-DOCS}}), the warming job (#823).
+The web app's renderer (#836), the cards (#837), Stats (#838), the rest of the wording (#839), the warming job (#823).
 
 **Acceptance criteria**
 - [ ] `git ls-files waypoint/storage tools | grep -E 'roads|states'` prints nothing.
@@ -355,48 +360,48 @@ The web app's renderer ({{MAPKIT-FRONTEND}}), the cards ({{MAPKIT-CARDS}}), Stat
 Remove `tests/test_roads.py`, `tests/test_trip_roads.py`, `tests/test_states.py`, `tests/test_trip_states.py`. Change `tests/test_trips.py`, `tests/test_tripstats.py`, `tests/test_trip_summary.py`, `tests/test_route_cache.py`, `tests/test_route_warming.py`, `tests/test_demo.py`, `tests/test_api_contract.py`, `tests/test_mail_cars.py`, `tests/test_mail_generic_kinds_scan.py` and the web app tests whose places fixtures carry `roads` or `boundaries`. Run `make check`, `make verify`.
 
 **Depends on**
-#823; the owner's sign-off on #828 (the distance rule was decided on #833).
+#823; the owner's sign-off on #833 (2026-11-18), which also decided the distance rule.
 
 **Model**
 Sonnet: removal and a settled distance rule (Waypoint `CLAUDE.md`).
 
-### Step 2: `{{MAPKIT-FRONTEND}}` Remove the bundled renderer from the replay; hide it with no key
+### Step 2 (#836): Remove the bundled renderer from the replay; hide it with no key
 
 **Context**
-After {{MAPKIT-SERVER}}, the replay (`frontend/src/lib/components/RouteReplayMap.svelte`) still draws bundled land outlines (`lib/land.svelte.ts`, `world-atlas`) and falls back to them whenever MapKit is off or fails. The owner decided on #828 that with no key or a failing MapKit the replay is hidden. Design: `docs/design/mapkit-only/README.md` and frame c (`c-replay-no-key.html`), signed off on #828.
+After #835, the replay (`frontend/src/lib/components/RouteReplayMap.svelte`) still draws bundled land outlines (`lib/land.svelte.ts`, `world-atlas`) and falls back to them whenever MapKit is off or fails. The owner decided on #828 that with no key or a failing MapKit the replay is hidden. Design: `docs/design/mapkit-only/README.md` and frame c (`c-replay-no-key.html`), signed off on #833.
 
 **Scope**
-- `RouteReplay.svelte` renders nothing unless `app.state.mapkit === true`, the viewer is online and `loadMapkit()` resolved with a working map; a later failure removes the block, moves focus to the facts heading if it was inside, and announces "The map couldn't load" in a polite live region.
+- `RouteReplay.svelte` renders nothing unless `app.state.mapkit === true`, the viewer is online and `loadMapkit()` resolved with a working map; a later failure replaces the block with a short quiet line, "The map couldn't load" (`text-sm text-muted-foreground` in a rounded, dashed `border-border` box, as frame c3 draws it; in a polite live region; decided on #833), moves focus to the facts heading if it was inside, and the line goes when the page is left.
 - `RouteReplayMap.svelte`: the map area is `RouteReplayMapKit` only; remove the SVG land, road, interstate and boundary layers; keep controls, labels, slider, timing and the vehicle.
 - `lib/route-replay.ts`: remove `roadFor`, `retraceFor`, `RETRACE_*`, `ROAD_MATCH_KM`, `boundaryShapes`, `boundariesShown`, `BOUNDARY_MIN_SCALE`, `NO_ROADS`, `NO_BOUNDARIES`, `Boundaries`, `BoundaryShape` and road tracks; `replay-mapkit.ts` draws a drive with no Apple road as a straight line (decided on #833).
 - `PastTrip.svelte`: with no replay possible, the phone map hero becomes the title, dates, "No photos yet" and the facts; Replay trip is not offered; the desktop left column has no map block (frames c1 to c3).
-- `RouteTileMap.svelte` and `land.svelte.ts` stay until {{MAPKIT-CARDS}} and {{MAPKIT-STATS}} (the cards and Stats still use them).
+- `RouteTileMap.svelte` and `land.svelte.ts` stay until #837 and #838 (the cards and Stats still use them).
 - `make verify`: every demo server gets a run key (`waypoint/verify.py`), the stand-in (`frontend/verify/fake-mapkit.js`) answers by default, `mapkit` in a flow becomes `"none"`, `"error"` or `"blocked"` (`frontend/verify/verify.mjs`, `flows/README.md`); `tools/control start` gets a run key and the stand-in, dropping the `needs_mapkit` refusal (`frontend/verify/control-daemon.mjs`; `make verify-skill` after changing its help).
 - Flows: change `trip-route-replay.json`, `trip-route-replay-backtrack.json`, `home-route-replay.json`, `trip-route-replay-mapkit-fallback.json` and `-blocked.json` (the replay hidden); add `trip-route-replay-no-key.json`.
 - Static demo: `demo/README.md` and `demo/verify.mjs` as the design says: no maps and no replay until #834 gives the demo a real key.
 
 **Out of scope**
-The cards ({{MAPKIT-CARDS}}), Stats ({{MAPKIT-STATS}}), promise wording ({{MAPKIT-DOCS}}).
+The cards (#837), Stats (#838), promise wording (#839).
 
 **Acceptance criteria**
 - [ ] With `mapkit: false` the trip page has no `section[aria-label='Route replay']`, no Replay trip and makes no request to an Apple host (Vitest and `trip-route-replay-no-key`).
 - [ ] With the stand-in failing to load, refusing a token or raising later, the replay is hidden (`RouteReplayMapKit.svelte.test.ts`, the two flows).
 - [ ] No `land.svelte` or `world-atlas` import is left in the replay's files.
-- [ ] The UI matches frame c of `docs/design/mapkit-only/` (signed off on #828); any change to layout, flow or visual style needs the owner's sign-off before merge, and the pull request shows `make verify` images at phone and desktop width beside the frames.
+- [ ] The UI matches frame c of `docs/design/mapkit-only/` (signed off on #833); any change to layout, flow or visual style needs the owner's sign-off before merge, and the pull request shows `make verify` images at phone and desktop width beside the frames.
 
 **Tests**
 Remove `lib/route-roads.test.ts`, `lib/route-boundaries.test.ts`, `RouteReplayRoads.svelte.test.ts`, `RouteReplayBoundaries.svelte.test.ts` (`Removes-Test:`). Change `RouteReplayMap`, `RouteReplay`, `RouteReplayCompact`, `RouteReplayHome`, `RouteReplayHidden`, `RouteReplayMapKit` suites, `replay-mapkit.test.ts`, `route-replay.test.ts`, `PastTrip.svelte.test.ts`, `tests/test_verify.py`, `frontend/verify/verify.test.mjs`. Run `make check`, `make verify`, `make control-smoke`.
 
 **Depends on**
-{{MAPKIT-SERVER}}.
+#835.
 
 **Model**
 Sonnet: a settled UI change held by the frames and the checks.
 
-### Step 3: `{{MAPKIT-CARDS}}` Past trips cards on Apple's map
+### Step 3 (#837): Past trips cards on Apple's map
 
 **Context**
-`frontend/src/lib/components/RouteTile.svelte` draws a Past card's route on bundled outlines (`RouteTileMap.svelte`). The owner decided on #828 that the cards load Apple's map and, with no key, hide it. Design: `docs/design/mapkit-only/README.md` ("Trips list cards") and frame a, signed off on #828, with the owner's decision on #833 (2026-11-18): Apple's static snapshot with Waypoint's route on top.
+`frontend/src/lib/components/RouteTile.svelte` draws a Past card's route on bundled outlines (`RouteTileMap.svelte`). The owner decided on #828 that the cards load Apple's map and, with no key, hide it. Design: `docs/design/mapkit-only/README.md` ("Trips list cards") and frame a, signed off on #833, with the owner's decision on #833 (2026-11-18): Apple's static snapshot with Waypoint's route on top.
 
 **Scope**
 - **To confirm with Apple first, before any code:** the snapshot service's parameters (`center`, `z`, `size`, `scale`, `colorScheme`, `poi`, `lang`, `teamId`, `keyId`, `signature`), whether it accepts `expires`, and whether its terms let Waypoint draw its own route on top of a snapshot. Record what Apple's documentation or support says in the pull request; if any of it doesn't hold, stop and raise it on #828 before building.
@@ -408,28 +413,28 @@ Sonnet: a settled UI change held by the frames and the checks.
 - Flows: change `past-trips-list.json`, `past-trip-saved-route.json`, `trips-widths.json`; add `past-trips-list-no-key.json` and `past-trips-list-map-failed.json`; the snapshot stand-in in `verify.mjs`.
 
 **Out of scope**
-Stats ({{MAPKIT-STATS}}), the replay ({{MAPKIT-FRONTEND}}), promise wording ({{MAPKIT-DOCS}}, though this pull request adds the snapshot's sentence to AGENTS.md's MapKit passage, since it adds what Apple learns).
+Stats (#838), the replay (#836), promise wording (#839, though this pull request adds the snapshot's sentence to AGENTS.md's MapKit passage, since it adds what Apple learns).
 
 **Acceptance criteria**
 - [ ] A card with photos, or with fewer than two stops, makes no snapshot request (Vitest).
 - [ ] With `mapkit: false` no card asks for an address or an image, and the kinds tile shows.
 - [ ] `tests/test_map_snapshots.py` proves the signed query holds only the allowed parameters and no stop coordinate, a stranger's trip is left out, assistants are blocked, and `no_leaks` holds with the key, Key ID and Team ID as canaries.
 - [ ] A 60-card list scrolled end to end in `make verify` requests no more images than cards without photos.
-- [ ] The UI matches frame a (signed off on #828); any change to layout, flow or visual style needs the owner's sign-off before merge; `make verify` images at phone and desktop width beside the frames.
+- [ ] The UI matches frame a (signed off on #833); any change to layout, flow or visual style needs the owner's sign-off before merge; `make verify` images at phone and desktop width beside the frames.
 
 **Tests**
 New `tests/test_map_snapshots.py`; extend `tests/test_mapkit.py`; change `RouteTile.svelte.test.ts`, `PastTripCard.svelte.test.ts`, `pages/Trips.svelte.test.ts`, `lib/driving-routes.test.ts`. Run `make check`, `make verify`.
 
 **Depends on**
-{{MAPKIT-FRONTEND}}; Apple's snapshot parameters, `expires` and drawing on top confirmed (first item of the scope).
+#836; Apple's snapshot parameters, `expires` and drawing on top confirmed (first item of the scope).
 
 **Model**
 Sonnet: a decided design; the new route is held by `tests/test_every_route.py`, `no_leaks` and review.
 
-### Step 4: `{{MAPKIT-STATS}}` The Stats map on MapKit
+### Step 4 (#838): The Stats map on MapKit
 
 **Context**
-`frontend/src/lib/components/TravelMap.svelte` draws the Stats world map from bundled outlines (`lib/map.ts`, `lib/land.svelte.ts`, `world-atlas`, `us-atlas`). The owner decided on #828 that Stats uses MapKit and hides the map with no key, and on #833 (2026-11-18) that the visited countries and states stay shaded, from the bundled outlines. Design: `docs/design/mapkit-only/README.md` ("Stats world map") and frame b, signed off on #828.
+`frontend/src/lib/components/TravelMap.svelte` draws the Stats world map from bundled outlines (`lib/map.ts`, `lib/land.svelte.ts`, `world-atlas`, `us-atlas`). The owner decided on #828 that Stats uses MapKit and hides the map with no key, and on #833 (2026-11-18) that the visited countries and states stay shaded, from the bundled outlines. Design: `docs/design/mapkit-only/README.md` ("Stats world map") and frame b, signed off on #833.
 
 **Scope**
 - New `frontend/src/lib/components/StatsMapKit.svelte`: one `mapkit.Map` (dark, no points of interest, MapKit's zoom control); the visited countries as `mapkit.PolygonOverlay`s from `world-atlas`'s 1:50m outlines and, once zoomed in to a span under about 40° of longitude, the visited US states from `us-atlas` (the United States' fill dropped then), styled with `--map-visited` (fill about 35%, edge about 70%); airports as sized dots, flights as great-circle polylines, stays as pins, above the shading; fitted as `flownBounds` is today; scroll enabled on phone only after zooming in; a tap on any of them selects it and shows today's caption under the map. Only visited features become overlays. If the outlines fail to load, the map shows without shading.
@@ -439,33 +444,33 @@ Sonnet: a decided design; the new route is held by `tests/test_every_route.py`, 
 - Flows: change `open-stats.json`, `stats-map-details.json`, `stats-map-zoom.json`, `stats-long-names.json`, `hotel-stats.json`, `parking-stats.json`; add `stats-no-key.json`, `stats-map-failed.json`.
 
 **Out of scope**
-Cards, replay, wording beyond the Stats sentence in AGENTS.md's MapKit passage ({{MAPKIT-DOCS}}).
+Cards, replay, wording beyond the Stats sentence in AGENTS.md's MapKit passage (#839).
 
 **Acceptance criteria**
 - [ ] With `mapkit: false` Stats has no `#stats-map-slot` map and makes no request to an Apple host; the Countries tile and lists show.
 - [ ] The stand-in records only the period's airports, arcs and stays and the visited countries' and states' outlines, never an unvisited one (`StatsMapKit.svelte.test.ts`); the visited-shading and tap cases of the removed `TravelMap.svelte.test.ts` pass against it.
 - [ ] With no key the outline files are not requested.
 - [ ] The check fails on a `geoPath(` in a component or an outline import outside `lib/map.ts` (its examples).
-- [ ] The UI matches frame b (signed off on #828); any change to layout, flow or visual style needs the owner's sign-off before merge; `make verify` images at phone and desktop width beside the frames.
+- [ ] The UI matches frame b (signed off on #833); any change to layout, flow or visual style needs the owner's sign-off before merge; `make verify` images at phone and desktop width beside the frames.
 
 **Tests**
 New `StatsMapKit.svelte.test.ts`; remove `TravelMap.svelte.test.ts`, `lib/land.svelte.test.ts` (`Removes-Test:`); change `lib/map.test.ts`, `frontend/src/test/fake-mapkit.ts`. Run `make check`, `make verify`.
 
 **Depends on**
-{{MAPKIT-FRONTEND}}.
+#836.
 
 **Model**
 Sonnet: a decided UI change.
 
-### Step 5: `{{MAPKIT-DOCS}}` Promises and docs for MapKit only
+### Step 5 (#839): Promises and docs for MapKit only
 
 **Context**
-Steps {{MAPKIT-SERVER}} to {{MAPKIT-STATS}} make every map Apple's and remove the bundled one. AGENTS.md ("You see the trips you're on"), SECURITY.md ("MapKit (optional)"), `.github/agent-review/invariants.md` 4 and 9 and the user docs still describe the bundled map. The wording to write is in `docs/design/mapkit-only/README.md` ("Wording that must change"), signed off on #828.
+Steps #835 to #838 make every map Apple's and remove the bundled one. AGENTS.md ("You see the trips you're on"), SECURITY.md ("MapKit (optional)"), `.github/agent-review/invariants.md` 4 and 9 and the user docs still describe the bundled map. The wording to write is in `docs/design/mapkit-only/README.md` ("Wording that must change"), signed off on #833.
 
 **Scope**
-- Rewrite the passages listed there in AGENTS.md, SECURITY.md and `invariants.md`, citing the owner's decisions on #828 and keeping every earlier decision cited.
+- Rewrite the passages listed there in AGENTS.md, SECURITY.md and `invariants.md`, citing the owner's decisions on #828 and #833 and keeping every earlier decision cited.
 - User docs: `start/trips.md`, `start/stats.md`, `start/docker.md`, `reference/configuration.md`, `privacy/email-scanning.md`, `README.md`, `docs/PHOTOS.md`; a status line in `docs/design/mapkit-only/README.md` and `docs/design/mapkit-spike.md`.
-- If the owner chooses it (open question 1): the Settings → Travel "Maps" row (frame c4) and its test.
+- The Settings → Travel "Maps" row (frame c4, decided on #833): read-only, "Apple Maps" with an "On" chip and a "What Apple learns" link to the trips docs' Apple's map section when `app.state.mapkit` is true; "Off: this server has no MapKit key, so Waypoint shows no maps or route replays." with an "Off" chip and a "How to turn on maps" link to the configuration docs otherwise. No switch.
 - `make feature-map`, `make user-feature-map`.
 
 **Out of scope**
@@ -474,28 +479,20 @@ Code changes other than the Settings row.
 **Acceptance criteria**
 - [ ] `grep -rniE 'bundled (svg )?map|state lines|roads\.tsv|states\.tsv|never drawn by MapKit' AGENTS.md SECURITY.md .github docs/src README.md docs/PHOTOS.md` finds nothing but history.
 - [ ] Every check named in the new wording exists (the second review checks it).
-- [ ] If the Settings row is built: it matches frame c4, with `make verify` images at phone and desktop width.
+- [ ] The Settings row matches frame c4 (signed off on #833), with `make verify` images at phone and desktop width for both states (a `mapkit: "none"` flow and a default one).
 
 **Tests**
-`make docs-build`, `make check`; `pages/Settings.svelte.test.ts` if the row is built.
+`make docs-build`, `make check`; `pages/Settings.svelte.test.ts` (both states, the links' targets).
 
 **Depends on**
-{{MAPKIT-CARDS}}, {{MAPKIT-STATS}}.
+#837, #838.
 
 **Model**
 Sonnet: the wording is fixed here; Codex and the second review check it against the code.
 
 ## Open questions for the owner
 
-Answered on #833 (2026-11-18), see [Owner decisions on #833](#owner-decisions-on-833-2026-11-18): cards on Apple's snapshot with Waypoint's route on top; a straight line for a drive with no Apple road and the distance rule; Stats keeps the shading; the demo's real key is #834 and docs screenshots keep the stand-in unless #834 decides otherwise.
-
-Still open. The design uses the recommended default for each until the owner answers:
-
-1. **Settings line**: add the read-only "Maps" row in Settings → Travel (frame c4), or say it in the docs only? Default: drawn and proposed; built only if the owner says yes.
-2. **Failure during a replay**: announce "The map couldn't load" in a live region (as drawn), or close silently? Default: announce.
-3. **Card zoom cap**: a card's map no closer than city level (zoom 12), so a card never shows the street around a stay or Home? Default: zoom 12.
-4. **Privacy statement**: is the [statement above](#privacy-what-apple-learns) what you want the promise to say, including that Apple newly learns the rough areas of past trips without photos as the list scrolls, and from Stats the period's travel area, airports, flights, stays and which countries and states are shaded? **Not signed off.**
-5. **The frames' look**: a, b and c as drawn, or changes? **Not signed off.**
+None. Every question this design asked was answered on #833 on 2026-11-18 (see [Owner decisions on #833](#owner-decisions-on-833-2026-11-18) and [the sign-off comment](https://github.com/AnthonyPluth/Waypoint/pull/833#issuecomment-6980482363)). What is left outside this design is the demo's real MapKit key, [#834](https://github.com/AnthonyPluth/Waypoint/issues/834).
 
 ## Fonts
 
