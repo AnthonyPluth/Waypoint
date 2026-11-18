@@ -329,10 +329,16 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(by_trip[unknown["trip_id"]], {"DEN": "Denver"})
         self.assertEqual(by_trip[stay["trip_id"]], {})
 
-    def test_cities_are_empty_for_someone_who_cannot_see_the_booking(self):
+    def test_cities_hold_only_the_airports_of_the_viewers_own_trips_never_someone_elses(self):
         self.book("ana", flight(days(1), days(3), origin="DEN", destination="GJT"), [{"person_id": self.person["ana"]}])
         self.assertEqual(self.ok("ben"), {"version": 1, "trips": []})
-        self.assertNotIn("Denver", json.dumps(self.ok("ben")))
+        mine = self.trip_with("ben", days(2), days(4), flight(days(2), days(4), origin="SEA", destination="PDX", confirmation="BEN001"),
+                              [{"person_id": self.person["ben"]}])
+        got = self.ok("ben")
+        self.assertEqual([c["trip"]["id"] for c in got["trips"]], [mine["trip_id"]])
+        self.assertEqual(got["trips"][0]["cities"], {"SEA": "Seattle", "PDX": "Portland"})
+        for others in ("Denver", "Grand Junction", "DEN", "GJT"):
+            self.assertNotIn(others, json.dumps(got))
 
     def test_the_route_is_a_get_and_the_only_one(self):
         self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])

@@ -87,6 +87,9 @@ struct WaypointApp: App {
     private func returnToForeground() async {
         await renewWebSession()
         guard phase == .shell else { return }
+        if PendingPage.shared.peek() != nil {
+            NotificationCenter.default.post(name: .openSavedPage, object: nil)
+        }
         await OfflineSync.shared.sync()
     }
 

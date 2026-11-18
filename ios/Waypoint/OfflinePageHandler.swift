@@ -113,14 +113,17 @@ final class OfflineNavigation: NSObject {
     private let gate: OfflineGate
     private let showCachedPage: (WKWebView) -> Void
     private let serverPageLoaded: (WKWebView) -> Void
+    private let cachedPageLoaded: (WKWebView) -> Void
 
     init(wrapping wrapped: WKNavigationDelegate?, server: URL, gate: OfflineGate = .shared,
-         showCachedPage: @escaping (WKWebView) -> Void, serverPageLoaded: @escaping (WKWebView) -> Void) {
+         showCachedPage: @escaping (WKWebView) -> Void, serverPageLoaded: @escaping (WKWebView) -> Void,
+         cachedPageLoaded: @escaping (WKWebView) -> Void = { _ in }) {
         self.wrapped = wrapped
         self.server = server
         self.gate = gate
         self.showCachedPage = showCachedPage
         self.serverPageLoaded = serverPageLoaded
+        self.cachedPageLoaded = cachedPageLoaded
     }
 
     override func responds(to aSelector: Selector!) -> Bool {
@@ -145,6 +148,8 @@ extension OfflineNavigation: WKNavigationDelegate {
         wrapped?.webView?(webView, didFinish: navigation)
         if let url = webView.url, Endpoints.origin(url) == Endpoints.origin(server) {
             serverPageLoaded(webView)
+        } else if let url = webView.url, url.scheme == OfflinePageAddress.scheme, url.host == OfflinePageAddress.host {
+            cachedPageLoaded(webView)
         }
     }
 }

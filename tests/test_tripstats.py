@@ -61,7 +61,7 @@ class TripSummaryCase(Household):
             self.c.execute(insert(PhotoExclusion).values(person_id=person, asset_id=f"asset-{self.asset}", trip_id=trip_id, created=1.0))
 
     def summary(self, trip_id, who=None):
-        got = tripstats.summary(self.c, who or self.jane, trip_id, time.time())
+        got = tripstats.summary(self.c, who or self.jane, trip_id)
         assert got is not None
         return got
 
@@ -168,13 +168,13 @@ class TripSummaryTests(TripSummaryCase):
         self.assertGreater(got["road_km"], before["road_km"])
         self.assertEqual(got["distance_km"], got["road_km"])
 
-    def test_an_expired_stored_road_is_ignored_like_the_replay_ignores_it(self):
+    def test_a_road_stored_400_days_ago_still_counts_in_the_distance(self):
         trip = self.mine(DENVER)["trip_id"]
         self.mine(SALT_LAKE_DRIVE, trip)
-        drive, _ = self.stored_road(trip, (40.2, -108.0), (40.9, -110.0), now=time.time() - driving_routes.REPLACE_AFTER_SECONDS - 60)
+        drive, _ = self.stored_road(trip, (40.2, -108.0), (40.9, -110.0), now=time.time() - 400 * 24 * 3600)
         got = self.summary(trip)
-        self.assertTrue(got["road_estimated"])
-        self.assertEqual(got["road_km"], round(stats.distance_km(drive[:2], drive[2:]), 1))
+        self.assertFalse(got["road_estimated"])
+        self.assertGreater(got["road_km"], round(stats.distance_km(drive[:2], drive[2:]), 1))
 
     def test_a_drive_with_no_stored_road_is_a_straight_line_and_estimated(self):
         trip = self.mine(DENVER)["trip_id"]
@@ -256,8 +256,8 @@ class TripSummaryTests(TripSummaryCase):
 
     def test_someone_not_on_the_trip_gets_nothing(self):
         trip = self.add(self.jane, DENVER, None, self.on(self.jane.person_id))["trip_id"]
-        self.assertIsNone(tripstats.summary(self.c, self.sam, trip, time.time()))
-        self.assertIsNone(tripstats.summary(self.c, self.jane, 99999, time.time()))
+        self.assertIsNone(tripstats.summary(self.c, self.sam, trip))
+        self.assertIsNone(tripstats.summary(self.c, self.jane, 99999))
 
 
 if __name__ == "__main__":

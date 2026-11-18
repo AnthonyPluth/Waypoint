@@ -201,7 +201,7 @@ def api_trip_places(conn, _q, _b, trip_id) -> TripPlaces:
 
 def api_trip_summary(conn, _q, _b, trip_id) -> TripSummary:
     who = viewer(conn)
-    return _run(lambda: tripstats.summary(conn, who, row_id(trip_id, NO_TRIP), time.time()), NO_TRIP)
+    return _run(lambda: tripstats.summary(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
 
 
 def api_trip_edit(conn, _q, body: TripBody, trip_id) -> Trip:
