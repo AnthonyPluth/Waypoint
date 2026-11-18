@@ -282,6 +282,17 @@ describe("the saved picture in the iPhone app with no connection", () => {
     expect(screen.getByTestId("code-confirmation")).toBeInTheDocument();
   });
 
+  it("treats a gateway failure from a proxy or tunnel like no connection", async () => {
+    for (const status of [502, 503, 504]) {
+      offlineShell(saved([{ segment_id: 7, type: "image/png", data: "QUJD" }]));
+      vi.mocked(apiImage).mockRejectedValue(Object.assign(new Error("Bad gateway"), { status }));
+      const { unmount } = render(GateCode, { segment: lot, now: NOW });
+      await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+      expect(await screen.findByRole("img", { name: "QR code for Example Airport Long-Term Lot" })).toHaveAttribute("src", "data:image/png;base64,QUJD");
+      unmount();
+    }
+  });
+
   it("does not look in the saved trips when the server answers, even in the app", async () => {
     vi.mocked(inShell).mockReturnValue(true);
     vi.mocked(shellLoad).mockResolvedValue([saved([{ segment_id: 7, type: "image/png", data: "QUJD" }])]);

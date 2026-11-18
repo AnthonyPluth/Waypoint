@@ -50,7 +50,7 @@ For each trip, Waypoint saves:
 - the travellers’ display names;
 - the cities of the trip’s airports: for each airport code on the trip’s own flights, its city name (for example `DEN` is Denver), so the saved copy can say where a flight goes without a connection. Only the flights you can see add to it, and a code Waypoint has no city for is left out;
 - the confirmation message kept for each booking, as **View email** shows it, without images: subject, the sender’s domain and day, its text and its formatting. Offline, each image shows its description in place of the picture;
-- in the iPhone app, the QR code of your own [parking bookings](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking), so the **Show QR code** picture opens with no connection (the owner’s decision, 2026-11-18).
+- in the iPhone app, the QR code of your own [parking bookings](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking) (the owner’s decision, 2026-11-18). The picture is kept on the phone with the saved trips and the **Show QR code** dialog shows it when the app can’t reach your server. The saved-trips page itself has no **Show QR code** button yet; a later change (#850) adds a way to open it from there.
 
 Never saved: loyalty and Known Traveler numbers, the QR code of a parking booking in a browser, live flight status, any trip that isn’t saved, and People, Settings, the review queue, mailboxes, AI settings and sign-in data.
 

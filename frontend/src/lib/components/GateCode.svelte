@@ -36,7 +36,8 @@
   const lot = $derived(headline(segment));
   const side = $derived(squareSide(Math.min(stage.width, stage.height), natural));
 
-  const unreachable = (err: unknown) => !(err && typeof err === "object" && "status" in err && typeof err.status === "number" && err.status > 0);
+  const GATEWAY = [502, 503, 504];
+  const unreachable = (err: unknown) => !(err && typeof err === "object" && "status" in err && typeof err.status === "number" && err.status > 0 && !GATEWAY.includes(err.status));
 
   async function look() {
     src = null;
