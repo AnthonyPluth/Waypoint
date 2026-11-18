@@ -1,21 +1,42 @@
 import type { Maps, Mk, MkAnnotation, MkCoordinate, MkDirectionsRequest, MkEvent, MkOverlay } from "$lib/mapkit";
 
 export type FakeAnnotation = MkAnnotation & { factory: () => HTMLElement; options: Record<string, unknown> };
-export type FakeOverlay = MkOverlay & { options: { style?: FakeStyle } };
+export type FakeOverlay = MkOverlay & { options: { style?: FakeStyle; data?: unknown; enabled?: boolean } };
 export type FakeStyle = { options: Record<string, unknown> };
 export type FakeRect = { x: number; y: number; width: number; height: number };
 
 export class FakeMap {
+  isScrollEnabled: boolean;
+  region = { span: { latitudeDelta: 180, longitudeDelta: 360 } };
+  selectedAnnotation: FakeAnnotation | null = null;
+  selectedOverlay: FakeOverlay | null = null;
+  private heard = new Map<string, Set<(e: MkEvent) => void>>();
   annotations = new Set<FakeAnnotation>();
   overlays = new Set<FakeOverlay>();
   rects: FakeRect[] = [];
   destroyed = false;
-  constructor(readonly host: HTMLElement, readonly options: Record<string, unknown>) { fake.maps.push(this); }
+  constructor(readonly host: HTMLElement, readonly options: Record<string, unknown>) { this.isScrollEnabled = options.isScrollEnabled !== false; fake.maps.push(this); }
+  addEventListener(type: string, l: (e: MkEvent) => void) { (this.heard.get(type) ?? this.heard.set(type, new Set()).get(type)!).add(l); }
+  removeEventListener(type: string, l: (e: MkEvent) => void) { this.heard.get(type)?.delete(l); }
+  emit(type: string, event: MkEvent = {}) { for (const l of [...(this.heard.get(type) ?? [])]) l(event); }
+  zoomTo(longitudeDelta: number) { this.region = { span: { latitudeDelta: longitudeDelta / 2, longitudeDelta } }; this.emit("region-change-end"); }
+  select(item: FakeAnnotation | FakeOverlay) {
+    const annotation = "coordinate" in item ? item : undefined;
+    this.selectedAnnotation = annotation ?? null;
+    this.selectedOverlay = annotation ? null : (item as FakeOverlay);
+    this.emit("select", annotation ? { annotation } : { overlay: item as FakeOverlay });
+  }
+  deselect() { this.selectedAnnotation = null; this.selectedOverlay = null; this.emit("deselect"); }
   addAnnotation(a: FakeAnnotation) { if (fake.broken) throw new Error("MapKit failed"); this.annotations.add(a); }
   removeAnnotation(a: FakeAnnotation) { this.annotations.delete(a); }
   addOverlay(o: FakeOverlay) { if (fake.broken) throw new Error("MapKit failed"); this.overlays.add(o); }
   removeOverlay(o: FakeOverlay) { this.overlays.delete(o); }
-  setVisibleMapRectAnimated(rect: object, animate: boolean) { this.rects.push({ ...(rect as FakeRect), animate } as FakeRect); }
+  setVisibleMapRectAnimated(rect: object, animate: boolean) {
+    const r = rect as FakeRect;
+    this.rects.push({ ...r, animate } as FakeRect);
+    this.region = { span: { latitudeDelta: r.height * 360, longitudeDelta: r.width * 360 } };
+    this.emit("region-change-end");
+  }
   destroy() { this.destroyed = true; }
 }
 
@@ -60,11 +81,17 @@ export const fakeMk: Mk = {
   } as unknown as Mk["MapRect"],
   Annotation: class {
     visible = true;
-    constructor(public coordinate: MkCoordinate, readonly factory: () => HTMLElement, readonly options: Record<string, unknown> = {}) { this.visible = options.visible !== false; }
+    data: unknown;
+    constructor(public coordinate: MkCoordinate, readonly factory: () => HTMLElement, readonly options: Record<string, unknown> = {}) { this.visible = options.visible !== false; this.data = options.data; }
   } as unknown as Mk["Annotation"],
   PolylineOverlay: class {
-    constructor(public points: MkCoordinate[], readonly options: { style?: object } = {}) {}
+    data: unknown;
+    constructor(public points: MkCoordinate[], readonly options: { style?: object; data?: unknown } = {}) { this.data = options.data; }
   } as unknown as Mk["PolylineOverlay"],
+  PolygonOverlay: class {
+    data: unknown;
+    constructor(public points: MkCoordinate[][], readonly options: { style?: object; data?: unknown } = {}) { this.data = options.data; }
+  } as unknown as Mk["PolygonOverlay"],
   Style: class { constructor(readonly options: Record<string, unknown>) {} } as unknown as Mk["Style"],
   Directions: Object.assign(
     class {

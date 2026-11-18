@@ -97,14 +97,25 @@ def route_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Poin
     kept = [s for s in at.live if s["kind"] in keeps]
     stored = {g.id: (g.latitude, g.longitude) for g in at.stays if g.latitude is not None and g.longitude is not None}
     found: list[Point] = [(a.latitude, a.longitude) for a in sorted(at.airports, key=lambda a: a.code)]
+    def city(text: str | None) -> Point | None:
+        wanted = (text or "").strip().lower()
+        for key in (wanted, wanted.split(",")[0].strip()):
+            if key and key in at.cities:
+                return at.cities[key]
+        return None
+
     for s in sorted(kept, key=lambda s: s["id"]):
-        named = [at.cities[c] for c in sorted(_names(s)) if c in at.cities]
-        if s["kind"] in ("train", "cruise"):
-            found += named
-        elif s["id"] in stored:
-            found.append(stored[s["id"]])
-        elif named:
-            found.append(named[0])
+        have = stored.get(s["id"])
+        if s["kind"] == "train":
+            found += [p for p in (city(s["origin"]), have or city(s["destination"])) if p is not None]
+        elif s["kind"] == "cruise":
+            found += [p for p in (have or city(s["origin"]), *(city(port["name"]) for port in s["itinerary"]), city(s["destination"])) if p is not None]
+        elif have is not None:
+            found.append(have)
+        else:
+            named = [at.cities[c] for c in sorted(_names(s)) if c in at.cities]
+            if named:
+                found.append(named[0])
     if at.home is not None and all(s["kind"] not in ("flight", "train", "cruise") for s in at.live):
         found.append((at.home["latitude"], at.home["longitude"]))
     return found

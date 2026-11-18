@@ -38,7 +38,7 @@ cd Waypoint
 docker compose up -d
 ```
 
-Open `http://localhost:8765`. No account, `.env` file or API key is needed to start: add people and bookings by hand, and connect Gmail, AI or live flight status later if you want them. Brand logos and the map are bundled. The database and its encryption key live in `./data`; keep that folder.
+Open `http://localhost:8765`. No account, `.env` file or API key is needed to start: add people and bookings by hand, and connect Gmail, AI or live flight status later if you want them. Brand logos are bundled; maps need a MapKit key. The database and its encryption key live in `./data`; keep that folder.
 
 The image is `ghcr.io/anthonypluth/waypoint` (Intel/AMD and ARM), tagged `latest` and by version (`2`, `2.131`, `2.131.5`). Every push to `main` that passes the tests becomes a release; update with `docker compose pull && docker compose up -d`.
 
@@ -46,7 +46,7 @@ One deployment serves one household. Before you put it on the internet, read [In
 
 ## Privacy
 
-Waypoint sends nothing about itself anywhere: no analytics, no error reporting, no logo or map service (unless you add a MapKit key: then Apple’s map (the route replay, and a map image on each past trip without photos, which shows Apple the rough area), and, overnight, the start and end of each finished trip’s drives for their roads; see the docs). Your email is read on your server and never stored in the clear. You see only the trips you’re on or booked. Loyalty and Known Traveler numbers are encrypted and never appear in logs, notifications or hosted AI prompts. The exact promises, and the checks that hold the code to them, are in [Waypoint’s promises](AGENTS.md#waypoints-promises); [Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) explains what a scan reads and keeps.
+Waypoint sends nothing about itself anywhere: no analytics, no error reporting, no logo or map service (unless you add a MapKit key: then Apple’s map for the route replay, a map image on each past trip without photos (which shows Apple the rough area) and Stats, and, overnight, the start and end of each finished trip’s drives for their roads; see the docs). Your email is read on your server and never stored in the clear. You see only the trips you’re on or booked. Loyalty and Known Traveler numbers are encrypted and never appear in logs, notifications or hosted AI prompts. The exact promises, and the checks that hold the code to them, are in [Waypoint’s promises](AGENTS.md#waypoints-promises); [Email scanning](https://anthonypluth.github.io/Waypoint/privacy/email-scanning/) explains what a scan reads and keeps.
 
 ## Documentation
 

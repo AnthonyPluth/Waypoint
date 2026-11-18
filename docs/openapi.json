@@ -9614,13 +9614,20 @@
             "items": {
               "$ref": "#/components/schemas/StatsPlacePoint"
             }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "countries",
           "cities",
           "visits",
-          "points"
+          "points",
+          "states"
         ],
         "additionalProperties": false
       },

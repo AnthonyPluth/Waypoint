@@ -41,14 +41,6 @@
     apiCall<"GET /api/people">("/api/people").then((p) => { people = p.people; }).catch(() => { people = []; });
   });
 
-  let TravelMap = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"]; visits: Stats["places"]["visits"]; points: Stats["places"]["points"] }> | null>(null);
-  let mapError = $state("");
-  async function loadMap() {
-    mapError = "";
-    try { TravelMap = (await import("$lib/components/TravelMap.svelte")).default; } catch (err) { mapError = errMsg(err); }
-  }
-  $effect(() => { if (!TravelMap && !mapError) void loadMap(); });
-
   const current = $derived(loaded && loaded.key === key ? loaded.stats : null);
   const problem = $derived(failed && failed.key === key ? failed.message : "");
   const yearChoices = $derived(sel.year !== null && !years.includes(sel.year) ? [sel.year, ...years] : years);
@@ -64,6 +56,22 @@
   const whoName = $derived(sel.who === "all" ? "Everyone" : people.find((p) => p.id === sel.who)?.display_name ?? "this person");
   const selectionLabel = $derived([people.length ? whoName : null, sel.year ?? "All time"].filter(Boolean).join(" · "));
   const unit = $derived(current?.distance_unit ?? "mi");
+
+  let StatsMapKit = $state<Component<{ flights: Stats["flights"]; stays: Stats["stays"]["pins"]; visits: Stats["places"]["visits"]; points: Stats["places"]["points"]; onfailure: () => void }> | null>(null);
+  let mapGone = $state(false);
+  let connected = $state(typeof navigator === "undefined" || navigator.onLine !== false);
+  $effect(() => {
+    const set = () => { connected = navigator.onLine !== false; };
+    window.addEventListener("online", set);
+    window.addEventListener("offline", set);
+    return () => { window.removeEventListener("online", set); window.removeEventListener("offline", set); };
+  });
+  const mappable = $derived(!!current && (current.flights.airports.some((a) => a.latitude !== null) || current.stays.pins.length > 0 || current.places.visits.length > 0 || current.places.points.length > 0));
+  const mapWanted = $derived(app.state?.mapkit === true && !app.offline && connected && mappable && !mapGone);
+  $effect(() => {
+    if (!mapWanted || StatsMapKit) return;
+    import("$lib/components/StatsMapKit.svelte").then((m) => { StatsMapKit = m.default; }, () => { mapGone = true; });
+  });
 
   let reviewing = $state(false);
   const reviewable = $derived(reviewOffered(sel.year, new Date()));
@@ -98,6 +106,11 @@
     { label: "Nights at sea", value: count(current.cruises.nights) },
     { label: "Sea days", value: count(current.cruises.sea_days) },
     { label: "Ports of call", value: count(current.cruises.ports) },
+  ] : []);
+
+  const placeTiles = $derived<Tile[]>(current ? [
+    { label: "Countries", value: count(current.places.countries.length) },
+    ...(current.places.states.length ? [{ label: "States", value: count(current.places.states.length) }] : []),
   ] : []);
 
   const headlineTiles = $derived<Tile[]>(current && f ? [
@@ -245,15 +258,17 @@
       <Button variant="outline" onclick={() => (reviewing = true)}>See your {sel.year} in review</Button>
     {/if}
     {#if headlineTiles.length}{@render headline(headlineTiles)}{/if}
-    <section aria-labelledby="places-title" id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20 space-y-3">
+    <section aria-labelledby="places-title" class="scroll-mt-20 space-y-3">
       <h2 id="places-title" class="text-2xl font-bold tracking-tight">Where you’ve been</h2>
-      {@render tileGrid([{ label: "Countries", value: count(current.places.countries.length) }])}
-      {#if TravelMap}
-        <TravelMap flights={f} stays={current?.stays.pins ?? []} visits={current?.places.visits ?? []} points={current?.places.points ?? []} />
-      {:else if mapError}
-        <p class="text-sm text-muted-foreground">The map couldn’t load: {mapError} <Button variant="outline" size="sm" onclick={loadMap}>Try again</Button></p>
-      {:else}
-        <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
+      {@render tileGrid(placeTiles)}
+      {#if mapWanted}
+        <div id="stats-map-slot" data-testid="stats-map-slot" class="scroll-mt-20">
+          {#if StatsMapKit}
+            <StatsMapKit flights={f} stays={current.stays.pins} visits={current.places.visits} points={current.places.points} onfailure={() => { mapGone = true; }} />
+          {:else}
+            <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
+          {/if}
+        </div>
       {/if}
       {#each placeLists as l (l.title)}<TopList title={l.title} rows={l.rows} />{/each}
     </section>

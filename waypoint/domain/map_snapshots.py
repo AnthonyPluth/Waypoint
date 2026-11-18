@@ -73,13 +73,22 @@ def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
     return 2 * EARTH_KM * math.asin(min(1.0, math.sqrt(h)))
 
 
+def _unwrapped(longitudes: list[float]) -> list[float]:
+    ordered = sorted(longitudes)
+    gaps = [(ordered[(i + 1) % len(ordered)] - ordered[i]) % 360 for i in range(len(ordered))]
+    start = ordered[(gaps.index(max(gaps)) + 1) % len(ordered)]
+    return [lon if lon >= start else lon + 360 for lon in longitudes]
+
+
 def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | None:
     if not any(_km(a, b) >= APART_KM for i, a in enumerate(points) for b in points[i + 1:]):
         return None
-    ground = [_world(lat, lon) for lat, lon in points]
+    wrapped = _unwrapped([lon for _, lon in points])
+    ground = [_world(lat, lon) for (lat, _), lon in zip(points, wrapped, strict=True)]
     xs, ys = [g[0] for g in ground], [g[1] for g in ground]
-    latitude, longitude = (round(v, CENTRE_DECIMALS) for v in _ground((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
-    cx, cy = _world(latitude, longitude)
+    latitude, spread = (round(v, CENTRE_DECIMALS) for v in _ground((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2))
+    cx, cy = _world(latitude, spread)
+    longitude = round((spread + 180) % 360 - 180, CENTRE_DECIMALS)
     reach_x, reach_y = max(abs(x - cx) for x in xs), max(abs(y - cy) for y in ys)
     for zoom in range(MAX_ZOOM, MIN_ZOOM - 1, -1):
         scale = 2 ** zoom
