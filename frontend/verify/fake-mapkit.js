@@ -68,9 +68,11 @@
     }
     addAnnotation(a) { this.annotations.add(a); }
     removeAnnotation(a) { this.annotations.delete(a); const n = this.nodes.get(a); if (n) { n.remove(); this.nodes.delete(a); } }
-    addOverlay(o) { this.overlays.add(o); }
+    addOverlay(o) { this.overlays.add(o); this.count(); }
+    count() { this.host.setAttribute("data-polygons", String([...this.overlays].filter((o) => Array.isArray(o.points[0])).length)); }
     removeOverlay(o) {
       this.overlays.delete(o);
+      this.count();
       const n = this.nodes.get(o);
       if (n) { const hit = this.nodes.get(n); if (hit) hit.remove(); n.remove(); this.nodes.delete(n); this.nodes.delete(o); }
     }

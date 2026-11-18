@@ -27,6 +27,9 @@
       "scroll_to": "#stats-map-slot"
     },
     {
+      "wait_for": "[data-mapkit][data-polygons='3']"
+    },
+    {
       "screenshot": "map-for-one-person"
     },
     {
@@ -42,7 +45,7 @@
       "click": "[data-zoom='in']"
     },
     {
-      "wait_for": "[data-hit][data-kind='polygon'] >> visible=true"
+      "wait_for": "[data-mapkit][data-polygons='7']"
     },
     {
       "screenshot": "zoomed-into-states"
