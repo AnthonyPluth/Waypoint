@@ -30,6 +30,7 @@ export interface AiSuggestion {
   price_currency?: string;
   sources?: Record<string, string>;
   parsed?: boolean;
+  alternative?: number;
 }
 
 export interface AiTraveler {

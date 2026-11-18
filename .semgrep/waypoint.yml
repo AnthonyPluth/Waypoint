@@ -205,19 +205,40 @@ rules:
 
   - id: waypoint-ai-suggest-caller
     message: >-
-      Email text is asked of the AI in one place, scan._read, which the scan and Ask AI both go through, and only the
-      household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server"). Call scan's readers
-      instead of ai.suggest(), and don't import suggest or ai under another name.
+      Email text is asked of the AI in one place, scan._read in waypoint/domain/mail/scan.py, which the scan and Ask AI both
+      go through, and only the household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server").
+      Call scan's readers instead of ai.suggest().
+    severity: ERROR
+    languages: [python]
+    pattern: ai.suggest(...)
+    paths:
+      include: ["/waypoint/"]
+      exclude: ["/waypoint/domain/mail/ai.py", "/waypoint/domain/mail/scan.py"]
+
+  - id: waypoint-ai-suggest-caller-in-scan
+    message: >-
+      In waypoint/domain/mail/scan.py only the function _read may call ai.suggest(); every other reader goes through _read
+      (AGENTS.md, "Email stays on the server").
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern: ai.suggest(...)
+      - pattern-not-inside: |
+          def _read(...):
+              ...
+    paths:
+      include: ["/waypoint/domain/mail/scan.py"]
+
+  - id: waypoint-ai-suggest-import
+    message: >-
+      Don't import suggest or ai under another name (single-line or parenthesised, over one line or several): the one caller of
+      ai.suggest() is scan._read (AGENTS.md, "Email stays on the server").
     severity: ERROR
     languages: [python]
     pattern-either:
-      - patterns:
-          - pattern: ai.suggest(...)
-          - pattern-not-inside: |
-              def _read(...):
-                  ...
-      - pattern-regex: \bfrom\s+\S+\s+import\s+[^\n]*\bsuggest\b
-      - pattern-regex: \bimport\s+\S*\bai\s+as\s+\w+|\bfrom\s+\S+\s+import\s+[^\n]*\bai\s+as\s+\w+
+      - pattern-regex: \bfrom\s+\S+\s+import\s+(?:\([^)]*|[^\n(]*)\bsuggest\b
+      - pattern-regex: \bimport\s+\S*\bai\s+as\s+\w+
+      - pattern-regex: \bfrom\s+\S+\s+import\s+(?:\([^)]*|[^\n(]*)\bai\s+as\s+\w+
     paths:
       include: ["/waypoint/"]
       exclude: ["/waypoint/domain/mail/ai.py"]
@@ -387,13 +408,13 @@ rules:
 
   - id: waypoint-apple-directions-caller
     message: >-
-      Only waypoint/domain/route_warming.py may call mapkit.Directions, so what the server sends Apple (the start and end
+      Only waypoint/domain/route_warming.py may call mapkit.Directions (and the provider module can't be imported under another name, which would hide a call), so what the server sends Apple (the start and end
       of a drive of a trip that has ended that the replay would draw, from the nightly job, with a MapKit key active)
       stays in one place and no route handler or other job sends it coordinates (AGENTS.md, "You see the trips you're
       on"): add what you need to that job instead.
     severity: ERROR
     languages: [generic]
-    pattern-regex: (?:\bmapkit\.Directions\b|from\s+[\w.]*mapkit\s+import\s+[^\n]*\bDirections\b)
+    pattern-regex: (?:\bmapkit\.Directions\b|from\s+[\w.]*mapkit\s+import\s+[^\n]*\bDirections\b|\bimport\s+[\w.]*mapkit\s+as\b|from\s+[\w.]*providers\s+import\s+[^\n]*\bmapkit\s+as\b)
     paths:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/mapkit.py", "/waypoint/domain/route_warming.py"]

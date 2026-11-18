@@ -92,7 +92,7 @@ def fixed_suggestions(conn: db.Connection, mailbox_id: int, message_id: str) -> 
     return held if all(x.get("parsed") for x in held) else []
 
 
-NOT_VALUES = ("sources", "parsed")
+NOT_VALUES = ("sources", "parsed", "alternative")
 
 
 def _same_reservation(fixed: ai.Suggestion, said: ai.Suggestion) -> bool:
@@ -120,7 +120,20 @@ def keeping_fixed(fixed: list[ai.Suggestion], said: list[ai.Suggestion]) -> tupl
             out.append(found)
         else:
             held.append(found)
-    return out, held + [p for n, p in enumerate(fixed) if n not in paired]
+    return out, _marked(fixed, said, held, [p for n, p in enumerate(fixed) if n not in paired])
+
+
+def _marked(fixed: list[ai.Suggestion], said: list[ai.Suggestion], held: list[ai.Suggestion], left: list[ai.Suggestion]) -> list[ai.Suggestion]:
+    out = held + left
+    number = 0
+    for kind in dict.fromkeys(x.get("kind") for x in held):
+        theirs = [n for n, x in enumerate(held) if x.get("kind") == kind]
+        ours = [n for n, x in enumerate(left) if x.get("kind") == kind]
+        if len(theirs) == 1 and len(ours) == 1 and sum(1 for x in fixed if x.get("kind") == kind) == 1 and sum(1 for x in said if x.get("kind") == kind) == 1:
+            number += 1
+            out[theirs[0]] = cast(ai.Suggestion, {**held[theirs[0]], "alternative": number})
+            out[len(held) + ours[0]] = cast(ai.Suggestion, {**left[ours[0]], "alternative": number})
+    return out
 
 
 def suggestions_of(stored: str | None) -> list[ai.Suggestion]:

@@ -11,7 +11,7 @@ from waypoint import tls
 from waypoint.domain import demo, driving_routes, people, photos, stats, trips
 from waypoint.domain.visibility import Viewer
 from waypoint.storage import gate_codes, secretbox, stored_mail
-from waypoint.storage.models import DrivingRoute, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment
+from waypoint.storage.models import DrivingRoute, ReviewItem, Photo, PhotoExclusion, PhotoGrant, PhotoSource, PhotoTripSync, Segment
 from tests.shared import DbCase
 
 
@@ -26,6 +26,14 @@ class DemoTests(DbCase):
         before = self.rows()
         added = demo.seed(self.c)
         self.assertEqual(self.rows() - before, added)
+
+    def test_the_stay_read_two_ways_carries_the_marker_the_scan_sets_so_review_offers_a_choice(self):
+        demo.seed(self.c)
+        stored = self.c.orm.scalar(select(ReviewItem.suggestion).where(ReviewItem.message_id == "demo-two-readings"))
+        readings = json.loads(stored)
+        self.assertEqual([bool(r.get("parsed")) for r in readings], [False, True])
+        self.assertEqual(len({r.get("alternative") for r in readings}), 1)
+        self.assertIsNotNone(readings[0].get("alternative"))
 
     def test_keeps_the_road_of_one_of_the_road_trips_two_drives_for_the_trips_cards(self):
         demo.seed(self.c, date(2026, 10, 5))
