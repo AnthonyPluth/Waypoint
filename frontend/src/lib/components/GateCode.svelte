@@ -7,6 +7,7 @@
   import { Button } from "$lib/components/ui/button";
   import { Sheet } from "$lib/components/ui/sheet";
   import { SHARE, squareSide } from "$lib/gate-code";
+  import { savedCodeFor } from "$lib/saved-code";
   import { endAt, headline } from "$lib/trips";
   import { Dialog } from "bits-ui";
   import X from "@lucide/svelte/icons/x";
@@ -21,6 +22,7 @@
   let choosing = $state(false);
   let src = $state<string | null>(null);
   let failed = $state(false);
+  let savedOnly = $state(false);
   let natural = $state(0);
   let stage = $state({ width: 0, height: 0 });
   let pictures = $state<Picture[] | null>(null);
@@ -34,17 +36,24 @@
   const lot = $derived(headline(segment));
   const side = $derived(squareSide(Math.min(stage.width, stage.height), natural));
 
+  const unreachable = (err: unknown) => !(err && typeof err === "object" && "status" in err && typeof err.status === "number" && err.status > 0);
+
   async function look() {
     src = null;
     failed = false;
+    savedOnly = false;
     natural = 0;
     try { src = await apiImage(`/api/segments/${segment.id}/code`); }
-    catch { failed = true; }
+    catch (err) {
+      const saved = unreachable(err) ? await savedCodeFor(segment.id) : null;
+      if (saved?.picture) src = saved.picture;
+      else { failed = true; savedOnly = saved !== null; }
+    }
   }
 
   $effect(() => {
     if (showing) void look();
-    else { src = null; failed = false; natural = 0; }
+    else { src = null; failed = false; savedOnly = false; natural = 0; }
   });
 
   $effect(() => {
@@ -145,6 +154,9 @@
         <p class="text-sm text-muted-foreground" data-testid="code-times">
           Entry <DayTime segment={segment} dated /> · Exit <DayTime segment={segment} end dated />
         </p>
+        {#if failed && savedOnly && segment.confirmation}
+          <p class="text-sm text-muted-foreground" data-testid="code-confirmation">Confirmation <span class="font-mono text-foreground">{segment.confirmation}</span></p>
+        {/if}
         <p class="text-sm font-medium">Turn your screen brightness up</p>
       </div>
     </Dialog.Content>

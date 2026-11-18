@@ -125,6 +125,15 @@ class OfflineForTheApp(AppSignIn):
         self.assertEqual(r.json["version"], offline.VERSION)
         self.assertIn(mine, [c["trip"]["id"] for c in r.json["trips"]])
 
+    def test_only_the_app_token_gets_the_codes_list_a_browser_session_does_not(self):
+        mine = self.book("user-1", "me@example.com", "Me", "Trip " + base.tag())
+        token = self.app_tokens()["access_token"]
+        got = [c for c in self.api(token, path="/api/offline").json["trips"] if c["trip"]["id"] == mine]
+        self.assertEqual([c["codes"] for c in got], [[]])
+        browser = self.http("GET", "/api/offline", headers={}, cookies=self.session)
+        self.assertEqual(browser.status, 200, browser.body)
+        self.assertTrue(all("codes" not in c for c in browser.json["trips"]))
+
     def test_the_app_sees_only_trips_its_person_may_see_and_nothing_leaks(self):
         self.book("user-1", "me@example.com", "Me", "Trip " + base.tag())
         self.book("other-sub", "other@example.com", "Other", OTHERS_TRIP)

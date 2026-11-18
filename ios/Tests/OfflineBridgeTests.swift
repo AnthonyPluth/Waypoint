@@ -22,6 +22,19 @@ enum TripFixtures {
         }
         return try! JSONSerialization.data(withJSONObject: ["version": version, "trips": entries])
     }
+
+    static let pictureData = "QUJD"
+
+    static func replyWithCode(_ name: String, picture: Bool = true) -> Data {
+        let parking: [String: Any] = ["id": 5, "kind": "parking", "status": "confirmed", "confirmation": "PK30417",
+                                      "gate_code": ["state": "ready", "day": "2026-10-16"] as [String: Any]]
+        let flight: [String: Any] = ["id": 6, "kind": "flight", "status": "confirmed", "gate_code": NSNull()]
+        var entry: [String: Any] = ["trip": ["id": 1, "name": name, "start_date": "2026-12-01", "end_date": "2026-12-08",
+                                             "segments": [parking, flight]] as [String: Any],
+                                    "messages": [] as [Any]]
+        if picture { entry["codes"] = [["segment_id": 5, "type": "image/png", "data": pictureData] as [String: Any]] }
+        return try! JSONSerialization.data(withJSONObject: ["version": 1, "trips": [entry]])
+    }
 }
 
 final class OfflineBridgeTests: XCTestCase {
@@ -126,6 +139,21 @@ final class OfflineBridgeTests: XCTestCase {
         }
     }
 
+    func testLoadPassesTheGateCodeAndTheCodesListThroughUnchanged() async throws {
+        try store.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
+        let loaded = trips(try await ask(["type": "load"]))
+        let entry = try XCTUnwrap(loaded.first)
+        let codes = try XCTUnwrap(entry["codes"] as? [[String: Any]])
+        XCTAssertEqual(codes.count, 1)
+        XCTAssertEqual(codes.first?["segment_id"] as? Int, 5)
+        XCTAssertEqual(codes.first?["type"] as? String, "image/png")
+        XCTAssertEqual(codes.first?["data"] as? String, TripFixtures.pictureData)
+        let segments = try XCTUnwrap((entry["trip"] as? [String: Any])?["segments"] as? [[String: Any]])
+        XCTAssertEqual(NSDictionary(dictionary: try XCTUnwrap(segments.first?["gate_code"] as? [String: Any])),
+                       NSDictionary(dictionary: ["state": "ready", "day": "2026-10-16"]))
+        XCTAssertTrue(segments.last?["gate_code"] is NSNull)
+    }
+
     func testLoadWithNothingSavedIsEmpty() async throws {
         let reply = try await ask(["type": "load"])
         XCTAssertEqual(reply["version"] as? Int, 1)
@@ -168,6 +196,25 @@ final class OfflineBridgeTests: XCTestCase {
         XCTAssertFalse(settings.isOn)
         XCTAssertNil(store.load(server: home))
         XCTAssertFalse(pages.hasPage(for: home))
+    }
+
+    func testSettingSavingOffAndRemoveDeleteThePictureWithTheSavedTrips() async throws {
+        settings.set(true)
+        try store.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
+        _ = try await ask(["type": "setSaving", "on": false])
+        XCTAssertNil(store.load(server: home))
+        XCTAssertTrue(trips(try await ask(["type": "load"])).isEmpty)
+        try store.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
+        _ = try await ask(["type": "remove"])
+        XCTAssertNil(store.load(server: home))
+        XCTAssertTrue(trips(try await ask(["type": "load"])).isEmpty)
+    }
+
+    func testLoadDropsThePictureWithATripThatEndedMoreThanThreeDaysAgo() async throws {
+        let ended = TripFixtures.store(at: root.appendingPathComponent("trips"), now: TripFixtures.utc.date(from: DateComponents(year: 2026, month: 12, day: 20, hour: 12))!)
+        try ended.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
+        let loaded = ended.load(server: home)
+        XCTAssertTrue(loaded == nil || !String(decoding: loaded!.json, as: UTF8.self).contains(TripFixtures.pictureData))
     }
 
     func testRemovePurgesTheCopyAndLeavesTheFlagAlone() async throws {

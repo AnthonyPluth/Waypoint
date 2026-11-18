@@ -48,13 +48,14 @@ For each trip, Waypoint saves:
 - the bookings, with confirmation codes, times and their time zones, places, seats, rooms, addresses, phone numbers and manage links;
 - each booking’s [cost](/Waypoint/start/trips/#cost) and the trip’s total;
 - the travellers’ display names;
-- the confirmation message kept for each booking, as **View email** shows it, without images: subject, the sender’s domain and day, its text and its formatting. Offline, each image shows its description in place of the picture.
+- the confirmation message kept for each booking, as **View email** shows it, without images: subject, the sender’s domain and day, its text and its formatting. Offline, each image shows its description in place of the picture;
+- in the iPhone app, the QR code of your own [parking bookings](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking), so the **Show QR code** picture opens with no connection (the owner’s decision, 2026-11-18).
 
-Never saved: loyalty and Known Traveler numbers, the QR code of a [parking booking](/Waypoint/start/trips/#the-gate-code-of-a-parking-booking), live flight status, any trip that isn’t saved, and People, Settings, the review queue, mailboxes, AI settings and sign-in data.
+Never saved: loyalty and Known Traveler numbers, the QR code of a parking booking in a browser, live flight status, any trip that isn’t saved, and People, Settings, the review queue, mailboxes, AI settings and sign-in data.
 
 ## The reply, and the iPhone app
 
-`GET /api/offline` is the one source of the saved copy. Its reply is `{"version": 1, "trips": [...]}`: `version` is the shape of the reply, 1 today. The iPhone app checks `version` before it saves a reply, and keeps the copy it already has when it doesn’t know the number. The browser’s own offline vault doesn’t read it today. The trips are those above, only the ones the signed-in person may see.
+`GET /api/offline` is the one source of the saved copy. Its reply is `{"version": 1, "trips": [...]}`: `version` is the shape of the reply, 1 today. The iPhone app checks `version` before it saves a reply, and keeps the copy it already has when it doesn’t know the number. The browser’s own offline vault doesn’t read it today. The trips are those above, only the ones the signed-in person may see. For a request made with the iPhone app’s token, each trip also carries `codes`, a list of `{segment_id, type, data}` with the QR picture (base64) of the person’s own parking bookings on it that aren’t cancelled and have a code chosen; its parking segments keep their `gate_code` state. A browser session’s reply has neither.
 
 The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in token (an OAuth access token of scope `app`, sent as `Authorization: Bearer …`), the same way it calls the rest of the API. An assistant’s token is never accepted: assistants can’t read this route, whatever their switches say, and a request with no sign-in is refused with 401.
 

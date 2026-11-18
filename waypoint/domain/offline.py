@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import base64
 from datetime import date, timedelta
 from typing import TypedDict
 
 from .. import dates
-from ..storage import db, stored_mail
+from ..storage import db, gate_codes, stored_mail
 from . import trips, visibility
 from .visibility import Viewer
 
@@ -17,9 +18,16 @@ class SegmentMessages(TypedDict):
     emails: list[stored_mail.Content]
 
 
+class SegmentPicture(TypedDict):
+    segment_id: int
+    type: str
+    data: str
+
+
 class SavedTrip(TypedDict):
     trip: trips.TripOut
     messages: list[SegmentMessages]
+    codes: list[SegmentPicture]
 
 
 class Saved(TypedDict):
@@ -46,19 +54,33 @@ def saved_trip_ids(conn: db.Connection, viewer: Viewer, today: date) -> list[int
     return [*chosen[:MAX_TRIPS - 1], nxt]
 
 
-def _saved(conn: db.Connection, viewer: Viewer, trip_id: int) -> SavedTrip | None:
+def _pictures(conn: db.Connection, viewer: Viewer, trip: trips.TripOut) -> list[SegmentPicture]:
+    found: list[SegmentPicture] = []
+    for segment in trip["segments"]:
+        code = segment["gate_code"]
+        if segment["kind"] != gate_codes.KIND or segment["status"] == "cancelled" or code is None or code["state"] != "ready":
+            continue
+        image = trips.gate_code_of(conn, viewer, segment["id"])
+        if image is not None:
+            found.append({"segment_id": segment["id"], "type": image["type"], "data": base64.b64encode(image["data"]).decode("ascii")})
+    return found
+
+
+def _saved(conn: db.Connection, viewer: Viewer, trip_id: int, with_codes: bool) -> SavedTrip | None:
     trip = trips.get(conn, viewer, trip_id)
     if trip is None:
         return None
+    codes = _pictures(conn, viewer, trip) if with_codes else []
     messages: list[SegmentMessages] = []
     for segment in trip["segments"]:
-        segment["gate_code"] = None
+        if not with_codes:
+            segment["gate_code"] = None
         emails = trips.emails_of(conn, viewer, segment["id"]) if segment["has_email"] else None
         if emails:
             messages.append({"segment_id": segment["id"], "emails": [{**e, "images": 0} for e in emails]})
-    return {"trip": trip, "messages": messages}
+    return {"trip": trip, "messages": messages, "codes": codes}
 
 
-def projection(conn: db.Connection, viewer: Viewer, today: date) -> Saved:
-    found = (_saved(conn, viewer, tid) for tid in saved_trip_ids(conn, viewer, today))
+def projection(conn: db.Connection, viewer: Viewer, today: date, with_codes: bool = False) -> Saved:
+    found = (_saved(conn, viewer, tid, with_codes) for tid in saved_trip_ids(conn, viewer, today))
     return {"trips": [s for s in found if s is not None]}

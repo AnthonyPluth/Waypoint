@@ -6,7 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("$lib/api", () => ({ api: vi.fn(), apiImage: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
+vi.mock("$lib/offline-shell", () => ({ inShell: vi.fn(() => false), shellLoad: vi.fn() }));
+
 import { api, apiImage } from "$lib/api";
+import { inShell, shellLoad } from "$lib/offline-shell";
 import { segment } from "../../test/fixtures";
 import GateCode from "./GateCode.svelte";
 
@@ -37,7 +40,7 @@ function stubWakeLock() {
   return request;
 }
 
-beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(apiImage).mockReset(); serve(); });
+beforeEach(() => { vi.mocked(api).mockReset(); vi.mocked(apiImage).mockReset(); vi.mocked(inShell).mockReturnValue(false); vi.mocked(shellLoad).mockReset(); serve(); });
 afterEach(() => { Reflect.deleteProperty(navigator, "wakeLock"); vi.clearAllMocks(); });
 
 describe("GateCode button", () => {
@@ -242,5 +245,60 @@ describe("Choose the code", () => {
     unmount();
     render(GateCode, { segment: { ...lot, has_email: false }, now: NOW });
     expect(screen.queryByRole("button", { name: /Choose another picture/ })).toBeNull();
+  });
+});
+
+describe("the saved picture in the iPhone app with no connection", () => {
+  const saved = (codes: { segment_id: number; type: string; data: string }[] | undefined) => ({ trip: { id: 1, segments: [lot] }, messages: [], savedAt: 1, ...(codes ? { codes } : {}) });
+  const offlineShell = (...copies: unknown[]) => {
+    vi.mocked(inShell).mockReturnValue(true);
+    vi.mocked(shellLoad).mockResolvedValue(copies);
+    vi.mocked(apiImage).mockRejectedValue(new TypeError("Failed to fetch"));
+  };
+
+  it("shows the picture saved with the trip for a ready booking", async () => {
+    offlineShell(saved([{ segment_id: 3, type: "image/png", data: "AAAA" }, { segment_id: 7, type: "image/png", data: "QUJD" }]));
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    expect(await screen.findByRole("img", { name: "QR code for Example Airport Long-Term Lot" })).toHaveAttribute("src", "data:image/png;base64,QUJD");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows the failure line and the confirmation number when the ready booking has no saved picture (frame B2)", async () => {
+    offlineShell(saved([{ segment_id: 3, type: "image/png", data: "AAAA" }]), saved(undefined));
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The code can’t be shown right now");
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByTestId("code-confirmation")).toHaveTextContent("Confirmation PK30417");
+  });
+
+  it("shows the failure line and the confirmation number when the saved trips can’t be read", async () => {
+    offlineShell();
+    vi.mocked(shellLoad).mockRejectedValue(new Error("unreadable"));
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The code can’t be shown right now");
+    expect(screen.getByTestId("code-confirmation")).toBeInTheDocument();
+  });
+
+  it("does not look in the saved trips when the server answers, even in the app", async () => {
+    vi.mocked(inShell).mockReturnValue(true);
+    vi.mocked(shellLoad).mockResolvedValue([saved([{ segment_id: 7, type: "image/png", data: "QUJD" }])]);
+    vi.mocked(apiImage).mockRejectedValue(Object.assign(new Error("No such image"), { status: 404 }));
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The code can’t be shown right now");
+    expect(shellLoad).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("code-confirmation")).toBeNull();
+  });
+
+  it("is unchanged in a browser: no saved picture and no confirmation number", async () => {
+    vi.mocked(apiImage).mockRejectedValue(new TypeError("Failed to fetch"));
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The code can’t be shown right now");
+    expect(shellLoad).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("code-confirmation")).toBeNull();
   });
 });
