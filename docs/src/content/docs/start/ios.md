@@ -31,13 +31,33 @@ With no connection, the app shows the saved trips, read-only, instead of an erro
 
 ## Finding the places of your bookings
 
-For the arrival codes planned in [#819](https://github.com/AnthonyPluth/Waypoint/issues/819), the app finds a street-level point for each parking lot, rental pickup and hotel on your saved trips, because the points your server keeps are only a postcode or city centre. This is the first part (#848); nothing is watched and no notification appears yet.
+For the arrival codes planned in [#819](https://github.com/AnthonyPluth/Waypoint/issues/819), the app finds a street-level point for each parking lot, rental pickup and hotel on your saved trips, because the points your server keeps are only a postcode or city centre. This is the first part of [Arrival codes](#arrival-codes).
 
 - **What is sent to Apple:** the text of the booking’s address, to Apple’s geocoder (the same service behind Apple Maps), from the phone, once for each distinct address, again only if Apple could not find it or the copy was removed in between. This is the owner’s decision of 2026-11-18. Nothing else goes with it, except that, as with any request, Apple sees the phone’s IP address.
 - **What is never sent:** the phone’s location. It is not sent to Apple, to your server or to anyone, and nothing is logged. Your server is not involved, and no other request is made.
-- **When:** only while Waypoint has location permission (While Using or Always; there is no switch of Waypoint’s own), after each successful save of the trips. Without permission nothing is looked up and any earlier result is deleted. The app does not ask for permission yet.
+- **When:** only while Waypoint has location permission (While Using or Always; there is no switch of Waypoint’s own), after each successful save of the trips. Without permission nothing is looked up and any earlier result is deleted. The app asks for permission as [Arrival codes](#arrival-codes) describes.
 - **Which bookings:** parking, rental pickups and hotels that aren’t cancelled and whose window hasn’t ended. A rental pickup with no address that can be found uses its airport’s coordinate when the saved trip has it (the saved copy carries the coordinates of the airports your car rentals name, see [Offline](/Waypoint/start/offline/)). A booking with neither is left out.
 - **Where it is kept:** one file beside the saved trips, under the same file protection. It holds each place’s coordinates, circle and window, and the lookups cached by a hash of the address text, never the address itself. It is replaced with each save and deleted whenever the saved trips are (sign-out, a 401 or 403, saving switched off, a changed server address, 3 days after the trip ends).
+
+## Arrival codes
+
+When you get near a parking lot, rental pickup or hotel on your saved trips, the app tells you with one quiet notification, so you don't have to dig for it. This is the notification and its permissions (#849); opening the code from it, and a card on Upcoming, come later (#850).
+
+- **What it does:** on an iPhone with location set to Always and Precise Location on, iOS tells the app when you enter a circle around a booking's address (parking 250 m, rental pickup 300 m, or 2 km around the airport when only its code is known, hotel 200 m), and the app posts one notification, with no sound and no badge, that names only the kind: “Your parking code is ready”, “Your rental pickup is near” or “You’re near your hotel”. It never shows the place, a name or a code. It is posted only inside the booking's window: parking from 2 hours before entry until exit, at most once every 4 hours; a rental pickup from 2 hours before to 4 hours after, once; a hotel on the check-in day from 3 hours before check-in, once. It is removed when the window ends, and only the 15 bookings with the soonest windows are watched. It works with no connection, from the saved trips.
+- **What is asked, and when:** there is no prompt of Waypoint's own. The first time a save of your trips leaves a parking, rental pickup or hotel booking whose window hasn't ended, while the app is open (otherwise the next time you open it), iOS asks for your location (While Using), then straight away whether to also allow Always, then, once Always is allowed, whether Waypoint may send notifications (alerts only). Each is asked once per phone; nothing is asked while saving is off or nothing qualifies. If you keep While Using only, nothing is watched and no notification is posted.
+- **Where your location goes:** nowhere. It never leaves the phone, is not sent to your Waypoint server or to Apple, and is not recorded or logged: the app learns only that you entered a circle. The one thing that goes to Apple is the booking's address text, to find its place on the map, as described in [Finding the places of your bookings](#finding-the-places-of-your-bookings). No server change was needed.
+- **No switch in Waypoint:** granting iOS's permissions is the opt-in, and iOS Settings is how to stop it.
+
+| In iOS Settings → Waypoint, or in the app | What stops | What is deleted |
+| --- | --- | --- |
+| Location → Never (or Ask Next Time) | Everything: the watched places are dropped and every arrival notification is removed | The arrival file and the looked-up coordinates. Never a saved trip or the QR picture |
+| Location → While Using (from Always) | The watching and the notification | Nothing |
+| Precise Location off | The watching and the notification | Nothing; turning it on again resumes |
+| Notifications off | The notification only | Nothing |
+| Sign out, a 401 or 403, a changed server address, no server | Everything | The arrival file and the coordinates, with the saved trips |
+| **Save my upcoming trips** off | Everything | The saved copy, and with it the arrival file and the coordinates |
+
+Turning location back on in iOS Settings resumes watching the next time the app is opened or saves your trips, with no new ask. The app keeps an arrival file beside the saved trips so iOS can wake it for a place while the phone is locked: for each watched booking only its ids, kind, window, circle and when it last notified, never a name, address or code, readable after the first unlock since the phone started. The permission texts iOS shows are the two in the app's `Info.plist`. Region monitoring's wake-up while the phone is locked, its behaviour with Precise Location off and how late it fires have not been confirmed on a phone.
 
 ## Siri and Shortcuts
 
