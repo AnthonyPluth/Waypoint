@@ -587,6 +587,14 @@ describe("the boarding-pass variant", () => {
     expect(code?.className).not.toMatch(/phone:col-span/);
     expect(screen.getByText("Address").closest("div")).not.toHaveClass("phone:basis-full");
   });
+  it("lines every stub value up on the same row on a phone, whatever its height (owner, 2026-11-18)", () => {
+    const { container } = render(PassCard, board({}, { kind: "hotel", confirmation: "G20417", price: { amount_minor: 31000, currency: "GBP", source: "email" }, details: { address: "Camden, London", room: "412" }, travelers: [] }));
+    const facts = container.querySelector("[data-stub] dl");
+    expect(facts).toHaveClass("phone:items-start");
+    const values = [...(facts?.querySelectorAll("dd") ?? [])];
+    expect(values.length).toBeGreaterThanOrEqual(3);
+    for (const dd of values) expect(dd).toHaveClass("phone:min-h-11", "phone:items-center");
+  });
   it("keeps the live status between the route and the actions", () => {
     const live = createRawSnippet(() => ({ render: () => "<p>live area</p>" }));
     const footer = createRawSnippet(() => ({ render: () => "<a href='#trip/1'>Open trip</a>" }));
