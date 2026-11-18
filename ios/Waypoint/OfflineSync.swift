@@ -85,7 +85,8 @@ actor OfflineSync {
     static let shared = OfflineSync(
         server: { await ServerSession.shared.server },
         bearer: { try await ServerSession.shared.offlineBearer() },
-        parametersChanged: { ShortcutParameters.refresh() })
+        parametersChanged: { ShortcutParameters.refresh() },
+        watching: ArrivalWatch.shared)
 
     enum Outcome: Equatable {
         case off
@@ -112,6 +113,7 @@ actor OfflineSync {
     private let pages: OfflinePages
     private let pageFetching: PageFetching
     private let arrival: ArrivalPlaces
+    private let watching: ArrivalWatching?
     private var arrivalTask: Task<Void, Never>?
     private let currentServer: @Sendable () async -> URL?
     private let currentBearer: @Sendable () async throws -> String?
@@ -128,7 +130,8 @@ actor OfflineSync {
          state: OfflineSyncState = OfflineSyncState(),
          server: @escaping @Sendable () async -> URL?,
          bearer: @escaping @Sendable () async throws -> String?,
-         parametersChanged: @escaping @Sendable () -> Void = {}) {
+         parametersChanged: @escaping @Sendable () -> Void = {},
+         watching: ArrivalWatching? = nil) {
         self.store = store
         self.settings = settings
         self.fetching = fetching
@@ -139,6 +142,7 @@ actor OfflineSync {
         self.currentServer = server
         self.currentBearer = bearer
         self.parametersChanged = parametersChanged
+        self.watching = watching
     }
 
     @discardableResult
@@ -238,11 +242,19 @@ actor OfflineSync {
         return reply.data
     }
 
-    /// After a save, in the background: the lookups can take a while and must not hold the save's result. A purge cancels it.
+    /// After a save, in the background: the permission asks, the lookups and the regions can take a while and must not hold the save's result.
+    /// A purge cancels it. Without an `ArrivalWatching` only the places are found.
     private func findArrivalPlaces(server: URL) {
         arrivalTask?.cancel()
         let finder = arrival
-        arrivalTask = Task { _ = await finder.refresh(server: server) }
+        let watcher = watching
+        arrivalTask = Task {
+            if let watcher {
+                await watcher.saved(server: server)
+            } else {
+                _ = await finder.refresh(server: server)
+            }
+        }
     }
 
     /// Waits for the lookups started by the last save.
@@ -253,7 +265,8 @@ actor OfflineSync {
     func purge() {
         generation += 1
         arrivalTask?.cancel()
-        arrivalTask = nil
+        let watcher = watching
+        arrivalTask = watcher.map { watcher in Task { await watcher.cleared() } }
         state.setFailed(false)
         try? store.purgeAll()
         try? pages.purgeAll()

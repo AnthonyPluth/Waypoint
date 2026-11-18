@@ -1,8 +1,10 @@
 import SwiftUI
+import UIKit
 
 @main
 struct WaypointApp: App {
     @State private var phase: Phase = .starting
+    @State private var launch = LaunchGate()
     @Environment(\.scenePhase) private var scenePhase
 
     enum Phase: Equatable {
@@ -13,13 +15,25 @@ struct WaypointApp: App {
         case failed(String)
     }
 
+    init() {
+        ArrivalWatch.listen()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
                 content
             }
             .onChange(of: scenePhase) { newPhase in
-                if newPhase == .active { Task { await returnToForeground() } }
+                if newPhase == .active {
+                    Task { await openIfAllowed() }
+                    Task {
+                        await ArrivalWatch.shared.foregrounded()
+                        await returnToForeground()
+                    }
+                } else if newPhase == .background {
+                    Task { await ArrivalWatch.shared.backgrounded() }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .webViewUnauthorized)) { _ in
                 Task { await endSession() }
@@ -31,7 +45,7 @@ struct WaypointApp: App {
     private var content: some View {
         switch phase {
         case .starting:
-            ProgressView().task { await open() }
+            ProgressView().task { await openIfAllowed() }
         case .connect:
             ConnectView { await open() }
         case .signedOut:
@@ -54,12 +68,26 @@ struct WaypointApp: App {
     }
 
     @MainActor
+    private func openIfAllowed() async {
+        guard phase == .starting,
+              launch.begin(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
+        await open()
+        launch.end()
+    }
+
+    @MainActor
     private func open() async {
         Task { await ServerSession.shared.retryPendingRevocations() }
-        guard await ServerSession.shared.isConnected else {
+        switch LaunchDecision.of(await ServerSession.shared.standing()) {
+        case .failed(let why):
+            phase = .failed(why)
+            return
+        case .purgeAndConnect:
             await OfflineSync.shared.purge()
             phase = .connect
             return
+        case .launch:
+            break
         }
         switch await ServerSession.shared.launchWebView() {
         case .server(let url):
@@ -90,6 +118,7 @@ struct WaypointApp: App {
         if PendingPage.shared.peek() != nil {
             NotificationCenter.default.post(name: .openSavedPage, object: nil)
         }
+        await ArrivalWatch.shared.activated()
         await OfflineSync.shared.sync()
     }
 

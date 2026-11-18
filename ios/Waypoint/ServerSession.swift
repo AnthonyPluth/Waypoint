@@ -16,7 +16,22 @@ actor ServerSession {
     private static let openKey = "open"
     private static let revocationsKey = "pending-revocations"
 
-    private(set) var server: URL?
+    private var heldServer: URL?
+    private var loaded = false
+    private let keychain: KeychainReading
+
+    /// The server, read again from the Keychain while an earlier read could not be made (before the first unlock after a restart): a failed
+    /// read is never kept as "no server".
+    private(set) var server: URL? {
+        get {
+            reloadIfNeeded()
+            return heldServer
+        }
+        set {
+            heldServer = newValue
+        }
+    }
+
     private var tokens: Tokens?
     private var open = false
     private var webSessionExpiresAt: Date?
@@ -28,22 +43,67 @@ actor ServerSession {
     init(offline: OfflineSync = .shared,
          api: ServerAPI = LiveServerAPI(),
          restoring: (server: URL, tokens: Tokens?)? = nil,
+         keychain: KeychainReading = LiveKeychainReader(),
          installCookie: @escaping @Sendable (WebCookie, URL) async throws -> Void = { try await ServerSession.install($0, for: $1) }) {
         self.offline = offline
         self.api = api
         self.installCookie = installCookie
+        self.keychain = keychain
         if let restoring {
-            server = restoring.server
+            heldServer = restoring.server
             tokens = restoring.tokens
+            loaded = true
             return
         }
-        if let data = Keychain.get(Self.serverKey), let text = String(data: data, encoding: .utf8) {
-            server = URL(string: text)
+        if let found = Self.load(keychain) {
+            heldServer = found.server
+            open = found.open
+            tokens = found.tokens
+            loaded = true
         }
-        open = Keychain.get(Self.openKey) != nil
-        if let data = Keychain.get(Self.tokensKey) {
-            tokens = try? JSONDecoder().decode(Tokens.self, from: data)
+    }
+
+    private struct Stored {
+        var server: URL?
+        var open: Bool
+        var tokens: Tokens?
+    }
+
+    private static func load(_ keychain: KeychainReading) -> Stored? {
+        let serverRead = keychain.read(serverKey)
+        let openRead = keychain.read(openKey)
+        let tokensRead = keychain.read(tokensKey)
+        if serverRead == .unavailable || openRead == .unavailable || tokensRead == .unavailable { return nil }
+        var stored = Stored(server: nil, open: openRead != .missing, tokens: nil)
+        if case .found(let data) = serverRead, let text = String(data: data, encoding: .utf8) {
+            stored.server = URL(string: text)
         }
+        if case .found(let data) = tokensRead {
+            stored.tokens = try? JSONDecoder().decode(Tokens.self, from: data)
+        }
+        return stored
+    }
+
+    private func reloadIfNeeded() {
+        guard !loaded, let found = Self.load(keychain) else { return }
+        heldServer = found.server
+        open = found.open
+        tokens = found.tokens
+        loaded = true
+    }
+
+    enum Standing: Equatable {
+        case connected
+        case notConnected
+        case unknown
+    }
+
+    /// Whether the app is connected, not connected, or cannot yet tell because the Keychain is not readable (before the first unlock after a
+    /// restart). Only `notConnected` may lead to deleting the saved trips.
+    func standing() -> Standing {
+        reloadIfNeeded()
+        if !loaded { return .unknown }
+        return isConnected ? .connected : .notConnected
     }
 
     var isConnected: Bool { server != nil && (open || tokens != nil) }
@@ -72,6 +132,7 @@ actor ServerSession {
     }
 
     func offlineBearer() async throws -> String? {
+        reloadIfNeeded()
         if open { return nil }
         return try await accessToken()
     }
@@ -161,6 +222,7 @@ actor ServerSession {
             savePending(PendingRevocation.adding(PendingRevocation(server: server.absoluteString, refreshToken: current.refreshToken), to: pendingRevocations()))
         }
         let host = server?.host
+        loaded = true
         server = nil
         open = false
         forgetTokens()
@@ -198,6 +260,7 @@ actor ServerSession {
 
     private func keep(server: URL, tokens: Tokens?) {
         self.server = server
+        loaded = true
         self.tokens = tokens
         Keychain.set(Data(server.absoluteString.utf8), for: Self.serverKey)
         if let tokens, let data = try? JSONEncoder().encode(tokens) {

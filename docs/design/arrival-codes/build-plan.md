@@ -102,6 +102,8 @@ Sonnet.
 
 ## {{ARRIVAL-WATCH}} (#849) feat(ios): watch the places and post the arrival notification
 
+> Note, 2026-11-18 (owner decision, issue #849 comment): as built, the arrival file also holds when each alert last fired, and the other accepted departures are listed in the design README under "Accepted departures".
+
 **Context**
 The design (#819, `docs/design/arrival-codes/`, frames A1, A2, C and D and README points 2 to 6). There is no switch or card in Waypoint (owner decision, 2026-11-18): iOS's own permission asks are the opt-in, and iOS Settings or signing out is how to stop it. `{{ARRIVAL-PLACES}}` gives the places. The iPhone app has no CoreLocation or UserNotifications code today (`ios/README.md`). The saved copy is `.complete`, unreadable while the phone is locked.
 
