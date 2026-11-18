@@ -165,6 +165,33 @@ final class ArrivalHereTests: XCTestCase {
         XCTAssertNil(second)
     }
 
+    func testAnAskBeforeThePrerequisitesAreReadyIsNotCachedForTheSession() async {
+        let phone = ArrivalRig(authorization: .whenInUse, at: afternoon)
+        rig = phone
+        phone.fix.point = ArrivalFixtures.lot
+        let nothingSaved = await phone.here.answer(server: phone.home)
+        XCTAssertNil(nothingSaved)
+        phone.fix.isAllowed = false
+        phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot]
+        phone.save([ArrivalFixtures.parking()])
+        await phone.watch.saved(server: phone.home)
+        let noPermission = await phone.here.answer(server: phone.home)
+        XCTAssertNil(noPermission)
+        XCTAssertEqual(phone.fix.requests, 0)
+        phone.fix.isAllowed = true
+        let ready = await phone.here.answer(server: phone.home)
+        XCTAssertEqual(ready?.segmentId, 1)
+        XCTAssertEqual(phone.fix.requests, 1)
+    }
+
+    func testACompletedCheckThatFoundNobodyStaysForTheSession() async {
+        let phone = await saved()
+        phone.fix.point = nearBy(ArrivalFixtures.lot, north: 1_100)
+        _ = await phone.here.answer(server: phone.home)
+        _ = await phone.here.answer(server: phone.home)
+        XCTAssertEqual(phone.fix.requests, 1)
+    }
+
     func testAnswersAgainForAnotherServer() async {
         let phone = await saved()
         phone.fix.point = ArrivalFixtures.lot

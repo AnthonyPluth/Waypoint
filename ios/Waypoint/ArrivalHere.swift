@@ -126,7 +126,7 @@ actor ArrivalHere: ArrivalHereAnswering {
     private let settings: OfflineSettings
     private let protectedDataAvailable: @Sendable () async -> Bool
     private let now: @Sendable () -> Date
-    private var check: (server: URL, task: Task<ArrivalHereAnswer?, Never>)?
+    private var check: (server: URL, task: Task<Outcome, Never>)?
 
     init(places: ArrivalPlaces,
          fix: ArrivalFixing,
@@ -140,18 +140,35 @@ actor ArrivalHere: ArrivalHereAnswering {
         self.now = now
     }
 
+    /// A check that could not start (saving off, no permission, nothing saved yet or no window open) is not cached, so the next ask tries
+    /// again once the save, the lookup or the permission has happened; only a check that asked where the phone is stays for the session.
+    private enum Outcome {
+        case notReady
+        case checked(ArrivalHereAnswer?)
+    }
+
     func answer(server: URL) async -> ArrivalHereAnswer? {
         if let running = check, running.server == server {
-            let cached = await running.task.value
-            guard let cached else { return nil }
-            if await stillHolds(cached, server: server) { return cached }
-            check = nil
-            return nil
+            switch await running.task.value {
+            case .notReady:
+                if check?.task == running.task { check = nil }
+            case .checked(let cached):
+                guard let cached else { return nil }
+                if await stillHolds(cached, server: server) { return cached }
+                check = nil
+                return nil
+            }
         }
         check?.task.cancel()
         let task = Task { await look(server: server) }
         check = (server, task)
-        return await task.value
+        switch await task.value {
+        case .notReady:
+            if check?.task == task { check = nil }
+            return nil
+        case .checked(let found):
+            return found
+        }
     }
 
     /// The app went to the background: the answer is forgotten, so the next time it comes forward asks again.
@@ -168,12 +185,12 @@ actor ArrivalHere: ArrivalHereAnswering {
         return found.contains { $0.segmentId == answer.segmentId && $0.tripId == answer.tripId }
     }
 
-    private func look(server: URL) async -> ArrivalHereAnswer? {
-        guard settings.isOn, fix.isAllowed, await protectedDataAvailable() else { return nil }
+    private func look(server: URL) async -> Outcome {
+        guard settings.isOn, fix.isAllowed, await protectedDataAvailable() else { return .notReady }
         let found = await places.places(server: server)
-        guard !ArrivalHereRules.open(found, at: now()).isEmpty else { return nil }
-        guard let point = await fix.current(), !Task.isCancelled else { return nil }
-        guard let place = ArrivalHereRules.place(among: found, at: point, now: now()) else { return nil }
-        return ArrivalHereAnswer(segmentId: place.segmentId, tripId: place.tripId)
+        guard !ArrivalHereRules.open(found, at: now()).isEmpty else { return .notReady }
+        guard let point = await fix.current(), !Task.isCancelled else { return .checked(nil) }
+        guard let place = ArrivalHereRules.place(among: found, at: point, now: now()) else { return .checked(nil) }
+        return .checked(ArrivalHereAnswer(segmentId: place.segmentId, tripId: place.tripId))
     }
 }
