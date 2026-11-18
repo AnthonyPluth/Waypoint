@@ -149,8 +149,9 @@ final class OfflineStore: @unchecked Sendable {
             try files.createDirectory(at: staging, withIntermediateDirectories: false, attributes: protection)
             try trips.write(to: staging.appendingPathComponent(Self.tripsFile), options: .completeFileProtection)
             try meta.write(to: staging.appendingPathComponent(Self.metaFile), options: .completeFileProtection)
-            if let places = try? Data(contentsOf: folder.appendingPathComponent(Self.placesFile)) {
-                try places.write(to: staging.appendingPathComponent(Self.placesFile), options: .completeFileProtection)
+            if let earlier = try? Data(contentsOf: folder.appendingPathComponent(Self.placesFile)),
+               let carried = Self.placesKept(earlier, trips: trips) {
+                try carried.write(to: staging.appendingPathComponent(Self.placesFile), options: .completeFileProtection)
             }
             if files.fileExists(atPath: folder.path) {
                 _ = try files.replaceItemAt(folder, withItemAt: staging)
@@ -161,6 +162,28 @@ final class OfflineStore: @unchecked Sendable {
             try? files.removeItem(at: staging)
             throw OfflineStoreError.cannotWrite
         }
+    }
+
+    /// The arrival places file as it stays when the saved trips become `trips` (a save, or an expiry on load): only the places of a trip still
+    /// saved, and only the cached lookups some such trip uses. Nothing left means no file (nil), so expired trips leave no coordinates behind.
+    private static func placesKept(_ places: Data, trips: Data) -> Data? {
+        guard let saved = parse(trips),
+              var object = try? JSONSerialization.jsonObject(with: places) as? [String: Any],
+              let listed = object["places"] as? [[String: Any]] else { return nil }
+        let ids = Set(saved.trips.compactMap { ($0["trip"] as? [String: Any])?["id"] as? Int })
+        let keptPlaces = listed.filter { ids.contains($0["tripId"] as? Int ?? -1) }
+        guard !keptPlaces.isEmpty else { return nil }
+        var keptLookups: [String: Any] = [:]
+        for (key, value) in object["geocoded"] as? [String: [String: Any]] ?? [:] {
+            let users = (value["tripIds"] as? [Int] ?? []).filter { ids.contains($0) }
+            if users.isEmpty { continue }
+            var lookup = value
+            lookup["tripIds"] = users
+            keptLookups[key] = lookup
+        }
+        object["places"] = keptPlaces
+        object["geocoded"] = keptLookups
+        return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 
     private func discardLeftoverStaging() {

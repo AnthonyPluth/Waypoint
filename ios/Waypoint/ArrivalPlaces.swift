@@ -92,9 +92,18 @@ actor ArrivalPlaces {
     static let rentalTail: TimeInterval = 4 * 3600
     static let hotelLead: TimeInterval = 3 * 3600
 
+    /// A cached lookup, with the saved trips that use it, so `OfflineStore` can drop it when they expire.
+    private struct CachedPoint: Codable {
+        let latitude: Double
+        let longitude: Double
+        let tripIds: [Int]
+
+        var point: PlacePoint { PlacePoint(latitude: latitude, longitude: longitude) }
+    }
+
     private struct PlacesFile: Codable {
         let version: Int
-        let geocoded: [String: PlacePoint]
+        let geocoded: [String: CachedPoint]
         let places: [ArrivalPlace]
     }
 
@@ -122,9 +131,18 @@ actor ArrivalPlaces {
         return !Self.candidates(in: snapshot.json, now: now(), calendar: calendar).isEmpty
     }
 
-    /// The places found by the last `refresh`, soonest window first, without a lookup.
+    /// The places found by the last `refresh`, soonest window first, without a lookup. Only those of a trip that is still saved: reading
+    /// the saved trips first drops an expired trip's places from the file too (`OfflineStore`).
     func places(server: URL) -> [ArrivalPlace] {
-        readFile(server: server)?.places ?? []
+        guard let snapshot = store.load(server: server), snapshot.version == OfflineSync.supportedVersion,
+              let file = readFile(server: server) else { return [] }
+        let saved = Self.savedTripIds(in: snapshot.json)
+        return file.places.filter { saved.contains($0.tripId) }
+    }
+
+    private static func savedTripIds(in json: Data) -> Set<Int> {
+        guard let root = try? JSONDecoder().decode(ArrivalRoot.self, from: json) else { return [] }
+        return Set(root.trips.compactMap(\.value).map(\.id))
     }
 
     /// Looks up the qualifying bookings' places and replaces the file. Without location permission it looks nothing up and deletes the
@@ -139,6 +157,7 @@ actor ArrivalPlaces {
         let wanted = Self.candidates(in: snapshot.json, now: now(), calendar: calendar)
         let earlier = readFile(server: server)?.geocoded ?? [:]
         var geocoded: [String: PlacePoint] = [:]
+        var users: [String: Set<Int>] = [:]
         var missed: Set<String> = []
         var found: [ArrivalPlace] = []
         for candidate in wanted {
@@ -146,13 +165,20 @@ actor ArrivalPlaces {
             var atAirport = false
             if let address = Self.clean(candidate.address) {
                 let key = Self.key(address)
-                if let known = geocoded[key] ?? earlier[key] {
+                if let known = geocoded[key] ?? earlier[key]?.point {
                     geocoded[key] = known
+                    users[key, default: []].insert(candidate.tripId)
                     point = known
                 } else if !missed.contains(key) {
                     if Task.isCancelled { return [] }
+                    // Permission is checked before every request: once it goes, nothing more is sent to Apple.
+                    guard permission.isAllowed else {
+                        store.deletePlaces(server: server)
+                        return []
+                    }
                     if let looked = await geocoder.point(for: address), looked.isValid {
                         geocoded[key] = looked
+                        users[key, default: []].insert(candidate.tripId)
                         point = looked
                     } else {
                         missed.insert(key)
@@ -174,7 +200,11 @@ actor ArrivalPlaces {
             store.deletePlaces(server: server)
             return []
         }
-        let file = PlacesFile(version: Self.fileVersion, geocoded: geocoded, places: found)
+        var cached: [String: CachedPoint] = [:]
+        for (key, looked) in geocoded {
+            cached[key] = CachedPoint(latitude: looked.latitude, longitude: looked.longitude, tripIds: (users[key] ?? []).sorted())
+        }
+        let file = PlacesFile(version: Self.fileVersion, geocoded: cached, places: found)
         if let data = try? Self.encoder.encode(file) {
             try? store.savePlaces(data, for: server)
         }

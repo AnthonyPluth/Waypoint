@@ -3,10 +3,12 @@ import XCTest
 
 private final class FakeGeocoder: AddressGeocoding, @unchecked Sendable {
     var answers: [String: PlacePoint] = [:]
+    var afterAsk: (() -> Void)?
     private(set) var asked: [String] = []
 
     func point(for address: String) async -> PlacePoint? {
         asked.append(address)
+        afterAsk?()
         return answers[address]
     }
 }
@@ -16,6 +18,14 @@ private final class FakePermission: LocationPermission, @unchecked Sendable {
 
     init(_ allowed: Bool) {
         isAllowed = allowed
+    }
+}
+
+private final class StoreClock {
+    var date: Date
+
+    init(_ date: Date) {
+        self.date = date
     }
 }
 
@@ -32,6 +42,7 @@ final class ArrivalPlacesTests: XCTestCase {
     private var suite: String!
     private var defaults: UserDefaults!
     private var store: OfflineStore!
+    private var clock: StoreClock!
     private var geocoder: FakeGeocoder!
     private var permission: FakePermission!
     private let home = URL(string: "https://waypoint.example.com")!
@@ -59,8 +70,8 @@ final class ArrivalPlacesTests: XCTestCase {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("arrival-places-\(UUID().uuidString)", isDirectory: true)
         suite = "arrival-places-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suite)
-        let saved = storeNow
-        store = OfflineStore(root: root, calendar: Self.utc, now: { saved })
+        clock = StoreClock(storeNow)
+        store = OfflineStore(root: root, calendar: Self.utc, now: { [clock] in clock!.date })
         geocoder = FakeGeocoder()
         permission = FakePermission(true)
     }
@@ -95,6 +106,20 @@ final class ArrivalPlacesTests: XCTestCase {
                                     "messages": [] as [Any], "codes": [] as [Any]]
         if let airports { entry["airports"] = airports }
         return try! JSONSerialization.data(withJSONObject: ["version": 1, "trips": [entry]])
+    }
+
+    private func tripEntry(_ id: Int, start: String, end: String, segments: [[String: Any]]) -> [String: Any] {
+        ["trip": ["id": id, "name": "Trip \(id)", "start_date": start, "end_date": end, "segments": segments] as [String: Any],
+         "messages": [] as [Any], "codes": [] as [Any]]
+    }
+
+    private func saveTrips(_ entries: [[String: Any]]) {
+        try! store.save(try! JSONSerialization.data(withJSONObject: ["version": 1, "trips": entries]), version: 1, for: home)
+    }
+
+    private func placesObject() throws -> [String: Any] {
+        let data = try XCTUnwrap(store.loadPlaces(server: home))
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
 
     private func save(_ segments: [[String: Any]], airports: [[String: Any]]? = nil) {
@@ -358,6 +383,66 @@ final class ArrivalPlacesTests: XCTestCase {
     }
 
     // MARK: Purge and protection
+
+    // MARK: Expiry and revoked permission
+
+    private func twoTrips() -> [[String: Any]] {
+        [tripEntry(7, start: "2026-12-01", end: "2026-12-08", segments: [parking(1, address: "1 Main St")]),
+         tripEntry(8, start: "2026-12-15", end: "2026-12-20",
+                   segments: [segment(2, "hotel", start: "2026-12-15T15:00", end: "2026-12-20T11:00", address: "3 Inn Ave")])]
+    }
+
+    func testAnExpiredTripsPlacesAndLookupsAreDroppedWhenTheCopyIsPruned() async throws {
+        saveTrips(twoTrips())
+        geocoder.answers = ["1 Main St": lot, "3 Inn Ave": inn]
+        let places = finder()
+        await places.refresh(server: home)
+        clock.date = Self.moment(2026, 12, 13, 12)
+        XCTAssertNotNil(store.load(server: home))
+        let object = try placesObject()
+        let listed = try XCTUnwrap(object["places"] as? [[String: Any]])
+        XCTAssertEqual(listed.compactMap { $0["tripId"] as? Int }, [8])
+        let cached = try XCTUnwrap(object["geocoded"] as? [String: Any])
+        XCTAssertEqual(Set(cached.keys), [ArrivalPlaces.key("3 Inn Ave")])
+        let remaining = await places.places(server: home)
+        XCTAssertEqual(remaining.map(\.segmentId), [2])
+    }
+
+    func testTheFileIsDeletedWhenEveryTripHasExpired() async {
+        saveTrips(twoTrips())
+        geocoder.answers = ["1 Main St": lot, "3 Inn Ave": inn]
+        let places = finder()
+        await places.refresh(server: home)
+        clock.date = Self.moment(2026, 12, 30, 12)
+        _ = store.load(server: home)
+        XCTAssertNil(store.loadPlaces(server: home))
+        let remaining = await places.places(server: home)
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func testPlacesIgnoresAnEntryWhoseTripIsNotSaved() async throws {
+        save([parking()])
+        let stray = """
+        {"version":1,"geocoded":{},"places":[{"segmentId":5,"tripId":99,"kind":"parking","latitude":1,"longitude":2,"radius":250,
+        "opens":"2026-12-01T14:00:00Z","closes":"2026-12-05T18:00:00Z"}]}
+        """
+        try store.savePlaces(Data(stray.utf8), for: home)
+        let found = await finder().places(server: home)
+        XCTAssertTrue(found.isEmpty)
+    }
+
+    func testNothingMoreIsSentToAppleOnceLocationIsRevokedMidBatch() async {
+        save([parking(1, address: "1 Main St"), segment(2, "hotel", start: "2026-12-01T15:00", end: "2026-12-05T11:00", address: "3 Inn Ave"),
+              segment(3, "car", start: "2026-12-02T10:00", end: "2026-12-05T10:00", address: "2 Rental Rd")])
+        geocoder.answers = ["1 Main St": lot, "3 Inn Ave": inn, "2 Rental Rd": counter]
+        let revoker: FakePermission = permission
+        geocoder.afterAsk = { revoker.isAllowed = false }
+        let again = finder()
+        let found = await again.refresh(server: home)
+        XCTAssertEqual(geocoder.asked.count, 1)
+        XCTAssertTrue(found.isEmpty)
+        XCTAssertNil(store.loadPlaces(server: home))
+    }
 
     func testPurgeOfOneServerDeletesTheFile() async {
         save([parking()])
