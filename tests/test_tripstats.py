@@ -145,13 +145,13 @@ class TripSummaryTests(TripSummaryCase):
         self.assertAlmostEqual(got["flight_km"], self.great_circle(("SFO", "DEN")), delta=0.1)
         self.assertEqual(got["kinds"]["flight"], 2)
 
-    def stored_road(self, trip, *middle):
+    def stored_road(self, trip, *middle, now=None):
         places, booked = tripmap.places(self.c, self.jane, trip), trips.get(self.c, self.jane, trip)
         drive = route_warming.drives_of(booked, places)[0]
         lat1, lon1, lat2, lon2 = drive
         path = [[lat1, lon1], *[list(p) for p in middle], [lat2, lon2]]
         self.assertTrue(driving_routes.store(self.c, self.jane, trip, {"latitude": round(lat1, 4), "longitude": round(lon1, 4)},
-                                             {"latitude": round(lat2, 4), "longitude": round(lon2, 4)}, path, time.time()))
+                                             {"latitude": round(lat2, 4), "longitude": round(lon2, 4)}, path, time.time() if now is None else now))
         return drive, path
 
     def test_a_drive_with_a_stored_road_is_measured_along_that_road(self):
@@ -167,6 +167,14 @@ class TripSummaryTests(TripSummaryCase):
         self.assertEqual(got["road_km"], round(sum(stats.distance_km(tuple(a), tuple(b)) for a, b in itertools.pairwise(path)), 1))
         self.assertGreater(got["road_km"], before["road_km"])
         self.assertEqual(got["distance_km"], got["road_km"])
+
+    def test_a_stored_road_past_its_thirty_days_is_ignored_like_the_replay_ignores_it(self):
+        trip = self.mine(DENVER)["trip_id"]
+        self.mine(SALT_LAKE_DRIVE, trip)
+        drive, _ = self.stored_road(trip, (40.2, -108.0), (40.9, -110.0), now=time.time() - driving_routes.REPLACE_AFTER_SECONDS - 60)
+        got = self.summary(trip)
+        self.assertTrue(got["road_estimated"])
+        self.assertEqual(got["road_km"], round(stats.distance_km(drive[:2], drive[2:]), 1))
 
     def test_a_drive_with_no_stored_road_is_a_straight_line_and_estimated(self):
         trip = self.mine(DENVER)["trip_id"]

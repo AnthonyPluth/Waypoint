@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import time
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date, timedelta
@@ -12,7 +13,7 @@ from sqlalchemy import select
 
 from ..storage import db, geocode, reference
 from ..storage.models import Airport, DrivingRoute, Segment
-from . import photos, place_zones, route_warming, stats, tripmap, trips, visibility
+from . import driving_routes, photos, place_zones, route_warming, stats, tripmap, trips, visibility
 from .visibility import Viewer
 
 UNSURE_MATCH = "far"
@@ -109,7 +110,7 @@ def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int) -> tuple[float, 
     trip, places = trips.get(conn, viewer, trip_id), tripmap.places(conn, viewer, trip_id)
     if trip is None or places is None:
         return 0.0, False
-    stored = {(r.from_lat, r.from_lon, r.to_lat, r.to_lon): r for r in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id))}
+    stored = {(r.from_lat, r.from_lon, r.to_lat, r.to_lon): r for r in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id, DrivingRoute.stored > time.time() - driving_routes.REPLACE_AFTER_SECONDS))}
     total, estimated = 0.0, False
     for drive in route_warming.drives_of(trip, places):
         row = stored.get(route_warming.key_of(drive))
