@@ -18,6 +18,11 @@ final class PendingPage: @unchecked Sendable {
         page.range(of: #"^#trip/[0-9]+(/flight/[0-9]+)?\z"#, options: .regularExpression) != nil
     }
 
+    /// The script that opens a page in the web view, or nil for anything but the two trip routes.
+    static func script(for page: String) -> String? {
+        isValid(page) ? "window.location.hash = '\(page)'" : nil
+    }
+
     func hold(_ page: String?, now: Date = Date()) {
         lock.lock()
         defer { lock.unlock() }

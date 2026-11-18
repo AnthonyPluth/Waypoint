@@ -19,7 +19,7 @@ final class ShellViewController: CAPBridgeViewController {
         if let url = Self.serverURL {
             descriptor.serverURL = url.absoluteString
             // A tap on a Siri card that launched the app: open the page it names (only `#trip/...` routes pass).
-            if let page = PendingPage.shared.take() { descriptor.serverURL = url.absoluteString + page }
+            if let page = PendingPage.shared.peek() { descriptor.serverURL = url.absoluteString + page }
             if let host = url.host {
                 descriptor.allowedNavigationHostnames = [host, OfflinePageAddress.host]
             }
@@ -33,8 +33,15 @@ final class ShellViewController: CAPBridgeViewController {
     }
 
     @objc private func openSavedPage(_ note: Notification) {
-        guard let page = PendingPage.shared.peek(), PendingPage.isValid(page), let webView else { return }
-        webView.evaluateJavaScript("window.location.hash = '\(page)'") { _, error in
+        guard let webView else { return }
+        applyPendingPage(to: webView)
+    }
+
+    /// Opens the page a Siri card named, on whichever page is showing (the server's or the cached one), and forgets it only once
+    /// the script ran. A cold start that fell back to the cached page keeps it until that page has loaded.
+    private func applyPendingPage(to webView: WKWebView) {
+        guard let page = PendingPage.shared.peek(), let script = PendingPage.script(for: page) else { return }
+        webView.evaluateJavaScript(script) { _, error in
             if error == nil { PendingPage.shared.clear() }
         }
     }
@@ -66,7 +73,11 @@ final class ShellViewController: CAPBridgeViewController {
             },
             serverPageLoaded: { [weak self] webView in
                 self?.showingCachedPage = false
+                self?.applyPendingPage(to: webView)
                 self?.refreshPages(from: webView, syncTrips: false)
+            },
+            cachedPageLoaded: { [weak self] webView in
+                self?.applyPendingPage(to: webView)
             })
         self.navigation = navigation
         webView.navigationDelegate = navigation

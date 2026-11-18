@@ -725,6 +725,22 @@ final class PendingPageTests: XCTestCase {
         XCTAssertNil(pages.take(now: start.addingTimeInterval(20)))
     }
 
+    func testTheScriptOpensOnlyATripRoute() {
+        XCTAssertEqual(PendingPage.script(for: "#trip/3"), "window.location.hash = '#trip/3'")
+        XCTAssertEqual(PendingPage.script(for: "#trip/3/flight/12"), "window.location.hash = '#trip/3/flight/12'")
+        XCTAssertNil(PendingPage.script(for: "#trip/3'; alert(1)//"))
+        XCTAssertNil(PendingPage.script(for: "#settings"))
+    }
+
+    func testAColdStartThatFallsBackKeepsThePageUntilItIsApplied() {
+        let pages = PendingPage()
+        pages.hold("#trip/3", now: start)
+        XCTAssertEqual(pages.peek(now: start.addingTimeInterval(5)), "#trip/3", "read for the launch address, not used up")
+        XCTAssertEqual(pages.peek(now: start.addingTimeInterval(15)), "#trip/3", "still there for the cached page")
+        pages.clear()
+        XCTAssertNil(pages.peek(now: start.addingTimeInterval(16)))
+    }
+
     func testHoldingNothingClearsWhatWasHeld() {
         let pages = PendingPage()
         pages.hold("#trip/3", now: start)
