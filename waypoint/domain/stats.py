@@ -615,8 +615,7 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
             "visits": sorted(points.values(), key=lambda p: (p["country"], p["state"] or "")), "points": list(points_of_call), "states": []}
 
 
-KNOWN_US_KM = 100.0
-UNKNOWN_KM = 40.0
+NEAREST_KM = 100.0
 
 
 def _visited_states(airports: Sequence[AirportVisit], pins: Sequence[StayPin], places: PlaceStats) -> list[str]:
@@ -626,13 +625,13 @@ def _visited_states(airports: Sequence[AirportVisit], pins: Sequence[StayPin], p
         if a["country"] != "US":
             continue
         if (state := named.get(a["code"])) or (a["latitude"] is not None and a["longitude"] is not None
-                                               and (state := us_states.state_at(a["latitude"], a["longitude"], KNOWN_US_KM))):
+                                               and (state := us_states.state_at(a["latitude"], a["longitude"], NEAREST_KM))):
             found.add(state)
     for pin in pins:
-        if pin["country"] in (None, "US") and (state := us_states.state_at(pin["latitude"], pin["longitude"], KNOWN_US_KM if pin["country"] else UNKNOWN_KM)):
+        if pin["country"] in (None, "US") and (state := us_states.state_at(pin["latitude"], pin["longitude"], NEAREST_KM)):
             found.add(state)
     for point in places["points"]:
-        if state := us_states.state_at(point["latitude"], point["longitude"], UNKNOWN_KM):
+        if state := us_states.state_at(point["latitude"], point["longitude"], NEAREST_KM):
             found.add(state)
     for visit in places["visits"]:
         if visit["country"] == "US" and visit["state"] and (state := us_states.STATE_NAMES.get(visit["state"])):

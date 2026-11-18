@@ -467,9 +467,39 @@ class VisitedStatesTests(StatsCase):
         self.add(self.jane, {**VISIT_AK, "details": {}, "start_local": "2007-07-02T00:00", "end_local": "2007-07-04T00:00"}, travelers=self.on(self.jane.person_id))
         self.assertEqual(self.states(), ["Alaska"])
 
+    def car(self, place, zone):
+        self.mine({**CAR, "origin": place, "destination": place, "start_zone": zone, "end_zone": zone})
+        return self.states()
+
     def test_a_car_place_counts_its_state(self):
-        self.mine({**CAR, "origin": "Seattle", "destination": "Seattle", "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles"})
-        self.assertEqual(self.states(), ["Washington"])
+        self.assertEqual(self.car("Seattle", "America/Los_Angeles"), ["Washington"])
+
+    def test_a_detroit_rental_counts_michigan(self):
+        self.assertEqual(self.car("Detroit, MI", "America/Detroit"), ["Michigan"])
+
+    def test_a_seattle_rental_counts_washington(self):
+        self.assertEqual(self.car("Seattle, WA", "America/Los_Angeles"), ["Washington"])
+
+    def test_a_san_diego_rental_counts_california(self):
+        self.assertEqual(self.car("San Diego, CA", "America/Los_Angeles"), ["California"])
+
+    def test_a_windsor_rental_counts_no_us_state(self):
+        self.assertEqual(self.car("Windsor, ON", "America/Toronto"), [])
+
+    def test_a_vancouver_rental_counts_no_us_state(self):
+        self.assertEqual(self.car("Vancouver, BC", "America/Vancouver"), [])
+
+    def test_a_victoria_rental_counts_no_us_state(self):
+        self.assertEqual(self.car("Victoria, BC", "America/Vancouver"), [])
+
+    def test_a_tijuana_rental_counts_no_us_state(self):
+        self.assertEqual(self.car("Tijuana, Mexico", "America/Tijuana"), [])
+
+    def test_a_point_is_placed_by_the_nearest_known_place_and_only_when_that_is_in_the_us(self):
+        for lat, lon, state in ((42.3314, -83.0457, "Michigan"), (47.6062, -122.3321, "Washington"), (32.7157, -117.1647, "California"), (39.74, -104.99, "Colorado"), (61.2, -149.9, "Alaska")):
+            self.assertEqual(us_states.state_at(lat, lon, 100.0), state, (lat, lon))
+        for lat, lon in ((42.3001, -83.0165), (49.2497, -123.1193), (48.4359, -123.3516), (32.5027, -117.0037), (51.5, -0.1), (-33.9, 151.2)):
+            self.assertIsNone(us_states.state_at(lat, lon, 100.0), (lat, lon))
 
     def test_the_year_and_the_traveller_narrow_it_as_the_map_is_narrowed(self):
         self.mine(JFK_LHR)
@@ -482,12 +512,6 @@ class VisitedStatesTests(StatsCase):
     def test_a_trip_the_viewer_is_not_on_adds_none(self):
         self.mine(JFK_LHR)
         self.assertEqual(self.stats(Viewer(self.mia))["places"]["states"], [])
-
-    def test_a_point_is_placed_in_the_state_of_its_nearest_zip_centre(self):
-        self.assertEqual(us_states.state_at(39.74, -104.99, 100.0), "Colorado")
-        self.assertEqual(us_states.state_at(61.2, -149.9, 100.0), "Alaska")
-        self.assertIsNone(us_states.state_at(51.5, -0.1, 100.0))
-        self.assertIsNone(us_states.state_at(-33.9, 151.2, 100.0))
 
 
 class MapDetailTests(StatsCase):

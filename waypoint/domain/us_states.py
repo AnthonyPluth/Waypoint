@@ -44,6 +44,12 @@ def _state_of_zip3() -> dict[str, str]:
 
 
 def state_at(latitude: float, longitude: float, within_km: float) -> str | None:
-    code = reference.nearest_us_postal(latitude, longitude, within_km)
-    state = _state_of_zip3().get(code[:3]) if code else None
-    return STATE_NAMES.get(state) if state else None
+    near = reference.nearest_place(latitude, longitude, within_km)
+    if near is None or near.country != "US":
+        return None
+    if near.state:
+        return STATE_NAMES.get(near.state)
+    if near.postal:
+        code = _state_of_zip3().get(near.postal[:3])
+        return STATE_NAMES.get(code) if code else None
+    return reference.airport_states().get(near.airport or "")
