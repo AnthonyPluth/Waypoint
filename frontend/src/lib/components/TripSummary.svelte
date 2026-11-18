@@ -8,6 +8,9 @@
 
   type Loaded = { summary: TripSummary; unit: Stats["distance_unit"] | null } | null;
   let loaded = $state<Loaded>(null);
+  let list = $state<HTMLElement | null>(null);
+
+  export function headingElement(): HTMLElement | null { return list; }
   let shownFor = 0;
 
   const US = "United States";
@@ -62,7 +65,7 @@
 </script>
 
 {#if items.length && facts}
-  <dl class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-sm text-muted-foreground" aria-label="Trip summary" data-testid="trip-summary">
+  <dl bind:this={list} tabindex="-1" class="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-sm text-muted-foreground focus:outline-none" aria-label="Trip summary" data-testid="trip-summary">
     {#each items as item (item.term)}
       <div class="contents" data-summary-item>
         <dt class="sr-only">{item.term}</dt>

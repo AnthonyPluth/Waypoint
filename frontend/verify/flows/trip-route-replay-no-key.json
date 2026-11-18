@@ -1,0 +1,15 @@
+{
+  "name": "trip-route-replay-no-key",
+  "page": "trips",
+  "mapkit": "none",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/']:has-text('Orlando') >> visible=true" },
+    { "wait_for": "h1:has-text('Orlando')" },
+    { "wait_for": "[data-testid='trip-summary']" },
+    { "expect_absent": "section[aria-label='Route replay']" },
+    { "expect_absent": "button[aria-label='Replay trip']" },
+    { "expect_absent": "[data-mapkit]" },
+    { "screenshot": "no-map" }
+  ]
+}

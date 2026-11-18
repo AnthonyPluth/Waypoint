@@ -62,12 +62,6 @@ describe("a road trip with a Home", () => {
     expect(positions(stops, projection)).toHaveLength(4);
   });
 
-  it("uses the road data for a leg from Home when some covers it", () => {
-    const stops = stopsOf(trip([first, second]), places);
-    const roads = { legs: [{ from_segment_id: 0, to_segment_id: 1, refs: ["I-55"], points: [[39.8, -89.65], [39.2, -89.9], [38.63, -90.2]] }], interstates: [] };
-    expect(legsOf(stops, routeProjection(stops, 960, 520, undefined, roads), roads)[0].refs).toEqual(["I-55"]);
-  });
-
   it("leaves out the Home stop at an end that is already the home city", () => {
     expect(names(stopsOf(trip([near, second]), places))).toEqual(["Capitol Inn", "Music Row Inn", "Springfield"]);
     expect(names(stopsOf(trip([first, lastNear]), places))).toEqual(["Springfield", "Arch Inn", "Lincoln Inn"]);

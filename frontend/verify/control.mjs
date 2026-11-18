@@ -65,13 +65,15 @@ export const COMMANDS = {
       "idle-minutes": { type: "number", default: DEFAULT_IDLE_MINUTES, help: "stop by itself after this long with no command" },
       anyway: { type: "boolean", help: "start even though the machine is busy (pages may load slowly)" },
       "signed-in": { type: "string", values: ["jane", "sam"], help: "serve the demo as that signed-in member, so the photo routes answer (default: the local user, who has no photos)" },
+      "no-key": { type: "boolean", help: "serve the demo with no MapKit key, as a household that never set one up (default: a key made for the session, with a stand-in for Apple's script), so no map and no replay show" },
     },
     details: ["The demo data is what make verify seeds (`run.py demo`), so pages look as in docs/src/assets/screenshots/.",
       "The server and the seed run under libfaketime at make verify's frozen moment, and the browser's clock is fixed at the same moment (UTC).",
       "One session per checkout, on a port and data of its own: a running make verify is left alone.",
       "--signed-in jane (or sam) makes every request that member, as if signed in, on this session's demo server only: the photo routes and Settings' photo sources then answer, which the default local user can't reach. It works only on demo data this tool seeded; a normal run, with or without sign-in configured, ignores it.",
+      "The server has a MapKit key made for the session, and the browser answers every request to an Apple host itself, with the stand-in map that make verify draws, so the pages with maps can be driven; nothing reaches Apple. --no-key starts the server with no key instead, which the flows that set mapkit to none need.",
       "Refuses when the machine is busy (more than 1.5 runnable processes per CPU) unless --anyway. A stale session (its process gone) is cleaned up first."],
-    examples: ["start", "start --viewport desktop", "start --signed-in jane"],
+    examples: ["start", "start --viewport desktop", "start --signed-in jane", "start --no-key"],
   },
   stop: {
     group: "session", summary: "Stop the session: its browser, its demo server and its copy of the data.",
@@ -654,7 +656,7 @@ async function startLocked(options) {
   if (status.verify_running) notes.push(`make verify is running (${status.verify_running}); this session doesn't touch it`);
   const log = openSync(join(CONTROL_DIR, "daemon.log"), "w", 0o600);
   const child = spawn(process.execPath, [DAEMON, "--dir", CONTROL_DIR, "--python", python, "--now", status.frozen_now_iso, "--viewport", options.viewport,
-    "--idle-minutes", String(options["idle-minutes"]), ...(options["signed-in"] ? ["--signed-in", options["signed-in"]] : [])],
+    "--idle-minutes", String(options["idle-minutes"]), ...(options["signed-in"] ? ["--signed-in", options["signed-in"]] : []), ...(options["no-key"] ? ["--no-key"] : [])],
   { cwd: ROOT, detached: true, stdio: ["ignore", log, log] });
   closeSync(log);
   child.unref();

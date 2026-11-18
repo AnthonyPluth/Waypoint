@@ -335,6 +335,18 @@ describe("the local legs and the camera", () => {
     expect(legs.every((l) => l.d.startsWith("M"))).toBe(true);
   });
 
+  it("draws a drive as a straight line, and keeps a bow for a train and a cruise", () => {
+    const at = (name: string, longitude: number, via: Stop["via"]): Stop => ({ name, city: name, code: null, kind: "place", latitude: 38, longitude, from: "2025-12-05", to: "2025-12-05", via });
+    const set = [at("A", -122, null), at("B", -121, null), at("C", -120, "train"), at("D", -119, "cruise")];
+    const legs = legsOf(set, routeProjection(set, 960, 520));
+    const bow = (l: (typeof legs)[number]) => Math.hypot(l.control.x - (l.from.x + l.to.x) / 2, l.control.y - (l.from.y + l.to.y) / 2);
+    expect(legs.map((l) => l.vehicle)).toEqual(["car", "car", "boat"]);
+    expect(bow(legs[0])).toBe(0);
+    expect(bow(legs[1])).toBeGreaterThan(1);
+    expect(bow(legs[2])).toBeGreaterThan(1);
+    expect(legs[0].road).toBeNull();
+  });
+
   it("finds the local run after each flight, up to the next flight", () => {
     const set = stopsOf(trip([out, stay, back]), places);
     expect(localRuns(set)).toEqual([{ from: 1, to: 3 }]);

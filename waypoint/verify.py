@@ -95,11 +95,11 @@ def pages_need_signed_in(pages: list[str] | None = None, only: list[str] | None 
     return any(page in SIGNED_PAGES for page in (pages or SIGNED_PAGES))
 
 
-def flows_need_mapkit(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
-    return flows_asking("mapkit", pages, only, folder)
+def flows_need_no_key(pages: list[str] | None = None, only: list[str] | None = None, folder: str = FLOWS) -> bool:
+    return flows_asking("mapkit", pages, only, folder, "none")
 
 
-def flows_asking(key: str, pages: list[str] | None, only: list[str] | None, folder: str) -> bool:
+def flows_asking(key: str, pages: list[str] | None, only: list[str] | None, folder: str, value: object = None) -> bool:
     try:
         names = sorted(n for n in os.listdir(folder) if n.endswith(".json"))
     except OSError:
@@ -110,7 +110,7 @@ def flows_asking(key: str, pages: list[str] | None, only: list[str] | None, fold
                 flow = json.load(f)
         except (OSError, ValueError):
             continue
-        if not isinstance(flow, dict) or flow.get(key) in (None, False):
+        if not isinstance(flow, dict) or flow.get(key) in (None, False) or (value is not None and flow.get(key) != value):
             continue
         if only:
             selected = flow.get("name") in only
@@ -158,14 +158,14 @@ def resolve_jobs(flag: int | None, env: Mapping[str, str] | None = None, cpus: i
     return jobs
 
 
-def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str], signed_url: str | None = None, mapkit_url: str | None = None) -> list[str]:
+def node_command(node: str, frontend: str, urls: list[str], pages: list[str], flows: list[str], signed_url: str | None = None, no_key_url: str | None = None) -> list[str]:
     command = [node, os.path.join(frontend, "verify", "verify.mjs")]
     for url in urls:
         command += ["--url", url]
     if signed_url:
         command += ["--signed-url", signed_url]
-    if mapkit_url:
-        command += ["--mapkit-url", mapkit_url]
+    if no_key_url:
+        command += ["--no-key-url", no_key_url]
     for flow in flows:
         command += ["--flow", flow]
     return [*command, "--out", OUT, "--images", IMAGES, "--now", FROZEN_NOW_ISO, *pages]
@@ -218,8 +218,8 @@ def mark_demo(folder: str) -> None:
         pass
 
 
-def start_instances(root: str, jobs: int, library: str, signed_in: str | None = None, with_mapkit: bool = False) -> list[Instance]:
-    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs + (signed_in is not None) + with_mapkit)]
+def start_instances(root: str, jobs: int, library: str, signed_in: str | None = None, with_no_key: bool = False) -> list[Instance]:
+    folders = [os.path.join(root, f"instance-{i + 1}") for i in range(jobs + (signed_in is not None) + with_no_key)]
     os.mkdir(folders[0])
     seeded = seed_demo(folders[0], library)
     if seeded.returncode:
@@ -233,9 +233,9 @@ def start_instances(root: str, jobs: int, library: str, signed_in: str | None = 
             port = free_port()
             log = os.path.join(folder, "server.log")
             asks_signed = signed_in is not None and i == jobs
-            asks_mapkit = with_mapkit and i == len(folders) - 1
+            keyless = with_no_key and i == len(folders) - 1
             env = signed_in_env(frozen_env(clean_env(folder), library), signed_in if asks_signed else None)
-            env = mapkit_env(env, folder, f"http://127.0.0.1:{port}" if asks_mapkit else None)
+            env = mapkit_env(env, folder, None if keyless else f"http://127.0.0.1:{port}")
             with open(log, "w") as out:
                 server = subprocess.Popen(server_command(port), env=env, cwd=ROOT, stdout=out, stderr=subprocess.STDOUT)
             started.append(Instance(folder, f"http://127.0.0.1:{port}", server, log))
@@ -275,19 +275,20 @@ def run(pages: list[str], jobs: int | None = None, flows: list[str] | None = Non
     instances: list[Instance] = []
     try:
         signed = SIGNED_IN_AS[0] if flows_need_signed_in(pages, flows) or pages_need_signed_in(pages, flows) else None
-        with_mapkit = flows_need_mapkit(pages, flows)
+        with_no_key = flows_need_no_key(pages, flows)
         try:
-            instances = start_instances(root, count, library, signed, with_mapkit)
+            instances = start_instances(root, count, library, signed, with_no_key)
         except RuntimeError as e:
             print(f"verify: {e}", file=sys.stderr)
             return 2
         urls = [i.url for i in instances[:count]]
         signed_url = instances[count].url if signed else None
-        mapkit_url = instances[-1].url if with_mapkit else None
+        no_key_url = instances[-1].url if with_no_key else None
         print(f"verify: demo data served at {', '.join(urls)}" + (f" ({count} servers, each with its own copy of the data)" if count > 1 else "")
+              + ", each with MapKit on, a throwaway key and a stand-in for Apple's script"
               + (f"; signed in as {signed} at {signed_url} for the pages and flows that ask for it" if signed_url else "")
-              + (f"; MapKit on, with a throwaway key and a stand-in for Apple's script, at {mapkit_url} for the flows that ask for it" if mapkit_url else ""))
-        code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url, mapkit_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
+              + (f"; no MapKit key at {no_key_url} for the flows that ask for mapkit none" if no_key_url else ""))
+        code = subprocess.run(node_command(node, frontend, urls, pages, flows or [], signed_url, no_key_url), cwd=frontend, env=clean_env(instances[0].data)).returncode
         for instance in instances:
             if instance.server.poll() is not None:
                 print(f"verify: the server at {instance.url} exited with code {instance.server.returncode}\n{log_tail(instance.log)}", file=sys.stderr)
@@ -334,6 +335,7 @@ def serve(argv: list[str]) -> int:
     p.add_argument("--data", required=True)
     p.add_argument("--port", type=int, required=True)
     p.add_argument("--signed-in", choices=SIGNED_IN_AS)
+    p.add_argument("--no-key", action="store_true")
     a = p.parse_args(argv)
     made = [False]
 
@@ -361,7 +363,8 @@ def serve(argv: list[str]) -> int:
     os.close(log)
     os.chdir(ROOT)
     command = server_command(a.port)
-    os.execve(command[0], command, signed_in_env(frozen_env(clean_env(a.data), library), a.signed_in))
+    env = mapkit_env(signed_in_env(frozen_env(clean_env(a.data), library), a.signed_in), a.data, None if a.no_key else f"http://127.0.0.1:{a.port}")
+    os.execve(command[0], command, env)
     return 1
 
 
@@ -408,5 +411,5 @@ if __name__ == "__main__":
     if sys.argv[1:2] == ["status"]:
         print(json.dumps(status()))
         sys.exit(0)
-    sys.exit("usage: python -m waypoint.verify serve --parent PID --seed S --data D --port P [--signed-in jane|sam] (make verify runs it), "
+    sys.exit("usage: python -m waypoint.verify serve --parent PID --seed S --data D --port P [--signed-in jane|sam] [--no-key] (make verify runs it), "
              "or seed --data D, or status (frontend/verify/control.mjs runs those)")

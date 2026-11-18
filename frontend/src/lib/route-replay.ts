@@ -9,12 +9,8 @@ export type StopKind = "airport" | "stay" | "place" | "home";
 export type Stop = { name: string; city: string; code: string | null; kind: StopKind; latitude: number; longitude: number; from: string; to: string; via: Kind | null };
 export type Spot = { x: number; y: number };
 export type Vehicle = "plane" | "car" | "boat";
-export type Roads = { legs: { from_segment_id: number; to_segment_id: number; refs: string[]; points: number[][] }[]; interstates: { ref: string; points: number[][] }[] };
-export type Boundaries = { points: number[][] }[];
 export type Track = { points: Spot[]; along: number[] };
-export type Leg = { d: string; flight: boolean; vehicle: Vehicle; from: Spot; control: Spot; to: Spot; road: Track | null; refs: string[] };
-export type Extent = { left: number; top: number; right: number; bottom: number };
-export type BoundaryShape = Extent & { d: string };
+export type Leg = { d: string; flight: boolean; vehicle: Vehicle; from: Spot; control: Spot; to: Spot; road: Track | null };
 export type Box = { x: number; y: number; w: number; h: number };
 type Visit = Stop & { exact?: boolean; rental?: boolean };
 type Point = { name: string; city?: string; code?: string | null; kind?: StopKind; latitude: number; longitude: number; exact?: boolean };
@@ -34,13 +30,6 @@ export const SLOW_AFTER_STOPS = 6;
 export const SLOW_PER_STOP_MS = 4000;
 export const LABEL_HOLD_MS = 1750;
 export const SCRUB_STEPS = 4000;
-export const NO_ROADS: Roads = { legs: [], interstates: [] };
-export const ROAD_MATCH_KM = 90;
-export const RETRACE_KM = 48.3;
-export const RETRACE_MIN_SHARE = 0.5;
-export const RETRACE_WHOLE_SHARE = 0.9;
-export const NO_BOUNDARIES: Boundaries = [];
-export const BOUNDARY_MIN_SCALE = 500;
 export const HEADING_UNITS = 6;
 
 const EARTH_KM = 6371;
@@ -190,114 +179,23 @@ export const stopLine = (stop: Stop, year: number): string => `${stopTitle(stop)
 
 const lonLat = (s: Pick<Point, "latitude" | "longitude">): [number, number] => [s.longitude, s.latitude];
 
-const km = (at: number[], s: Stop): number => geoDistance([at[1], at[0]], [s.longitude, s.latitude]) * EARTH_KM;
-
 const DRIVE_DECIMALS = 4;
 type LatLon = Pick<Stop, "latitude" | "longitude">;
-export type SavedLeg = Roads["legs"][number] & { key: string };
 
 export const driveKey = (a: LatLon, b: LatLon): string =>
   `${a.latitude.toFixed(DRIVE_DECIMALS)},${a.longitude.toFixed(DRIVE_DECIMALS)}>${b.latitude.toFixed(DRIVE_DECIMALS)},${b.longitude.toFixed(DRIVE_DECIMALS)}`;
 
-const savedKey = (leg: Roads["legs"][number]): string | null => ("key" in leg && typeof leg.key === "string" ? leg.key : null);
-
-export function roadFor(from: Stop, to: Stop, roads: Roads): Roads["legs"][number] | null {
-  if (to.via !== null) return null;
-  let best: Roads["legs"][number] | null = null;
-  let nearest = Infinity;
-  for (const leg of roads.legs) {
-    const key = savedKey(leg);
-    if (key !== null) {
-      if (key === driveKey(from, to)) return leg;
-      continue;
-    }
-    const start = leg.points[0], end = leg.points.at(-1);
-    if (leg.points.length < 2 || !start || !end) continue;
-    const a = km(start, from), b = km(end, to);
-    if (a <= ROAD_MATCH_KM && b <= ROAD_MATCH_KM && a + b < nearest) {
-      best = leg;
-      nearest = a + b;
-    }
-  }
-  return best;
-}
-
-type Drawn = { points: number[][]; refs: string[] };
-type Located = { index: number; share: number; km: number; at: number[] };
-type Retraced = { points: number[][]; refs: string[]; gap: number };
-
-const KM_PER_DEGREE = 111.195;
-
-function locate(points: number[][], stop: Stop): Located | null {
-  const scale = Math.cos((stop.latitude * Math.PI) / 180);
-  let best: Located | null = null;
-  for (let k = 0; k < points.length - 1; k++) {
-    const [lat1, lon1] = points[k], [lat2, lon2] = points[k + 1];
-    const ax = (lon1 - stop.longitude) * scale, ay = lat1 - stop.latitude, dx = (lon2 - lon1) * scale, dy = lat2 - lat1;
-    const span = dx * dx + dy * dy;
-    const share = span === 0 ? 0 : Math.min(1, Math.max(0, -(ax * dx + ay * dy) / span));
-    const km = Math.hypot(ax + dx * share, ay + dy * share) * KM_PER_DEGREE;
-    if (!best || km < best.km) best = { index: k, share, km, at: [lat1 + (lat2 - lat1) * share, lon1 + (lon2 - lon1) * share] };
-  }
-  return best;
-}
-
-const lengthKm = (points: number[][]): number => points.slice(1).reduce((sum, p, i) => sum + geoDistance([points[i][1], points[i][0]], [p[1], p[0]]) * EARTH_KM, 0);
-
-function sectionOf(line: Drawn, from: Stop, to: Stop): Retraced | null {
-  const a = locate(line.points, from), b = locate(line.points, to);
-  if (!a || !b || Math.max(a.km, b.km) > RETRACE_KM) return null;
-  const forward = a.index < b.index || (a.index === b.index && a.share <= b.share);
-  const [low, high] = forward ? [a, b] : [b, a];
-  const walk = [low.at, ...line.points.slice(low.index + 1, high.index + 1), high.at];
-  const points = (forward ? walk : walk.reverse()).filter((p, i, all) => i === 0 || p[0] !== all[i - 1][0] || p[1] !== all[i - 1][1]);
-  const km = lengthKm(points);
-  if (km <= 0 || km < RETRACE_MIN_SHARE * distanceKm(from, to)) return null;
-  const whole = km >= RETRACE_WHOLE_SHARE * lengthKm(line.points);
-  return { points, refs: whole ? (forward ? line.refs : [...line.refs].reverse()) : [], gap: a.km + b.km };
-}
-
-export function retraceFor(from: Stop, to: Stop, drawn: Drawn[]): Retraced | null {
-  if (to.via !== null) return null;
-  let best: Retraced | null = null;
-  for (const line of drawn) {
-    const found = sectionOf(line, from, to);
-    if (found && (!best || found.gap < best.gap)) best = found;
-  }
-  return best;
-}
-
-function trackOf(from: Spot, road: number[][], to: Spot, projection: GeoProjection): Track {
-  const points = [from];
-  for (const [lat, lon] of road) {
-    const at = projection([lon, lat]);
-    if (at) points.push({ x: at[0], y: at[1] });
-  }
-  points.push(to);
-  const along = [0];
-  for (let i = 1; i < points.length; i++) along.push(along[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
-  return { points, along };
-}
-
-const polyline = (points: Spot[]): string => points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-
-export function legsOf(stops: Stop[], projection: GeoProjection, roads: Roads = NO_ROADS): Leg[] {
+export function legsOf(stops: Stop[], projection: GeoProjection): Leg[] {
   const spots = positions(stops, projection);
   const out: Leg[] = [];
-  const drawn: Drawn[] = [];
   for (let i = 1; i < stops.length; i++) {
     const from = spots[i - 1], to = spots[i];
     const flight = stops[i].via === "flight";
     const length = Math.hypot(to.x - from.x, to.y - from.y);
-    const bow = length * (flight ? BOW : LOCAL_BOW);
+    const bow = length * (flight ? BOW : stops[i].via === null ? 0 : LOCAL_BOW);
     const control = length === 0 ? from : { x: (from.x + to.x) / 2 + ((to.y - from.y) / length) * bow, y: (from.y + to.y) / 2 - ((to.x - from.x) / length) * bow };
     const vehicle: Vehicle = flight ? "plane" : stops[i].via === "cruise" ? "boat" : "car";
-    const found = roadFor(stops[i - 1], stops[i], roads);
-    if (found) drawn.push({ points: found.points, refs: found.refs });
-    const line = found ?? retraceFor(stops[i - 1], stops[i], drawn);
-    const road = line ? trackOf(from, line.points, to, projection) : null;
-    const curve = `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${control.x.toFixed(1)},${control.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`;
-    out.push({ vehicle, d: road ? polyline(road.points) : curve, flight, from, control, to, road, refs: line ? line.refs : [] });
+    out.push({ vehicle, d: `M${from.x.toFixed(1)},${from.y.toFixed(1)} Q${control.x.toFixed(1)},${control.y.toFixed(1)} ${to.x.toFixed(1)},${to.y.toFixed(1)}`, flight, from, control, to, road: null });
   }
   return out;
 }
@@ -328,13 +226,10 @@ export function moverAt(leg: Leg, t: number): { x: number; y: number; angle: num
   return { x: now.x, y: now.y, angle: (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI };
 }
 
-export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, roads: Roads = NO_ROADS, base: () => GeoProjection = geoEqualEarth): GeoProjection {
+export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, base: () => GeoProjection = geoEqualEarth): GeoProjection {
   const points = stops.map(lonLat);
   const geometries: Geometry[] = [{ type: "MultiPoint", coordinates: points }];
-  for (let i = 1; i < points.length; i++) {
-    const found = roadFor(stops[i - 1], stops[i], roads);
-    geometries.push({ type: "LineString", coordinates: found ? [points[i - 1], ...found.points.map(([lat, lon]) => [lon, lat]), points[i]] : [points[i - 1], points[i]] });
-  }
+  for (let i = 1; i < points.length; i++) geometries.push({ type: "LineString", coordinates: [points[i - 1], points[i]] });
   const [[west, south], [east, north]] = geoBounds({ type: "GeometryCollection", geometries });
   const spanLon = ((east - west) % 360 + 360) % 360, spanLat = north - south;
   if (spanLon < MIN_SPAN_DEGREES || spanLat < MIN_SPAN_DEGREES) {
@@ -389,25 +284,6 @@ const smooth = (t: number): number => {
   const c = Math.min(1, Math.max(0, t));
   return c * c * (3 - 2 * c);
 };
-
-export function boundaryShapes(lines: Boundaries, projection: GeoProjection): BoundaryShape[] {
-  const out: BoundaryShape[] = [];
-  for (const line of lines) {
-    const points: Spot[] = [];
-    for (const [lat, lon] of line.points) {
-      const at = projection([lon, lat]);
-      if (at) points.push({ x: at[0], y: at[1] });
-    }
-    if (points.length < 2) continue;
-    const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
-    out.push({ d: polyline(points), left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) });
-  }
-  return out;
-}
-
-export const boundariesShown = (projection: GeoProjection, zoom: number): boolean => projection.scale() / zoom >= BOUNDARY_MIN_SCALE;
-
-export const inView = (shape: Extent, box: Box): boolean => shape.right >= box.x && shape.left <= box.x + box.w && shape.bottom >= box.y && shape.top <= box.y + box.h;
 
 export function cameraAt(stops: Stop[], spots: Spot[], width: number, height: number, progress: number, legs: Leg[] = []): Box {
   const full: Box = { x: 0, y: 0, w: width, h: height };

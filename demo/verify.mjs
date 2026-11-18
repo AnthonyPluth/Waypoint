@@ -66,6 +66,9 @@ try {
       assert.equal(await page.locator('button[data-demo-disabled]:not([disabled])').count(),0,`${route}: mutation enabled`);
       assert.equal(await page.locator('a[href]:not([href^="#"])').count(),0,`${route}: external navigation enabled`);
       if (route.startsWith('trip/')) {
+        assert.equal(await page.getByRole('region',{name:'Route replay'}).count(),0,`${route}: a route replay is offered with no MapKit key`);
+        assert.equal(await page.getByRole('button',{name:'Replay trip'}).count(),0,`${route}: Replay trip is offered with no MapKit key`);
+        assert.equal(await page.locator('[data-mapkit]').count(),0,`${route}: an Apple map is drawn with no MapKit key`);
         assert.equal(await page.getByRole('button',{name:'Add a booking',exact:true}).isDisabled(),true,'Trip editing enabled');
         const trip = data.trips.find(item=>item.id === Number(route.slice(5)));
         const buttons = page.getByRole('button',{name:/^View email for/});
@@ -79,13 +82,10 @@ try {
     }
     const past = data.trips.find(trip=>trip.end_date < data.asOf && trip.segments.some(segment=>segment.kind === 'flight'));
     await page.goto(`${origin}${prefix}#trip/${past.id}`);
-    const replay = page.getByRole('region',{name:'Route replay'});await replay.waitFor();
-    const scrubber = page.getByRole('slider',{name:'Position along the route'});
-    const before = await scrubber.inputValue();
-    await page.waitForFunction(value=>document.querySelector('input[aria-label="Position along the route"]')?.value !== value,before);
-    await replay.getByRole('button',{name:'Pause',exact:true}).click();
-    assert.equal(await replay.getByRole('button',{name:'Resume',exact:true}).count(),1);
-    await replay.getByRole('button',{name:/Playback speed/}).click();
+    await page.locator('h1').first().waitFor();
+    assert.equal(await page.getByRole('region',{name:'Route replay'}).count(),0,'a route replay is offered with no MapKit key');
+    assert.equal(await page.getByRole('button',{name:'Replay trip'}).count(),0,'Replay trip is offered with no MapKit key');
+    assert.equal(await page.locator('[data-mapkit]').count(),0,'an Apple map is drawn with no MapKit key');
     await page.goto(`${origin}${prefix}#review`);
     await page.getByRole('button',{name:/View email/}).first().click();
     await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
@@ -109,7 +109,8 @@ try {
     if (await selects.count()) {assert.equal(await selects.first().isDisabled(),false,'Stats filter disabled');await selects.first().selectOption({index:0});}
     assert.equal(await page.evaluate(()=>navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(items=>items.length) : 0),0);
     assert.equal(await page.evaluate(()=>localStorage.length),0);
-    console.log(`${width}px: main app views, ${data.trips.reduce((count,trip)=>count+trip.segments.length,0)} booking emails, review and animated past replay passed; ${new Set(requests).size} bundled URLs`);
+    assert.equal(requests.some(url=>/apple/i.test(new URL(url).hostname)),false,'a request went to an Apple host');
+    console.log(`${width}px: main app views, ${data.trips.reduce((count,trip)=>count+trip.segments.length,0)} booking emails, review and no route replay passed; ${new Set(requests).size} bundled URLs`);
     await context.close();
   }
   assert.deepEqual(failures,[]);

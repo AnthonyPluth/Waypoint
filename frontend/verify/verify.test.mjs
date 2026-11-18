@@ -337,37 +337,66 @@ describe("signed_in flows", () => {
   });
 });
 
+describe("expect_absent", () => {
+  const page = (calls) => ({ locator: (selector) => ({ first: () => ({ waitFor: async (options) => { calls.push({ selector, options }); } }) }) });
+  it("waits for nothing to match the selector within the step's timeout", async () => {
+    const calls = [];
+    await runStep(page(calls), { expect_absent: "section[aria-label='Route replay']", timeout: 2500 });
+    expect(calls).toEqual([{ selector: "section[aria-label='Route replay']", options: { state: "detached", timeout: 2500 } }]);
+  });
+  it("is a step the flow checker knows, and leaves a check on the page alone", () => {
+    expect(flowProblems({ name: "no-replay", steps: [{ expect_absent: "button" }] })).toEqual([]);
+    expect(flowProblems({ name: "no-replay", steps: [{ expect_absent: true }] })).toEqual(["step 1: expect_absent takes a string"]);
+    expect(checksAfter([{ selector: "ul" }], { expect_absent: "button" })).toEqual([{ selector: "ul" }]);
+  });
+});
+
 describe("mapkit flows", () => {
   const ok = { name: "replay", steps: [{ goto: "#trips" }] };
-  it("takes fake, error or blocked", () => {
-    for (const mode of ["fake", "error", "blocked"]) expect(flowProblems({ ...ok, mapkit: mode })).toEqual([]);
-    expect(flowProblems({ ...ok, mapkit: true })).toEqual(["mapkit is one of fake, error, blocked"]);
+  it("takes none, error or blocked", () => {
+    for (const mode of ["none", "error", "blocked"]) expect(flowProblems({ ...ok, mapkit: mode })).toEqual([]);
+    expect(flowProblems({ ...ok, mapkit: true })).toEqual(["mapkit is one of none, error, blocked"]);
+    expect(flowProblems({ ...ok, mapkit: "fake" })).toEqual(["mapkit is one of none, error, blocked"]);
   });
-  it("runs a flow on the MapKit server and refuses one when none was started", () => {
-    const env = { base: "http://127.0.0.1:1", mapkitBase: "http://127.0.0.1:3" };
-    expect(baseFor(env, { ...ok, mapkit: "fake" })).toBe("http://127.0.0.1:3");
+  it("runs a none flow only on the server with no key, which it needs started, and the rest on the keyed servers", () => {
+    const env = { base: "http://127.0.0.1:1", signedBase: "http://127.0.0.1:2", noKeyBase: "http://127.0.0.1:3" };
+    expect(baseFor(env, { ...ok, mapkit: "none" })).toBe("http://127.0.0.1:3");
     expect(baseFor(env, ok)).toBe("http://127.0.0.1:1");
-    expect(() => baseFor({ base: "http://127.0.0.1:1" }, { ...ok, mapkit: "fake" })).toThrow(/needs the MapKit demo server/);
+    for (const mode of ["error", "blocked"]) expect(baseFor(env, { ...ok, mapkit: mode })).toBe("http://127.0.0.1:1");
+    expect(baseFor(env, { ...ok, mapkit: "error", signed_in: true })).toBe("http://127.0.0.1:2");
+    expect(() => baseFor({ base: "http://127.0.0.1:1" }, { ...ok, mapkit: "none" })).toThrow(/needs the demo server with no MapKit key/);
   });
-  it("answers Apple's hosts itself: the stand-in for the script, a refusal for the rest", async () => {
+  it("keeps a none flow off the signed-in server, which has a key", () => {
+    expect(flowProblems({ ...ok, mapkit: "none", signed_in: true })).toEqual(["mapkit none runs on a server that isn't signed in"]);
+  });
+  it("answers Apple's hosts itself: the stand-in for the script by default, a refusal for the rest", async () => {
     const routes = [];
     const ctx = { route: async (pattern, handler) => routes.push({ pattern, handler }) };
+    const seen = [];
     const answer = async (mode, url) => {
       routes.length = 0;
-      await standInForApple(ctx, mode);
+      await standInForApple(ctx, mode, (u) => seen.push(u));
       const out = {};
       await routes[0].handler({ request: () => ({ url: () => url }), fulfill: (o) => { out.fulfilled = o; }, abort: (reason) => { out.aborted = reason; } });
       return out;
     };
     const script = "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js";
-    const fake = await answer("fake", script);
+    const standIn = await answer(undefined, script);
     expect(routes[0].pattern).toBe(APPLE_MAPS_URLS);
-    expect(fake.fulfilled.headers["Access-Control-Allow-Origin"]).toBe("*");
-    expect(fake.fulfilled.body).toContain("window.mapkit");
-    expect(fake.fulfilled.body).not.toContain("__fail(\"Unauthorized\")");
+    expect(standIn.fulfilled.headers["Access-Control-Allow-Origin"]).toBe("*");
+    expect(standIn.fulfilled.body).toContain("window.mapkit");
+    expect(standIn.fulfilled.body).not.toContain("__fail(\"Unauthorized\")");
     expect((await answer("error", script)).fulfilled.body).toContain("__fail(\"Unauthorized\")");
     expect((await answer("blocked", script)).aborted).toBe("blockedbyclient");
-    expect((await answer(undefined, script)).aborted).toBe("blockedbyclient");
-    expect((await answer("fake", "https://cdn.apple-mapkit.com/tiles/1.png")).aborted).toBe("blockedbyclient");
+    expect((await answer("none", script)).aborted).toBe("blockedbyclient");
+    expect((await answer(undefined, "https://cdn.apple-mapkit.com/tiles/1.png")).aborted).toBe("blockedbyclient");
+  });
+  it("tells the run about every request to an Apple host, so a flow with no key can fail on one", async () => {
+    const routes = [];
+    const ctx = { route: async (pattern, handler) => routes.push({ pattern, handler }) };
+    const seen = [];
+    await standInForApple(ctx, "none", (u) => seen.push(u));
+    await routes[0].handler({ request: () => ({ url: () => "https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js" }), fulfill: () => {}, abort: () => {} });
+    expect(seen).toEqual(["https://cdn.apple-mapkit.com/mk/5.x.x/mapkit.js"]);
   });
 });

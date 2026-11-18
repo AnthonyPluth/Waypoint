@@ -3,12 +3,12 @@ import { drivingRoutes, type Drive } from "./driving-routes";
 import type { Mk, MkAnnotation, MkMap, MkOverlay } from "./mapkit";
 import {
   activeStop, cameraAt, legProgress, legsOf, moverAt, positions, reached, routeProjection,
-  type Box, type Leg, type Roads, type Spot, type Stop, type Vehicle,
+  type Box, type Leg, type Spot, type Stop, type Vehicle,
 } from "./route-replay";
 
 export type Frame = { progress: number; playing: boolean; calm: boolean };
 export type Palette = { route: string; stay: string };
-export type ReplayMapOptions = { stops: Stop[]; roads: Roads; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number };
+export type ReplayMapOptions = { stops: Stop[]; width: number; height: number; palette: Palette; scale: number; onFailure: () => void; tripId?: number };
 export type ReplayMap = { update(frame: Frame): void; destroy(): void };
 
 export const WORLD = 1;
@@ -42,9 +42,9 @@ function centreLongitude(stops: Stop[]): number {
   return west + span / 2;
 }
 
-export const mercatorFor = (stops: Stop[], width: number, height: number, roads: Roads): GeoProjection => {
+export const mercatorFor = (stops: Stop[], width: number, height: number): GeoProjection => {
   const centre = centreLongitude(stops);
-  return routeProjection(stops, width, height, undefined, roads, () => geoMercator().rotate([-centre, 0]));
+  return routeProjection(stops, width, height, undefined, () => geoMercator().rotate([-centre, 0]));
 };
 
 type Path = { points: Spot[]; along: number[] };
@@ -123,9 +123,9 @@ function moverElement(index: number, vehicle: Vehicle): { node: HTMLElement; bod
 }
 
 export function createReplayMap(mk: Mk, host: HTMLElement, options: ReplayMapOptions): ReplayMap {
-  const { stops, roads, width, height, palette, scale, onFailure, tripId = null } = options;
-  const projection = mercatorFor(stops, width, height, roads);
-  const legs = legsOf(stops, projection, roads);
+  const { stops, width, height, palette, scale, onFailure, tripId = null } = options;
+  const projection = mercatorFor(stops, width, height);
+  const legs = legsOf(stops, projection);
   const spots = positions(stops, projection);
   const paths = legs.map(legPath);
   let lastFrame: Frame | null = null;

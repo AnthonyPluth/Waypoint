@@ -3,10 +3,9 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/sve
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
 import { replayMs, SCRUB_STEPS, stopsOf } from "$lib/route-replay";
+import { fake, fakeMaps } from "../../test/fake-mapkit";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
-
-vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
 
 const places: TripPlaces = {
   home: null,
@@ -23,6 +22,17 @@ const flights = [
 ];
 const stops = stopsOf(trip(flights), places);
 
+const draw = (props: Record<string, unknown>) => render(RouteReplayMap, { maps, ...props } as never);
+let maps: ReturnType<typeof fakeMaps>;
+const mapped = () => fake.last();
+const nodes = () => [...mapped().annotations].map((a) => a.factory());
+const stopNodes = () => nodes().filter((n) => n.hasAttribute("data-stop"));
+const moverNodes = () => nodes().filter((n) => n.hasAttribute("data-mover"));
+const pinging = () => stopNodes().filter((n) => (n.querySelector("[data-ping]") as HTMLElement).style.display !== "none");
+const legCount = () => mapped().overlays.size;
+const lastRect = () => mapped().rects.at(-1)!;
+const rotation = (node: Element) => Number(/rotate\((-?[\d.]+)\)/.exec(node.querySelector("g")!.getAttribute("transform")!)![1]);
+
 let frames: ((at: number) => void)[] = [];
 let clock = 0;
 const advance = (ms: number) => {
@@ -33,6 +43,8 @@ const advance = (ms: number) => {
 };
 
 beforeEach(() => {
+  fake.reset();
+  maps = fakeMaps();
   frames = [];
   clock = 0;
   vi.stubGlobal("requestAnimationFrame", (f: (at: number) => void) => frames.push(f));
@@ -46,12 +58,12 @@ const list = () => within(screen.getByRole("list", { name: "Stops in order" })).
 
 describe("RouteReplayMap", () => {
   it("lists the stops in order as text, without waiting for any animation", () => {
-    render(RouteReplayMap, { stops, year: 2025, still: false });
+    draw({ stops, year: 2025, still: false });
     expect(list()).toEqual(["Minneapolis (MSP), Dec 5", "San Francisco (SFO), Dec 5 – 11", "Minneapolis (MSP), Dec 11"]);
   });
 
   it("leaves the stops list out when asked, keeping the map, its name and the controls", () => {
-    render(RouteReplayMap, { stops, year: 2025, still: false, stopList: false });
+    draw({ stops, year: 2025, still: false, stopList: false });
     expect(screen.queryByRole("list", { name: "Stops in order" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Stops list" })).toBeNull();
     expect(screen.getByRole("img", { name: "Map of the route, stop by stop" })).toBeTruthy();
@@ -60,23 +72,22 @@ describe("RouteReplayMap", () => {
   });
 
   it("does not play until asked, and shows only the first stop", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
+    const { container } = draw({ stops, year: 2025, still: false });
     expect(frames).toHaveLength(0);
     expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
     expect(labels(container)).toEqual(["Minneapolis"]);
-    expect(container.querySelector("[data-leg]")).toBeNull();
+    expect(legCount()).toBe(0);
   });
 
   it("draws the path and labels each stop as it is reached, pulsing the current one", async () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
+    const { container } = draw({ stops, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
     advance(4500);
     await Promise.resolve();
     expect(labels(container)).toEqual(["San Francisco"]);
-    expect(container.querySelectorAll("[data-leg]")).toHaveLength(2);
-    expect(container.querySelectorAll(".animate-ping")).toHaveLength(1);
-    expect(container.querySelector("[data-stop='San Francisco'] .animate-ping")).toBeTruthy();
+    expect(legCount()).toBe(2);
+    expect(pinging().map((n) => n.getAttribute("data-stop"))).toEqual(["San Francisco"]);
     advance(9000);
     await Promise.resolve();
     expect(labels(container)).toEqual(["Minneapolis"]);
@@ -88,14 +99,14 @@ describe("RouteReplayMap", () => {
     expect(labels(container)).toEqual([]);
     advance(1000);
     await Promise.resolve();
-    expect(container.querySelector(".animate-ping")).toBeNull();
+    expect(pinging()).toEqual([]);
     expect(frames).toHaveLength(0);
-    expect(container.querySelectorAll("[data-plane]")).toHaveLength(0);
+    expect(moverNodes()).toHaveLength(0);
     expect(list()).toHaveLength(3);
   });
 
   it("pauses, resumes, scrubs by keyboard-operable range and replays from the start", async () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
+    const { container } = draw({ stops, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(1000);
     await fireEvent.click(screen.getByRole("button", { name: "Pause" }));
@@ -111,12 +122,12 @@ describe("RouteReplayMap", () => {
   });
 
   it("with reduced motion shows the whole path and every stop labelled, with no controls, timers or animation classes", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
+    const { container } = draw({ stops, year: 2025, still: true });
     expect(labels(container)).toEqual(["Minneapolis", "San Francisco", "Minneapolis"]);
-    expect(container.querySelectorAll("[data-leg]")).toHaveLength(2);
-    expect(container.querySelectorAll("path[data-leg][stroke-dashoffset='0']")).toHaveLength(2);
-    expect(container.querySelector("[data-testid='movers']")!.children).toHaveLength(0);
-    expect(container.querySelector(".animate-ping")).toBeNull();
+    expect(legCount()).toBe(2);
+    expect(stopNodes()).toHaveLength(3);
+    expect(moverNodes()).toHaveLength(0);
+    expect(pinging()).toEqual([]);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.queryByRole("slider")).toBeNull();
     expect(frames).toHaveLength(0);
@@ -126,19 +137,19 @@ describe("RouteReplayMap", () => {
   it("follows the system's reduced-motion setting when none is forced", () => {
     const listeners: ((e: { matches: boolean }) => void)[] = [];
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: (_: string, f: never) => listeners.push(f), removeEventListener: vi.fn() }));
-    const { container } = render(RouteReplayMap, { stops, year: 2025 });
+    const { container } = draw({ stops, year: 2025 });
     expect(labels(container)).toHaveLength(3);
     expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("keeps the dates of a stay beside its name", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
+    const { container } = draw({ stops, year: 2025, still: true });
     const label = container.querySelector("[data-label='San Francisco']")!;
     expect(label.textContent).toContain("Dec 5");
   });
 
   it("pins every stop label in the top-left corner of the map", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
+    const { container } = draw({ stops, year: 2025, still: true });
     const pins = new Set([...container.querySelectorAll("[data-label]")].map((l) => l.parentElement));
     expect(pins.size).toBe(1);
     const pin = [...pins][0]!;
@@ -147,29 +158,30 @@ describe("RouteReplayMap", () => {
   });
 
   it("flies a plane along each flight, there and back, hidden from assistive technology", async () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
-    expect(container.querySelector("[data-plane]")).toBeNull();
+    draw({ stops, year: 2025, still: false });
+    expect(moverNodes()).toHaveLength(0);
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(1500);
     await Promise.resolve();
-    const first = container.querySelector("[data-plane='0']")!;
+    const first = moverNodes()[0];
+    expect(first.getAttribute("data-plane")).toBe("0");
     expect(first.getAttribute("data-flying")).toBe("true");
-    expect(first.closest("[aria-hidden='true']")).toBeTruthy();
-    const before = first.getAttribute("transform");
+    expect(first.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    const before = first.querySelector("g")!.getAttribute("transform");
     advance(1000);
     await Promise.resolve();
-    expect(container.querySelector("[data-plane='0']")!.getAttribute("transform")).not.toBe(before);
-    const angle = (i: number) => Number(/rotate\((-?[\d.]+)\)/.exec(container.querySelector(`[data-plane='${i}']`)!.getAttribute("transform")!)![1]);
-    const out = angle(0);
+    expect(moverNodes()[0].querySelector("g")!.getAttribute("transform")).not.toBe(before);
+    const out = rotation(moverNodes()[0]);
     advance(3000);
     await Promise.resolve();
-    expect(container.querySelector("[data-plane='1']")!.getAttribute("data-flying")).toBe("true");
-    expect(container.querySelector("[data-plane='0']")).toBeNull();
-    expect(Math.abs(Math.cos((out * Math.PI) / 180) - Math.cos((angle(1) * Math.PI) / 180))).toBeGreaterThan(0.5);
+    expect(moverNodes()).toHaveLength(1);
+    expect(moverNodes()[0].getAttribute("data-plane")).toBe("1");
+    expect(moverNodes()[0].getAttribute("data-flying")).toBe("true");
+    expect(Math.abs(Math.cos((out * Math.PI) / 180) - Math.cos((rotation(moverNodes()[0]) * Math.PI) / 180))).toBeGreaterThan(0.5);
   });
 
   it("fades a label out after its hold and fades the next one in", async () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
+    const { container } = draw({ stops, year: 2025, still: false });
     expect(labels(container)).toEqual(["Minneapolis"]);
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(1000);
@@ -183,7 +195,7 @@ describe("RouteReplayMap", () => {
   });
 
   it("autoplays once on load and does not start again after it finishes", async () => {
-    render(RouteReplayMap, { stops, year: 2025, still: false, autoplay: true });
+    draw({ stops, year: 2025, still: false, autoplay: true });
     await Promise.resolve();
     expect(frames).toHaveLength(1);
     expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
@@ -198,81 +210,86 @@ describe("RouteReplayMap", () => {
   });
 
   it("does not autoplay with reduced motion, and shows the full path", async () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, autoplay: true });
+    const { container } = draw({ stops, year: 2025, still: true, autoplay: true });
     await Promise.resolve();
     expect(frames).toHaveLength(0);
-    expect(container.querySelectorAll("[data-leg]")).toHaveLength(2);
+    expect(legCount()).toBe(2);
     expect(labels(container)).toHaveLength(3);
   });
 
   it("draws a hotel as its own marker beside the airport it is near", () => {
     const withHotel = stopsOf(trip([...flights, segment({ id: 3, kind: "hotel", origin: "Bayview Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T11:00", end_zone: "America/Los_Angeles" })]),
       { ...places, cities: [{ city: "san francisco", latitude: 37.6213, longitude: -122.379 }] });
-    const { container } = render(RouteReplayMap, { stops: withHotel, year: 2025, still: true });
-    expect([...container.querySelectorAll("[data-stop]")].map((g) => g.getAttribute("data-kind"))).toEqual(["airport", "airport", "stay", "airport", "airport"]);
-    expect(container.querySelector("[data-stop='Bayview Inn'] rect")).toBeTruthy();
-    expect(container.querySelector("[data-stop='Bayview Inn'] circle")).toBeNull();
+    const { container } = draw({ stops: withHotel, year: 2025, still: true });
+    expect(stopNodes().map((g) => g.getAttribute("data-kind"))).toEqual(["airport", "airport", "stay", "airport", "airport"]);
+    const bayview = stopNodes().find((g) => g.getAttribute("data-stop") === "Bayview Inn")!;
+    expect(bayview.querySelector("rect")).toBeTruthy();
+    expect(bayview.querySelector("circle:not([data-ping])")).toBeNull();
     expect(container.querySelector("[data-label='Bayview Inn']")!.textContent).toContain("Stay: Bayview Inn, San Francisco");
-    expect(container.querySelectorAll("[data-leg]")).toHaveLength(4);
-    expect(container.querySelectorAll("[data-plane]")).toHaveLength(0);
+    expect(legCount()).toBe(4);
+    expect(moverNodes()).toHaveLength(0);
   });
 
   const la = "America/Los_Angeles";
   const hotel = segment({ id: 3, kind: "hotel", origin: "Bayview Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la });
   const hotelStops = stopsOf(trip([...flights, hotel]), { ...places, cities: [{ city: "san francisco", latitude: 37.6213, longitude: -122.379 }] });
-  const viewBox = (container: HTMLElement) => container.querySelector("svg")!.getAttribute("viewBox")!.split(" ").map(Number);
+  const zoomed = (container: HTMLElement) => container.querySelector("[data-mapkit]")!.getAttribute("data-zoomed");
+  const whole = () => ({ ...mapped().rects[0] });
 
   it("sends a car from the airport to the hotel, zooming in after the flight and back out before the next one", async () => {
-    const { container } = render(RouteReplayMap, { stops: hotelStops, year: 2025, still: false });
-    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    const { container } = draw({ stops: hotelStops, year: 2025, still: false });
+    const full = whole();
+    expect(zoomed(container)).toBe("false");
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(3750);
     await Promise.resolve();
-    expect(container.querySelector("[data-car='1']")!.getAttribute("data-flying")).toBe("true");
-    expect(container.querySelector("[data-car='1']")!.closest("[aria-hidden='true']")).toBeTruthy();
-    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("true");
-    expect(viewBox(container)[2]).toBeLessThan(960);
+    const car = moverNodes().find((n) => n.getAttribute("data-car") === "1")!;
+    expect(car.getAttribute("data-flying")).toBe("true");
+    expect(car.querySelector("svg")!.getAttribute("aria-hidden")).toBe("true");
+    expect(zoomed(container)).toBe("true");
+    expect(lastRect().width).toBeLessThan(full.width);
     advance(6250);
     await Promise.resolve();
-    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
-    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("false");
+    expect(lastRect()).toMatchObject({ x: full.x, y: full.y, width: full.width, height: full.height });
+    expect(zoomed(container)).toBe("false");
   });
 
   it("returns to the whole map when scrubbed to the start or the end", async () => {
-    const { container } = render(RouteReplayMap, { stops: hotelStops, year: 2025, still: false });
+    draw({ stops: hotelStops, year: 2025, still: false });
     const slider = screen.getByRole("slider", { name: "Position along the route" });
+    const full = whole();
     await fireEvent.input(slider, { target: { value: "1500" } });
-    expect(viewBox(container)[2]).toBeLessThan(960);
+    expect(lastRect().width).toBeLessThan(full.width);
     await fireEvent.input(slider, { target: { value: "0" } });
-    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    expect(lastRect()).toMatchObject({ width: full.width, height: full.height });
     await fireEvent.input(slider, { target: { value: "4000" } });
-    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
+    expect(lastRect()).toMatchObject({ width: full.width, height: full.height });
   });
 
   it("sends a boat along a cruise", async () => {
     const cruise = segment({ id: 5, kind: "cruise", origin: "San Francisco", destination: "San Francisco", start_local: "2025-12-09T16:00", start_zone: la, end_local: "2025-12-13T07:00", end_zone: la,
       itinerary: [{ name: "Napa", zone: la, arrive_local: "2025-12-11T08:00", depart_local: "2025-12-11T17:00" }] });
     const ship = stopsOf(trip([cruise]), { ...places, cities: [{ city: "san francisco", latitude: 37.6213, longitude: -122.379 }, { city: "napa", latitude: 38.2975, longitude: -122.2869 }] });
-    const { container } = render(RouteReplayMap, { stops: ship, year: 2025, still: false });
+    draw({ stops: ship, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(1500);
     await Promise.resolve();
-    expect(container.querySelector("[data-boat='0']")).toBeTruthy();
-    expect(container.querySelector("[data-car]")).toBeNull();
+    expect(moverNodes().map((n) => n.getAttribute("data-boat"))).toEqual(["0"]);
+    expect(moverNodes().some((n) => n.hasAttribute("data-car"))).toBe(false);
   });
 
   it("with reduced motion keeps the whole map, with no zoom and static icons", () => {
     const far = stopsOf(trip([...flights, segment({ id: 3, kind: "hotel", origin: "Bay Lodge", destination: "Monterey", start_local: "2025-12-05T15:00", start_zone: la, end_local: "2025-12-11T11:00", end_zone: la })]),
       { ...places, stays: [{ segment_id: 3, latitude: 36.6, longitude: -121.9, precision: "city" }] });
-    const { container } = render(RouteReplayMap, { stops: far, year: 2025, still: true });
-    expect(viewBox(container)).toEqual([0, 0, 960, 520]);
-    expect(container.querySelector("svg")!.getAttribute("data-zoomed")).toBe("false");
-    expect(container.querySelector("[data-testid='movers']")!.children).toHaveLength(0);
-    expect(container.querySelector(".animate-ping")).toBeNull();
+    const { container } = draw({ stops: far, year: 2025, still: true });
+    expect(mapped().rects).toHaveLength(1);
+    expect(zoomed(container)).toBe("false");
+    expect(moverNodes()).toHaveLength(0);
+    expect(pinging()).toEqual([]);
   });
 
   it("speeds the replay up with the speed button, cycling 1×, 2×, 4× and back", async () => {
-    render(RouteReplayMap, { stops, year: 2025, still: false });
+    draw({ stops, year: 2025, still: false });
     const slider = screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     await fireEvent.click(screen.getByRole("button", { name: "Playback speed 1×" }));
@@ -287,7 +304,7 @@ describe("RouteReplayMap", () => {
   it("moves the replay faster at 2× and 4× than at 1×", async () => {
     const slider = () => screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement;
     const pace = async (presses: number) => {
-      render(RouteReplayMap, { stops, year: 2025, still: false });
+      draw({ stops, year: 2025, still: false });
       await fireEvent.click(screen.getByRole("button", { name: "Play" }));
       for (const label of ["1×", "2×", "4×"].slice(0, presses)) await fireEvent.click(screen.getByRole("button", { name: `Playback speed ${label}` }));
       advance(1500);
@@ -305,7 +322,7 @@ describe("RouteReplayMap", () => {
   it("plays a 25-stop trip over a minute and a half, with each town's label lit as the path reaches it", async () => {
     const towns = Array.from({ length: 25 }, (_, i) => ({ name: `Town ${i}`, city: `Town ${i}`, code: null, kind: "place" as const, latitude: 30 + i * 0.6, longitude: -100 + i * 0.9, from: "2025-12-05", to: "2025-12-05", via: i === 0 ? null : ("car" as const) }));
     expect(replayMs(towns.length)).toBe(88000);
-    const { container } = render(RouteReplayMap, { stops: towns, year: 2025, still: false });
+    const { container } = draw({ stops: towns, year: 2025, still: false });
     await fireEvent.click(screen.getByRole("button", { name: "Play" }));
     advance(44000);
     await Promise.resolve();
@@ -331,16 +348,16 @@ describe("RouteReplayMap", () => {
     const slide = (to: number) => fireEvent.input(screen.getByRole("slider", { name: "Position along the route" }), { target: { value: String(to) } });
 
     it("highlights no stop before the replay has begun, and none in a still map", () => {
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       expect(current()).toEqual([]);
       cleanup();
-      render(RouteReplayMap, { stops, year: 2025, still: true });
+      draw({ stops, year: 2025, still: true });
       expect(current()).toEqual([]);
       expect(scrollTo).not.toHaveBeenCalled();
     });
 
     it("marks the stop the replay is at, and moves the mark along as it goes", async () => {
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       await slide(0.5 * SCRUB_STEPS);
       expect(current()).toEqual(["1"]);
       await slide(SCRUB_STEPS);
@@ -351,7 +368,7 @@ describe("RouteReplayMap", () => {
     });
 
     it("scrolls the list, not the page, to keep that stop in view", async () => {
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       await slide(0.5 * SCRUB_STEPS);
       expect(scrollTo).toHaveBeenLastCalledWith(expect.objectContaining({ behavior: "smooth" }));
       expect(scrollTo.mock.contexts.at(-1)).toBe(screen.getByRole("region", { name: "Stops list" }));
@@ -359,7 +376,7 @@ describe("RouteReplayMap", () => {
 
     it("leaves the list alone for a few seconds after the person scrolls it themselves", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       await slide(0);
       scrollTo.mockClear();
       await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
@@ -378,7 +395,7 @@ describe("RouteReplayMap", () => {
 
     it("drops a pending catch-up when the replay moves on first", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       await slide(0);
       await fireEvent.wheel(screen.getByRole("region", { name: "Stops list" }));
       await slide(0.5 * SCRUB_STEPS);
@@ -389,7 +406,7 @@ describe("RouteReplayMap", () => {
     });
 
     it("keeps a long list in a scrollable box the keyboard can reach", () => {
-      render(RouteReplayMap, { stops, year: 2025 });
+      draw({ stops, year: 2025 });
       const box = screen.getByRole("region", { name: "Stops list" });
       expect(box).toHaveAttribute("tabindex", "0");
       expect(box.className).toContain("overflow-y-auto");

@@ -3,13 +3,16 @@ import { render, screen, within } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/auth/login" }));
-vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
+vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn() }));
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
+import { loadMapkit } from "$lib/mapkit";
 import type { TripPlaces } from "$lib/api-types";
 import { stopsOf } from "$lib/route-replay";
-import { segment, trip } from "../../test/fixtures";
+import { app } from "$lib/app.svelte";
+import { fake, fakeMaps } from "../../test/fake-mapkit";
+import { segment, state, trip } from "../../test/fixtures";
 import RouteReplay from "./RouteReplay.svelte";
 import RouteReplayMap from "./RouteReplayMap.svelte";
 
@@ -29,18 +32,25 @@ const after = Date.parse("2026-01-15T12:00:00Z");
 const stops = stopsOf(trip([first, second]), places);
 const labels = (container: HTMLElement) => [...container.querySelectorAll("[data-label][data-visible='true']")].map((l) => l.getAttribute("data-label"));
 
+let maps: ReturnType<typeof fakeMaps>;
+const stopNodes = () => [...fake.last().annotations].map((a) => a.factory()).filter((n) => n.hasAttribute("data-stop"));
 beforeEach(() => {
+  fake.reset();
+  maps = fakeMaps();
+  vi.mocked(loadMapkit).mockReset();
+  vi.mocked(loadMapkit).mockImplementation(async () => maps);
+  app.state = state({ mapkit: true });
   vi.mocked(api).mockReset();
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { app.state = null; vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("RouteReplayMap with Home", () => {
   it("marks the first and last stops with a house and names the home city, with no street", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
-    const houses = container.querySelectorAll("[data-kind='home'] [data-house]");
-    expect(houses).toHaveLength(2);
-    expect([...container.querySelectorAll("[data-kind='home']")].map((g) => g.getAttribute("data-stop"))).toEqual(["Springfield", "Springfield"]);
+    render(RouteReplayMap, { maps, stops, year: 2025, still: true });
+    const homes = stopNodes().filter((n) => n.getAttribute("data-kind") === "home");
+    expect(homes.flatMap((n) => [...n.querySelectorAll("[data-house]")])).toHaveLength(2);
+    expect(homes.map((g) => g.getAttribute("data-stop"))).toEqual(["Springfield", "Springfield"]);
     expect(screen.getByLabelText("Map key").textContent).toContain("Home");
     const items = within(screen.getByRole("list", { name: "Stops in order" })).getAllByRole("listitem").map((li) => li.lastElementChild?.textContent?.replace(/\s+/g, " "));
     expect(items[0]).toBe("Springfield, Dec 5");
@@ -48,15 +58,15 @@ describe("RouteReplayMap with Home", () => {
   });
 
   it("with reduced motion shows the finished route with both Home stops labelled once each", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true });
+    const { container } = render(RouteReplayMap, { maps, stops, year: 2025, still: true });
     expect(labels(container)).toEqual(["Springfield", "Arch Inn", "Music Row Inn", "Springfield"]);
-    expect(container.querySelectorAll("[data-leg]")).toHaveLength(3);
+    expect(fake.last().overlays.size).toBe(3);
   });
 
   it("shows the Home label once at the start, before anything is played", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
+    const { container } = render(RouteReplayMap, { maps, stops, year: 2025, still: false });
     expect(labels(container)).toEqual(["Springfield"]);
-    expect(container.querySelectorAll("[data-kind='home']")).toHaveLength(1);
+    expect(stopNodes().filter((n) => n.getAttribute("data-kind") === "home")).toHaveLength(1);
   });
 });
 
@@ -86,6 +96,6 @@ describe("RouteReplay with Home", () => {
     reply({ ...places, airports: [{ code: "MSP", city: "Minneapolis", latitude: 44.9, longitude: -93.2 }, { code: "SFO", city: "San Francisco", latitude: 37.6, longitude: -122.4 }] });
     render(RouteReplay, { trip: trip([first, flight]), now: after });
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
-    expect(document.querySelector("[data-kind='home']")).toBeNull();
+    expect(stopNodes().some((n) => n.getAttribute("data-kind") === "home")).toBe(false);
   });
 });

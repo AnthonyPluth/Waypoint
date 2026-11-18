@@ -5,7 +5,7 @@ import { apiCall } from "./contract";
 import { clearRouteCache, ROUTE_TIMEOUT_MS } from "./driving-routes";
 import { cutAt, createReplayMap, DEFAULT_PALETTE, legPath, mapPoint, mapRectFor, MAX_LATITUDE, mercatorFor, SAMPLES, WORLD, type ReplayMap, type ReplayMapOptions } from "./replay-mapkit";
 import { geoMercator } from "d3-geo";
-import { legsOf, positions, type Roads, type Stop } from "./route-replay";
+import { legsOf, positions, type Stop } from "./route-replay";
 
 vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 const server = vi.mocked(apiCall);
@@ -13,16 +13,9 @@ const server = vi.mocked(apiCall);
 const stopAt = (name: string, latitude: number, longitude: number, via: Stop["via"] = null, kind: Stop["kind"] = "airport"): Stop =>
   ({ name, city: name, code: kind === "airport" ? name.slice(0, 3).toUpperCase() : null, kind, latitude, longitude, from: "2025-12-05T08:00", to: "2025-12-05T10:00", via });
 const flying = [stopAt("Minneapolis", 44.88, -93.22), stopAt("San Francisco", 37.62, -122.38, "flight"), stopAt("Minneapolis", 44.88, -93.22, "flight")];
-const none: Roads = { legs: [], interstates: [] };
 const denver = stopAt("Denver", 39.74, -104.99, null, "stay"), saltLake = stopAt("Salt Lake City", 40.76, -111.89, null, "stay");
-const roads: Roads = {
-  legs: [{ from_segment_id: 1, to_segment_id: 2, refs: ["I-25", "I-80"], points: [[39.77, -105.0], [40.2, -105.0], [41.2, -107.5], [40.75, -111.85]] }],
-  interstates: [{ ref: "I-25", points: [[39.0, -105.0], [40.2, -105.0]] }, { ref: "I-80", points: [[41.2, -107.5], [40.75, -111.85]] }],
-};
-const boundaries = [{ points: [[40.99, -109.05], [37.0, -109.05]] }];
-
 const options = (extra: Partial<ReplayMapOptions> = {}): ReplayMapOptions =>
-  ({ stops: flying, roads: none, width: 960, height: 520, palette: DEFAULT_PALETTE, scale: 1, onFailure: vi.fn(), ...extra });
+  ({ stops: flying, width: 960, height: 520, palette: DEFAULT_PALETTE, scale: 1, onFailure: vi.fn(), ...extra });
 const start = (extra: Partial<ReplayMapOptions> = {}): { replay: ReplayMap; opts: ReplayMapOptions } => {
   const opts = options(extra);
   return { replay: createReplayMap(fakeMk, document.createElement("div"), opts), opts };
@@ -47,7 +40,7 @@ describe("the map's projection", () => {
   });
 
   it("is a Mercator fit of the same stops the flat map shows", () => {
-    const projection = mercatorFor(flying, 960, 520, none);
+    const projection = mercatorFor(flying, 960, 520);
     const [x, y] = projection([-93.22, 44.88])!;
     expect(x).toBeGreaterThan(0);
     expect(y).toBeGreaterThan(0);
@@ -134,9 +127,9 @@ describe("cutting a path", () => {
     expect(cutAt(path, 7)).toEqual(path.points);
   });
 
-  it("samples a flight's arc into a bowed line and uses a road's own points", () => {
-    const projection = mercatorFor(flying, 960, 520, none);
-    const [flight] = legsOf(flying, projection, none);
+  it("samples a flight's arc into a bowed line, a drive into a straight one, and uses a road's own points once it has one", () => {
+    const projection = mercatorFor(flying, 960, 520);
+    const [flight] = legsOf(flying, projection);
     const arc = legPath(flight);
     expect(arc.points).toHaveLength(SAMPLES + 1);
     expect(arc.points[0]).toEqual(flight.from);
@@ -144,10 +137,14 @@ describe("cutting a path", () => {
     const middle = arc.points[SAMPLES / 2];
     const chord = { x: (flight.from.x + flight.to.x) / 2, y: (flight.from.y + flight.to.y) / 2 };
     expect(Math.hypot(middle.x - chord.x, middle.y - chord.y)).toBeGreaterThan(5);
-    const roadProjection = mercatorFor([denver, saltLake], 960, 520, roads);
-    const [drive] = legsOf([denver, saltLake], roadProjection, roads);
-    expect(legPath(drive)).toBe(drive.road);
-    expect(positions([denver, saltLake], roadProjection)).toHaveLength(2);
+    const driveProjection = mercatorFor([denver, saltLake], 960, 520);
+    const [drive] = legsOf([denver, saltLake], driveProjection);
+    const line = legPath(drive);
+    expect(line.points).toHaveLength(SAMPLES + 1);
+    for (const p of line.points) expect((p.x - drive.from.x) * (drive.to.y - drive.from.y) - (p.y - drive.from.y) * (drive.to.x - drive.from.x)).toBeCloseTo(0, 6);
+    const road = { points: [drive.from, { x: drive.from.x + 5, y: drive.from.y - 9 }, drive.to], along: [0, 10, 20] };
+    expect(legPath({ ...drive, road })).toBe(road);
+    expect(positions([denver, saltLake], driveProjection)).toHaveLength(2);
   });
 });
 
@@ -177,10 +174,10 @@ describe("the MapKit map", () => {
     expect(visibleStops()).toHaveLength(3);
     const glyph = (name: string, kind: string) => { const node = named(name).factory(); expect(node.getAttribute("data-kind")).toBe(kind); return node.querySelector("svg")!.innerHTML; };
     expect(glyph("Minneapolis", "airport")).toContain("fill-map-airport");
-    const stay = start({ stops: [denver, saltLake], roads });
+    const stay = start({ stops: [denver, saltLake] });
     stay.replay.update({ progress: 1, playing: false, calm: false });
     expect(named("Denver").factory().querySelector("rect")!.getAttribute("class")).toContain("fill-map-stay");
-    const home = start({ stops: [{ ...denver, kind: "home" }, { ...saltLake, kind: "place" }], roads });
+    const home = start({ stops: [{ ...denver, kind: "home" }, { ...saltLake, kind: "place" }] });
     home.replay.update({ progress: 1, playing: false, calm: false });
     expect(named("Denver").factory().querySelector("path[data-house]")).toBeTruthy();
     expect(named("Salt Lake City").factory().querySelector("circle:not([data-ping])")!.getAttribute("r")).toBe("4.5");
@@ -217,12 +214,13 @@ describe("the MapKit map", () => {
     expect(overlays()).toHaveLength(1);
   });
 
-  it("draws a drive along its road, in the ground colour", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads, palette: { route: "#111111", stay: "#222222" } });
+  it("draws a drive with no Apple road yet as a straight line, in the ground colour", () => {
+    const { replay } = start({ stops: [denver, saltLake], palette: { route: "#111111", stay: "#222222" } });
     replay.update({ progress: 1, playing: false, calm: false });
     const drive = overlays().find((o) => colorOf(o) === "#222222" && o.options.style!.options.lineWidth === 2)!;
-    expect(drive.points.length).toBeGreaterThanOrEqual(4);
-    expect(drive.points[1].latitude).toBeCloseTo(39.77, 1);
+    const [first, ...rest] = drive.points;
+    const last = rest.at(-1)!;
+    for (const p of rest) expect((p.longitude - first.longitude) * (last.latitude - first.latitude) - (p.latitude - first.latitude) * (last.longitude - first.longitude)).toBeCloseTo(0, 1);
   });
 
   it("moves a plane along its leg, hidden before and after, turned the way it flies", () => {
@@ -250,7 +248,7 @@ describe("the MapKit map", () => {
     const kinds = () => moversOnMap().map((a) => a.factory().getAttribute("data-vehicle"));
 
     it("is never more than one on the map as the replay passes leg after leg", () => {
-      const { replay } = start({ stops: trip, roads: none });
+      const { replay } = start({ stops: trip });
       const seen = new Set<string | null>();
       for (let progress = 0; progress <= 1.0001; progress += 0.01) {
         replay.update(frame(Math.min(1, progress)));
@@ -261,7 +259,7 @@ describe("the MapKit map", () => {
     });
 
     it("is replaced, not left behind, when the next leg starts", () => {
-      const { replay } = start({ stops: trip, roads: none });
+      const { replay } = start({ stops: trip });
       replay.update(frame(0.1));
       const [first] = moversOnMap();
       expect(first.factory().getAttribute("data-mover")).toBe("0");
@@ -272,7 +270,7 @@ describe("the MapKit map", () => {
     });
 
     it("is gone while paused at a stop, at the end, and when scrubbing back", () => {
-      const { replay } = start({ stops: trip, roads: none });
+      const { replay } = start({ stops: trip });
       replay.update(frame(0.1));
       expect(moversOnMap()).toHaveLength(1);
       replay.update({ progress: 0.5, playing: false, calm: false });
@@ -288,7 +286,7 @@ describe("the MapKit map", () => {
     });
 
     it("is not on the map at all in calm mode, even if it was moving a moment before", () => {
-      const { replay } = start({ stops: trip, roads: none });
+      const { replay } = start({ stops: trip });
       replay.update(frame(0.1));
       expect(moversOnMap()).toHaveLength(1);
       replay.update(frame(0.1, true));
@@ -298,7 +296,7 @@ describe("the MapKit map", () => {
     });
 
     it("is taken off the map when the replay is destroyed", () => {
-      const { replay } = start({ stops: trip, roads: none });
+      const { replay } = start({ stops: trip });
       replay.update(frame(0.1));
       replay.destroy();
       expect(fake.last().annotations.size).toBe(0);
@@ -314,11 +312,11 @@ describe("the MapKit map", () => {
   });
 
   it("moves a car and a boat as the flat map does", () => {
-    const car = start({ stops: [denver, saltLake], roads });
+    const car = start({ stops: [denver, saltLake] });
     car.replay.update({ progress: 0.5, playing: true, calm: false });
     expect(fake.last().annotations.size).toBe(2);
     expect(annotations().some((a) => a.factory().getAttribute("data-car") === "0")).toBe(true);
-    const ship = start({ stops: [denver, { ...saltLake, via: "cruise" }], roads: none });
+    const ship = start({ stops: [denver, { ...saltLake, via: "cruise" }] });
     ship.replay.update({ progress: 0.5, playing: true, calm: false });
     expect(annotations().some((a) => a.factory().getAttribute("data-boat") === "0")).toBe(true);
   });
@@ -345,16 +343,6 @@ describe("the MapKit map", () => {
     const count = fake.last().rects.length;
     replay.update({ progress: 0.8, playing: true, calm: false });
     expect(fake.last().rects).toHaveLength(count);
-  });
-
-  it("draws no state lines, even when the reply has them, and no highway lines or shields", () => {
-    const { replay } = start({ stops: [denver, saltLake], roads, ...{ boundaries } });
-    replay.update({ progress: 1, playing: false, calm: true });
-    expect(overlays().filter((o) => o.options.style!.options.lineDash)).toHaveLength(0);
-    expect(overlays()).toHaveLength(1);
-    expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);
-    replay.update({ progress: 1, playing: false, calm: true });
-    expect(annotations().some((a) => a.factory().hasAttribute("data-shield"))).toBe(false);
   });
 
   it("takes down what it put up, and stops listening, when it is destroyed", () => {
@@ -407,7 +395,7 @@ describe("driving routes from Apple's directions", () => {
   const here = (c: { latitude: number; longitude: number }) => ({ lat: c.latitude, lon: c.longitude });
 
   it("asks once for each drive leg, by car, and not again on every frame", async () => {
-    const { replay } = start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], roads: none });
+    const { replay } = start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")] });
     for (const progress of [0, 0.2, 0.4, 0.6, 0.8, 1]) replay.update({ progress, playing: true, calm: false });
     await flush();
     for (const progress of [0.1, 0.5, 0.9, 1]) replay.update({ progress, playing: true, calm: false });
@@ -435,7 +423,7 @@ describe("driving routes from Apple's directions", () => {
   });
 
   it("draws the line along the returned road, and keeps the car on it", async () => {
-    const { replay } = start({ stops: drive, roads: none });
+    const { replay } = start({ stops: drive });
     replay.update({ progress: 0.5, playing: true, calm: false });
     await flush();
     replay.update(calm);
@@ -449,7 +437,7 @@ describe("driving routes from Apple's directions", () => {
   });
 
   it("redraws a leg already on screen when its road arrives, and moves the car onto it", async () => {
-    const { replay } = start({ stops: drive, roads: none });
+    const { replay } = start({ stops: drive });
     replay.update({ progress: 0.5, playing: true, calm: false });
     const line = legLine();
     const straight = line.points.length;
@@ -464,17 +452,9 @@ describe("driving routes from Apple's directions", () => {
     expect(line.points.length).toBeLessThanOrEqual(road.length + 2);
   });
 
-  it("takes the road over a bundled highway for the same drive", async () => {
-    const { replay } = start({ stops: drive, roads });
-    replay.update(calm);
-    expect(legLine().points).toHaveLength(roads.legs[0].points.length + 2);
-    await flush();
-    expect(legLine().points).toHaveLength(windingPath(origin, destination).flat().length + 2);
-  });
-
   it.each<DirectionsMode>(["error", "empty", "throw"])("keeps today's line, and raises no error, when the directions call goes wrong (%s)", async (mode) => {
     fake.directions.mode = mode;
-    const { replay, opts } = start({ stops: drive, roads: none });
+    const { replay, opts } = start({ stops: drive });
     replay.update(calm);
     await flush();
     expect(legLine().points).toHaveLength(SAMPLES + 1);
@@ -484,7 +464,7 @@ describe("driving routes from Apple's directions", () => {
   it("gives up on a call that never answers after a few seconds, and keeps the line", async () => {
     vi.useFakeTimers();
     fake.directions.mode = "hang";
-    const { replay, opts } = start({ stops: drive, roads: none });
+    const { replay, opts } = start({ stops: drive });
     replay.update(calm);
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(ROUTE_TIMEOUT_MS - 1);
@@ -497,7 +477,7 @@ describe("driving routes from Apple's directions", () => {
 
   it("keeps the line when this MapKit has no directions at all", async () => {
     const old = { ...fakeMk, Directions: undefined };
-    const opts = options({ stops: drive, roads: none });
+    const opts = options({ stops: drive });
     const replay = createReplayMap(old, document.createElement("div"), opts);
     replay.update(calm);
     await flush();
@@ -506,9 +486,9 @@ describe("driving routes from Apple's directions", () => {
   });
 
   it("asks Apple once for the same drive however often the replay is opened", async () => {
-    start({ stops: drive, roads: none });
+    start({ stops: drive });
     await flush();
-    const again = start({ stops: drive, roads: none });
+    const again = start({ stops: drive });
     again.replay.update(calm);
     await flush();
     expect(fake.directions.calls).toHaveLength(1);
@@ -517,16 +497,16 @@ describe("driving routes from Apple's directions", () => {
 
   it("asks again the next time after a failure", async () => {
     fake.directions.mode = "error";
-    start({ stops: drive, roads: none });
+    start({ stops: drive });
     await flush();
     fake.directions.mode = "ok";
-    start({ stops: drive, roads: none });
+    start({ stops: drive });
     await flush();
     expect(fake.directions.calls).toHaveLength(2);
   });
 
   it("ignores a road that arrives after the map is gone", async () => {
-    const { replay } = start({ stops: drive, roads: none });
+    const { replay } = start({ stops: drive });
     replay.update(calm);
     const line = legLine();
     const before = line.points.length;
@@ -547,7 +527,7 @@ describe("driving routes kept on the server", () => {
   const stores = () => server.mock.calls.filter(([, o]) => o?.method === "PUT");
 
   it("asks MapKit on a first replay and stores each path, and a reload of the same trip asks MapKit for none", async () => {
-    start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], roads: none, tripId: 12 });
+    start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], tripId: 12 });
     await flush();
     expect(fake.directions.calls).toHaveLength(2);
     expect(stores().map(([path]) => path)).toEqual(["/api/trips/12/driving-routes", "/api/trips/12/driving-routes"]);
@@ -557,7 +537,7 @@ describe("driving routes kept on the server", () => {
     fake.reset();
     server.mockReset();
     server.mockResolvedValue({ routes: kept } as never);
-    const { replay } = start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], roads: none, tripId: 12 });
+    const { replay } = start({ stops: [denver, saltLake, stopAt("Park City", 40.65, -111.5, null, "stay")], tripId: 12 });
     replay.update(calm);
     await flush();
     expect(fake.directions.calls).toHaveLength(0);
@@ -568,7 +548,7 @@ describe("driving routes kept on the server", () => {
 
   it("gets a second device's paths from the server in one request and asks MapKit for none", async () => {
     server.mockResolvedValue({ routes: [{ start: origin, end: destination, path: road().map((c) => [c.latitude, c.longitude]) }] });
-    const { replay } = start({ stops: drive, roads: none, tripId: 3 });
+    const { replay } = start({ stops: drive, tripId: 3 });
     replay.update(calm);
     await flush();
     expect(fake.directions.calls).toHaveLength(0);
@@ -583,7 +563,7 @@ describe("driving routes kept on the server", () => {
       fake.reset();
       server.mockReset();
       server.mockImplementation(reply as never);
-      const { replay, opts } = start({ stops: drive, roads: none, tripId: 3 });
+      const { replay, opts } = start({ stops: drive, tripId: 3 });
       replay.update(calm);
       await flush();
       expect(fake.directions.calls).toHaveLength(1);
@@ -592,9 +572,9 @@ describe("driving routes kept on the server", () => {
     }
   });
 
-  it("keeps the bundled line for a drive that neither the server nor MapKit has a path for", async () => {
+  it("draws a straight line for a drive that neither the server nor MapKit has a path for", async () => {
     fake.directions.mode = "empty";
-    const { replay } = start({ stops: drive, roads: none, tripId: 3 });
+    const { replay } = start({ stops: drive, tripId: 3 });
     replay.update(calm);
     await flush();
     expect(legLine().points).toHaveLength(SAMPLES + 1);
@@ -602,7 +582,7 @@ describe("driving routes kept on the server", () => {
   });
 
   it("does not touch the server without a trip", async () => {
-    start({ stops: drive, roads: none });
+    start({ stops: drive });
     await flush();
     expect(server).not.toHaveBeenCalled();
     expect(fake.directions.calls).toHaveLength(1);
