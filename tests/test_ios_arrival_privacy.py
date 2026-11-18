@@ -1,8 +1,3 @@
-"""The iPhone app's arrival feature (issue #819) sends a booking's address text to Apple's geocoder, once location is allowed, and nothing
-else anywhere (owner decision 3, 2026-11-18); the phone's location is used on the phone only, by region monitoring, and is never kept or
-sent. These checks hold the shape of that in the Swift source, which CI compiles but this suite cannot run: the geocoder is named in one
-file, the arrival files have no way to make a request or write a log line or to ask for a location fix, and the two usage strings iOS
-shows are the signed-off ones."""
 import plistlib
 import re
 import unittest
