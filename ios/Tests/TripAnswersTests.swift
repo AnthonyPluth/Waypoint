@@ -1145,15 +1145,20 @@ final class OpenTripTests: XCTestCase {
             IntentRuntime.pages = pages
             URLProtocol.unregisterClass(OpenTripFailingProtocol.self)
         }
+        let opener = IntentRuntime.openHeldPage
+        defer { IntentRuntime.openHeldPage = opener }
         IntentRuntime.service = service(server: home)
         let held = PendingPage()
         IntentRuntime.pages = held
+        let asked = OpenCalls()
+        IntentRuntime.openHeldPage = { [held] in asked.record(held.peek()) }
         OpenTripFailingProtocol.reset()
         URLProtocol.registerClass(OpenTripFailingProtocol.self)
         _ = try await OpenTripIntent(trip: entity(1, "Grand Junction", scope: OfflineStore.folderName(for: home))).perform()
         XCTAssertEqual(held.take(), "#trip/1")
         _ = try await OpenTripIntent(trip: entity(7, "Lisbon", scope: OfflineStore.folderName(for: home))).perform()
         XCTAssertEqual(held.take(), "#upcoming", "a trip that isn't saved opens Upcoming")
+        XCTAssertEqual(asked.pages, ["#trip/1", "#upcoming"], "the shell is asked to open each page once it is held")
         XCTAssertEqual(OpenTripFailingProtocol.requests, 0)
     }
 
