@@ -3,10 +3,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TripPlaces } from "$lib/api-types";
 import { SCRUB_STEPS, stopsOf } from "$lib/route-replay";
+import { fake, fakeMaps } from "../../test/fake-mapkit";
 import { segment, trip } from "../../test/fixtures";
 import RouteReplayMap from "./RouteReplayMap.svelte";
-
-vi.mock("$lib/map", async (original) => ({ ...(await original<typeof import("$lib/map")>()), loadCountries: async () => [], loadDetailedCountries: async () => [], loadFineCountries: async () => [] }));
 
 const places: TripPlaces = {
   home: null,
@@ -23,9 +22,12 @@ const flights = [
 ];
 const stops = stopsOf(trip(flights), places);
 
+let maps: ReturnType<typeof fakeMaps>;
 let frames: ((at: number) => void)[] = [];
 let clock = 0;
 beforeEach(() => {
+  fake.reset();
+  maps = fakeMaps();
   frames = [];
   clock = 0;
   vi.stubGlobal("requestAnimationFrame", (f: (at: number) => void) => frames.push(f));
@@ -38,9 +40,10 @@ const slide = (to: number) => fireEvent.input(screen.getByRole("slider", { name:
 
 describe("the trip page's compact map", () => {
   it("is a group named Trip map, with no image role, and no key, controls or stops list", () => {
-    const { container } = render(RouteReplayMap, { stops, year: 2025, still: true, compact: true });
+    const { container } = render(RouteReplayMap, { maps, stops, year: 2025, still: true, compact: true });
     expect(screen.getByRole("group", { name: "Trip map" })).toBeTruthy();
-    expect(container.querySelector("svg[role=img]")).toBeNull();
+    expect(container.querySelector("[role=img]")).toBeNull();
+    expect(container.querySelector("[data-mapkit]")!.getAttribute("aria-hidden")).toBe("true");
     expect(screen.queryByRole("list", { name: "Map key" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Stops list" })).toBeNull();
     expect(screen.queryByRole("slider")).toBeNull();
@@ -48,28 +51,28 @@ describe("the trip page's compact map", () => {
 
   it("draws only the map and Replay trip when compact, and calls back when it is pressed", () => {
     const onreplay = vi.fn();
-    render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, onreplay });
+    render(RouteReplayMap, { maps, stops, year: 2025, still: true, compact: true, onreplay });
     fireEvent.click(screen.getByRole("button", { name: "Replay trip" }));
     expect(onreplay).toHaveBeenCalledOnce();
   });
 
   it("starts playing again each time a still map is let go, and reports when the replay reaches its end", async () => {
     const onended = vi.fn();
-    const { rerender } = render(RouteReplayMap, { stops, year: 2025, still: true, compact: true, autoplay: true, onended });
+    const { rerender } = render(RouteReplayMap, { maps, stops, year: 2025, still: true, compact: true, autoplay: true, onended });
     for (let round = 0; round < 2; round++) {
-      await rerender({ stops, year: 2025, still: false, compact: false, autoplay: true, onended });
+      await rerender({ maps, stops, year: 2025, still: false, compact: false, autoplay: true, onended });
       expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
-      await rerender({ stops, year: 2025, still: true, compact: true, autoplay: true, onended });
+      await rerender({ maps, stops, year: 2025, still: true, compact: true, autoplay: true, onended });
       expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
     }
     expect(onended).not.toHaveBeenCalled();
-    await rerender({ stops, year: 2025, still: false, compact: false, autoplay: true, onended });
+    await rerender({ maps, stops, year: 2025, still: false, compact: false, autoplay: true, onended });
     slide(SCRUB_STEPS);
     await vi.waitFor(() => expect(onended).toHaveBeenCalledOnce());
   });
 
   it("has no Replay trip button without a handler", () => {
-    render(RouteReplayMap, { stops, year: 2025, still: true, compact: true });
+    render(RouteReplayMap, { maps, stops, year: 2025, still: true, compact: true });
     expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
   });
 });

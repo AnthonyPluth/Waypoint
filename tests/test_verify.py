@@ -186,15 +186,38 @@ class InstanceTests(unittest.TestCase):
             self.assertEqual(datas, [i.data for i in instances])
             self.assertTrue(all(call.kwargs["env"]["FAKETIME"] == verify.FROZEN_NOW for call in popen.call_args_list))
 
-    def test_the_last_server_alone_is_the_mapkit_one(self):
+    def test_every_server_gets_a_throwaway_key_for_its_own_address(self):
+        with tempfile.TemporaryDirectory() as root:
+            _, run, popen_patch, port, ready, popen = self.fakes(root)
+            with run, popen_patch, port, ready:
+                instances = verify.start_instances(root, 2, "/lib/f.so", "jane")
+            self.assertEqual(len(instances), 3)
+            envs = [call.kwargs["env"] for call in popen.call_args_list]
+            self.assertTrue(all(maps.KEY_FILE_ENV in e for e in envs))
+            self.assertEqual([e[maps.PUBLIC_URL_ENV] for e in envs], [i.url for i in instances])
+            self.assertEqual(len({e[maps.KEY_FILE_ENV] for e in envs}), 3)
+            self.assertTrue(all(maps.FLAG_ENV not in e for e in envs))
+
+    def test_the_last_server_alone_has_no_key_when_a_flow_asks_for_none(self):
         with tempfile.TemporaryDirectory() as root:
             _, run, popen_patch, port, ready, popen = self.fakes(root)
             with run, popen_patch, port, ready:
                 instances = verify.start_instances(root, 2, "/lib/f.so", None, True)
             self.assertEqual(len(instances), 3)
             envs = [call.kwargs["env"] for call in popen.call_args_list]
-            self.assertEqual([maps.KEY_FILE_ENV in e for e in envs], [False, False, True])
-            self.assertEqual(envs[2][maps.PUBLIC_URL_ENV], instances[2].url)
+            self.assertEqual([maps.KEY_FILE_ENV in e for e in envs], [True, True, False])
+            self.assertEqual([maps.PUBLIC_URL_ENV in e for e in envs], [True, True, False])
+            self.assertEqual(envs[1][maps.PUBLIC_URL_ENV], instances[1].url)
+
+    def test_a_signed_in_server_and_a_server_with_no_key_can_both_be_started(self):
+        with tempfile.TemporaryDirectory() as root:
+            _, run, popen_patch, port, ready, popen = self.fakes(root)
+            with run, popen_patch, port, ready:
+                instances = verify.start_instances(root, 1, "/lib/f.so", "jane", True)
+            envs = [call.kwargs["env"] for call in popen.call_args_list]
+            self.assertEqual(len(instances), 3)
+            self.assertEqual([maps.KEY_FILE_ENV in e for e in envs], [True, True, False])
+            self.assertEqual([verify.SIGNED_IN_ENV in e for e in envs], [False, True, False])
 
     def test_one_server_is_served_from_the_seeded_folder_itself(self):
         with tempfile.TemporaryDirectory() as root:
@@ -424,20 +447,23 @@ class SignedInTests(unittest.TestCase):
         both = verify.node_command("node", "/f", ["http://a"], [], [], "http://b")
         self.assertEqual(both[both.index("--signed-url") + 1], "http://b")
 
-    def test_a_mapkit_server_is_started_only_when_a_selected_flow_asks_for_one(self):
+    def test_a_server_with_no_key_is_started_only_when_a_selected_flow_asks_for_none(self):
         with tempfile.TemporaryDirectory() as tmp:
-            for name, body in (("a.json", {"name": "a", "steps": []}), ("b.json", {"name": "b", "page": "trips", "mapkit": "fake", "steps": []})):
+            for name, body in (("a.json", {"name": "a", "steps": []}), ("b.json", {"name": "b", "page": "trips", "mapkit": "none", "steps": []}),
+                               ("c.json", {"name": "c", "page": "settings", "mapkit": "error", "steps": []})):
                 with open(os.path.join(tmp, name), "w") as f:
                     json.dump(body, f)
-            need = lambda pages=None, only=None: verify.flows_need_mapkit(pages, only, tmp)
+            need = lambda pages=None, only=None: verify.flows_need_no_key(pages, only, tmp)
             self.assertTrue(need())
             self.assertTrue(need(None, ["b"]))
             self.assertFalse(need(None, ["a"]))
+            self.assertFalse(need(None, ["c"]))
             self.assertTrue(need(["trips"]))
             self.assertFalse(need(["settings"]))
             self.assertFalse(verify.flows_need_signed_in(None, None, tmp))
+        self.assertFalse(verify.flows_need_no_key(None, None, "/no/such/folder"))
 
-    def test_the_mapkit_server_gets_a_throwaway_key_and_the_default_flag_and_no_other_server_does(self):
+    def test_a_server_gets_a_throwaway_key_and_the_default_flag_unless_it_is_to_have_none(self):
         with tempfile.TemporaryDirectory() as root:
             env = verify.mapkit_env({"A": "1"}, root, "http://127.0.0.1:9")
             self.assertEqual(verify.mapkit_env({"A": "1"}, root, None), {"A": "1"})
@@ -448,10 +474,26 @@ class SignedInTests(unittest.TestCase):
             with mock.patch.dict(os.environ, env):
                 self.assertTrue(maps.enabled())
 
-    def test_the_node_command_names_the_mapkit_server_only_when_there_is_one(self):
-        self.assertNotIn("--mapkit-url", verify.node_command("node", "/f", ["http://a"], [], []))
+    def test_the_node_command_names_the_server_with_no_key_only_when_there_is_one(self):
+        self.assertNotIn("--no-key-url", verify.node_command("node", "/f", ["http://a"], [], []))
+        self.assertNotIn("--mapkit-url", verify.node_command("node", "/f", ["http://a"], [], [], None, "http://c"))
         command = verify.node_command("node", "/f", ["http://a"], [], [], None, "http://c")
-        self.assertEqual(command[command.index("--mapkit-url") + 1], "http://c")
+        self.assertEqual(command[command.index("--no-key-url") + 1], "http://c")
+
+    def test_a_served_session_gets_a_key_for_its_port_unless_it_is_asked_for_none(self):
+        with tempfile.TemporaryDirectory() as root:
+            seed = os.path.join(root, "seed")
+            os.mkdir(seed)
+            for flags, keyed in (([], True), (["--no-key"], False)):
+                data = os.path.join(root, f"data-{len(flags)}")
+                execed = {}
+                with mock.patch.object(verify, "find_faketime", return_value="/lib/f.so"), mock.patch.object(verify, "die_with_parent"), \
+                        mock.patch("signal.signal"), mock.patch("os.dup2"), mock.patch("os.chdir"), mock.patch("os.execve", side_effect=lambda c, a, e: execed.update(env=e)):
+                    verify.serve(["--parent", "1", "--seed", seed, "--data", data, "--port", "9345", *flags])
+                env = execed["env"]
+                self.assertEqual(maps.KEY_FILE_ENV in env, keyed)
+                if keyed:
+                    self.assertEqual(env[maps.PUBLIC_URL_ENV], "http://127.0.0.1:9345")
 
 
 if __name__ == "__main__":

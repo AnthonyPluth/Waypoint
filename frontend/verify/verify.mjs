@@ -40,11 +40,11 @@ export const heroFile = (name, viewport) => `${name}-${viewport}-hero.png`;
 export const writesImage = (viewport) => IMAGE_VIEWPORTS.includes(viewport);
 export const localBase = (base) => base.replace("127.0.0.1", "localhost");
 export const VIRTUAL_AUTHENTICATOR = { protocol: "ctap2", ctap2Version: "ctap2_1", transport: "internal", hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true, hasPrf: true };
-export const MAPKIT_MODES = ["fake", "error", "blocked"];
+export const MAPKIT_MODES = ["none", "error", "blocked"];
 export const APPLE_MAPS_URLS = "https://*.apple-mapkit.com/**";
 export const OFFLINE_SAVED = "[data-testid='offline-saved']:text-matches('^\\s*Saved [0-9]|^\\s*Saved just now')";
 
-const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_bookings: "string", fake_flight_status: "string", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", fake_shell: "string", wait_for: "string", expect_text: "object", screenshot: "string" };
+const ACTIONS = { goto: "string", click: "string", click_if_present: "string", hover: "string", select: "object", fill: "object", press: "object", upload: "object", download: "object", scroll_to: "string", scroll_under_bar: "string", audit: "boolean", authenticator: "string", offline: "boolean", reload: "boolean", clock: "string", long_names: "string", fake_labels: "string", fake_ignored: "string", fake_ignore: "string", fake_dismiss: "boolean", fake_destination: "string", fake_first_run: "string", fake_merge_warning: "string", fake_archive: "number", fake_bookings: "string", fake_flight_status: "string", fake_photo_limit: "number", fake_immich: "string", fake_resume: "number", fake_shell: "string", wait_for: "string", expect_absent: "string", expect_text: "object", screenshot: "string" };
 const LONG_NAME_KEYS = new Set(["name", "city", "hotel"]);
 
 export function lengthenNames(value, suffix) {
@@ -126,9 +126,11 @@ const REPO = join(HERE, "..", "..");
 const fakeSource = (mode) => ["fake-mapkit.js", ...(mode === "error" ? ["fake-mapkit-error.js"] : [])].map((f) => readFileSync(join(HERE, f), "utf8")).join("\n");
 const CROSS_ORIGIN = { "Access-Control-Allow-Origin": "*" };
 
-export async function standInForApple(ctx, mode) {
+export async function standInForApple(ctx, mode, onRequest = () => {}) {
+  const refused = mode === "none" || mode === "blocked";
   await ctx.route(APPLE_MAPS_URLS, (route) => {
-    if (mode && mode !== "blocked" && /\/mapkit\.js$/.test(new URL(route.request().url()).pathname)) {
+    onRequest(route.request().url());
+    if (!refused && /\/mapkit\.js$/.test(new URL(route.request().url()).pathname)) {
       return route.fulfill({ status: 200, contentType: "application/javascript", headers: CROSS_ORIGIN, body: fakeSource(mode) });
     }
     return route.abort("blockedbyclient");
@@ -153,6 +155,7 @@ export function flowProblems(flow) {
   if (flow?.phone_agent !== undefined && typeof flow.phone_agent !== "boolean") out.push("phone_agent is true or false");
   if (flow?.signed_in !== undefined && typeof flow.signed_in !== "boolean") out.push("signed_in is true or false");
   if (flow?.mapkit !== undefined && !MAPKIT_MODES.includes(flow.mapkit)) out.push(`mapkit is one of ${MAPKIT_MODES.join(", ")}`);
+  else if (flow?.mapkit === "none" && flow.signed_in === true) out.push("mapkit none runs on a server that isn't signed in");
   if (flow?.scheme !== undefined) out.push("scheme is not an option: the app is dark only");
   return out;
 }
@@ -396,6 +399,8 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
     }, undefined, { timeout });
   } else if ("wait_for" in step) {
     await page.locator(step.wait_for).first().waitFor({ timeout });
+  } else if ("expect_absent" in step) {
+    await page.locator(step.expect_absent).first().waitFor({ state: "detached", timeout });
   } else if ("expect_text" in step) {
     const el = page.locator(step.expect_text.selector).first();
     await el.waitFor({ timeout });
@@ -411,7 +416,7 @@ export async function runStep(page, step, shot, saveDownload, audit = undefined)
   }
 }
 
-const NEUTRAL_STEPS = ["wait_for", "screenshot", "scroll_to", "scroll_under_bar"];
+const NEUTRAL_STEPS = ["wait_for", "expect_absent", "screenshot", "scroll_to", "scroll_under_bar"];
 
 export function checksAfter(checks, step) {
   const action = Object.keys(step).find((k) => k !== "timeout");
@@ -452,10 +457,10 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
   const ctx = await browser.newContext(contextOptions(viewport, { reducedMotion, phoneAgent }));
   try {
     await prepareContext(ctx, now);
-    await standInForApple(ctx, mapkit);
-    const page = await ctx.newPage();
     const where = `${label} @ ${viewport}`;
     const problems = [];
+    await standInForApple(ctx, mapkit, (url) => { if (mapkit === "none") problems.push(`${where}: asked an Apple host with no MapKit key: ${new URL(url).origin}`); });
+    const page = await ctx.newPage();
     const notes = [];
     const consoleErrors = [];
     page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
@@ -495,9 +500,9 @@ async function visit(env, label, viewport, work, { audit = true, reducedMotion =
 }
 
 export function baseFor(env, flow) {
-  if (flow?.mapkit !== undefined) {
-    if (!env.mapkitBase) throw new Error(`flow ${flow.name} needs the MapKit demo server, which this run didn't start (make verify starts it for a flow that sets mapkit)`);
-    return env.mapkitBase;
+  if (flow?.mapkit === "none") {
+    if (!env.noKeyBase) throw new Error(`flow ${flow.name} needs the demo server with no MapKit key, which this run didn't start (make verify starts it for a flow that sets mapkit to none)`);
+    return env.noKeyBase;
   }
   if (flow?.signed_in !== true) return env.base;
   if (!env.signedBase) throw new Error(`flow ${flow.name} needs the signed-in demo server, which this run didn't start (make verify starts it for a flow that sets signed_in)`);
@@ -597,7 +602,7 @@ async function main() {
   const flowsDir = opt("--flows", join(here, "flows"));
   const only = optAll("--flow").flatMap(urlsOf);
   const signedBase = opt("--signed-url", undefined);
-  const mapkitBase = opt("--mapkit-url", undefined);
+  const noKeyBase = opt("--no-key-url", undefined);
   if (!urls.length) { console.error("verify: no server address (--url or WAYPOINT_VERIFY_URL)"); process.exit(2); }
   const unknown = unknownPages(args);
   if (unknown.length) { console.error(`verify: no such page: ${unknown.join(", ")} (pages: ${PAGES.join(", ")})`); process.exit(2); }
@@ -630,11 +635,11 @@ async function main() {
         try { await warmMaps(browser, signedBase); }
         catch (e) { startup.push({ worker, reason: `warming the map data on the signed-in server: ${String(e.message).split("\n")[0]}` }); }
       }
-      if (mapkitBase && worker === 0) {
-        try { await warmMaps(browser, mapkitBase); }
-        catch (e) { startup.push({ worker, reason: `warming the map data on the MapKit server: ${String(e.message).split("\n")[0]}` }); }
+      if (noKeyBase && worker === 0) {
+        try { await warmMaps(browser, noKeyBase); }
+        catch (e) { startup.push({ worker, reason: `warming the map data on the server with no MapKit key: ${String(e.message).split("\n")[0]}` }); }
       }
-      return { browser, base, signedBase, mapkitBase, approveUrl, now, images, out };
+      return { browser, base, signedBase, noKeyBase, approveUrl, now, images, out };
     },
     work: (v, env) => runVisit(env, v),
     release: (env) => env.browser.close(),

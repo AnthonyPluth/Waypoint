@@ -1,22 +1,18 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { geoEqualEarth, geoPath } from "d3-geo";
   import RouteReplayMapKit from "$lib/components/RouteReplayMapKit.svelte";
   import { Button } from "$lib/components/ui/button";
-  import { landFor } from "$lib/land.svelte";
   import type { Maps } from "$lib/mapkit";
   import { viewport } from "$lib/phone.svelte";
-  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, SCRUB_STEPS, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, labelLit, LABEL_HOLD_MS, SCRUB_STEPS, replayMs, stopDates, stopLine, stopTitle, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, stopList = true, tripId, compact = false, onreplay = null, onended = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; stopList?: boolean; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
+  let { stops, year, maps, still = null, autoplay = false, stopList = true, tripId, compact = false, onreplay = null, onended = null, onready = null, onfailure = null }: { stops: Stop[]; year: number; maps: Maps; tripId?: number; still?: boolean | null; autoplay?: boolean; stopList?: boolean; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null; onready?: (() => void) | null; onfailure?: (() => void) | null } = $props();
   const replayable = $derived(stops.length >= 2);
   const COMPACT_LABEL = "Trip map";
   const mapLabel = $derived(stopList ? "Map of the route, stop by stop; the stops are listed below" : "Map of the route, stop by stop");
-  let fellBack = $state(false);
-  const onMapkit = $derived(maps !== null && !fellBack && replayable);
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -30,12 +26,7 @@
 
   const width = $derived(compact ? 600 : viewport.phone ? 600 : 960);
   const height = $derived(compact ? 405 : viewport.phone ? 640 : 520);
-  const projection = $derived(routeProjection(stops, width, height, undefined, roads, geoEqualEarth));
-  const path = $derived(geoPath(projection));
-  const legs = $derived(legsOf(stops, projection, roads));
-  const lines = $derived(boundaryShapes(boundaries, projection));
-  const spots = $derived(positions(stops, projection));
-  const sphere = $derived(path({ type: "Sphere" }) ?? "");
+  const otherTravel = $derived(stops.some((s, i) => i > 0 && s.via !== "flight"));
 
   let progress = $state(0);
   let playing = $state(false);
@@ -84,19 +75,7 @@
   });
   const scrub = (e: Event) => { ran = true; touched = true; playing = false; tail = 0; progress = Number((e.currentTarget as HTMLInputElement).value) / SCRUB_STEPS; };
 
-  const showing = (i: number) => calm || reached(i, stops.length, progress);
   const lit = (i: number) => calm || (i === stops.length - 1 ? progress >= 1 && playing && tail < LABEL_HOLD_MS : labelLit(i, stops.length, progress, !playing));
-  const box = $derived(calm ? { x: 0, y: 0, w: width, h: height } : cameraAt(stops, spots, width, height, progress, legs));
-  const terrain = landFor(() => ({ projection, width, height, box, zoom: width / box.w }));
-  const land = $derived(terrain.features.map((c, i) => ({ id: i, d: path(c) ?? "" })));
-  const zoom = $derived(box.w / width);
-  const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
-  const zoomed = $derived(box.w < width - 0.5);
-  const movers = $derived(legs.flatMap((leg, i) => {
-    const done = calm ? 1 : legProgress(i, stops.length, progress);
-    if (done <= 0 || done >= 1) return [];
-    return [{ i, moving: true, vehicle: leg.vehicle, ...moverAt(leg, done) }];
-  }));
   const RING: Record<Stop["kind"], string> = { airport: "border-map-airport", stay: "border-map-stay", home: "border-map-visited", place: "border-map-visited" };
   const following = $derived(!calm && (playing || progress > 0));
   let listBox = $state<HTMLElement | null>(null);
@@ -126,62 +105,8 @@
 
 <div class="space-y-3">
   <div role={compact ? "group" : undefined} aria-label={compact ? COMPACT_LABEL : undefined} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
-    {#if onMapkit && maps}
-      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {width} {height} {progress} {playing} {calm} label={mapLabel} onfailure={() => { fellBack = true; }} />
-    {:else}
-    <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role={compact ? undefined : "img"} aria-label={compact ? undefined : mapLabel} aria-hidden={compact ? "true" : undefined} class="block h-full w-full">
-      <path d={sphere} class="fill-map-sea" />
-      <g class="fill-map-land stroke-map-border" stroke-width="0.5" vector-effect="non-scaling-stroke">
-        {#each land as c, i (i)}<path d={c.d} />{/each}
-      </g>
-      {#if stateLines.length}
-        <g aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" opacity="0.8" data-testid="state-lines">
-          {#each stateLines as l, i (i)}<path d={l.d} class="stroke-map-border" stroke-width="1" vector-effect="non-scaling-stroke" />{/each}
-        </g>
-      {/if}
-      <g fill="none" stroke-linecap="round" stroke-linejoin="round" data-testid="legs">
-        {#each legs as leg, i (i)}
-          {@const done = calm ? 1 : legProgress(i, stops.length, progress)}
-          {#if done > 0}
-            <path d={leg.d} pathLength="1" stroke-dasharray="1" stroke-dashoffset={1 - done} stroke-width={(leg.flight ? 2.5 : 2) * zoom}
-              class={leg.flight ? "stroke-map-route" : "stroke-map-stay"} data-leg={leg.flight ? "flight" : "ground"} data-road-leg={leg.road ? leg.refs.join(" ") : undefined} />
-          {/if}
-        {/each}
-      </g>
-      <g data-testid="stops">
-        {#each stops as s, i (i)}
-          {#if showing(i)}
-            <g data-stop={s.name} data-kind={s.kind} transform="translate({spots[i].x} {spots[i].y}) scale({zoom})">
-              {#if !calm && playing && i === now}<circle r="10" class="animate-ping fill-map-airport/60" style="transform-box: fill-box; transform-origin: center" />{/if}
-              {#if s.kind === "stay"}
-                <rect x="-6" y="-6" width="12" height="12" rx="2" transform="rotate(45)" class="fill-map-stay stroke-map-sea" stroke-width="2" />
-              {:else if s.kind === "home"}
-                <path d="M0 -8 L8 -1 L5.5 -1 L5.5 6 L-5.5 6 L-5.5 -1 L-8 -1 Z" class="fill-map-visited stroke-map-sea" stroke-width="2" stroke-linejoin="round" data-house />
-              {:else if s.kind === "airport"}
-                <circle r="6" class="fill-map-airport stroke-map-sea" stroke-width="2" />
-              {:else}
-                <circle r="4.5" class="fill-map-visited stroke-map-sea" stroke-width="2" />
-              {/if}
-            </g>
-          {/if}
-        {/each}
-      </g>
-      <g data-testid="movers" aria-hidden="true">
-        {#each movers as m (m.i)}
-          <g data-mover={m.i} data-vehicle={m.vehicle} data-plane={m.vehicle === "plane" ? m.i : undefined} data-car={m.vehicle === "car" ? m.i : undefined} data-boat={m.vehicle === "boat" ? m.i : undefined}
-            data-flying={m.moving} transform="translate({m.x.toFixed(1)} {m.y.toFixed(1)}) rotate({m.angle.toFixed(1)}) scale({1.1 * zoom})">
-            {#if m.vehicle === "plane"}
-              <path d="M12 0 L3 -2.5 L-2 -10 L-5 -10 L-3 -1.5 L-8 -1.5 L-10 -4 L-12.5 -4 L-10.5 0 L-12.5 4 L-10 4 L-8 1.5 L-3 1.5 L-5 10 L-2 10 L3 2.5 Z" class="fill-map-route stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
-            {:else if m.vehicle === "car"}
-              <rect x="-9" y="-5" width="18" height="10" rx="3" class="fill-map-stay stroke-map-sea" stroke-width="1.2" />
-              <rect x="1" y="-3.5" width="4" height="7" rx="1" class="fill-map-sea" />
-            {:else}
-              <path d="M12 0 L6 6 L-10 6 L-8 0 L-10 -6 L6 -6 Z" class="fill-map-visited stroke-map-sea" stroke-width="1.2" stroke-linejoin="round" />
-            {/if}
-          </g>
-        {/each}
-      </g>
-    </svg>
+    {#if replayable}
+    <RouteReplayMapKit {maps} {tripId} {stops} {width} {height} {progress} {playing} {calm} label={compact ? undefined : mapLabel} decorative={compact} {onready} onfailure={() => onfailure?.()} />
     {/if}
     {#if compact && onreplay && replayable && !observed}
       <Button class="absolute bottom-3 left-3" variant="secondary" size="sm" aria-label="Replay trip" aria-expanded="false" onclick={onreplay}><Play class="size-3.5" aria-hidden="true" /> Replay trip</Button>
@@ -206,8 +131,7 @@
     {#if stops.some((s) => s.kind === "home")}<li class="flex items-center gap-2"><svg viewBox="-9 -9 18 16" class="h-3 w-3.5" aria-hidden="true"><path d="M0 -8 L8 -1 L5.5 -1 L5.5 6 L-5.5 6 L-5.5 -1 L-8 -1 Z" class="fill-map-visited" /></svg>Home</li>{/if}
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
     <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
-    {#if stateLines.length && !onMapkit}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
-    {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
+    {#if otherTravel}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
     {/if}
   </ul>
   {/if}

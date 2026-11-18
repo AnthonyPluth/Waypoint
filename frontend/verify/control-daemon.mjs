@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { ACTING_COMMANDS, ARTIFACTS, UNREACHABLE_ARGS, ControlError, allowedRequest, isGuardedPath, LOOPBACK_HOSTS, PROG, ROOT, closest, errorResult, jsExpression, lastShotNumber, onHost, parseTarget, readState, rel, removeState, routeUrl, sameServer, scrubText, scrubUrl, shotName, socketPath, writeState } from "./control.mjs";
 import { auditPage } from "./a11y.mjs";
 import { startServer } from "./control-server.mjs";
-import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage } from "./verify.mjs";
+import { VIEWPORTS, checksAfter, contextOptions, launchOptions, prepareContext, readFlows, recheck, runStep, screenshotFile, setUpOffline, settlePage, standInForApple } from "./verify.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BUFFER = 500;
@@ -21,7 +21,7 @@ const firstLine = (e) => String(e?.message ?? e).split("\n")[0];
 
 function options(argv) {
   const get = (name) => { const i = argv.indexOf(`--${name}`); return i < 0 ? undefined : argv[i + 1]; };
-  return { dir: get("dir"), python: get("python"), now: get("now"), viewport: get("viewport") ?? "phone", idleMinutes: Number(get("idle-minutes") ?? 30), signedIn: get("signed-in") };
+  return { dir: get("dir"), python: get("python"), now: get("now"), viewport: get("viewport") ?? "phone", idleMinutes: Number(get("idle-minutes") ?? 30), signedIn: get("signed-in"), noKey: argv.includes("--no-key") };
 }
 
 function runToEnd(program, args, env) {
@@ -75,7 +75,7 @@ async function main() {
 
   async function newServer() {
     server = await startServer({
-      command: (port, folder) => [opt.python, "-m", "waypoint.verify", "serve", "--parent", String(process.pid), "--seed", seedDir, "--data", folder, "--port", String(port), ...(opt.signedIn ? ["--signed-in", opt.signedIn] : [])],
+      command: (port, folder) => [opt.python, "-m", "waypoint.verify", "serve", "--parent", String(process.pid), "--seed", seedDir, "--data", folder, "--port", String(port), ...(opt.signedIn ? ["--signed-in", opt.signedIn] : []), ...(opt.noKey ? ["--no-key"] : [])],
       folder: join(sessionDir, `data-${++servers}`), timeout: 60000, cwd: ROOT,
     });
     base = `http://127.0.0.1:${server.port}`;
@@ -101,7 +101,7 @@ async function main() {
   let guarded = null;
   let blocking = null;
   let wantBlock = true;
-  const offServer = (url) => !allowedRequest(url.href, base);
+  const offServer = (url) => !allowedRequest(url.href, base) && !url.hostname.endsWith(".apple-mapkit.com");
   const abortOffServer = (route) => {
     blockedHosts.push(scrubUrl(route.request().url(), base) ?? "a data address");
     return route.abort("blockedbyclient");
@@ -130,7 +130,7 @@ async function main() {
     }
   }
 
-  async function openPage(viewport, phoneAgent = false) {
+  async function openPage(viewport, phoneAgent = false, mapkit = undefined) {
     const previous = ctx;
     const fresh = await browser.newContext(contextOptions(viewport, { phoneAgent }));
     await prepareContext(fresh, opt.now);
@@ -138,6 +138,7 @@ async function main() {
       await fresh.route(offServer, abortOffServer);
       blocking = fresh;
     }
+    await standInForApple(fresh, mapkit ?? (opt.noKey ? "none" : undefined));
     const tab = await fresh.newPage();
     tab.setDefaultTimeout(30000);
     tab.setDefaultNavigationTimeout(30000);
@@ -235,7 +236,7 @@ async function main() {
     const size = page.viewportSize();
     return { route: route(), title: await page.title(), viewport: { name: state.viewport, ...size },
       clock: { frozenNow: opt.now, browser: await page.evaluate(() => new Date().toString()), server: `${opt.now.replace("T", " ").replace("Z", "")} UTC, stopped (libfaketime)` },
-      session: { pid: process.pid, server: base, idleMinutes: opt.idleMinutes, signedIn: opt.signedIn ?? null } };
+      session: { pid: process.pid, server: base, idleMinutes: opt.idleMinutes, signedIn: opt.signedIn ?? null, mapkit: opt.noKey ? "off" : "stand-in" } };
   }
 
   async function settledNow() {
@@ -379,8 +380,8 @@ async function main() {
       const near = closest(name, flows.map((f) => f.name));
       throw new ControlError("no_such_flow", `no flow named ${name}`, near ? `did you mean ${near}? (\`${PROG} flows\` lists them)` : `\`${PROG} flows\` lists them`);
     }
-    if (flow.mapkit !== undefined) {
-      throw new ControlError("needs_mapkit", `${name} needs the MapKit demo server that make verify starts for it, which a session doesn't have`, `run it with \`make verify\` (\`make verify PAGES=… \` limits the pages; the flow is named ${name})`);
+    if (flow.mapkit === "none" && !opt.noKey) {
+      throw new ControlError("needs_no_key", `${name} needs a session with no MapKit key, and this one has one`, `\`${PROG} stop\`, then \`${PROG} start --no-key\``);
     }
     if (flow.signed_in === true && !opt.signedIn) {
       throw new ControlError("needs_signed_in", `${name} needs a signed-in session, and this one isn't`, `\`${PROG} stop\`, then \`${PROG} start --signed-in jane\``);
@@ -390,6 +391,7 @@ async function main() {
     const notes = [];
     const wanted = flow.viewports ?? ["phone", "desktop"];
     if (!wanted.includes(vp)) notes.push(`make verify runs ${name} at ${wanted.join(", ")} only; this is ${vp}`);
+    if (opt.noKey && flow.mapkit !== "none") notes.push("this session has no MapKit key (start --no-key), so no map or replay showed; make verify runs this flow with one");
     notes.push("it ran on this session's data: `reset` first for the data make verify starts it from");
     notes.push("it ran in a new browser, as make verify's flows do; the session is now that browser as the flow left it (`reset` for a fresh one)");
     consoleBuffer.length = 0;
@@ -408,7 +410,7 @@ async function main() {
       await download.saveAs(target);
       files.push(rel(target));
     };
-    await openPage(vp, flow.phone_agent === true);
+    await openPage(vp, flow.phone_agent === true, flow.mapkit);
     await page.goto(`${onHost(base, flow.host ?? "127.0.0.1")}/#${flow.page ?? "upcoming"}`, { waitUntil: "networkidle" });
     for (const [i, step] of flow.steps.entries()) {
       const started = Date.now();

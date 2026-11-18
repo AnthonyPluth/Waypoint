@@ -1,7 +1,6 @@
 {
   "name": "past-trip-saved-route",
   "page": "trips",
-  "mapkit": "fake",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "wait_for": "ul[aria-label='Past trips in 2026'] a:has-text('Denver') [data-testid='route-tile'][data-drawn='true']" },

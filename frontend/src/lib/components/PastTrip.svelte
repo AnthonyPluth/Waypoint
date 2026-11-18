@@ -34,8 +34,10 @@
   let photoChanges = $state(0);
   let looks = $state(0);
   let stopCount = $state(0);
+  let mapShown = $state(false);
   let replaying = $state(false);
   let gallery = $state<{ viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
+  let facts = $state<{ headingElement: () => HTMLElement | null } | null>(null);
   let acting = $state<PersonSharing[]>([]);
   let settled = $state(false);
   let sharingOpen = $state(false);
@@ -104,8 +106,8 @@
         <h1 class="break-words text-display">{trip.name}</h1>
         {#if caption}<p class="min-w-0 break-words text-muted-foreground">{caption}</p>{/if}
       </div>
-      <div class={wide ? "max-w-[60rem]" : ""}><RouteReplay {trip} {now} stopList={false} /></div>
-      {#if noPhotos}<p class="-mt-3 text-sm text-muted-foreground" data-testid="no-photos">No photos yet</p>{/if}
+      <RouteReplay {trip} {now} stopList={false} wrapClass={wide ? "max-w-[60rem]" : ""} onmap={(on) => (mapShown = on)} fallbackFocus={() => facts?.headingElement() ?? null} />
+      {#if noPhotos}<p class={`text-sm text-muted-foreground ${mapShown ? "-mt-3" : ""}`} data-testid="no-photos">No photos yet</p>{/if}
       {@render controls()}
     {:else}
       <div class={`relative overflow-hidden rounded-[22px] border border-border bg-surface-3 ${wide ? "h-[260px]" : "h-[170px]"}`} data-testid="trip-hero">
@@ -130,7 +132,7 @@
 
     {#if !wide}
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-        <TripSummary tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
+        <TripSummary bind:this={facts} tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
         <AvatarStack people={avatars} />
         {#if hasTotal || looks > 0 || (heroKind !== "map" && stopCount >= 2)}
           <div class="flex basis-full flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-muted-foreground">
@@ -145,7 +147,7 @@
       {#if trip.notes}<p class="whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
 
       {#if heroKind !== "map"}
-        <div id="past-trip-replay"><RouteReplay {trip} {now} shown={replaying} stopList={false} onstops={(n) => (stopCount = n)} /></div>
+        <RouteReplay {trip} {now} shown={replaying} stopList={false} onstops={(n) => (stopCount = n)} wrapId="past-trip-replay" fallbackFocus={() => facts?.headingElement() ?? null} />
       {/if}
 
       {#if onbookings && counts.total > 0}
@@ -165,7 +167,7 @@
       <div class="sticky top-[calc(env(safe-area-inset-top)+5rem)] -m-1 flex max-h-[calc(100dvh-6rem)] min-w-0 flex-col gap-[18px] overflow-y-auto overscroll-contain p-1 lg:top-4 lg:max-h-[calc(100dvh-2rem)]" data-testid="trip-column">
         {#if !editing}
           <div class="flex flex-col gap-2.5">
-            <TripSummary tripId={trip.id} revision={`${loads}.${photoChanges}`} facts column />
+            <TripSummary bind:this={facts} tripId={trip.id} revision={`${loads}.${photoChanges}`} facts column />
             {#if hasTotal || photoTotal > 0}
               <div class="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-sm text-muted-foreground">
                 {#if hasTotal}{@render total()}{/if}
@@ -180,9 +182,7 @@
             {#if trip.notes}<p class="whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
           </div>
           {#if heroKind !== "map"}
-            <div class="flex flex-col gap-2.5">
-              <div id="past-trip-replay"><RouteReplay {trip} {now} stopList={false} compact={!replaying} onreplay={() => (replaying = true)} onended={() => (replaying = false)} onstops={(n) => (stopCount = n)} /></div>
-            </div>
+            <RouteReplay {trip} {now} stopList={false} compact={!replaying} onreplay={() => (replaying = true)} onended={() => (replaying = false)} onstops={(n) => (stopCount = n)} wrapId="past-trip-replay" fallbackFocus={() => facts?.headingElement() ?? null} />
           {/if}
           {#if bookings}{@render bookings()}{/if}
         {/if}

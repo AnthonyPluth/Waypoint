@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import type { Trip, TripPlaces } from "$lib/api-types";
   import { apiCall } from "$lib/contract";
   import RouteReplayMap from "$lib/components/RouteReplayMap.svelte";
   import { app } from "$lib/app.svelte";
   import { loadMapkit, type Maps } from "$lib/mapkit";
-  import { NO_BOUNDARIES, NO_ROADS, stopsOf, worthLocating } from "$lib/route-replay";
+  import { stopsOf, worthLocating } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
-  let { trip, now, shown = true, stopList = true, onstops, compact = false, onreplay = null, onended = null }: { trip: Trip; now: number; shown?: boolean; stopList?: boolean; onstops?: (count: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
+  let { trip, now, shown = true, stopList = true, onstops, compact = false, onreplay = null, onended = null, wrapClass = "", wrapId = undefined, fallbackFocus = null, onmap }: { trip: Trip; now: number; shown?: boolean; stopList?: boolean; onstops?: (count: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null; wrapClass?: string; wrapId?: string; fallbackFocus?: (() => HTMLElement | null) | null; onmap?: (showing: boolean) => void } = $props();
 
   let places = $state<TripPlaces | null>(null);
 
@@ -16,27 +16,49 @@
   const eligible = $derived(worthLocating(trip, today));
   const stops = $derived(eligible && places ? stopsOf(trip, places) : []);
   const year = $derived(Number(today.slice(0, 4)));
+  const online = $derived(!app.offline && (typeof navigator === "undefined" || navigator.onLine !== false));
+  const wanted = $derived(app.state?.mapkit === true && online && stops.length >= 2);
+
+  let maps = $state<Maps | null | undefined>(undefined);
+  let appeared = $state(false);
+  let lost = $state(false);
+  let section = $state<HTMLElement | null>(null);
+
+  const available = $derived(maps != null && !lost);
 
   $effect(() => {
-    const count = stops.length;
+    const count = wanted && (maps != null || lost) ? stops.length : 0;
     untrack(() => onstops?.(count));
   });
 
-  let maps = $state<Maps | null | undefined>(undefined);
+  $effect(() => {
+    const on = shown && wanted && available && maps != null;
+    untrack(() => onmap?.(on));
+  });
+
   let askedFor: number | null = null;
   $effect(() => {
     const id = trip.id;
-    if (stops.length < 2 || !shown || compact) {
+    if (!wanted) {
       askedFor = null;
-      untrack(() => { maps = undefined; });
+      untrack(() => { maps = undefined; appeared = false; lost = false; });
       return;
     }
     if (askedFor === id) return;
     askedFor = id;
-    untrack(() => { if (maps === null) maps = undefined; });
-    if (app.state?.mapkit === false) { maps = null; return; }
-    loadMapkit().then((found) => { if (askedFor === id) maps = found; });
+    untrack(() => { maps = undefined; appeared = false; lost = false; });
+    loadMapkit().then((found) => { if (askedFor === id) maps = found && !found.failed() ? found : null; });
   });
+
+  async function failed() {
+    if (!appeared) { maps = null; return; }
+    const inside = !!section && section.contains(document.activeElement);
+    lost = true;
+    appeared = false;
+    if (!inside) return;
+    await tick();
+    fallbackFocus?.()?.focus();
+  }
 
   let latest = 0;
   let placesFor = 0;
@@ -54,8 +76,13 @@
   });
 </script>
 
-{#if shown && stops.length >= 2}
-  <section class={compact ? "" : "mb-6"} aria-label="Route replay">
-    {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} roads={NO_ROADS} boundaries={NO_BOUNDARIES} autoplay={maps !== undefined} still={compact ? true : null} {compact} {onreplay} {onended} maps={compact ? null : (maps ?? null)} {stopList} />{/key}
-  </section>
+{#if shown && wanted && (maps || lost)}
+  <div id={wrapId} class={wrapClass || undefined}>
+    {#if available && maps}
+      <section bind:this={section} class={compact ? "" : "mb-6"} aria-label="Route replay">
+        {#key trip.id}<RouteReplayMap {stops} {year} tripId={trip.id} autoplay={true} still={compact ? true : null} {compact} {onreplay} {onended} {maps} {stopList} onready={() => { appeared = true; }} onfailure={() => void failed()} />{/key}
+      </section>
+    {/if}
+    <p role="status" aria-live="polite" class={lost ? "rounded-[14px] border border-dashed border-border px-3.5 py-3 text-sm text-muted-foreground" : "sr-only"}>{lost ? "The map couldn’t load" : ""}</p>
+  </div>
 {/if}

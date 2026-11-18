@@ -374,11 +374,11 @@ describe("the saved routes the Trips cards draw", () => {
     const saved = new Map([["39.7400,-104.9900>40.0000,-111.8900", pairs]]);
     const stops = [stop(39.74, -104.99), stop(40, -111.89), stop(40, -111.89), stop(51.47, -0.45, "flight")];
     const roads = savedRoads(stops, saved);
-    expect(roads.legs).toHaveLength(1);
-    expect(roads.legs[0].points).toBe(pairs);
-    expect(roads.interstates).toEqual([]);
-    expect(savedRoads([stop(39.74, -104.99), stop(40, -111.89, "flight")], saved).legs).toEqual([]);
-    expect(savedRoads(stops, new Map()).legs).toEqual([]);
+    expect(roads).toHaveLength(3);
+    expect(roads[0]).toBe(pairs);
+    expect(roads.slice(1)).toEqual([null, null]);
+    expect(savedRoads([stop(39.74, -104.99), stop(40, -111.89, "flight")], saved)).toEqual([null]);
+    expect(savedRoads(stops, new Map())).toEqual([null, null, null]);
   });
 
   it("says whether a trip has a drive at all, so a flights-only trip is never looked up", () => {

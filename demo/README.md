@@ -1,6 +1,6 @@
 # Standalone read-only demo
 
-The demo builds the same Svelte screens and components as the main application, with its dark theme and bundled Geist font: Upcoming, Trips, booking details, Review, People and loyalty numbers, Stats and travel maps, year-in-review cards, Settings, and animated route replays with pause, speed and scrubbing controls.
+The demo builds the same Svelte screens and components as the main application, with its dark theme and bundled Geist font: Upcoming, Trips, booking details, Review, People and loyalty numbers, Stats, year-in-review cards and Settings. It has no route replay: that needs an Apple map, and the demo has no Apple key.
 
 - **Data.** All records are invented. `frontend/demo/data.json` was generated from the repository’s synthetic demo seed in a new, temporary database with network access denied, and that database was discarded.
   - It includes an explicit Colorado road trip with a rental car. Every booking has fictional details, a price and a simulated source email.
@@ -10,20 +10,21 @@ The demo builds the same Svelte screens and components as the main application, 
 - **No network.** The build replaces the network transport with `frontend/demo/api.ts`, which returns copies of bundled synthetic responses.
   - Changes are rejected, and controls for editing, importing, authentication, mailbox connections, notifications, offline setup and external integrations are disabled. Revealing a fictional loyalty number is a read of bundled data.
   - The app’s service-worker entry point is replaced.
-  - There are no runtime API calls, storage writes, external fonts or tiles, analytics or backend services. Map geography is bundled and drawn in SVG by the application’s vector replay and map components; OpenStreetMap is not used.
+  - There are no runtime API calls, storage writes, external fonts or tiles, analytics or backend services. It makes no request to Apple or anyone else for a map, and the page shows no route replay or Replay trip. Until the Trips cards and Stats move to Apple’s maps ([#837](https://github.com/AnthonyPluth/Waypoint/issues/837), [#838](https://github.com/AnthonyPluth/Waypoint/issues/838)), the cards and the Stats map still draw their bundled outlines in SVG; OpenStreetMap is not used.
 - **Source emails.** They can be inspected on past bookings as well as upcoming ones. They are synthetic text, without remote images or message links. The production app’s past trips show no offline-saving notices or setup prompts.
-- **Clock.** It stays at noon UTC on the snapshot’s `asOf` date and is installed before the shared frontend loads, so upcoming itineraries, active travel and past-trip replay stay available whatever the visitor’s date. Explicit booking dates and animation timers behave as normal. Production time handling is unchanged.
+- **Clock.** It stays at noon UTC on the snapshot’s `asOf` date and is installed before the shared frontend loads, so upcoming itineraries and active travel stay available whatever the visitor’s date. Explicit booking dates and animation timers behave as normal. Production time handling is unchanged.
 
 ## Build and verify
 
 Run `npm ci` and `npm run build:demo` from `frontend/`. The standalone output is `frontend/demo-dist/` and can be served by any static HTTP server.
 
-Run `node demo/verify.mjs` from the repository root to check the compiled payload at phone, tablet and desktop widths, including requests, blocked controls, source emails, filters and animated replay. Screenshots are written to `artifacts/static-demo/`.
+Run `node demo/verify.mjs` from the repository root to check the compiled payload at phone, tablet and desktop widths, including requests, blocked controls, source emails, filters and that no route replay or Apple map is offered. Screenshots are written to `artifacts/static-demo/`.
 
 The browser verification:
 
 - sets the visitor’s clock to 2040 and checks that the shared Upcoming page still shows its itinerary and pass card;
 - accepts only requests for bundled files under the demo directory, and fails on any API, external-service, fetch/XHR, worker or websocket request;
+- checks that no trip page offers a route replay or Replay trip or draws an Apple map, and that no request goes to an Apple host;
 - runs under a Content Security Policy that also denies all connections.
 
 ## GitHub Pages
@@ -34,4 +35,4 @@ Pages Source must be **GitHub Actions**, and the `github-pages` environment only
 
 ## Apple's maps
 
-The static demo shows no maps and no route replay, and no Apple token or key is made for it: the owner decided this on [#834](https://github.com/AnthonyPluth/Waypoint/issues/834#issuecomment-6982585262) (option C, 2026-11-18), and the MapKit-only renderer ([#836](https://github.com/AnthonyPluth/Waypoint/issues/836)) builds it. See [Maps in the demo](../docs/src/content/docs/contributing/demo-maps.md) and [the options that were weighed](../docs/design/demo-maps/README.md).
+The static demo shows no maps and no route replay, and no Apple token or key is made for it: the owner decided this on [#834](https://github.com/AnthonyPluth/Waypoint/issues/834#issuecomment-6982585262) (option C, 2026-11-18), and the MapKit-only renderer ([#836](https://github.com/AnthonyPluth/Waypoint/issues/836)) builds it for the replay. See [Maps in the demo](../docs/src/content/docs/contributing/demo-maps.md) and [the options that were weighed](../docs/design/demo-maps/README.md).

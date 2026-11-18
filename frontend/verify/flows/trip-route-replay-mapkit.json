@@ -1,7 +1,6 @@
 {
   "name": "trip-route-replay-mapkit",
   "page": "trips",
-  "mapkit": "fake",
   "steps": [
     {
       "expect_text": {
