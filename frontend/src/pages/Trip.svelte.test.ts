@@ -1883,21 +1883,18 @@ describe("Trip photos", () => {
     expect(vi.mocked(api).mock.calls.filter(([p]) => p === "/api/trips/1/photos")).toHaveLength(1);
   });
 
-  it("draws the photo clusters as pins on the trip’s map and takes Show these photos to the first photo of that cluster in the gallery", async () => {
+  it("draws no photo pins on the trip’s map, however the photos cluster", async () => {
     afterStart();
     app.state = state();
     const answer = vi.mocked(api).getMockImplementation()!;
     const shot = (id: number, taken_local: string) => ({ id, person_id: 1, trip_id: 1, kind: "image", taken_local, zone: "Europe/London", latitude: 51.5, longitude: -0.1, location_source: "exif", segment_id: 2, match: "place", distance_km: 1, cluster: 0, removed_at: null });
     const cluster = { latitude: 51.5, longitude: -0.1, count: 2, first: "2026-11-21T16:20", last: "2026-11-22T09:00", cover: 6, inferred: false };
     vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/trips/1/photos" ? { photos: [shot(6, "2026-11-22T09:00"), shot(5, "2026-11-21T16:20")], clusters: [cluster], counts: { total: 2, located: 2, inferred: 0, far: 0 }, people: [] } : answer(path, opts)) as never);
-    render(TripPage);
-    const pin = await screen.findByRole("button", { name: /^2 photos near Harbour Hotel, Nov 21/ });
-    const map = screen.getByRole("region", { name: "Trip photo map" });
-    expect(map.contains(pin)).toBe(true);
-    await userEvent.click(pin);
-    await userEvent.click(screen.getByRole("button", { name: "Show these photos" }));
-    await waitFor(() => expect(document.activeElement?.getAttribute("data-photo")).toBe("5"));
-    expect(screen.getByRole("button", { name: "Show fewer" }).getAttribute("aria-expanded")).toBe("true");
+    const { container } = render(TripPage);
+    await screen.findByRole("button", { name: "Photo, 4:20 PM, near Harbour Hotel, Jane’s library" });
+    expect(container.querySelector("[data-pin]")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Trip photo map" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show these photos" })).toBeNull();
   });
 
   it("asks for no photos in local mode", async () => {

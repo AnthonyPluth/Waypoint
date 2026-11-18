@@ -10,7 +10,8 @@ from tests.privacy import no_leaks
 from tests.shared import DbCase, add_database
 from tests.test_trip_roads import DENVER, SALT_LAKE
 from tests.test_trips import HOTEL, RouteCase
-from waypoint.domain import driving_routes
+from waypoint.domain import driving_routes, people, tripmap
+from waypoint.domain.visibility import Viewer
 from waypoint.storage import backup, db
 from waypoint.storage.models import DrivingRoute, Trip
 
@@ -150,6 +151,37 @@ class StoringAndReadingTests(RouteCacheCase):
         self.assertEqual([c.name for c in DrivingRoute.__table__.columns], ["trip_id", "from_lat", "from_lon", "to_lat", "to_lon", "path", "stored"])
         self.assertEqual((row.from_lat, row.from_lon), (round(drive["start"]["latitude"] * 10000), round(drive["start"]["longitude"] * 10000)))
         self.assertEqual(json.loads(row.path), line(drive))
+
+
+class CostTests(RouteCacheCase):
+    def setUp(self):
+        super().setUp()
+        with db.session() as conn:
+            conn.execute(DrivingRoute.__table__.delete())
+
+    def test_looking_up_storing_and_the_batch_never_work_out_the_trips_roads_or_state_lines(self):
+        trip, drive = self.trip_with_a_drive()
+        with (mock.patch.object(tripmap, "road_legs", side_effect=AssertionError("worked out the roads")) as roads,
+              mock.patch.object(tripmap, "state_lines", side_effect=AssertionError("worked out the state lines")) as lines):
+            self.assertEqual(self.look_up("ana", trip, drive), (200, {"routes": []}))
+            self.assertEqual(self.put("ana", trip, drive), (200, {"stored": True}))
+            self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"], [{**drive, "path": line(drive)}])
+            self.assertEqual(len(self.call("ana", "GET", f"/api/driving-routes?trip={trip}")[1]["trips"]), 1)
+            self.assertEqual(self.put("ana", trip, {**drive, "end": {"latitude": 30.0, "longitude": -90.0}})[0], 400)
+        self.assertEqual((roads.call_count, lines.call_count), (0, 0))
+
+    def test_the_stops_a_drive_may_run_between_are_the_places_the_map_shows(self):
+        trip, _drive = self.trip_with_a_drive()
+        self.book("ana", {**HOTEL, "destination": "Chicago", "start_local": "2026-06-09T15:00", "end_local": "2026-06-10T10:00"}, trip_id=trip)
+        with db.session() as conn:
+            viewer = Viewer(people.person_for_sub(conn, "sub-ana"))
+            places = tripmap.places(conn, viewer, trip)
+            assert places is not None
+            shown = [(a["latitude"], a["longitude"]) for a in places["airports"]] + [(c["latitude"], c["longitude"]) for c in places["cities"]]
+            shown += [(s["latitude"], s["longitude"]) for s in places["stays"]]
+            shown += [(places["home"]["latitude"], places["home"]["longitude"])] if places["home"] else []
+            self.assertEqual(tripmap.stop_points(conn, viewer, trip), shown)
+            self.assertIsNone(tripmap.stop_points(conn, Viewer(people.person_for_sub(conn, "sub-ben")), trip))
 
 
 class VisibilityTests(RouteCacheCase):
@@ -370,12 +402,12 @@ class BatchedLookupTests(RouteCacheCase):
         trip, drive = self.trip_with_a_drive()
         others = [self.another_trip("ana", day) for day in (7, 8, 9)]
         self.put("ana", trip, drive)
-        with mock.patch.object(driving_routes.tripmap, "places", wraps=driving_routes.tripmap.places) as worked:
+        with mock.patch.object(driving_routes.tripmap, "stop_points", wraps=driving_routes.tripmap.stop_points) as worked:
             got = self.batch("ana", trip, *others)[1]
         self.assertEqual([t["trip_id"] for t in got["trips"]], [trip])
         self.assertEqual(worked.call_count, 1)
         self.assertEqual(worked.call_args.args[2], trip)
-        with mock.patch.object(driving_routes.tripmap, "places", wraps=driving_routes.tripmap.places) as worked:
+        with mock.patch.object(driving_routes.tripmap, "stop_points", wraps=driving_routes.tripmap.stop_points) as worked:
             self.assertEqual(self.batch("ana", *others), (200, {"trips": []}))
         self.assertEqual(worked.call_count, 0)
 

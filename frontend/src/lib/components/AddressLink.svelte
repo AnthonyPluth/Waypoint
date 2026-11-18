@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { toast } from "svelte-sonner";
   import { Sheet } from "$lib/components/ui/sheet";
   import { directionsFor } from "$lib/directions";
 
@@ -7,9 +6,8 @@
   let open = $state(false);
 
   async function tap() {
-    try { await navigator.clipboard.writeText(address); toast.success("Address copied"); }
-    catch { toast("Couldn’t copy it: select the address instead."); }
     open = true;
+    await navigator.clipboard?.writeText(address).catch(() => undefined);
   }
 </script>
 

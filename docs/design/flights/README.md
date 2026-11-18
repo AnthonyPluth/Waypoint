@@ -59,6 +59,14 @@ Made in chat after seeing the frames and the build side by side (phone and deskt
 - The Home flight card no longer shows the check-in countdown, the brand logo, the seat and cabin lines or the "Confirmed" chip (owner, 2026-11-17, after seeing the frames and the build side by side). The full card, with the dropped lines, stays outside the window and after the flight lands, and the trip page keeps its full flight card.
 - The Home flight card keeps Check in / Open in app / Manage booking, Directions, Call, the travellers and the cost (owner, 2026-11-17, after the review asked whether they were meant to go): the card shows them as the old card did, under the drawn footer.
 
+## Owner request on the Home card footer (2026-11-18)
+
+- The owner asked, looking at the Home "Next up" hotel card on a phone, "Could we also spread out the bottom section of these cards instead of clustering them?" The section under the dashed rule (code, address, room, cost) sat in quarter-width columns at the left, so the confirmation code and the address wrapped while the right side stayed empty.
+- On a phone the details now spread across the full width of the card, with the first at the left edge and the last at the right edge, so values keep to one line where they fit. A long confirmation code still takes a row of its own, and the travellers stay on their own line below. This applies to every kind that shares the footer (hotel, car, parking, cruise, train, and flights outside the live-status window). Desktop is unchanged, and so are the header, times and buttons.
+- The flight decisions above stand: what the Home flight card drops and keeps is not touched.
+- Owner feedback on the first build (2026-11-18): the details weren't aligned; Cost sat higher than Address. Every value in the footer now sits on the same row on a phone (each is as tall as the 44px tap target and centred in it, and the row aligns to the top), so labels and values line up across Code, Address and Cost, and a wrapped value doesn't push the others off the line.
+- Not signed off yet: the owner approves the `make verify` images in the pull request before merge.
+
 ## Fonts
 
 The pages load Geist and Geist Mono from Google Fonts when you are online and fall back to system fonts otherwise. This is for viewing these design files only; the app bundles its own fonts and loads nothing from outside.

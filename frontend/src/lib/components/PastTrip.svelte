@@ -35,7 +35,7 @@
   let looks = $state(0);
   let stopCount = $state(0);
   let replaying = $state(false);
-  let gallery = $state<{ showCluster: (cluster: number) => Promise<void>; viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
+  let gallery = $state<{ viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
   let acting = $state<PersonSharing[]>([]);
   let settled = $state(false);
   let sharingOpen = $state(false);
@@ -104,7 +104,7 @@
         <h1 class="break-words text-display">{trip.name}</h1>
         {#if caption}<p class="min-w-0 break-words text-muted-foreground">{caption}</p>{/if}
       </div>
-      <div class={wide ? "max-w-[60rem]" : ""}><RouteReplay {trip} {now} photos={found} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
+      <div class={wide ? "max-w-[60rem]" : ""}><RouteReplay {trip} {now} stopList={false} /></div>
       {#if noPhotos}<p class="-mt-3 text-sm text-muted-foreground" data-testid="no-photos">No photos yet</p>{/if}
       {@render controls()}
     {:else}
@@ -145,7 +145,7 @@
       {#if trip.notes}<p class="whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
 
       {#if heroKind !== "map"}
-        <div id="past-trip-replay"><RouteReplay {trip} {now} photos={found} shown={replaying} onstops={(n) => (stopCount = n)} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
+        <div id="past-trip-replay"><RouteReplay {trip} {now} shown={replaying} stopList={false} onstops={(n) => (stopCount = n)} /></div>
       {/if}
 
       {#if onbookings && counts.total > 0}
@@ -181,7 +181,7 @@
           </div>
           {#if heroKind !== "map"}
             <div class="flex flex-col gap-2.5">
-              <div id="past-trip-replay"><RouteReplay {trip} {now} photos={found} compact={!replaying} onreplay={() => (replaying = true)} onended={() => (replaying = false)} onstops={(n) => (stopCount = n)} onshow={(cluster) => void gallery?.showCluster(cluster)} /></div>
+              <div id="past-trip-replay"><RouteReplay {trip} {now} stopList={false} compact={!replaying} onreplay={() => (replaying = true)} onended={() => (replaying = false)} onstops={(n) => (stopCount = n)} /></div>
             </div>
           {/if}
           {#if bookings}{@render bookings()}{/if}
