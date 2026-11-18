@@ -6,12 +6,25 @@ This is phase 1 of [#828](https://github.com/AnthonyPluth/Waypoint/issues/828): 
 2. With no MapKit key, or when Apple's map fails to load, the map and the replay are hidden. There is no fallback renderer.
 3. The server's bundled road routing, highway and state-line data, and the code that serves them, are removed. #826 is no longer needed.
 
+The owner answered more questions on this design's pull request (#833) on 2026-11-18; they are under [Owner decisions on #833](#owner-decisions-on-833-2026-11-18), and the sections below follow them.
+
+## Owner decisions on #833 (2026-11-18)
+
+Given in chat on 2026-11-18 while reviewing #833. These are decisions on the questions this design asked, not a sign-off of the design: the privacy statement and the frames' look are still open.
+
+1. **Cards: Apple's static snapshot, with Waypoint's route drawn on top** (option A). The rest as proposed: only cards near the screen load (lazy), photo cards and one-stop cards never ask Apple, and with no key a card shows today's kinds tile. The new server route that signs snapshot addresses, and Apple's options (the parameters, `expires`, and whether Waypoint may draw on top of a snapshot), stay marked **to confirm with Apple first** in the cards' build issue.
+2. **A drive with no road from Apple yet is a straight line. A trip's road distance** is the length of Apple's stored road where there is one, otherwise the straight-line distance, marked "about".
+3. **Stats keeps the visited countries and states shading.** The bundled outline data (`world-atlas`, `us-atlas`) stays, and the Stats map is one MapKit map with the visited regions drawn from it as polygon overlays, plus the arcs, dots and pins as before (reworked in [Stats world map](#stats-world-map-frame-b) and frame b).
+4. **The demo and docs screenshots: a real MapKit key, stored securely, for the demo** is tracked in [#834](https://github.com/AnthonyPluth/Waypoint/issues/834). Until #834 decides otherwise, the static demo shows no maps and the docs screenshots show the grid stand-in.
+
+Still open, with this design's recommended defaults used until the owner answers: the Settings "Maps" row (drawn, proposed), the live region on a failure during a replay (drawn), the city-level cap on a card's map (zoom 12), and the privacy statement and the frames' look (**not signed off**).
+
 The frames are self-contained HTML pages in the style of the other `docs/design/` pages: vector only, Waypoint's tokens from `frontend/src/app.css`, dark only, made-up names and places, and a toggle for phone (390 px) and desktop (1280 px) widths. Apple's map is drawn as a stylised stand-in, because a real tile can't be committed.
 
 | Screen | File | What it shows |
 | --- | --- | --- |
-| a | [a-trip-cards.html](a-trip-cards.html) | Past trips list cards on Apple's map: a card's map loaded, loading, failed and with no key; the photo card that never asks Apple; how many maps load on a long list; the options weighed (static snapshot, live map) |
-| b | [b-stats-map.html](b-stats-map.html) | The Stats world map on a live MapKit map: loaded, a tapped airport, loading, and the section with no key or a failed map |
+| a | [a-trip-cards.html](a-trip-cards.html) | Past trips list cards on Apple's snapshot (decided on #833): a card's map loaded, loading, failed and with no key; the photo card that never asks Apple; how many maps load on a long list; the options that were weighed |
+| b | [b-stats-map.html](b-stats-map.html) | The Stats world map on one live MapKit map with the visited countries and states shaded from the bundled outlines (decided on #833): loaded, zoomed into the states, a tapped airport and a tapped state, loading, and the section with no key or a failed map |
 | c | [c-replay-no-key.html](c-replay-no-key.html) | A completed trip's page with and without a key (phone and desktop), the replay failing after it started, and the proposed Settings line that says maps need a key |
 
 Images of each page at phone and desktop width were rendered with Playwright for the owner's review in chat; they are not committed, as the other design pages' images aren't (the pages are vector only).
@@ -20,14 +33,14 @@ The inventory, privacy statement, wording changes and build plan below are writt
 
 ## Contents
 
-1. [What #823 adds](#what-823-adds)
+1. [Owner decisions on #833](#owner-decisions-on-833-2026-11-18) and [what #823 adds](#what-823-adds)
 2. [Inventory](#inventory): keep (MapKit), remove, change
 3. [How the maps look and load](#how-the-maps-look-and-load)
 4. [Privacy: what Apple learns](#privacy-what-apple-learns)
 5. [Wording that must change, and the checks that hold it](#wording-that-must-change-and-the-checks-that-hold-it)
 6. [make verify and the demo without a real Apple key](#make-verify-and-the-demo-without-a-real-apple-key)
 7. [Build plan](#build-plan): five pull requests, each a draft agent-task issue
-8. [Questions for the owner](#questions-for-the-owner)
+8. [Open questions for the owner](#open-questions-for-the-owner)
 
 ## What #823 adds
 
@@ -53,10 +66,10 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `storage/places.tsv.gz`, `storage/geocode.py`, `storage/reference.py` | ZIP, postal-code and city centres: turn a booking's address into a point when it is saved, the Stats places, Home | **Keep**: MapKit still needs a point for every stop, and the points never come from Apple | none |
 | `storage/regions.tsv.gz`, `airports.tsv.gz`, `airlines.tsv.gz` | Reference lists | Keep | none |
 | `domain/tripmap.py` | `places` (stops plus `road_legs` and `state_lines`), `_drive`, `_section`, `_retrace`, `_pairs`, `_routes`, `drives`, `road_legs`, `_arc`, `_reach`, `map_extent`, `state_lines`, `PHONE_MAP`/`WIDE_MAP`/`MAP_PADDING`/`MIN_MAP_SPAN`, `MIN_ROAD_TRIP_MILES`, `MAX_DETOUR`, `MIN_RETRACE_SHARE`; and (#823) `_locate`, `stop_points`, `stop_places` | **Change**: keep `_locate`, `stop_points`, `stop_places` (renamed `places`), the TypedDicts without `RoadLeg`, `RoadLine`, `Roads`, `StateLine`; remove the rest | 1 |
-| `domain/tripstats.py` | `_road_km` sums `tripmap.drives` (bundled road miles) into a trip's distance, `road_estimated` | **Change**: road distance from the trip's stored Apple roads (`driving_routes`), otherwise the straight line, flagged estimated (see question 4) | 1 |
+| `domain/tripstats.py` | `_road_km` sums `tripmap.drives` (bundled road miles) into a trip's distance, `road_estimated` | **Change**: road distance from the trip's stored Apple roads (`driving_routes`), otherwise the straight line, flagged estimated ("about"; decided on #833) | 1 |
 | `domain/driving_routes.py`, `server/api/driving_routes.py`, `storage/migrations/versions/0048_driving_routes.py`, `storage/models.py` (`DrivingRoute`) | The stored Apple roads, per trip and drive | Keep | none |
 | `domain/route_warming.py` (#823) | The nightly warming job | Keep | none |
-| `domain/maps.py`, `providers/mapkit.py`, `server/api/mapkit.py`, `server/api/state.py` (`mapkit`) | The key, the flag, the browser token, the CSP widening, the Maps Server API client | Keep; **change** `providers/mapkit.py` and `domain/maps.py` to also sign snapshot addresses if the owner picks snapshots for the cards (question 1) | 3 |
+| `domain/maps.py`, `providers/mapkit.py`, `server/api/mapkit.py`, `server/api/state.py` (`mapkit`) | The key, the flag, the browser token, the CSP widening, the Maps Server API client | Keep; **change** `providers/mapkit.py` and `domain/maps.py` to also sign snapshot addresses for the cards (decided on #833; Apple's options to confirm first) | 3 |
 | `server/api/trips.py` (`api_trip_places`) | `GET /api/trips/{id}/places` | **Change**: replies with the stops only (`roads` and `boundaries` gone) | 1 |
 | `server/contract.py` (`TripPlaces`, `Roads`, `RoadLeg`, `StateLine`), `docs/openapi.json`, `frontend/src/lib/api-types.ts` | The places reply type | **Change**, then `make api-contract` | 1 |
 | `server/jobs.py` | Preloads `roads.highways()` and `states.state_lines()` at start-up; (#823) schedules warming | **Change**: drop the preload | 1 |
@@ -70,7 +83,7 @@ Because the job already has the server ask Apple for every drive of every ended 
 | --- | --- | --- |
 | `tools/roads.py`, `tools/states.py` (build the two `.tsv.gz` files) | Remove | 1 |
 | `tools/places.py` | Keep | none |
-| `NOTICE` (the Highways and State lines paragraphs; the Natural Earth and Census atlas lines for the web app's outlines, if present in the frontend notices) | **Change**: drop those paragraphs | 1, 2 |
+| `NOTICE` (the Highways and State lines paragraphs) | **Change**: drop those two paragraphs; the attribution of the web app's country and state outlines (Natural Earth, Census, through `world-atlas` and `us-atlas`) stays, since Stats keeps them | 1 |
 | `pyproject.toml` (`mapkit-alone` import contract) | Keep | none |
 
 ### Web app: `frontend/src/`
@@ -78,14 +91,14 @@ Because the job already has the server ask Apple for every drive of every ended 
 | File | What it does today | Verdict | Step |
 | --- | --- | --- | --- |
 | `lib/components/RouteReplayMap.svelte` | The replay: SVG land, roads, state lines, the moving vehicle, labels, camera, controls; hosts `RouteReplayMapKit` when MapKit is up | **Change**: keep the controls, labels, slider and timing; the map area is MapKit only; the SVG `<path>` land, roads and boundary layers go | 2 |
-| `lib/components/RouteReplayMapKit.svelte`, `lib/replay-mapkit.ts`, `lib/mapkit.ts`, `lib/driving-routes.ts` | The MapKit replay, the loader and preload, Apple directions and the stored roads | Keep; **change** `replay-mapkit.ts` so a drive with no Apple road yet is a straight line (question 3), and `driving-routes.ts`'s `savedRoads` to return the new shape | 2 |
+| `lib/components/RouteReplayMapKit.svelte`, `lib/replay-mapkit.ts`, `lib/mapkit.ts`, `lib/driving-routes.ts` | The MapKit replay, the loader and preload, Apple directions and the stored roads | Keep; **change** `replay-mapkit.ts` so a drive with no Apple road yet is a straight line (decided on #833), and `driving-routes.ts`'s `savedRoads` to return the new shape | 2 |
 | `lib/components/RouteReplay.svelte` | Fetches places, loads MapKit, picks SVG or MapKit | **Change**: renders nothing unless MapKit loaded (`app.state.mapkit === true` and `loadMapkit()` resolved); `NO_ROADS`/`NO_BOUNDARIES` gone | 2 |
 | `lib/route-replay.ts` | Stops, timing, labels and camera (keep); `roadFor`, `retraceFor`, `RETRACE_*`, `ROAD_MATCH_KM`, `boundaryShapes`, `boundariesShown`, `BOUNDARY_MIN_SCALE`, `NO_ROADS`, `NO_BOUNDARIES`, `Boundaries`, `BoundaryShape`, the road `Track`s in `legsOf`, `routeProjection`'s road extent | **Change**: keep what the MapKit replay and the cards use (`stopsOf`, `worthLocating`, `canReplay`, `replayMs`, `legsOf` without roads, `cameraAt`, `positions`, `mercatorFor`'s inputs); remove the road and boundary helpers | 2 |
-| `lib/components/RouteTile.svelte`, `lib/components/RouteTileMap.svelte` | The Past card's map: SVG land plus the stops and the stored roads | **Remove** `RouteTileMap`; **change** `RouteTile` to Apple's map (snapshot or live, question 1), the kinds tile otherwise | 3 |
+| `lib/components/RouteTile.svelte`, `lib/components/RouteTileMap.svelte` | The Past card's map: SVG land plus the stops and the stored roads | **Remove** `RouteTileMap`; **change** `RouteTile` to Apple's snapshot with Waypoint's route on top (decided on #833), the kinds tile otherwise | 3 |
 | `lib/components/PastTripCard.svelte` | Photo mosaic, else `RouteTile` | Keep (no change but the tile it hosts) | 3 |
-| `lib/components/TravelMap.svelte` | The Stats world map: SVG countries and US states shaded when visited, flight arcs, airport dots, stay pins, pan and zoom, tap for trips | **Remove**; replaced by `StatsMapKit.svelte` (new) | 4 |
-| `lib/map.ts` | World projection, dots, arcs, pins, zoom and pan, country and state outline loading, visited shading, detail levels | **Change**: keep the data side (`dots`, `arcs` as great-circle points, `pins`, `flownBounds` as a lat/lon box, `stateSources` if shading stays); remove the projection, outlines, `loadCountries`/`loadDetailedCountries`/`loadFineCountries`/`loadStates`, `detailFor`, `windowOf`, `clipToWindow`, `outlinePaths`, `zoomAt`, `clampPan`, `fitBox` | 4 |
-| `lib/land.svelte.ts` | Picks coarse, medium or fine land outlines for the view | Remove | 2 (cards and replay stop using it), 4 (last user goes) |
+| `lib/components/TravelMap.svelte` | The Stats world map: SVG countries and US states shaded when visited, flight arcs, airport dots, stay pins, pan and zoom, tap for trips | **Remove** the SVG renderer; replaced by `StatsMapKit.svelte` (new), which draws the same visited shading as MapKit polygon overlays from the same outlines | 4 |
+| `lib/map.ts` | World projection, dots, arcs, pins, zoom and pan, country and state outline loading, visited shading, detail levels | **Change**. **Keep** the data side and the outlines Stats shades from (decided on #833): `loadCountries`, `loadDetailedCountries`, `loadStates`, `US_ID`, `visitedFeatureIds`, `visitedPoints`, `stateSources`, `stateAt`, `visitedStateTrips`, `pins`, `dots` and `arcs` (as latitude and longitude points, not projected), `flownBounds` (as a latitude and longitude box), and a new `toOverlays` that turns a visited feature into MapKit polygon rings. **Remove** the SVG side: `worldProjection`, `MAP_WIDTH`/`MAP_HEIGHT`, `arcPath`, `mapData`, `pieces`, `zoomAt`, `clampPan`, `fitBox`, `IDENTITY`/`MAX_ZOOM`/`Transform`, `outlinePaths`, `kmPerPixel`, `windowOf`, `clipToWindow`, and `loadFineCountries`, `detailFor` and the detail constants unless the build finds the 1:50m outlines too coarse at state zoom | 4 |
+| `lib/land.svelte.ts` | Picks coarse, medium or fine land outlines for the SVG view | Remove: Apple draws the land; the shading needs only the visited features, loaded once | 2 (cards and replay stop using it), 4 (last user goes) |
 | `pages/Stats.svelte` | Lazy-loads `TravelMap` into `#stats-map-slot` | **Change**: lazy-loads `StatsMapKit` only when `app.state.mapkit === true`; no slot otherwise | 4 |
 | `pages/Trips.svelte`, `pages/Trip.svelte`, `lib/components/PastTrip.svelte` | Host the cards and the replay; `PastTrip` lays out the map hero and Replay trip | **Change**: `PastTrip` hides the map hero and the Replay trip button when the replay can't be shown (frames c) | 2 |
 | `lib/side-column.ts` | Checks a places reply's shape, including `roads` and `boundaries` | Change | 1 |
@@ -93,20 +106,21 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `App.svelte` | Preloads MapKit when idle | Keep | none |
 | `lib/offline.svelte.ts`, `pages/Settings.svelte` | `clearRouteCache` on sign-out | Keep | none |
 | `lib/components/RouteLine.svelte` | The pass card's flight progress glyph, not a map | Keep | none |
-| `test/fake-mapkit.ts` | The Vitest stand-in for `mapkit` | **Change**: add what the cards and Stats need (selection events, annotations with callouts, polygon or circle overlays, `showsZoomControl`, `isScrollEnabled`) | 2, 3, 4 |
-| `package.json` | `d3-geo`, `topojson-client`, `world-atlas`, `us-atlas`, `@types/d3-geo`, `@types/topojson-client`, `@types/geojson` | **Change**: drop `world-atlas`, `us-atlas`, `topojson-client` and their types once nothing reads outlines (step 4); keep `d3-geo` only if `geoDistance`/`geoInterpolate` are still used (they are cheap to replace; the step decides by `npm ls` and the bundle report) | 4 |
+| `test/fake-mapkit.ts` | The Vitest stand-in for `mapkit` | **Change**: add what the cards and Stats need (selection events on annotations and overlays, `PolygonOverlay` with `Style`, `showsZoomControl`, `isScrollEnabled`) | 2, 3, 4 |
+| `package.json` | `d3-geo`, `topojson-client`, `world-atlas`, `us-atlas`, `@types/d3-geo`, `@types/topojson-client`, `@types/geojson` | **Keep** `world-atlas`, `us-atlas`, `topojson-client`, `d3-geo` (for `geoContains`, `geoDistance`, `geoInterpolate`) and their types: Stats shades visited regions from them (decided on #833). Nothing else changes here | none |
 | `demo/data.json`, `demo/api.ts` | The static demo's canned replies, 11 of them with `roads` and `boundaries` | **Change**: regenerate | 1 |
 
 ### Web app tests
 
 | File | Verdict | Step |
 | --- | --- | --- |
-| `lib/route-roads.test.ts`, `lib/route-boundaries.test.ts`, `components/RouteReplayRoads.svelte.test.ts`, `components/RouteReplayBoundaries.svelte.test.ts`, `lib/land.svelte.test.ts`, `components/TravelMap.svelte.test.ts` | Remove (with a `Removes-Test:` trailer naming the removed code) | 2, 4 |
+| `lib/route-roads.test.ts`, `lib/route-boundaries.test.ts`, `components/RouteReplayRoads.svelte.test.ts`, `components/RouteReplayBoundaries.svelte.test.ts`, `lib/land.svelte.test.ts` | Remove (with a `Removes-Test:` trailer naming the removed code) | 2, 4 |
+| `components/TravelMap.svelte.test.ts` | Remove with `TravelMap.svelte`; its visited-shading cases (which countries and states are shaded, a tap on one lists its trips) move to the new `StatsMapKit.svelte.test.ts` | 4 |
 | `components/RouteReplayMap.svelte.test.ts`, `RouteReplay.svelte.test.ts`, `RouteReplayCompact.svelte.test.ts`, `RouteReplayHome.svelte.test.ts`, `RouteReplayHidden.svelte.test.ts`, `lib/route-replay.test.ts`, `lib/route-replay-home.test.ts` | Change: drive them through the fake MapKit; the SVG-map cases become "hidden with no key" and "hidden when MapKit fails" | 2 |
 | `components/RouteReplayMapKit.svelte.test.ts`, `lib/replay-mapkit.test.ts`, `lib/mapkit.test.ts`, `lib/driving-routes.test.ts`, `App.svelte.test.ts` ("preloading MapKit") | Keep; change the "keeps the bundled line" cases to "draws a straight line" | 2 |
 | `components/RouteTile.svelte.test.ts`, `PastTripCard.svelte.test.ts`, `PastTrip.svelte.test.ts`, `pages/Trips.svelte.test.ts`, `pages/Trip.svelte.test.ts`, `pages/Upcoming.svelte.test.ts`, `lib/side-column.test.ts`, `components/TripSummary.svelte.test.ts` | Change (places fixtures lose `roads`/`boundaries`; cards on MapKit) | 1, 2, 3 |
-| `lib/map.test.ts` | Change | 4 |
-| `pages/Settings.svelte.test.ts` | Change if the Settings line is built (question 7) | 5 |
+| `lib/map.test.ts` | Change: keep the outline, visited and state-source cases; drop the projection, zoom and pan cases | 4 |
+| `pages/Settings.svelte.test.ts` | Change if the Settings line is built (open question 1) | 5 |
 
 ### Python tests
 
@@ -144,7 +158,7 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `privacy/email-scanning.md` ("so the Stats map can show where you stayed"; what leaves the server) | Stats map is Apple's when a key is set | 5 |
 | `README.md` ("Brand logos and the map are bundled"; "no logo or map service (unless you add a MapKit key...)") | Rewritten | 5 |
 | `contributing/feature-map.md`, `docs/feature-map.json`, `.claude/skills/verify-waypoint/references/feature-map.md` | Regenerated (`make feature-map`, `make user-feature-map`) | each step |
-| Screenshots in `docs/src/assets/screenshots/` that show a map (`stats-*`, `trips-*`, `trip-*`) | Regenerated by `make verify` with the stand-in map (question 6) | 2, 3, 4 |
+| Screenshots in `docs/src/assets/screenshots/` that show a map (`stats-*`, `trips-*`, `trip-*`) | Regenerated by `make verify` with the grid stand-in, unless #834 (a real MapKit key, stored securely) decides otherwise | 2, 3, 4 |
 
 ### `make verify` flows and the demo
 
@@ -160,7 +174,7 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `open-stats.json`, `stats-map-details.json`, `stats-map-zoom.json`, `stats-long-names.json`, `hotel-stats.json`, `parking-stats.json` | Change: the stand-in map, MapKit's own zoom control | 4 |
 | New `stats-no-key.json`, `stats-map-failed.json` | Add | 4 |
 | `frontend/verify/flows/README.md` (the `mapkit` key) | Change: `mapkit` becomes `"none"`, `"error"` or `"blocked"`, the stand-in being the default | 2 |
-| `demo/README.md`, `demo/verify.mjs`, `frontend/demo/` | Change: the static demo has no key, so no maps and no replay (question 5) | 2 |
+| `demo/README.md`, `demo/verify.mjs`, `frontend/demo/` | Change: the static demo has no key, so no maps and no replay, until #834 gives it a real key stored securely | 2 |
 
 ## How the maps look and load
 
@@ -181,7 +195,7 @@ Because 1 to 3 are known before anything is asked of Apple, a page with no key n
 
 **Options weighed.**
 
-| | A. Apple static snapshot (recommended) | B. Live MapKit map per card | C. Live map, one at a time |
+| | A. Apple static snapshot (decided on #833) | B. Live MapKit map per card | C. Live map, one at a time |
 | --- | --- | --- | --- |
 | What it is | An image from Apple's Maps Web Snapshots service, for the trip's area, at the card's size; Waypoint draws the route and stops on top in SVG | A `mapkit.Map` in each card, non-interactive, with the stops as annotations and the route as a polyline | Snapshots as in A, and the one card under the pointer or in the middle of the screen swaps to a live map |
 | Scrolling | Smooth: an `<img>` with `loading="lazy"`, decoded off the main thread | Each map is a WebGL renderer, a worker and a few MB of memory; more than four or five on a phone janks and can lose the WebGL context | As A, plus a swap that can flash |
@@ -192,9 +206,9 @@ Because 1 to 3 are known before anything is asked of Apple, a page with no key n
 | Needs Apple's script | No (a card's map shows even before MapKit JS is preloaded) | Yes | Yes |
 | Looks | A real Apple map, in the dark style, without Apple's live labels changing as you scroll | The real thing | A |
 
-The recommendation is **A**, with Waypoint drawing the route line and stops on Apple's image in its own map tokens (`--map-route`, `--map-stay`, `--map-airport`), using the stored Apple road for a drive when there is one and a straight line otherwise. It scrolls like today's cards, sends Apple less than a live map would and doesn't depend on Apple's script being loaded. It needs a confirmed reading of Apple's snapshot terms and parameters (marked **confirm** below) before it is built.
+**Decided on #833 (2026-11-18): A**, with Waypoint drawing the route line and stops on Apple's image in its own map tokens (`--map-route`, `--map-stay`, `--map-airport`), using the stored Apple road for a drive when there is one and a straight line otherwise. It scrolls like today's cards, sends Apple less than a live map would and doesn't depend on Apple's script being loaded. Apple's snapshot terms and parameters (marked **confirm** below) are to be confirmed with Apple before step 3 builds it.
 
-**Snapshot details (A), each to confirm against Apple's documentation before step 3.**
+**Snapshot details, each to confirm with Apple before step 3** (including whether Waypoint may draw on top of a snapshot).
 
 - Address: `https://snapshot.apple-mapkit.com/api/v1/snapshot?center=<lat>,<lon>&z=<zoom>&size=<w>x<h>&scale=2&colorScheme=dark&poi=0&lang=<viewer's>&teamId=…&keyId=…&signature=…` (**confirm** the parameter names, and that `annotations` and `overlays` can be left out). No `annotations` and no `overlays`: the stops and the path never go in the address.
 - Signed on the server with the MapKit key over the path and query (ES256), by a new `providers/mapkit.py` function and a batched route for the cards on screen, `GET /api/map-snapshots?trip=…` (at most 12, like `GET /api/driving-routes`): sign-in required, blocked for assistants, the trips you can't see left out exactly as a trip with no route is, never logging the key, Key ID or Team ID. **Confirm** whether Apple accepts an `expires` parameter; if so, addresses last a day.
@@ -208,18 +222,18 @@ The recommendation is **A**, with Waypoint drawing the route line and stops on A
 
 ### Stats world map (frame b)
 
-One live MapKit map: the map is the point of the section, it is one per page, and pan and zoom are expected. It replaces `TravelMap.svelte` in `#stats-map-slot`, lazy-loaded as today.
+One live MapKit map: the map is the point of the section, it is one per page, and pan and zoom are expected. It replaces `TravelMap.svelte` in `#stats-map-slot`, lazy-loaded as today. The visited shading stays (decided on #833), drawn by MapKit from Waypoint's bundled outlines.
 
-- **What it draws.** Airports as dots sized by visits (`--map-airport`), flights as great-circle polylines whose width follows the number of flights (`--map-route`), stays as pins (`--map-stay`), Apple's dark style with points of interest off.
+- **What it draws.** Apple's dark style with points of interest off; then, as overlays, from the bottom up: the visited countries filled in `--map-visited` at about 35% with a 1 px edge at 70%; the visited US states, once the map is zoomed in far enough for states to read (a span under about 40° of longitude), filled the same way and the United States' own fill dropped so states don't double up; the flights as great-circle polylines whose width follows the number of flights (`--map-route`); the airports as dots sized by visits (`--map-airport`); the stays as small pins (`--map-stay`).
+- **How the shading is drawn.** MapKit JS draws polygons itself: `mapkit.PolygonOverlay` takes rings of coordinates (several rings for islands and holes) and a `mapkit.Style` (`fillColor`, `fillOpacity`, `strokeColor`, `strokeOpacity`, `lineWidth`); `mapkit.importGeoJSON` can build the same overlays from GeoJSON. The countries come from `world-atlas`'s 1:50m file (`loadDetailedCountries`), the states from `us-atlas` (`loadStates`), both converted with `topojson-client` in the browser, from the app's own lazily loaded files (same origin, never from Apple). Only the visited features become overlays (a household's few countries and states, not the world), which keeps MapKit's work small. Which are visited is worked out as today (`visitedFeatureIds`, `visitedStateTrips` with `geoContains`). **Confirm** while building: that MapKit JS keeps overlays with a few thousand vertices smooth on a phone (if not, use the 1:110m countries at world zoom), that overlay selection (`select` events on overlays) works as for annotations, and how overlays sit under annotations.
 - **Fit.** Fitted to the period's airports, stays and places, as `flownBounds` does today, capped so a single city doesn't zoom past city level.
-- **Interaction.** MapKit's own zoom control (+ and −) replaces Waypoint's buttons. One-finger drag pans only after zooming in on a phone (`isScrollEnabled` turned on at the first zoom), so the page still scrolls past the map, as today. A tap on a dot, arc or pin selects it and shows the same caption under the map as today (the place, then each trip with its dates).
-- **Visited countries and states.** Today's map shades them from bundled outlines. MapKit has no country shapes of its own, so shading needs Waypoint to keep `world-atlas` and `us-atlas` as overlay data. The frames draw the map without shading, with the countries list and the Countries tile carrying that information (question 2).
-- **Loading.** The skeleton the slot has today ("Loading the map", `h-56`, pulsing unless reduced motion) until MapKit and the first tiles are up; then the map.
-- **No key or failure.** The section keeps its heading "Where you've been", the Countries tile and the countries and states lists; the map slot is not there. A failure after the map showed collapses the slot.
+- **Interaction.** MapKit's own zoom control (+ and −) replaces Waypoint's buttons. One-finger drag pans only after zooming in on a phone (`isScrollEnabled` turned on at the first zoom), so the page still scrolls past the map, as today. A tap on a dot, arc, pin, shaded country or shaded state selects it and shows the same caption under the map as today (the place, then each trip with its dates).
+- **Loading.** The skeleton the slot has today ("Loading the map", `h-56`, pulsing unless reduced motion) until MapKit, the outlines and the first tiles are up; then the map. If the outlines fail to load, the map shows without shading (as today's map shows without states when they fail), since the tiles and the countries list still say where you've been.
+- **No key or failure.** The section keeps its heading "Where you've been", the Countries and States tiles and the countries and states lists; the map slot is not there, and the outlines are not loaded. A failure after the map showed collapses the slot.
 
 ### The replay (frame c)
 
-With a key nothing changes from today's MapKit replay, except that a drive with no stored Apple road and no answer from Apple's directions is a straight line instead of the bundled highway line (question 3).
+With a key nothing changes from today's MapKit replay, except that a drive with no stored Apple road and no answer from Apple's directions is a straight line instead of the bundled highway line (decided on #833).
 
 With no key, or when MapKit fails before the replay starts:
 
@@ -231,7 +245,7 @@ With no key, or when MapKit fails before the replay starts:
 ### Where it says maps need a key (frame c, c4)
 
 - **Docs**: "Trips" and "Stats" each open their map section with "Maps need a MapKit key on the server. Without one Waypoint shows no maps or route replays", linking to "Apple's map" in the Trips page.
-- **Settings (proposed, question 7)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings.
+- **Settings (proposed, still open: question 1 below)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings.
 
 ## Privacy: what Apple learns
 
@@ -241,13 +255,13 @@ This replaces "a trip's coordinates go to an outside service in one case only: t
 
 **With a key**, as today: Apple's script loads on every signed-in app open (idle preload, #759), unpinned, running in the page with the app's own access, and Apple learns the viewer's IP address and browser and this Waypoint's address on every open; the replay sends the area on screen and each drive's start and end to Apple's directions service; the server asks Apple for the roads of ended trips once a night (#823). In addition:
 
-- **A Trips list.** For each Past card that has no photos the viewer may see and a route of two or more stops, and that scrolls within about a screen of view, the viewer's browser asks Apple for a map image of the trip's area: its centre and zoom (no closer than city level) and the image's size, signed for this Waypoint. Apple can tie the requests of one page load together, so it learns, from the viewer's IP address, the rough areas of the household's past trips that have no photos, a few at a time, as the list scrolls. It is not sent the stops, the stays, Home, the path, a name, a date or which trip is which. A card with photos asks nothing. With a live map per card (option B) Apple learns the same areas from the tiles it serves, and its script is handed the stops and the path to draw.
-- **Stats.** Opening Stats draws one live map, fitted to the chosen period's airports, stays and places. Apple learns the area on screen and every area the viewer pans or zooms to, down to street level if they zoom that far, from the tiles. Apple's script is handed every airport, flight arc and stay pin of the period to draw, and, as everywhere with MapKit, could read them; Waypoint doesn't send them anywhere itself.
+- **A Trips list.** For each Past card that has no photos the viewer may see and a route of two or more stops, and that scrolls within about a screen of view, the viewer's browser asks Apple for a map image of the trip's area: its centre and zoom (no closer than city level) and the image's size, signed for this Waypoint. Apple can tie the requests of one page load together, so it learns, from the viewer's IP address, the rough areas of the household's past trips that have no photos, a few at a time, as the list scrolls. It is not sent the stops, the stays, Home, the path, a name, a date or which trip is which. A card with photos asks nothing. 
+- **Stats.** Opening Stats draws one live map, fitted to the chosen period's airports, stays and places. Apple learns the area on screen and every area the viewer pans or zooms to, down to street level if they zoom that far, from the tiles. Apple's script is handed every airport, flight arc and stay pin of the period to draw, and the outlines of the visited countries and US states to shade, and, as everywhere with MapKit, could read them, so it could learn which countries and states the household visited in the period. The outlines themselves are bundled with the app and loaded from this Waypoint, never fetched from Apple or anyone else; Waypoint doesn't send any of this anywhere itself.
 - **The replay with no road yet.** Unchanged: the browser asks Apple's directions service once per drive and stores the answer; a drive with no answer is a straight line.
 
 What stays true: the server sends Apple trip data only through the nightly warming job's drive ends (#823) and, with snapshots, the signed address it hands the browser (the area only; the server itself never fetches the image). A trip or card you can't see is never drawn, signed or asked about. No map is drawn for a trip with fewer than two stops. Photo places never widen or join a map.
 
-Compared with today: Apple newly learns the rough area of every past trip without photos when the list is scrolled (today only a replayed trip's area), and the whole period's travel area when Stats is opened (today nothing from Stats).
+Compared with today: Apple newly learns the rough area of every past trip without photos when the list is scrolled (today only a replayed trip's area), and the whole period's travel area, airports, flights, stays and visited countries and states when Stats is opened (today nothing from Stats).
 
 ## Wording that must change, and the checks that hold it
 
@@ -258,13 +272,13 @@ The exact text is settled in step 5 against `main` as it is then; what each pass
 - Replace "The map's places, highways and state lines are bundled data read from disk (`waypoint/storage/places.tsv.gz`, `waypoint/storage/roads.tsv.gz`, `waypoint/storage/states.tsv.gz`); a trip's coordinates, road legs and the state lines near them reach the browser only in the visibility-checked `GET /api/trips/{id}/places` reply, and go to an outside service in one case only: the route replay's map, when a MapKit key is configured…" with: "A booking's point is found from bundled data read from disk (`waypoint/storage/places.tsv.gz`), never from Apple; a trip's stops reach the browser only in the visibility-checked `GET /api/trips/{id}/places` reply, and go to an outside service only through Apple's MapKit, when a MapKit key is configured…, for three maps: the route replay, a Past trips card with no photos the viewer may see, and the Stats map (the owner's decisions on #828, 2026-11-18)."
 - Add the list and Stats paragraphs of the [privacy statement](#privacy-what-apple-learns), after the replay's.
 - Replace "With no key, a key that doesn't load, no `WAYPOINT_PUBLIC_URL` or the flag turned off, all map data stays on the server and in the browser, the Content-Security-Policy names no Apple host and the replay is the bundled SVG map; a MapKit script that doesn't load, a token that can't be had or any later MapKit error puts the replay back on the SVG map. The Stats map is never drawn by MapKit." with: "With no key, no `WAYPOINT_PUBLIC_URL` or the flag turned off, nothing is loaded from or sent to Apple, the Content-Security-Policy names no Apple host, and no map and no replay is shown (the owner's decision on #828: no fallback renderer); a MapKit script that doesn't load, a token or snapshot address that can't be had, or a later MapKit error hides that map, and a card shows its kinds tile."
-- Replace "a call that fails, times out or returns nothing silently leaves the bundled line for that drive" with "…leaves a straight line for that drive" (or the owner's answer to question 3).
+- Replace "a call that fails, times out or returns nothing silently leaves the bundled line for that drive" with "…leaves a straight line for that drive" (decided on #833).
 - In "Checked:", replace "the map's data is read from disk and the server sends nothing out for it, and a stranger gets a 404 (`tests/test_geocode.py`, `tests/test_roads.py`, `tests/test_trip_roads.py`, `tests/test_states.py`, `tests/test_trip_states.py`)" with "a booking's point is read from disk and a stranger gets a 404 for a trip's places (`tests/test_geocode.py`, `tests/test_trips.py`)"; and add the new checks below. Replace `RouteTile.svelte.test.ts`'s parenthesis ("a saved road drawn on a Past trips card only for its exact drive") with what the new card test holds.
 
 ### SECURITY.md, "MapKit (optional)"
 
 - "the route replay's map is Apple's" → "every map in Waypoint is Apple's (the route replay, the Past trips cards without photos, the Stats map), and without a key there are no maps".
-- Add after the replay's sentence: "A Past trips list asks Apple for an image of each card's area (its centre and zoom, no closer than city level; never its stops or path) as the cards scroll into view, so Apple learns the rough areas of past trips without photos; Stats draws a live map of the period's travel, so Apple learns the areas shown and Apple's script is handed the period's airports, flights and stays to draw."
+- Add after the replay's sentence: "A Past trips list asks Apple for an image of each card's area (its centre and zoom, no closer than city level; never its stops or path) as the cards scroll into view, so Apple learns the rough areas of past trips without photos; Stats draws a live map of the period's travel, so Apple learns the areas shown and Apple's script is handed the period's airports, flights and stays, and the outlines of the visited countries and states (bundled with the app, never fetched from Apple), to draw."
 - "a failed call keeps the bundled line" → "a failed call leaves a straight line".
 - "Without a key, or with `WAYPOINT_MAPKIT_ENABLED=off`, nothing is loaded from or sent to Apple and the content security policy names no Apple host." → add "and Waypoint shows no maps".
 
@@ -281,14 +295,14 @@ Listed in the [inventory](#user-docs-docssrccontentdocs). The new sentence each 
 
 | Promise | Check (new unless marked) |
 | --- | --- |
-| No bundled map renderer or data comes back | Semgrep `waypoint-no-bundled-map`: no `world-atlas`, `us-atlas`, `topojson-client` import and no `geoPath(` in `frontend/src/` (or an ESLint `no-restricted-imports` with the same list); no `roads.tsv`, `states.tsv`, `highways(` or `state_lines(` in `waypoint/` and `tools/`. With examples under `.semgrep/examples/` |
+| No bundled map renderer or road data comes back; the outlines stay data for Apple's map | Semgrep `waypoint-no-bundled-map`: no `geoPath(`, `geoEqualEarth(` or `geoMercator(` in `frontend/src/` (Waypoint no longer projects or draws land), `world-atlas`, `us-atlas` and `topojson-client` imported only in `frontend/src/lib/map.ts`; no `roads.tsv`, `states.tsv`, `highways(` or `state_lines(` in `waypoint/` and `tools/`. With examples under `.semgrep/examples/` |
 | No key: no map, nothing asked of Apple | `RouteReplay.svelte.test.ts`, `RouteTile.svelte.test.ts`, `StatsMapKit.svelte.test.ts`: with `mapkit: false` no map element, no `loadMapkit()`, no snapshot request, and the slot isn't in the DOM; `tests/test_mapkit.py` (kept): the CSP names no Apple host |
 | A failed map hides itself | The same suites with the fake failing to load, refusing a token and raising later; the verify flows `*-map-failed` and `trip-route-replay-mapkit-blocked` |
 | A card with photos or fewer than two stops never asks Apple | `RouteTile.svelte.test.ts` and `PastTripCard.svelte.test.ts`: no snapshot request, no `mapkit.Map` |
-| A snapshot address carries the area only (A) | `tests/test_map_snapshots.py`: the signed query has exactly `center`, `z` (at most 12), `size`, `scale`, `colorScheme`, `poi`, `lang`, `teamId`, `keyId`, `signature` (and `expires` if Apple has it), no stop coordinate of the trip (canaries); sign-in, blocked for assistants, a trip you can't see left out, `no_leaks` with the key, Key ID and Team ID as canaries; the route held by `tests/test_every_route.py` |
+| A snapshot address carries the area only | `tests/test_map_snapshots.py`: the signed query has exactly `center`, `z` (at most 12), `size`, `scale`, `colorScheme`, `poi`, `lang`, `teamId`, `keyId`, `signature` (and `expires` if Apple has it), no stop coordinate of the trip (canaries); sign-in, blocked for assistants, a trip you can't see left out, `no_leaks` with the key, Key ID and Team ID as canaries; the route held by `tests/test_every_route.py` |
 | Only the MapKit provider names Apple's hosts or signs for Apple | Semgrep `waypoint-mapkit-hosts`, `waypoint-apple-maps-server-host` (kept; the snapshot host matches the first) |
 | The replay's drive without a road is a straight line | `replay-mapkit.test.ts` (changed case) |
-| Stats sends Apple no more than it draws | `StatsMapKit.svelte.test.ts`: the fake records what it is handed; only the period's airports, arcs and stays, and no names but the city labels the caption already shows |
+| Stats hands Apple no more than it draws | `StatsMapKit.svelte.test.ts`: the fake records what it is handed; only the period's airports, arcs and stays and the visited countries' and states' outlines (never an unvisited one), and no names but the labels the caption already shows; the outlines are requested from the app's own origin only |
 | Nothing reaches Apple in `make verify` | `verify.mjs`: every `*.apple-mapkit.com` and `maps-api.apple.com` request is answered by the run or aborted, and any request to another outside host fails the run (kept, extended to the snapshot host) |
 
 ## make verify and the demo without a real Apple key
@@ -296,15 +310,15 @@ Listed in the [inventory](#user-docs-docssrccontentdocs). The new sentence each 
 **`make verify`** already runs MapKit flows without Apple: `waypoint/verify.py` makes a throwaway EC key for the run (`mapkit_env`), the demo server signs real tokens with it, and `frontend/verify/verify.mjs` answers every request to `*.apple-mapkit.com` itself (`standInForApple`): `fake-mapkit.js` is a stand-in `mapkit` that draws a plain grid with the app's annotations and polylines. The change:
 
 - The stand-in becomes the default for every flow. Each demo server `make verify` starts (local, signed-in) gets a run key, so every page with a map shows the stand-in; a flow sets `"mapkit": "none"` to run on a server with no key, or `"error"`/`"blocked"` for the failures.
-- A snapshot stand-in (if A is chosen): `verify.mjs` answers `snapshot.apple-mapkit.com/api/v1/snapshot` with a PNG it draws at the requested size (the stand-in's grid in the map tokens and a small "Map stand-in" label), and fails the flow if the address carries anything but the allowed parameters.
-- The stand-in gains what the cards and Stats use: annotation selection, the zoom control, `isScrollEnabled`.
+- A snapshot stand-in: `verify.mjs` answers `snapshot.apple-mapkit.com/api/v1/snapshot` with a PNG it draws at the requested size (the stand-in's grid in the map tokens and a small "Map stand-in" label), and fails the flow if the address carries anything but the allowed parameters.
+- The stand-in gains what the cards and Stats use: annotation and overlay selection, `PolygonOverlay` (drawn as filled shapes on the grid, so the shading shows in the images), the zoom control, `isScrollEnabled`.
 - `tools/control start` starts its demo server with a run key and the stand-in too, so a session can drive these pages (today it refuses MapKit flows with `needs_mapkit`).
 - The network stays closed: the demo server has `HTTPS_PROXY` pointed at nowhere (`NO_OUTSIDE`), the warming job never runs during a verify (it is at midnight and needs Apple), and the browser's outside requests are answered or aborted.
 - Vitest uses `frontend/src/test/fake-mapkit.ts`, extended the same way; Python tests sign with a key made in the test.
 
-**The static demo** (`frontend/demo/`, GitHub Pages) has no server and no key, and must make no request. With MapKit only it shows no maps and no replay: the Past cards without photos show their kinds tile, Stats has no map, and a completed trip has no Replay trip. `demo/README.md` stops listing "Stats and travel maps" and "animated route replays", and `demo/verify.mjs` checks that no map is drawn and no Apple host is asked. Shipping the stand-in in the public demo would show a grid where a map should be, so it is not proposed (question 5).
+**The static demo** (`frontend/demo/`, GitHub Pages) has no server and no key, and must make no request. With MapKit only it shows no maps and no replay: the Past cards without photos show their kinds tile, Stats has no map, and a completed trip has no Replay trip. `demo/README.md` stops listing "Stats and travel maps" and "animated route replays", and `demo/verify.mjs` checks that no map is drawn and no Apple host is asked. Shipping the stand-in in the public demo would show a grid where a map should be, so it is not proposed. The owner wants the demo to use real MapKit maps with a real key stored securely: that is [#834](https://github.com/AnthonyPluth/Waypoint/issues/834) (decided on #833). Until #834 lands, the demo shows no maps; when it does, the demo's maps follow whatever #834 settles, and step 2's demo changes are revisited there.
 
-**Docs screenshots** that show a map are regenerated by `make verify`, so they show the stand-in (question 6).
+**Docs screenshots** that show a map are regenerated by `make verify`, so they keep showing the grid stand-in unless #834 decides otherwise (decided on #833).
 
 ## Build plan
 
@@ -341,7 +355,7 @@ The web app's renderer ({{MAPKIT-FRONTEND}}), the cards ({{MAPKIT-CARDS}}), Stat
 Remove `tests/test_roads.py`, `tests/test_trip_roads.py`, `tests/test_states.py`, `tests/test_trip_states.py`. Change `tests/test_trips.py`, `tests/test_tripstats.py`, `tests/test_trip_summary.py`, `tests/test_route_cache.py`, `tests/test_route_warming.py`, `tests/test_demo.py`, `tests/test_api_contract.py`, `tests/test_mail_cars.py`, `tests/test_mail_generic_kinds_scan.py` and the web app tests whose places fixtures carry `roads` or `boundaries`. Run `make check`, `make verify`.
 
 **Depends on**
-#823; the owner's sign-off on #828; question 4 answered.
+#823; the owner's sign-off on #828 (the distance rule was decided on #833).
 
 **Model**
 Sonnet: removal and a settled distance rule (Waypoint `CLAUDE.md`).
@@ -354,12 +368,12 @@ After {{MAPKIT-SERVER}}, the replay (`frontend/src/lib/components/RouteReplayMap
 **Scope**
 - `RouteReplay.svelte` renders nothing unless `app.state.mapkit === true`, the viewer is online and `loadMapkit()` resolved with a working map; a later failure removes the block, moves focus to the facts heading if it was inside, and announces "The map couldn't load" in a polite live region.
 - `RouteReplayMap.svelte`: the map area is `RouteReplayMapKit` only; remove the SVG land, road, interstate and boundary layers; keep controls, labels, slider, timing and the vehicle.
-- `lib/route-replay.ts`: remove `roadFor`, `retraceFor`, `RETRACE_*`, `ROAD_MATCH_KM`, `boundaryShapes`, `boundariesShown`, `BOUNDARY_MIN_SCALE`, `NO_ROADS`, `NO_BOUNDARIES`, `Boundaries`, `BoundaryShape` and road tracks; `replay-mapkit.ts` draws a drive with no Apple road as a straight line (or the owner's answer to question 3).
+- `lib/route-replay.ts`: remove `roadFor`, `retraceFor`, `RETRACE_*`, `ROAD_MATCH_KM`, `boundaryShapes`, `boundariesShown`, `BOUNDARY_MIN_SCALE`, `NO_ROADS`, `NO_BOUNDARIES`, `Boundaries`, `BoundaryShape` and road tracks; `replay-mapkit.ts` draws a drive with no Apple road as a straight line (decided on #833).
 - `PastTrip.svelte`: with no replay possible, the phone map hero becomes the title, dates, "No photos yet" and the facts; Replay trip is not offered; the desktop left column has no map block (frames c1 to c3).
 - `RouteTileMap.svelte` and `land.svelte.ts` stay until {{MAPKIT-CARDS}} and {{MAPKIT-STATS}} (the cards and Stats still use them).
 - `make verify`: every demo server gets a run key (`waypoint/verify.py`), the stand-in (`frontend/verify/fake-mapkit.js`) answers by default, `mapkit` in a flow becomes `"none"`, `"error"` or `"blocked"` (`frontend/verify/verify.mjs`, `flows/README.md`); `tools/control start` gets a run key and the stand-in, dropping the `needs_mapkit` refusal (`frontend/verify/control-daemon.mjs`; `make verify-skill` after changing its help).
 - Flows: change `trip-route-replay.json`, `trip-route-replay-backtrack.json`, `home-route-replay.json`, `trip-route-replay-mapkit-fallback.json` and `-blocked.json` (the replay hidden); add `trip-route-replay-no-key.json`.
-- Static demo: `demo/README.md` and `demo/verify.mjs` as the design says (or the owner's answer to question 5).
+- Static demo: `demo/README.md` and `demo/verify.mjs` as the design says: no maps and no replay until #834 gives the demo a real key.
 
 **Out of scope**
 The cards ({{MAPKIT-CARDS}}), Stats ({{MAPKIT-STATS}}), promise wording ({{MAPKIT-DOCS}}).
@@ -382,9 +396,10 @@ Sonnet: a settled UI change held by the frames and the checks.
 ### Step 3: `{{MAPKIT-CARDS}}` Past trips cards on Apple's map
 
 **Context**
-`frontend/src/lib/components/RouteTile.svelte` draws a Past card's route on bundled outlines (`RouteTileMap.svelte`). The owner decided on #828 that the cards load Apple's map and, with no key, hide it. Design: `docs/design/mapkit-only/README.md` ("Trips list cards") and frame a, signed off on #828, with the owner's answer to question 1 (snapshot or live).
+`frontend/src/lib/components/RouteTile.svelte` draws a Past card's route on bundled outlines (`RouteTileMap.svelte`). The owner decided on #828 that the cards load Apple's map and, with no key, hide it. Design: `docs/design/mapkit-only/README.md` ("Trips list cards") and frame a, signed off on #828, with the owner's decision on #833 (2026-11-18): Apple's static snapshot with Waypoint's route on top.
 
-**Scope** (written for option A; rewritten if the owner picks B)
+**Scope**
+- **To confirm with Apple first, before any code:** the snapshot service's parameters (`center`, `z`, `size`, `scale`, `colorScheme`, `poi`, `lang`, `teamId`, `keyId`, `signature`), whether it accepts `expires`, and whether its terms let Waypoint draw its own route on top of a snapshot. Record what Apple's documentation or support says in the pull request; if any of it doesn't hold, stop and raise it on #828 before building.
 - `waypoint/providers/mapkit.py`: `snapshot_url(creds, center, zoom, size, scale, scheme, lang, now)` signing the path and query; `SNAPSHOT_URL` beside the other hosts.
 - `waypoint/domain/maps.py` and a new `waypoint/domain/map_snapshots.py`: the centre and zoom from a trip's stops (`tripmap.places`) fitted to the card, zoom capped at 12, signed addresses kept per trip and size for a day in memory.
 - `GET /api/map-snapshots?trip=…&w=…&h=…` (at most 12 trips): sign-in, blocked for assistants, a trip you can't see or with fewer than two stops left out, typed in `server/contract.py`, a docs page section; `make api-contract`, `make feature-map`.
@@ -406,7 +421,7 @@ Stats ({{MAPKIT-STATS}}), the replay ({{MAPKIT-FRONTEND}}), promise wording ({{M
 New `tests/test_map_snapshots.py`; extend `tests/test_mapkit.py`; change `RouteTile.svelte.test.ts`, `PastTripCard.svelte.test.ts`, `pages/Trips.svelte.test.ts`, `lib/driving-routes.test.ts`. Run `make check`, `make verify`.
 
 **Depends on**
-{{MAPKIT-FRONTEND}}; question 1 answered and Apple's snapshot parameters confirmed.
+{{MAPKIT-FRONTEND}}; Apple's snapshot parameters, `expires` and drawing on top confirmed (first item of the scope).
 
 **Model**
 Sonnet: a decided design; the new route is held by `tests/test_every_route.py`, `no_leaks` and review.
@@ -414,13 +429,13 @@ Sonnet: a decided design; the new route is held by `tests/test_every_route.py`, 
 ### Step 4: `{{MAPKIT-STATS}}` The Stats map on MapKit
 
 **Context**
-`frontend/src/lib/components/TravelMap.svelte` draws the Stats world map from bundled outlines (`lib/map.ts`, `lib/land.svelte.ts`, `world-atlas`, `us-atlas`). The owner decided on #828 that Stats uses MapKit and hides the map with no key. Design: `docs/design/mapkit-only/README.md` ("Stats world map") and frame b, signed off on #828, with the owner's answer to question 2 (shading).
+`frontend/src/lib/components/TravelMap.svelte` draws the Stats world map from bundled outlines (`lib/map.ts`, `lib/land.svelte.ts`, `world-atlas`, `us-atlas`). The owner decided on #828 that Stats uses MapKit and hides the map with no key, and on #833 (2026-11-18) that the visited countries and states stay shaded, from the bundled outlines. Design: `docs/design/mapkit-only/README.md` ("Stats world map") and frame b, signed off on #828.
 
 **Scope**
-- New `frontend/src/lib/components/StatsMapKit.svelte`: one `mapkit.Map` (dark, no points of interest, MapKit's zoom control), airports as sized dots, flights as great-circle polylines, stays as pins, fitted as `flownBounds` is today; scroll enabled on phone only after zooming in; a tap selects and shows today's caption under the map.
+- New `frontend/src/lib/components/StatsMapKit.svelte`: one `mapkit.Map` (dark, no points of interest, MapKit's zoom control); the visited countries as `mapkit.PolygonOverlay`s from `world-atlas`'s 1:50m outlines and, once zoomed in to a span under about 40° of longitude, the visited US states from `us-atlas` (the United States' fill dropped then), styled with `--map-visited` (fill about 35%, edge about 70%); airports as sized dots, flights as great-circle polylines, stays as pins, above the shading; fitted as `flownBounds` is today; scroll enabled on phone only after zooming in; a tap on any of them selects it and shows today's caption under the map. Only visited features become overlays. If the outlines fail to load, the map shows without shading.
 - `pages/Stats.svelte`: lazy-load it only when `app.state.mapkit === true` and online; keep the skeleton while it loads; no slot with no key; collapse on failure.
-- Delete `TravelMap.svelte`, `lib/land.svelte.ts`; strip `lib/map.ts` to the data helpers; drop `world-atlas`, `us-atlas`, `topojson-client` and their types (and `d3-geo` if unused) from `frontend/package.json` with `npm install` to update the lock file.
-- Add the `waypoint-no-bundled-map` check (Semgrep or ESLint) with examples.
+- Delete `TravelMap.svelte`, `lib/land.svelte.ts`; strip `lib/map.ts` to the data and outline helpers the README's inventory keeps; keep `world-atlas`, `us-atlas`, `topojson-client` and `d3-geo` in `frontend/package.json`.
+- Add the `waypoint-no-bundled-map` check (Semgrep or ESLint) with examples: no projection or `geoPath(` in `frontend/src/`, the outline packages imported only in `lib/map.ts`.
 - Flows: change `open-stats.json`, `stats-map-details.json`, `stats-map-zoom.json`, `stats-long-names.json`, `hotel-stats.json`, `parking-stats.json`; add `stats-no-key.json`, `stats-map-failed.json`.
 
 **Out of scope**
@@ -428,15 +443,16 @@ Cards, replay, wording beyond the Stats sentence in AGENTS.md's MapKit passage (
 
 **Acceptance criteria**
 - [ ] With `mapkit: false` Stats has no `#stats-map-slot` map and makes no request to an Apple host; the Countries tile and lists show.
-- [ ] The stand-in records only the period's airports, arcs and stays (`StatsMapKit.svelte.test.ts`).
-- [ ] `npm ls world-atlas us-atlas topojson-client` finds nothing, and the check fails on a re-added import (its examples).
+- [ ] The stand-in records only the period's airports, arcs and stays and the visited countries' and states' outlines, never an unvisited one (`StatsMapKit.svelte.test.ts`); the visited-shading and tap cases of the removed `TravelMap.svelte.test.ts` pass against it.
+- [ ] With no key the outline files are not requested.
+- [ ] The check fails on a `geoPath(` in a component or an outline import outside `lib/map.ts` (its examples).
 - [ ] The UI matches frame b (signed off on #828); any change to layout, flow or visual style needs the owner's sign-off before merge; `make verify` images at phone and desktop width beside the frames.
 
 **Tests**
 New `StatsMapKit.svelte.test.ts`; remove `TravelMap.svelte.test.ts`, `lib/land.svelte.test.ts` (`Removes-Test:`); change `lib/map.test.ts`, `frontend/src/test/fake-mapkit.ts`. Run `make check`, `make verify`.
 
 **Depends on**
-{{MAPKIT-FRONTEND}}; question 2 answered.
+{{MAPKIT-FRONTEND}}.
 
 **Model**
 Sonnet: a decided UI change.
@@ -449,7 +465,7 @@ Steps {{MAPKIT-SERVER}} to {{MAPKIT-STATS}} make every map Apple's and remove th
 **Scope**
 - Rewrite the passages listed there in AGENTS.md, SECURITY.md and `invariants.md`, citing the owner's decisions on #828 and keeping every earlier decision cited.
 - User docs: `start/trips.md`, `start/stats.md`, `start/docker.md`, `reference/configuration.md`, `privacy/email-scanning.md`, `README.md`, `docs/PHOTOS.md`; a status line in `docs/design/mapkit-only/README.md` and `docs/design/mapkit-spike.md`.
-- If the owner chose it (question 7): the Settings → Travel "Maps" row (frame c4) and its test.
+- If the owner chooses it (open question 1): the Settings → Travel "Maps" row (frame c4) and its test.
 - `make feature-map`, `make user-feature-map`.
 
 **Out of scope**
@@ -469,19 +485,17 @@ Code changes other than the Settings row.
 **Model**
 Sonnet: the wording is fixed here; Codex and the second review check it against the code.
 
-## Questions for the owner
+## Open questions for the owner
 
-1. **Cards: static snapshot or live map?** Recommended: Apple's snapshot images with Waypoint drawing the route on top (A). It needs a new server route that signs each card's address and a check of Apple's snapshot terms (confirm the parameters and whether drawing on top of a snapshot is allowed). A live map per card (B) needs no new route but scrolls worse and hands Apple's script each trip's stops.
-2. **Stats: keep the visited-country and visited-state shading?** It needs Waypoint to keep shipping the country and state outlines (`world-atlas`, `us-atlas`, about 200 KB) as overlay data on Apple's map. Recommended: drop it; the Countries tile and the countries and states lists stay.
-3. **A drive with no road from Apple yet** (directions failed, or not warmed yet): a straight line between the two stops (recommended), a dashed straight line, or no line at all?
-4. **A trip's road distance** (cards, the trip's facts, the year totals) after the highways are gone: the length of Apple's stored road where there is one and the straight-line distance, marked "about", otherwise (recommended); or always straight-line "about"?
-5. **The public static demo** (GitHub Pages) can't load Apple's map: accept no maps and no replay there (recommended), or show the grid stand-in?
-6. **Docs screenshots** generated by `make verify` will show the grid stand-in where a map is: accept, or hide maps in the screenshots?
-7. **Settings line**: add the read-only "Maps" row in Settings → Travel (frame c4), or say it in the docs only?
-8. **Failure during a replay**: announce "The map couldn't load" in a live region (as drawn), or close silently?
-9. **Card zoom cap**: a card's map no closer than city level (zoom 12, recommended), so a card never shows the street around a stay or Home.
-10. **Privacy statement**: is the [statement above](#privacy-what-apple-learns) what you want the promise to say, including that Apple newly learns the rough areas of past trips without photos when the list is scrolled and the period's travel area from Stats?
-11. **Visual frames**: a, b and c as drawn, or changes?
+Answered on #833 (2026-11-18), see [Owner decisions on #833](#owner-decisions-on-833-2026-11-18): cards on Apple's snapshot with Waypoint's route on top; a straight line for a drive with no Apple road and the distance rule; Stats keeps the shading; the demo's real key is #834 and docs screenshots keep the stand-in unless #834 decides otherwise.
+
+Still open. The design uses the recommended default for each until the owner answers:
+
+1. **Settings line**: add the read-only "Maps" row in Settings → Travel (frame c4), or say it in the docs only? Default: drawn and proposed; built only if the owner says yes.
+2. **Failure during a replay**: announce "The map couldn't load" in a live region (as drawn), or close silently? Default: announce.
+3. **Card zoom cap**: a card's map no closer than city level (zoom 12), so a card never shows the street around a stay or Home? Default: zoom 12.
+4. **Privacy statement**: is the [statement above](#privacy-what-apple-learns) what you want the promise to say, including that Apple newly learns the rough areas of past trips without photos as the list scrolls, and from Stats the period's travel area, airports, flights, stays and which countries and states are shaded? **Not signed off.**
+5. **The frames' look**: a, b and c as drawn, or changes? **Not signed off.**
 
 ## Fonts
 
