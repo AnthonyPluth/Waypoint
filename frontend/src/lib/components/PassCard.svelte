@@ -202,17 +202,17 @@
     </div>
 
     <div class="flex min-w-0 flex-col gap-5 border-t-2 border-dashed border-border p-5 desktop:border-l-2 desktop:border-t-0 md:p-6" data-stub>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-4 phone:flex phone:flex-wrap phone:justify-between">
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-4 phone:flex phone:flex-wrap phone:items-start phone:justify-between">
         {#if hasCode}
           <div class={`col-span-2 min-w-0 ${longCode ? "phone:basis-full" : ""}`}>
             <dt class="eyebrow"><span class="phone:hidden">{codes.length > 1 ? "Confirmations" : "Confirmation"}</span><span class="desktop:hidden">Code</span></dt>
-            <dd class="mt-1 flex flex-wrap gap-x-4">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full min-w-0 break-all text-left text-title font-semibold phone:text-heading" />{/each}</dd>
+            <dd class="mt-1 flex flex-wrap gap-x-4 phone:min-h-11 phone:items-center">{#each codes as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full min-w-0 break-all text-left text-title font-semibold phone:text-heading" />{/each}</dd>
           </div>
         {/if}
         {#each boardFacts as [name, value], i (name)}
           <div class={`min-w-0 ${i >= (hasCode ? 3 : 4) ? "phone:hidden" : ""}`}>
             <dt class="eyebrow">{name}</dt>
-            {#if value}<dd class="mt-1 break-words text-base font-medium" class:line-through={name === "Cost" && cancelled}>{#if fullAddress[name]}<AddressLink address={fullAddress[name] ?? ""} text={value} />{:else}{value}{/if}</dd>{:else}<dd class="mt-1 text-base text-muted-foreground">Not yet</dd>{/if}
+            {#if value}<dd class="mt-1 break-words text-base font-medium phone:flex phone:min-h-11 phone:items-center" class:line-through={name === "Cost" && cancelled}>{#if fullAddress[name]}<AddressLink address={fullAddress[name] ?? ""} text={value} />{:else}{value}{/if}</dd>{:else}<dd class="mt-1 text-base text-muted-foreground phone:flex phone:min-h-11 phone:items-center">Not yet</dd>{/if}
             {#if name === "Cost" && cancelled}<dd class="text-sm text-muted-foreground">Cancelled, so not in the trip’s total</dd>{/if}
           </div>
         {/each}
