@@ -3,8 +3,9 @@ name: Agent review
 # The Claude review of a risky pull request an AI agent wrote, run by fleet's reusable workflow (AnthonyPluth/fleet,
 # .github/workflows/agent-review.yml; docs/agent-review.md there). The independent first review of every pull request
 # is off, fleet's default since v2.0.0 (no "Agent review" status, no comment); Codex reviews every pull request instead.
-# A risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** or one of the files
-# below) is read by a fresh Claude Code session against main's AGENTS.md, .github/agent-review/context.md and
+# A risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** other than the .md
+# documents in a skill's references/, .mcp.json or one of the files below: fleet's second-review-always default
+# since v6.0.0) is read by a fresh Claude Code session against main's AGENTS.md, .github/agent-review/context.md and
 # .github/agent-review/invariants.md, as the "Second review" status; one that isn't risky gets a passing "Second
 # review" saying so, without running Claude, so only a risky pull request needs the ANTHROPIC_API_KEY or
 # CLAUDE_CODE_OAUTH_TOKEN secret. The merge gate requires "Second review".
@@ -34,7 +35,7 @@ jobs:
       pull-requests: write     # the comment (and the pull request's commits and comments)
       statuses: write          # the "Second review" status (and "Agent review" when the first review is on)
       actions: write           # start the merge gate
-    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@f16f119c4547b7c4524a44c26d708b51522210e4   # v4.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/agent-review.yml@bf386593387dcbb56303dcb11f16c93dcc59a5d9   # v7.1.0
     with:
       # Left out of the diff the reviewer reads (still listed for it): the generated API contract and feature map.
       generated: |
@@ -48,7 +49,8 @@ jobs:
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
       # A change to one of these files is risky and gets the second review, beside the labels (safety-critical,
-      # security) and .github/** and .claude/**, which always count. The list is short on purpose (#518): the exact
+      # security) and .github/**, .claude/** (all but the .md documents under .claude/skills/*/references/, such as
+      # verify-waypoint's regenerated feature map) and .mcp.json, which always count. The list is short on purpose (#518): the exact
       # files that directly implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty
       # numbers, a trip's photos and their grants and proxy, the offline copy and its encrypted store, log scrubbing),
       # the mail review and assist modules and the two handlers that serve a kept message (server/api/review.py,
