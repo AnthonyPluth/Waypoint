@@ -24,7 +24,9 @@
   import { Sheet } from "$lib/components/ui/sheet";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { flightStatus, loadFlightStatus, followFlightStatus, statusFor } from "$lib/flightstatus.svelte";
-  import { isSavedCopy } from "$lib/offline";
+  import { isSavedCopy, type SavedCopy } from "$lib/offline";
+  import { inShell, shellLoad } from "$lib/offline-shell";
+  import OfflineTrip from "$lib/components/OfflineTrip.svelte";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
   import { hasSavedTrip, onLock } from "$lib/offline-vault";
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
@@ -76,6 +78,7 @@
   let lockedCopy = $state(false);
   let savedCopy = $state<Trip | null>(null);
   let savedTrips = $state<Trip[]>([]);
+  let shellCopy = $state<SavedCopy | null>(null);
   let deleting = $state(false);
   let others = $state<Trip[]>([]);
   let merging = $state(false);
@@ -110,6 +113,18 @@
     else if (askAboutOffline()) askOffline = true;
   }
 
+  const unreachable = (err: unknown) => !(err && typeof err === "object" && "status" in err && typeof err.status === "number" && err.status > 0 && ![502, 503, 504].includes(err.status));
+
+  async function offerShellCopy(err: unknown, mine: number): Promise<boolean> {
+    if (!inShell() || !unreachable(err)) return false;
+    try {
+      const found = (await shellLoad()).filter(isSavedCopy).find((c) => String(c.trip.id) === id);
+      if (!found || mine !== latest) return false;
+      shellCopy = found;
+      return true;
+    } catch { return false; }
+  }
+
   async function offerSavedCopy() {
     lockedCopy = navigator.onLine === false && (await hasSavedTrip().catch(() => false));
   }
@@ -138,6 +153,7 @@
     const mine = ++latest;
     loadError = "";
     lockedCopy = false;
+    shellCopy = null;
     if (!/^\d+$/.test(id)) { trip = null; loadError = "No such trip"; return; }
     try {
       const [t, p, l] = await Promise.all([apiCall<"GET /api/trips/{id}">(`/api/trips/${id}`), apiCall<"GET /api/people">("/api/people"), apiCall<"GET /api/loyalty">("/api/loyalty")]);
@@ -148,6 +164,7 @@
     } catch (err) {
       if (mine !== latest) return;
       trip = null; loadError = errMsg(err);
+      if (await offerShellCopy(err, mine)) { if (mine === latest) loadError = ""; return; }
       await offerSavedCopy();
     }
   }
@@ -326,6 +343,8 @@
   {:else}
     <SavedTripLock onunlocked={openSaved} onremoved={() => (lockedCopy = false)} />
   {/if}
+{:else if shellCopy}
+  <OfflineTrip copy={shellCopy} />
 {:else if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">
     <span>{loadError}</span><Button variant="outline" onclick={load}>Try again</Button>
