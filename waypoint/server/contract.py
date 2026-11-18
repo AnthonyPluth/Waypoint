@@ -331,6 +331,7 @@ class OfflineMessages(TypedDict):
 class OfflineTrip(TypedDict):
     trip: Trip
     messages: list[OfflineMessages]
+    cities: dict[str, str]
 
 
 class Offline(TypedDict):

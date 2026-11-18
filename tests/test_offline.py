@@ -4,14 +4,14 @@ import time
 import unittest
 from datetime import date, timedelta
 
-from sqlalchemy import delete, insert
+from sqlalchemy import delete, insert, update
 
 from waypoint import oidc
 from waypoint.domain import loyalty, offline, people
 from waypoint.domain.visibility import Viewer
 from waypoint.server import ROUTES
 from waypoint.storage import db, secretbox, stored_mail
-from waypoint.storage.models import AuthSession, Mailbox, Person, Trip, User
+from waypoint.storage.models import AuthSession, Mailbox, Person, Segment, Trip, User
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, fetch
 
@@ -302,6 +302,37 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(self.ok("ana")["version"], offline.VERSION)
         self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
         self.assertEqual(self.ok("ana")["version"], 1)
+
+    def test_cities_hold_exactly_the_cities_of_the_saved_trips_own_flight_airports(self):
+        ana = [{"person_id": self.person["ana"]}]
+        mine = self.trip_with("ana", days(1), days(3), flight(days(1), days(3), origin="DEN", destination="GJT"), ana)
+        self.book("ana", {**flight(days(1), days(3)), "kind": "hotel", "origin": "Hotel Example", "destination": "Grand Junction",
+                          "start_zone": "America/Denver", "end_zone": "America/Denver", "trip_id": mine["trip_id"]}, ana)
+        self.trip_with("ana", days(2), days(4), flight(days(2), days(4), origin="SEA", destination="PDX", confirmation="OTHER1"), ana)
+        self.trip_with("cy", days(2), days(4), flight(days(2), days(4), origin="LAX", destination="SFO", confirmation="CY0001"),
+                       [{"person_id": self.person["cy"]}])
+        got = self.ok("ana")
+        by_trip = {c["trip"]["id"]: c["cities"] for c in got["trips"]}
+        self.assertEqual(by_trip[mine["trip_id"]], {"DEN": "Denver", "GJT": "Grand Junction"})
+        self.assertEqual(sorted(city for cities in by_trip.values() for city in cities), ["DEN", "GJT", "PDX", "SEA"])
+        self.assertNotIn("Los Angeles", json.dumps(got))
+
+    def test_a_code_the_airports_table_does_not_know_is_left_out_and_a_trip_without_flights_has_no_cities(self):
+        ana = [{"person_id": self.person["ana"]}]
+        unknown = self.trip_with("ana", days(1), days(3), flight(days(1), days(3), origin="DEN", destination="GJT"), ana)
+        with db.session() as conn:
+            conn.execute(update(Segment).where(Segment.id == unknown["id"]).values(destination="ZZZ"))
+        stay = self.trip_with("ana", days(2), days(3), {**flight(days(2), days(3)), "kind": "hotel", "origin": "Hotel Example",
+                                                        "destination": "Grand Junction", "confirmation": "HOTEL1",
+                                                        "start_zone": "America/Denver", "end_zone": "America/Denver"}, ana)
+        by_trip = {c["trip"]["id"]: c["cities"] for c in self.ok("ana")["trips"]}
+        self.assertEqual(by_trip[unknown["trip_id"]], {"DEN": "Denver"})
+        self.assertEqual(by_trip[stay["trip_id"]], {})
+
+    def test_cities_are_empty_for_someone_who_cannot_see_the_booking(self):
+        self.book("ana", flight(days(1), days(3), origin="DEN", destination="GJT"), [{"person_id": self.person["ana"]}])
+        self.assertEqual(self.ok("ben"), {"version": 1, "trips": []})
+        self.assertNotIn("Denver", json.dumps(self.ok("ben")))
 
     def test_the_route_is_a_get_and_the_only_one(self):
         self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])

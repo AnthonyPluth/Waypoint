@@ -6693,11 +6693,18 @@
             "items": {
               "$ref": "#/components/schemas/OfflineMessages"
             }
+          },
+          "cities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "trip",
-          "messages"
+          "messages",
+          "cities"
         ],
         "additionalProperties": false
       },
