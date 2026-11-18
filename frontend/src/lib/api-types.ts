@@ -590,6 +590,7 @@ export interface OfflinePicture {
 export interface OfflineTrip {
   trip: Trip;
   messages: OfflineMessages[];
+  cities: Record<string, string>;
   codes?: OfflinePicture[];
 }
 

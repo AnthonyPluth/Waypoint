@@ -6,7 +6,7 @@ from typing import TypedDict
 
 from .. import dates
 from ..storage import db, gate_codes, stored_mail
-from . import trips, visibility
+from . import airports, trips, visibility
 from .visibility import Viewer
 
 LOOKAHEAD_DAYS = 7
@@ -28,6 +28,7 @@ class SavedTrip(TypedDict):
     trip: trips.TripOut
     messages: list[SegmentMessages]
     codes: list[SegmentPicture]
+    cities: dict[str, str]
 
 
 class Saved(TypedDict):
@@ -66,6 +67,13 @@ def _pictures(conn: db.Connection, viewer: Viewer, trip: trips.TripOut) -> list[
     return found
 
 
+def _cities(conn: db.Connection, trip: trips.TripOut) -> dict[str, str]:
+    codes = dict.fromkeys(code.strip().upper() for seg in trip["segments"] if seg["kind"] == "flight"
+                          for code in (seg["origin"], seg["destination"]) if code and code.strip())
+    found = ((code, airports.lookup(conn, code)) for code in codes)
+    return {code: a["city"] for code, a in found if a is not None}
+
+
 def _saved(conn: db.Connection, viewer: Viewer, trip_id: int, with_codes: bool) -> SavedTrip | None:
     trip = trips.get(conn, viewer, trip_id)
     if trip is None:
@@ -78,7 +86,7 @@ def _saved(conn: db.Connection, viewer: Viewer, trip_id: int, with_codes: bool) 
         emails = trips.emails_of(conn, viewer, segment["id"]) if segment["has_email"] else None
         if emails:
             messages.append({"segment_id": segment["id"], "emails": [{**e, "images": 0} for e in emails]})
-    return {"trip": trip, "messages": messages, "codes": codes}
+    return {"trip": trip, "messages": messages, "codes": codes, "cities": _cities(conn, trip)}
 
 
 def projection(conn: db.Connection, viewer: Viewer, today: date, with_codes: bool = False) -> Saved:

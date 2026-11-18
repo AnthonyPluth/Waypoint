@@ -337,6 +337,7 @@ class OfflinePicture(TypedDict):
 class OfflineTrip(TypedDict):
     trip: Trip
     messages: list[OfflineMessages]
+    cities: dict[str, str]
     codes: NotRequired[list[OfflinePicture]]
 
 

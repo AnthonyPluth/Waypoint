@@ -143,6 +143,22 @@ final class OfflineStoreTests: XCTestCase {
         XCTAssertFalse(onDisk.contains("Ended trip"))
     }
 
+    func testACarriedCitiesMapSurvivesSaveLoadAndPruning() throws {
+        let cities = ["DEN": "Denver", "GJT": "Grand Junction"]
+        let entries: [[String: Any]] = [("Ended trip", "2026-11-01", "2026-11-10", ["LIS": "Lisbon"]), ("Later trip", "2026-11-20", "2026-11-25", cities)].enumerated().map { index, trip in
+            ["trip": ["id": index + 1, "name": trip.0, "start_date": trip.1, "end_date": trip.2] as [String: Any], "messages": [] as [Any], "cities": trip.3]
+        }
+        let data = try JSONSerialization.data(withJSONObject: ["version": 1, "trips": entries])
+        try store.save(data, version: 1, for: home)
+        XCTAssertEqual(try XCTUnwrap(store.load(server: home)).json, data)
+        clock.date = Self.noon(2026, 11, 14)
+        let loaded = try XCTUnwrap(store.load(server: home))
+        let decoded = try XCTUnwrap(try JSONSerialization.jsonObject(with: loaded.json) as? [String: Any])
+        let kept = try XCTUnwrap(decoded["trips"] as? [[String: Any]])
+        XCTAssertEqual(kept.count, 1)
+        XCTAssertEqual(kept.first?["cities"] as? [String: String], cities)
+    }
+
     func testEveryTripExpiredLeavesAnEmptySetRatherThanNothing() throws {
         try store.save(reply([("Ended trip", "2026-11-01", "2026-11-05")]), version: 1, for: home)
         clock.date = Self.noon(2026, 12, 1)

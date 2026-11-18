@@ -6714,6 +6714,12 @@
               "$ref": "#/components/schemas/OfflineMessages"
             }
           },
+          "cities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
           "codes": {
             "type": "array",
             "items": {
@@ -6723,7 +6729,8 @@
         },
         "required": [
           "trip",
-          "messages"
+          "messages",
+          "cities"
         ],
         "additionalProperties": false
       },

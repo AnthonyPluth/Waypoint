@@ -15,10 +15,11 @@ enum TripFixtures {
         OfflineStore(root: root, calendar: utc, now: { now })
     }
 
-    static func reply(_ names: [String], version: Int = 1, end: String = "2026-12-08") -> Data {
+    static func reply(_ names: [String], version: Int = 1, end: String = "2026-12-08", cities: [String: String] = [:]) -> Data {
         let entries: [[String: Any]] = names.enumerated().map { index, name in
             ["trip": ["id": index + 1, "name": name, "start_date": "2026-12-01", "end_date": end] as [String: Any],
-             "messages": [["id": 7, "subject": "Booking \(name)"] as [String: Any]]]
+             "messages": [["id": 7, "subject": "Booking \(name)"] as [String: Any]],
+             "cities": cities]
         }
         return try! JSONSerialization.data(withJSONObject: ["version": version, "trips": entries])
     }
@@ -152,6 +153,17 @@ final class OfflineBridgeTests: XCTestCase {
         XCTAssertEqual(NSDictionary(dictionary: try XCTUnwrap(segments.first?["gate_code"] as? [String: Any])),
                        NSDictionary(dictionary: ["state": "ready", "day": "2026-10-16"]))
         XCTAssertTrue(segments.last?["gate_code"] is NSNull)
+    }
+
+    func testLoadPassesEachSavedTripsCitiesToThePageUnchanged() async throws {
+        let cities = ["DEN": "Denver", "GJT": "Grand Junction"]
+        try store.save(TripFixtures.reply(["Lisbon", "Oslo"], cities: cities), version: 1, for: home)
+        let reply = try await ask(["type": "load"])
+        let loaded = trips(reply)
+        XCTAssertEqual(loaded.count, 2)
+        for entry in loaded {
+            XCTAssertEqual(entry["cities"] as? [String: String], cities)
+        }
     }
 
     func testLoadWithNothingSavedIsEmpty() async throws {
