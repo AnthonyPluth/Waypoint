@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import math
 import re
 import unicodedata
 from functools import cache
@@ -129,3 +130,27 @@ def us_state_points() -> dict[str, tuple[float, float]]:
             if country == "US" and state and population > largest.get(state, (0.0, 0.0, -1))[2]:
                 largest[state] = (lat, lon, population)
     return {state: (lat, lon) for state, (lat, lon, _) in largest.items()}
+
+
+@cache
+def _us_postal_grid() -> dict[tuple[int, int], tuple[tuple[str, float, float], ...]]:
+    found: dict[tuple[int, int], list[tuple[str, float, float]]] = {}
+    for (country, code), (lat, lon) in postal_points().items():
+        if country == "US":
+            found.setdefault((math.floor(lat), math.floor(lon)), []).append((code, lat, lon))
+    return {cell: tuple(rows) for cell, rows in found.items()}
+
+
+def nearest_us_postal(latitude: float, longitude: float, within_km: float) -> str | None:
+    grid = _us_postal_grid()
+    cells = math.ceil(within_km / (111.0 * max(math.cos(math.radians(latitude)), 0.2))) + 1
+    cells = min(cells, 6)
+    scale = math.cos(math.radians(latitude))
+    best: tuple[float, str] | None = None
+    for dy in range(-cells, cells + 1):
+        for dx in range(-cells, cells + 1):
+            for code, lat, lon in grid.get((math.floor(latitude) + dy, math.floor(longitude) + dx), ()):
+                km = math.hypot((lat - latitude) * 111.0, (lon - longitude) * 111.0 * scale)
+                if km <= within_km and (best is None or (km, code) < best):
+                    best = (km, code)
+    return best[1] if best else None

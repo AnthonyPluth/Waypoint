@@ -432,6 +432,31 @@ rules:
       include: ["/waypoint/"]
       exclude: ["/waypoint/domain/driving_routes.py", "/waypoint/domain/route_warming.py", "/waypoint/storage/"]
 
+  - id: waypoint-no-bundled-map
+    message: >-
+      Waypoint draws no map of its own: every map on screen is Apple's MapKit (AGENTS.md, "You see the trips you're on"), so the
+      web app does not project or draw land with d3's geoPath. The one exception is the Year in Review card image, which becomes a
+      downloadable image and is drawn in frontend/src/lib/review-map.ts, never contacting Apple (the owner's decision on #838,
+      2026-11-18); frontend/src/lib/components/RouteTileMap.svelte stays until #837 removes it, and this exemption goes with it.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: \bgeoPath\s*\(
+    paths:
+      include: ["/frontend/src/"]
+      exclude: ["/frontend/src/lib/review-map.ts", "/frontend/src/lib/components/RouteTileMap.svelte"]
+
+  - id: waypoint-no-bundled-map-outlines
+    message: >-
+      The country and state outlines (world-atlas, us-atlas, topojson-client) are data for shading Apple's map and for the Year in
+      Review card image, and only frontend/src/lib/map.ts loads them, so no component draws them on its own (AGENTS.md, "You see the
+      trips you're on"): use what that module exports.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?:\bfrom\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:world-atlas|us-atlas|topojson-client)\b
+    paths:
+      include: ["/frontend/src/"]
+      exclude: ["/frontend/src/lib/map.ts"]
+
   - id: waypoint-no-telemetry
     message: >-
       Waypoint sends nothing about itself to an outside service: no error reporting, analytics or monitoring SDK (AGENTS.md,

@@ -2,9 +2,20 @@
   "name": "open-stats",
   "page": "stats",
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Stats" } },
-    { "wait_for": "[data-visited]" },
-    { "scroll_to": "#stats-map-slot" },
-    { "screenshot": "map" }
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "wait_for": "[data-kind='country']"
+    },
+    {
+      "scroll_to": "#stats-map-slot"
+    },
+    {
+      "screenshot": "map"
+    }
   ]
 }

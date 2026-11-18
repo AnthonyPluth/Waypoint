@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from waypoint.domain import calendar, place_zones, stats, trips, visibility
+from waypoint.domain import calendar, place_zones, stats, trips, us_states, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.server.api import stats as api
 from waypoint.server.common import ApiError
@@ -300,7 +300,7 @@ class FlightTests(StatsCase):
         s = self.stats(self.jane)
         self.assertEqual((s["flights"]["count"], s["flights"]["distance_km"], s["flights"]["longest"], s["flights"]["top_seat"],
                           s["flights"]["busiest_month"], s["flights"]["most_visited_airport"]), (0, 0.0, None, None, None, None))
-        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": [], "visits": [], "points": []}))
+        self.assertEqual((s["stays"]["nights"], s["cars"]["days"], s["places"]), (0, 0, {"countries": [], "cities": [], "visits": [], "points": [], "states": []}))
 
     def test_a_route_is_one_route_either_way_round(self):
         self.mine(JFK_LHR, LHR_JFK)
@@ -441,6 +441,54 @@ class VisitCountTests(StatsCase):
         self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 1)
         self.mine({**HOTEL, "start_local": "2026-06-06T15:00", "end_local": "2026-06-07T10:00"})
         self.assertEqual({p["name"]: p["visits"] for p in self.stats(self.jane)["places"]["cities"]}["London"], 2)
+
+class VisitedStatesTests(StatsCase):
+    def states(self, **kwargs):
+        return self.stats(self.jane, **kwargs)["places"]["states"]
+
+    def test_there_are_none_without_a_us_place(self):
+        self.mine(JFK_LHR.copy() | {"origin": "LHR", "destination": "CDG"}, HOTEL)
+        self.assertEqual(self.states(), [])
+
+    def test_a_us_airport_names_its_state_and_a_foreign_one_none(self):
+        self.mine(JFK_LHR)
+        self.assertEqual(self.states(), ["New York"])
+
+    def test_each_state_counts_once_however_many_places_are_in_it(self):
+        self.mine(JFK_LHR, LHR_JFK, {**JFK_LHR, "origin": "LGA", "destination": "LAX", "start_local": "2026-07-01T09:00", "end_local": "2026-07-01T12:00"})
+        self.assertEqual(self.states(), ["California", "New York"])
+
+    def test_a_stay_names_the_state_of_its_city(self):
+        self.mine({**HOTEL, "destination": "Denver", "start_zone": "America/Denver", "end_zone": "America/Denver"})
+        self.assertEqual(self.states(), ["Colorado"])
+
+    def test_a_past_us_visit_with_a_state_counts_it_and_one_without_does_not(self):
+        self.add(self.jane, VISIT_AK, travelers=self.on(self.jane.person_id))
+        self.add(self.jane, {**VISIT_AK, "details": {}, "start_local": "2007-07-02T00:00", "end_local": "2007-07-04T00:00"}, travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.states(), ["Alaska"])
+
+    def test_a_car_place_counts_its_state(self):
+        self.mine({**CAR, "origin": "Seattle", "destination": "Seattle", "start_zone": "America/Los_Angeles", "end_zone": "America/Los_Angeles"})
+        self.assertEqual(self.states(), ["Washington"])
+
+    def test_the_year_and_the_traveller_narrow_it_as_the_map_is_narrowed(self):
+        self.mine(JFK_LHR)
+        self.add(self.jane, {**VISIT_AK, "start_local": "2007-07-02T00:00", "end_local": "2007-07-12T00:00"}, travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.states(), ["Alaska", "New York"])
+        self.assertEqual(self.states(year=2026), ["New York"])
+        self.assertEqual(self.states(year=2007), ["Alaska"])
+        self.assertEqual(self.stats(self.jane, person=self.sam.person_id)["places"]["states"], [])
+
+    def test_a_trip_the_viewer_is_not_on_adds_none(self):
+        self.mine(JFK_LHR)
+        self.assertEqual(self.stats(Viewer(self.mia))["places"]["states"], [])
+
+    def test_a_point_is_placed_in_the_state_of_its_nearest_zip_centre(self):
+        self.assertEqual(us_states.state_at(39.74, -104.99, 100.0), "Colorado")
+        self.assertEqual(us_states.state_at(61.2, -149.9, 100.0), "Alaska")
+        self.assertIsNone(us_states.state_at(51.5, -0.1, 100.0))
+        self.assertIsNone(us_states.state_at(-33.9, 151.2, 100.0))
+
 
 class MapDetailTests(StatsCase):
     def test_a_route_lists_each_flight_with_its_trip_and_dates(self):

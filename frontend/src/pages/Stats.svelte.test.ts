@@ -8,14 +8,18 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 import { api } from "$lib/api";
 import type { Person, Stats } from "$lib/api-types";
 import { app, route } from "$lib/app.svelte";
+import { loadDetailedCountries } from "$lib/map";
+import { loadMapkit } from "$lib/mapkit";
 import { viewport } from "$lib/phone.svelte";
+import { fake, fakeMaps } from "../test/fake-mapkit";
 import { state } from "../test/fixtures";
 import Stats_ from "./Stats.svelte";
 
 vi.mock("$lib/map", async (original) => {
   const real = await original<typeof import("$lib/map")>();
-  return { ...real, loadDetailedCountries: real.loadCountries, loadFineCountries: real.loadCountries };
+  return { ...real, loadDetailedCountries: vi.fn(async () => []), loadStates: vi.fn(async () => []) };
 });
+vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn() }));
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
 const sam: Person = { id: 2, display_name: "Sam Doe", first_name: "Sam", legal_name: null, aliases: [], member: true, links: [] };
@@ -25,7 +29,7 @@ const none: Stats = {
   flights: { count: 0, distance_km: 0, air_seconds: 0, airports: [], airlines: [], countries: [], routes: [], cabins: [], top_seat: null,
     seat_positions: { window: 0, aisle: 0, middle: 0, unknown: 0 }, longest: null, shortest: null, most_visited_airport: null, busiest_month: null,
     times_around_earth: 0, moon_fraction: 0 },
-  stays: { nights: 0, chains: [], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, parking: { days: 0, bookings: 0, lots: [] }, places: { countries: [], cities: [], visits: [], points: [] },
+  stays: { nights: 0, chains: [], cities: [], countries: [], count: 0, average_nights: 0, hotels: [], cities_by_nights: [], longest: null, most_visited_hotel: null, most_visited_city: null, busiest_month: null, pins: [] }, cars: { days: 0, companies: [] }, cruises: { count: 0, nights: 0, sea_days: 0, ports: 0, lines: [] }, parking: { days: 0, bookings: 0, lots: [] }, places: { countries: [], cities: [], visits: [], points: [], states: [] },
 };
 const airports = ["JFK", "LHR", "MCO", "SFO", "CDG", "AKL", "LAX"].map((code, i) => ({ code, name: `${code} Airport`, city: `City ${i}`, country: "US", visits: 10 - i, latitude: 1, longitude: 2 }));
 const full: Stats = {
@@ -47,7 +51,7 @@ const full: Stats = {
     longest: { hotel: "Harbour Hotel", city: "London", nights: 4, start_local: "2026-06-02T15:00" },
     most_visited_hotel: { name: "Harbour Hotel", stays: 2, nights: 6 }, most_visited_city: { name: "London", stays: 2, nights: 6 }, busiest_month: "2026-06", pins: [] }, cars: { days: 3, companies: [{ name: "Hertz", count: 1 }] }, cruises: { count: 2, nights: 10, sea_days: 4, ports: 5, lines: [{ name: "Example Cruise Line", count: 2 }] },
   parking: { days: 9, bookings: 3, lots: [{ name: "Example Long-Term Lot", count: 2 }, { name: "Example Economy Lot", count: 1 }] },
-  places: { countries: [{ name: "US", first_visit: "2025-05-02", visits: 3 }, { name: "GB", first_visit: "2026-06-01", visits: 1 }], cities: [], visits: [], points: [] },
+  places: { countries: [{ name: "US", first_visit: "2025-05-02", visits: 3 }, { name: "GB", first_visit: "2026-06-01", visits: 1 }], cities: [], visits: [], points: [], states: [] },
 };
 
 function serve(stats: (path: string) => Stats | Error | Promise<Stats>) {
@@ -61,7 +65,11 @@ function serve(stats: (path: string) => Stats | Error | Promise<Stats>) {
 
 beforeEach(() => {
   vi.mocked(api).mockReset();
-  app.state = state({ person_id: 1 });
+  fake.reset();
+  vi.mocked(loadMapkit).mockReset();
+  vi.mocked(loadMapkit).mockImplementation(async () => fakeMaps());
+  vi.mocked(loadDetailedCountries).mockClear();
+  app.state = state({ person_id: 1, mapkit: true } as never);
   route.query = ""; location.hash = "#stats";
 });
 afterEach(() => { viewport.phone = false; });
@@ -83,7 +91,7 @@ describe("Stats", () => {
     expect(within(screen.getByRole("region", { name: "Hotels" })).getByText("9")).toBeInTheDocument();
     expect((await traveller("Jane Doe (you)"))).toHaveAttribute("aria-pressed", "true");
     expect((await traveller("Sam Doe"))).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("stats-map-slot")).toBeInTheDocument();
+    expect(await screen.findByTestId("stats-map-slot")).toBeInTheDocument();
   });
 
   it("has a section each for flights, hotels, cars and cruises, with its own lists", async () => {
@@ -204,12 +212,102 @@ describe("Stats", () => {
     expect(screen.queryByRole("button", { name: /in review/ })).toBeNull();
   });
 
-  it("draws the map of the airports and routes in its slot", async () => {
-    serve(() => full);
-    render(Stats_);
-    const slot = await screen.findByTestId("stats-map-slot");
-    await waitFor(() => expect(slot.querySelectorAll("[data-dot]")).toHaveLength(airports.length));
-    expect(within(slot).getByRole("heading", { name: "Where you’ve been" })).toBeInTheDocument();
+  describe("the map", () => {
+    it("draws the airports and routes on Apple's map in its slot, under the heading, after the tiles", async () => {
+      serve(() => full);
+      render(Stats_);
+      const slot = await screen.findByTestId("stats-map-slot");
+      await waitFor(() => expect(fake.maps).toHaveLength(1));
+      await waitFor(() => expect(fake.last().annotations.size).toBe(airports.length));
+      expect(slot.id).toBe("stats-map-slot");
+      const section = slot.closest("section")!;
+      expect(within(section).getByRole("heading", { name: "Where you’ve been" })).toBeInTheDocument();
+      expect(within(section).getByText("Countries", { selector: "dt" })).toBeInTheDocument();
+    });
+
+    it("keeps the loading skeleton in the slot until MapKit is up", async () => {
+      let up: (v: ReturnType<typeof fakeMaps>) => void = () => {};
+      vi.mocked(loadMapkit).mockImplementation(() => new Promise((resolve) => { up = resolve as never; }));
+      serve(() => full);
+      render(Stats_);
+      const slot = await screen.findByTestId("stats-map-slot");
+      await waitFor(() => expect(loadMapkit).toHaveBeenCalled());
+      expect(within(slot).getByLabelText("Loading the map")).toBeInTheDocument();
+      up(fakeMaps());
+      await waitFor(() => expect(fake.maps).toHaveLength(1));
+      expect(within(slot).queryByLabelText("Loading the map")).toBeNull();
+    });
+
+    it.each([["the server has no key", { mapkit: false }], ["MapKit isn't reported yet", { mapkit: undefined }]])("has no slot, asks MapKit for nothing and loads no outline when %s, and keeps the tiles and lists", async (_name, flag) => {
+      app.state = state({ person_id: 1, ...flag } as never);
+      serve(() => full);
+      render(Stats_);
+      await screen.findByRole("region", { name: "Flights" });
+      expect(screen.queryByTestId("stats-map-slot")).toBeNull();
+      expect(document.getElementById("stats-map-slot")).toBeNull();
+      expect(loadMapkit).not.toHaveBeenCalled();
+      expect(loadDetailedCountries).not.toHaveBeenCalled();
+      const section = screen.getByRole("heading", { name: "Where you’ve been" }).closest("section")!;
+      expect(within(section).getByText("Countries", { selector: "dt" })).toBeInTheDocument();
+      expect(within(section).getByText("First visit Jun 1, 2026")).toBeInTheDocument();
+    });
+
+    it("has no slot while offline, or when there is nothing to put on it", async () => {
+      app.offline = true;
+      serve(() => full);
+      const { unmount } = render(Stats_);
+      await screen.findByRole("region", { name: "Flights" });
+      expect(screen.queryByTestId("stats-map-slot")).toBeNull();
+      expect(loadMapkit).not.toHaveBeenCalled();
+      app.offline = false;
+      unmount();
+      serve(() => ({ ...full, flights: { ...full.flights, airports: [], routes: [] }, stays: { ...full.stays, pins: [] }, places: { ...full.places, visits: [], points: [] } }));
+      render(Stats_);
+      await screen.findByRole("region", { name: "Hotels" });
+      expect(screen.queryByTestId("stats-map-slot")).toBeNull();
+      expect(loadMapkit).not.toHaveBeenCalled();
+    });
+
+    it("collapses the slot, with no message, when MapKit doesn't load or fails later", async () => {
+      vi.mocked(loadMapkit).mockResolvedValue(null);
+      serve(() => full);
+      render(Stats_);
+      await screen.findByRole("region", { name: "Flights" });
+      await waitFor(() => expect(screen.queryByTestId("stats-map-slot")).toBeNull());
+      expect(screen.queryByText(/couldn’t load the map|couldn’t be drawn/i)).toBeNull();
+      expect(screen.getByRole("heading", { name: "Where you’ve been" })).toBeInTheDocument();
+    });
+
+    it("collapses the slot when MapKit fails after the map showed", async () => {
+      const maps = fakeMaps();
+      vi.mocked(loadMapkit).mockResolvedValue(maps);
+      serve(() => full);
+      render(Stats_);
+      await screen.findByTestId("stats-map-slot");
+      await waitFor(() => expect(fake.maps).toHaveLength(1));
+      maps.fail();
+      await waitFor(() => expect(screen.queryByTestId("stats-map-slot")).toBeNull());
+    });
+  });
+
+  describe("the States tile", () => {
+    const withStates = (states: string[]): Stats => ({ ...full, places: { ...full.places, states } });
+
+    it("shows the count of visited states beside Countries, with a key or without", async () => {
+      app.state = state({ person_id: 1, mapkit: false } as never);
+      serve(() => withStates(["Colorado", "Florida", "New York"]));
+      render(Stats_);
+      const section = (await screen.findByRole("heading", { name: "Where you’ve been" })).closest("section")!;
+      const tiles = within(section).getAllByRole("term").map((t) => [t.textContent, t.nextElementSibling?.textContent]);
+      expect(tiles).toEqual([["Countries", "2"], ["States", "3"]]);
+    });
+
+    it("leaves the tile out for someone who has been to no US state", async () => {
+      serve(() => withStates([]));
+      render(Stats_);
+      const section = (await screen.findByRole("heading", { name: "Where you’ve been" })).closest("section")!;
+      expect(within(section).queryByText("States")).toBeNull();
+    });
   });
 
   it("leads with the headline totals, left out where there is nothing to total", async () => {

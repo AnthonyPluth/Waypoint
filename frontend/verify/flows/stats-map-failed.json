@@ -1,0 +1,31 @@
+{
+  "name": "stats-map-failed",
+  "page": "stats",
+  "mapkit": "blocked",
+  "allow_console": [
+    "net::ERR_BLOCKED_BY_CLIENT"
+  ],
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "wait_for": "#places-title"
+    },
+    {
+      "wait_for": "dt:has-text('Countries')"
+    },
+    {
+      "expect_absent": "#stats-map-slot"
+    },
+    {
+      "scroll_to": "#places-title"
+    },
+    {
+      "screenshot": "places-map-failed"
+    }
+  ]
+}
