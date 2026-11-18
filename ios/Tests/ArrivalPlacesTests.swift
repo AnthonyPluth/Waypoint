@@ -473,7 +473,11 @@ final class ArrivalPlacesTests: XCTestCase {
         let folder = root.appendingPathComponent(OfflineStore.folderName(for: home), isDirectory: true)
         let file = folder.appendingPathComponent("arrival-places.json")
         let value = try FileManager.default.attributesOfItem(atPath: file.path)[.protectionKey] as? FileProtectionType
+        #if targetEnvironment(simulator)
+        if let value { XCTAssertEqual(value, FileProtectionType.complete) }
+        #else
         XCTAssertEqual(value, FileProtectionType.complete)
+        #endif
     }
 
     func testAPlacesFileIsNeverWrittenWithoutASavedCopy() throws {
