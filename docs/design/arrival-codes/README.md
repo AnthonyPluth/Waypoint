@@ -1,29 +1,31 @@
-# Arrival codes on the iPhone: design in progress
+# Arrival codes on the iPhone: signed-off design
 
-This is the design for [#819](https://github.com/AnthonyPluth/Waypoint/issues/819): when you arrive near the address of a booking on a saved trip, the iPhone app brings up that booking's code (a parking lot's gate QR code, a rental pickup's or a hotel's confirmation number) so you don't have to dig for it. **The owner decided four points on 2026-11-18 (below). The look of the frames is not signed off, four points are still open, and nothing is built until the design is signed off.**
+This is the design for [#819](https://github.com/AnthonyPluth/Waypoint/issues/819): when you arrive near the address of a booking on a saved trip, the iPhone app brings up that booking's code (a parking lot's gate QR code, a rental pickup's or a hotel's confirmation number) so you don't have to dig for it. **The owner signed off the frames and wording on 2026-11-18, with one change (no Settings switch or card), recorded in [this comment on #819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981807369).** Nothing is left open. The build issues are listed under [Build](#build).
 
-Owner context from the issue and from 2026-11-18: no Live Activities and no Wallet passes (Wallet and the airline apps already do those), no clutter, and the phone's location never leaves the phone.
+Owner context: no Live Activities and no Wallet passes (Wallet and the airline apps already do those), no clutter, and the phone's location never leaves the phone.
 
-Each file is a self-contained HTML page (vector only, no raster images, dark only, phone width 390 px only). The pages use Waypoint's tokens from `frontend/src/app.css` and add none. The iOS lock screen, banner and permission alerts are drawn only to place Waypoint's parts; their look is Apple's. Every place, name, code and time in them is made up, and the QR pattern is random.
+Each file is a self-contained HTML page (vector only, no raster images, dark only, phone width 390 px only). The pages use Waypoint's tokens from `frontend/src/app.css` and add none. The iOS lock screen, banner, permission alerts and iOS Settings are drawn only to place Waypoint's parts; their look is Apple's. Every place, name, code and time in them is made up, and the QR pattern is random.
 
 | Screen | File | What it shows |
 | --- | --- | --- |
-| A | [a-arrival.html](a-arrival.html) | The closed notification on the lock screen (parking, rental pickup, hotel; the default wording and the place-name alternative), the same notification as a banner over another app, the card at the top of Upcoming when you open Waypoint near the place, the owner's decisions and what is still open |
+| A | [a-arrival.html](a-arrival.html) | The notification on the lock screen (parking, rental pickup, hotel; worded by kind only), the same notification as a banner over another app, the card at the top of Upcoming when you open Waypoint near the place, and the owner's decisions |
 | B | [b-opened-code.html](b-opened-code.html) | What opens: the existing QR code dialog for parking (online, or from the saved trips with no connection), the same dialog when no picture is saved yet, and the confirmation number for a rental pickup and a hotel |
-| C | [c-settings.html](c-settings.html) | The Arrival codes card in Settings, Offline & notifications: in place, off by default, the location and notification permission steps, on (Always, While Using, nothing to watch), and each missing piece (location refused, Precise Location off, notifications refused, saving trips off) |
+| C, D | [c-permissions.html](c-permissions.html) | iOS's own asks in context (location While Using, the Always upgrade straight after, notifications) over the page that is open, and iOS Settings, Waypoint, the only place to stop it |
 
-The draft build plan, as agent-task issue bodies, is in [build-plan.md](build-plan.md).
+The draft issue bodies the build issues were made from are in [build-plan.md](build-plan.md).
 
 ## Owner decisions
 
-Decided by the owner in chat on [PR #832](https://github.com/AnthonyPluth/Waypoint/pull/832), **2026-11-18**:
+Decided by the owner in chat on [PR #832](https://github.com/AnthonyPluth/Waypoint/pull/832), **2026-11-18**; the sign-off and the last two decisions are recorded in [a comment on #819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981807369):
 
 1. **Bookings: parking, rental pickup and hotel. Flights stay out.** A hotel has no check-in code, so its arrival opens the confirmation number (frame B3b).
-2. **Yes, the iPhone app may keep the parking QR picture with its saved trips**, so it shows with no connection. The server's offline reply carries it for the person's own parking bookings only. This changes a promise: [The parking QR picture on the phone](#the-parking-qr-picture-on-the-phone) says exactly which wording changes, how the picture is stored and which check holds it, and it is its own build issue, ahead of the arrival feature.
-3. **Finding places: Apple's geocoder on the phone.** The booking's address text goes to Apple once per save; the phone's location is never sent. The Settings card says so.
-4. **Opening the app near the place: a card on Upcoming with one tap to the code**, never opening the code by itself.
+2. **The iPhone app keeps the parking QR picture with its saved trips**, so it shows with no connection. The server's offline reply carries it for the person's own parking bookings only. This changes a promise: [The parking QR picture on the phone](#the-parking-qr-picture-on-the-phone) says exactly which wording changes, how the picture is stored and which check holds it. It is the first build issue, ahead of the arrival feature.
+3. **Finding places: Apple's geocoder on the phone.** The booking's address text goes to Apple once per save; the phone's location is never sent.
+4. **Opening the app near the place: a card on Upcoming with one tap to the code** (A3), never opening the code by itself.
+5. **No Settings switch and no card.** The feature has no toggle of its own and is always on once iOS permission is granted. iOS's own asks (location While Using, then the explicit Always request, then notifications) appear the first time a saved trip has a parking, rental pickup or hotel booking; granting them is the opt-in. Turning Location or Notifications off in iOS Settings, or signing out, stops it.
+6. **Defaults as recommended**: the lock-screen wording names the kind only; 250 m around a parking lot, from 2 h before entry until exit; 300 m around a rental pickup (2 km around the airport when only its code is known), from 2 h before to 4 h after; hotels as recommended (200 m, on the check-in day).
 
-Still open (the frames and the plan use the recommended default for each): the lock-screen wording, the windows and radii, the card's names, and what turning it off deletes. See [Still open](#still-open).
+The frames and their wording are signed off with these.
 
 ## What each booking holds today
 
@@ -39,22 +41,22 @@ Checked on `main` at the time of writing (`waypoint/storage/schema.py`, `waypoin
 Two facts shape the design:
 
 - **The server's coordinates are too coarse.** `segments.latitude`/`longitude` come from the bundled geocoder (`geocode.locate`), whose best precision is a postcode centroid, often a kilometre or more from the lot; they are also not in the `Segment` reply or the saved copy. A street-level point is looked up on the phone (decision 3).
-- **The saved copy is unreadable while the phone is locked.** `OfflineStore` writes with `.complete` file protection, so when iOS wakes the app for a region while the phone is locked, it can't read the trips. What the wake-up needs is kept in a small separate file (point 4 below).
+- **The saved copy is unreadable while the phone is locked.** `OfflineStore` writes with `.complete` file protection, so when iOS wakes the app for a region while the phone is locked, it can't read the trips. What the wake-up needs is kept in a small separate file (see Privacy below).
 
 ## The parking QR picture on the phone
 
-Decision 2 lets the iPhone app keep the gate's QR picture with the saved trips. This is how, and what it changes.
+Owner decision 2 lets the iPhone app keep the gate's QR picture with the saved trips. This is how, and what it changes.
 
 **What the server sends, and how the phone finds a ready code.** The picture travels inside the offline reply itself; the shell never fetches `GET /api/segments/{id}/code` and never has to guess which bookings have a code. For a request made with the iPhone app's token (scope `app`), `GET /api/offline` changes in two ways:
 
 - `offline.py` stops blanking `gate_code` for that request: each parking segment keeps `gate_code` exactly as the trip reply has it (`{state, day}`, no picture; `null` when the booking has no code), so the saved copy says which bookings have a ready code, the same metadata the online dialog reads.
 - Each saved trip gains a `codes` list beside `messages`: `{segment_id, type, data}` (the picture's type and base64 bytes, exactly as `GET /api/segments/{id}/code` would serve them), one entry for each of the person's own parking bookings on that trip whose `gate_code.state` is `ready` and that isn't cancelled.
 
-So in the saved copy a ready code is a segment whose `gate_code.state` is `ready` with an entry for its id in its trip's `codes`; the dialog (offline, in the shell) shows that entry's picture, and a `ready` segment with no entry (the code was chosen after the last save) is frame B2. "The person's own" means a parking booking the requester can see on a trip saved for them, through the same visibility helper as every trip route; another member's booking they can't see is never in it. Both fields are optional for readers, so `version` stays 1. A browser session's reply is unchanged: `gate_code` still `null` and no `codes` (browsers don't read this reply today; proposed, to confirm).
+So in the saved copy a ready code is a segment whose `gate_code.state` is `ready` with an entry for its id in its trip's `codes`; the dialog (offline, in the shell) shows that entry's picture, and a `ready` segment with no entry (the code was chosen after the last save) is frame B2. "The person's own" means a parking booking the requester can see on a trip saved for them, through the same visibility helper as every trip route; another member's booking they can't see is never in it. Both fields are optional for readers, so `version` stays 1. A browser session's reply is unchanged: `gate_code` still `null` and no `codes` (browsers don't read this reply today).
 
 **How the phone keeps it.** The iPhone app saves the reply as it does today, so the picture lands in the same files under `.complete` iOS Data Protection in the app's private storage, with no encryption of Waypoint's own, and goes into iCloud and computer backups like the rest of the copy. It is deleted with the saved trips, at every moment they are (sign-out, 401 or 403, saving off, a changed server address, no server, 3 days after the trip ends) and replaced at each save, so a picture changed or removed on the server is gone from the phone at the next online open. The bridge's `load` passes it to the web app unchanged, and the QR code dialog shows it with no connection. The browser vault, the calendar feed, reminders, `/mcp` and logs never carry it, and `/mcp` still never says a booking has one.
 
-**Wording that changes** (in the same pull request as the code, `{{ARRIVAL-QR}}` in the plan):
+**Wording that changes** (in the same pull request as the code, the first build issue):
 
 | Where | Today | Becomes |
 | --- | --- | --- |
@@ -70,69 +72,76 @@ There is no separate invariants list in the repository; these are all the places
 
 **Which check holds it.** `tests/test_gate_codes.py`'s `NeverElsewhereTests.test_the_offline_copy_the_calendar_and_an_assistant_never_carry_the_code_or_say_there_is_one` asserts today that the offline copy never carries the picture; it is rewritten (not removed) to: the app's offline reply carries exactly the requester's own ready, not cancelled parking pictures, byte for byte; a member who can't see the booking, a cancelled booking and a booking with no picture chosen get none; a browser session's reply has none; the calendar feed and `/mcp` still carry neither the picture nor its existence; and the request runs inside `tests/privacy.py`'s `no_leaks` with the picture's bytes as a canary, so nothing logs it. `tests/test_offline.py` gains the reply's shape. Decryption stays in the storage layer (`storage/gate_codes.py`), under the existing Semgrep rule.
 
-## The six points
+## The six points of #819
 
-### 1. Which bookings and which codes (decided)
+### 1. Which bookings and which codes
 
 - **Parking**: the gate's QR picture, from the saved trips when there is no connection.
 - **Rental pickup**: the confirmation number, which is what the counter asks for. Only the pickup (`start_local`), not the return.
 - **Hotel**: the confirmation number, with the room if known (B3b). Waypoint stores no check-in code.
 - **Flight**: out. Waypoint has no boarding pass, and Wallet already brings one up at the airport.
-- Trains, cruises and visits are not part of this. Nothing new is parsed: hotel check-in codes, rental pickup codes and boarding passes would each be new parsing and new storage, and are not in the plan.
+- Trains, cruises and visits are not part of this. Nothing new is parsed: hotel check-in codes, rental pickup codes and boarding passes would each be new parsing and new storage, and are not built.
 
-### 2. What happens on arrival (the in-app part decided)
+### 2. What happens on arrival
 
-- **Notification** (needs Always location and notifications): one local notification when you enter a booking's circle during its window. Passive interruption level: no sound, no badge, no vibration. Default wording names only the kind ("Your parking code is ready"), never the place, a name or a code (A1a; A1c shows the place-name alternative, still open). Tapping it unlocks the phone and opens the code (B). It is removed from Notification Centre when the booking's window ends.
-- **Card on Upcoming** (decided; While Using is enough): opening or returning to the app inside the circle during the window puts one card at the top of Upcoming, "You're at Harbour Parking, Lot B", with one button that opens the code and a dismiss (A3). One card at a time. It never opens the code by itself.
+- **Notification** (needs Always location and notifications): one local notification when you enter a booking's circle during its window. Passive interruption level: no sound, no badge, no vibration. The wording names only the kind ("Your parking code is ready", "Your rental pickup is near", "You're near your hotel"), never the place, a name or a code (A1). Tapping it unlocks the phone and opens the code (B). It is removed from Notification Centre when the booking's window ends.
+- **Card on Upcoming** (While Using is enough): opening or returning to the app inside the circle during the window puts one card at the top of Upcoming, "You're at Harbour Parking, Lot B", with one button that opens the code and a dismiss (A3). One card at a time. It never opens the code by itself.
 - What opens is the existing **Show QR code** dialog for parking, unchanged, and for a rental pickup or hotel a new dialog with the confirmation number large and copyable (B3). Closing either leaves you on that booking's trip page. With no connection and no picture saved yet for that booking, the dialog keeps its failure line and adds the confirmation number (B2).
 
-### 3. Location permission
+### 3. Location permission, and where it is asked
 
-**Recommended: one switch, asking for While Using first; Always is what makes the notification work.**
+There is no Waypoint prompt, switch or card: iOS's own asks are the opt-in (C).
 
-- Switching on asks, in this order and only from that tap: (C1a) iOS's location prompt for While Using (`requestWhenInUseAuthorization()`); if the person allows While Using, (C1b) straight away the upgrade prompt for Always (`requestAlwaysAuthorization()`, which iOS shows immediately with **Keep Only While Using** and **Change to Always Allow**); then (C1c) notifications (alerts only, no sound or badge). iOS does not offer the upgrade by itself: Apple's documentation for `requestAlwaysAuthorization()` says an app gets Always by first requesting When In Use and then requesting Always, that the second call then prompts immediately, and that further calls have no effect. Allow Once gives no Always (Core Location ignores the upgrade request then), so the card shows the While Using state.
-- While Using gives the card (A3); Always adds the notification, because region monitoring then wakes the app. The card says which you have (C2a, C2b). Each prompt is shown once: after Keep Only While Using or a refusal, the only way on is iOS Settings, which the card's **Open iOS Settings** opens (C2b, C3a, C3c). The app never asks again.
-- Region monitoring can't work with approximate location, so with Precise Location off the card says it isn't working (C3b). This and the wake-up behaviour come from Apple's documentation and are not confirmed on a device.
-- **Which bookings get a region**: iOS allows 20 per app. The app watches at most 15 (5 to spare): every qualifying booking on the saved trips whose window hasn't ended, soonest window first. The saved trips are at most 10, so 15 covers nearly every household; past 15, the soonest 15. The set is rebuilt after each save of the trips, each time the app becomes active, on each region event and when the switch changes.
+- **When**: the first time a save of the trips (`OfflineSync`, which runs when the app opens online, becomes active, or saving is switched on) leaves in the saved copy a parking, rental pickup or hotel booking whose window hasn't ended, while the app is in the foreground. If the app is in the background at that moment, the asks wait until it is next active. Nothing is asked, and nothing is watched, while **Save my upcoming trips** is off or nothing qualifies.
+- **What, in order, each once**: (C1a) location, `requestWhenInUseAuthorization()`; if the person allows While Using, (C1b) straight away `requestAlwaysAuthorization()`, which iOS shows at once as **Keep Only While Using** / **Change to Always Allow**; then (C1c) notifications, alerts only, no sound or badge. iOS does not offer the Always upgrade by itself: Apple's documentation for `requestAlwaysAuthorization()` says an app gets Always by first requesting When In Use and then requesting Always, that the second call prompts immediately, and that further calls have no effect; Allow Once gives no Always. A per-phone flag records that the asks were made, so the app never asks again; after a refusal the only way on is iOS Settings.
+- **What each answer gives**: Always and notifications: the notification and the card. While Using only: the card. Notifications refused: the card, and with Always no notification. Location refused or Allow Once: nothing (Allow Once lasts one session). Precise Location off: nothing, since region monitoring can't work with approximate location and the one-shot check can't tell a lot from its streets.
+- **The explanation lives where the asks happen**: the two usage-description strings iOS shows in the location alerts, and the docs (`docs/src/content/docs/start/ios.md` gains an "Arrival codes" section; `offline.md` links to it). The notification alert's text is Apple's and can't be changed, so the docs carry that part.
+  - `NSLocationWhenInUseUsageDescription`: "Waypoint uses your location on this device to bring up a booking’s code when you arrive at its parking lot, rental pickup or hotel. Your location is never sent to your Waypoint server or anyone else and is not recorded. Booking addresses are looked up with Apple Maps."
+  - `NSLocationAlwaysAndWhenInUseUsageDescription`: "Waypoint uses your location on this device to tell you when you arrive at a parking lot, rental pickup or hotel on a saved trip, even when Waypoint is closed. Your location is never sent anywhere and is not recorded."
+- **Which bookings get a region**: iOS allows 20 per app. The app watches at most 15 (5 to spare): every qualifying booking on the saved trips whose window hasn't ended, soonest window first. The saved trips are at most 10, so 15 covers nearly every household. The set is rebuilt after each save, each time the app becomes active, on each region event and on each permission change.
 
 ### 4. Privacy (binding)
 
 - **The phone's location never leaves the phone.** No location, region event, arrival or "near a booking" fact is sent to the server, to Apple, or to anyone; no new server route is added. The web view is told only which booking to open (its id), never a coordinate.
 - **Nothing is recorded.** The app keeps no location history: it uses iOS region monitoring (enter events) and, for the card, one current-location check when the app becomes active, compared in memory and dropped. Nothing about locations or arrivals is logged, in the app or on the server.
-- **Works from the saved trips, with no connection.** The bookings, and the parking pictures (decision 2), come from `OfflineStore`, never from a live request. Watching, the notification, the card and the code work in airplane mode.
-- **Finding the places (decided: Apple's geocoder).** The phone looks each booking's address up with `CLGeocoder` once per save of the trips and keeps the coordinate beside the saved trips. Waypoint's server is not involved, but the booking's address text (never the phone's location) goes to Apple, and it needs a connection at that moment, which a save has anyway. For a rental pickup with only an airport code, the airport's bundled coordinate is used (the server adds it to the saved copy; it is public reference data).
+- **Works from the saved trips, with no connection.** The bookings and the parking pictures come from `OfflineStore`, never from a live request. Watching, the notification, the card and the code work in airplane mode.
+- **Finding the places**: the phone looks each booking's address up with `CLGeocoder` once per save, only once location has been allowed, and keeps the coordinate beside the saved trips. Waypoint's server is not involved, but the booking's address text (never the phone's location) goes to Apple, and needs the connection the save already has. For a rental pickup with only an airport code, the airport's bundled coordinate is used (the server adds it to the saved copy; it is public reference data).
 - **What the phone keeps for a locked wake-up.** A small arrival file beside the saved trips, readable after the first unlock since restart (`.completeUntilFirstUserAuthentication`), holding for each watched booking only its id, its trip's id, its kind, its window as two instants, the circle's centre and radius. No name, address, code or confirmation number. The looked-up coordinates live in the saved trips' own folder under `.complete`.
-- **Turning it off** (default; still open) stops every region, removes pending and delivered arrival notifications and deletes the arrival file and the looked-up coordinates. It deletes no saved trip and no saved picture. **Signing out**, a 401 or 403, switching saving off, a changed server address and launching with no server do the same, as part of the purge they already do. Switching saving off also turns the card to C3d: arrival codes need the saved trips.
-- **The card says what it does** in plain words (C), saying "this device" as the Offline access card does. The privacy lines, as decided: "Your location stays on this device. It is never sent to your Waypoint server or anyone else, and it is not recorded." and "To find each place, this device sends the booking's address (never your location) to Apple Maps once, each time your trips are saved." (The Offline access card has no privacy sentence by the owner's decision of 2026-11-17; #819 asks for these here.)
 - **The test that proves no location reaches the server** (#819's acceptance criterion): an iOS unit test drives region events, the in-app check and the geocoding with a recording URL protocol and asserts that no request is made to the Waypoint server during them and that no request anywhere carries the test coordinates; a Python test fails if the arrival Swift files reference `URLSession`, `ServerClient` or `ServerAPI`, if `CLGeocoder` appears outside the one geocoding file, or if any `os_log`/`Logger`/`print` call appears in them.
 
-### 5. Window and radius (defaults; still open)
+### 5. Window and radius
 
 Times are the booking's own wall-clock times in its zone, turned into instants on the phone.
 
 | Kind | Circle | Window | How often | Stops |
 | --- | --- | --- | --- | --- |
-| Parking | 250 m around the lot's address | From 2 h before entry until the exit time | Once per arrival, at most once every 4 h (so the drop-off and the return for an exit gate each get one) | After the exit time, when cancelled, removed, its trip is no longer saved, or the switch is off |
+| Parking | 250 m around the lot's address | From 2 h before entry until the exit time | Once per arrival, at most once every 4 h (so the drop-off and the return for an exit gate each get one) | After the exit time, when cancelled, removed or its trip is no longer saved |
 | Rental pickup | 300 m around the pickup address; 2 km around the airport when only an airport code is known | From 2 h before pickup until 4 h after | Once | After the first notification or card, or the window's end |
 | Hotel | 200 m around the address | Check-in day, from 3 h before check-in until midnight there | Once | After the first notification or card, or the window's end |
 
-iOS region monitoring is not precise below roughly 100 to 200 m and can fire minutes after you cross the line; these radii allow for that and are to be tuned on a device. A booking with no usable address (no `details.address` and no airport code) is not watched.
+iOS region monitoring is not precise below roughly 100 to 200 m and can fire minutes after you cross the line; the radii allow for that. A booking with no usable address (no `details.address` and no airport code) is not watched.
 
-### 6. Where the switch lives, and its default
+### 6. No switch: how it is on, and how to stop it
 
-**Settings → Offline & notifications → Arrival codes**, a card of its own directly below Offline access (C0), only inside the iPhone app; in a browser there is no card. The switch is **Bring up codes when I arrive** (names still open). It is **off** until the person switches it on and allows location. It is per phone (a `UserDefaults` flag, missing means off), and signing out turns it off again (unlike saving trips, which signing in turns on). It needs **Save my upcoming trips**: while saving is off, the switch is disabled and says so (C3d).
+**There is no in-app off switch** (owner decision 5): no card in Settings, no toggle, no Waypoint prompt. The feature is on once iOS permission is granted (C), and these stop it (D):
 
-## Still open
+| What the person does | What stops | What is deleted |
+| --- | --- | --- |
+| iOS Settings → Waypoint → Location → Never (or Ask Next Time) | Every region is stopped and pending and delivered arrival notifications are removed, at the next permission change the app sees (iOS tells the app when it next runs) | The arrival file and the looked-up coordinates. No saved trip and no saved picture |
+| Location → While Using (from Always) | Regions and the notification; the card stays | Nothing |
+| Precise Location off | Regions, the notification and the card | Nothing (turning it on again resumes) |
+| Notifications off | The notification; the card stays | Nothing |
+| Sign out, a 401 or 403, a changed server address, no server | Everything | The arrival file and coordinates, with the saved trips and pictures, as part of the purge they already do |
+| Save my upcoming trips off | Everything (nothing is left to watch) | The saved copy, as today, and with it the arrival file and coordinates |
 
-The frames and the plan use the default in brackets.
+Turning location back on in iOS Settings resumes watching at the next save or activation, with no new ask. The docs' "Arrival codes" section says all of this in plain words, including that there is no switch in Waypoint and that iOS Settings is where to stop it.
 
-1. **Lock-screen wording**: kind only, "Your parking code is ready" (the default, A1a), or the place's name (A1c), which also puts the name in the file readable while locked?
-2. **Windows and radii**: the table above, including the second notification for a parking exit?
-3. **The card's names**: "Arrival codes" and "Bring up codes when I arrive", below Offline access, off after sign-out?
-4. **Turning it off** deletes the derived arrival file and coordinates but no trip and no saved picture: is that what #819 means by "deletes nothing"?
+## Build
 
-Two details of decision 2 to confirm: "the person's own parking bookings" read as the parking bookings they can see on the trips saved for them; and the picture going only to the iPhone app's token, not to a browser session's reply.
+The issues, in the order they land (Sonnet each; created from [build-plan.md](build-plan.md)):
+
+Created after this design merges; the list is also posted on #819.
 
 ## Not confirmed
 
-None of this has run on a device. Region monitoring's wake-up with Always, its behaviour with Precise Location off, how late it fires, and whether a wake-up while locked can read the arrival file are from Apple's documentation. The build plan says what each issue can check in CI and what needs a phone.
+None of this has run on a device. Region monitoring's wake-up with Always, its behaviour with Precise Location off, how late it fires, and whether a wake-up while locked can read the arrival file are from Apple's documentation. The build issues say what each can check in CI and what needs a phone.

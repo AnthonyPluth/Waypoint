@@ -1,8 +1,8 @@
-# Arrival codes: draft build plan
+# Arrival codes: build plan
 
-Draft agent-task issue bodies for building [the arrival codes design](README.md) ([#819](https://github.com/AnthonyPluth/Waypoint/issues/819)), in the sections the `fleet-agent-task` skill names. **None of these is to be opened before the owner signs the design off.** They follow the owner's decisions of 2026-11-18 (parking, rental pickup and hotel; the parking QR picture kept by the iPhone app; Apple's geocoder on the phone; a card, never auto-open) and the recommended defaults for what is still open (lock-screen wording, windows and radii, the card's names, what turning off deletes); an answer that differs changes the issue it names. Issues refer to each other by key in `{{…}}` until they exist.
+Draft agent-task issue bodies for building [the arrival codes design](README.md) ([#819](https://github.com/AnthonyPluth/Waypoint/issues/819)), in the sections the `fleet-agent-task` skill names. The design is signed off ([comment on #819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981807369), 2026-11-18): parking, rental pickup and hotel; the parking QR picture kept by the iPhone app; Apple's geocoder on the phone; a card on Upcoming, never auto-open; no Settings switch or card, iOS's own asks being the opt-in; the lock-screen wording by kind only and the windows and radii as recommended. The issues were created from these bodies; the README's "Build" section lists their numbers. Here they refer to each other by key in `{{…}}`; the created issues use the real numbers.
 
-Order: `{{ARRIVAL-QR}}` first, on its own, because it changes a promise (owner decision 2). Then `{{ARRIVAL-AIRPORTS}}` and `{{ARRIVAL-PLACES}}` (they can run at once; `{{ARRIVAL-AIRPORTS}}` touches the same reply as `{{ARRIVAL-QR}}`), then `{{ARRIVAL-WATCH}}`, then `{{ARRIVAL-CARD}}` and `{{ARRIVAL-OPEN}}` (at once, different files).
+Order: `{{ARRIVAL-QR}}` first, on its own, because it changes a promise (owner decision 2). Then `{{ARRIVAL-AIRPORTS}}` and `{{ARRIVAL-PLACES}}` (they can run at once; `{{ARRIVAL-AIRPORTS}}` touches the same reply as `{{ARRIVAL-QR}}`), then `{{ARRIVAL-WATCH}}`, then `{{ARRIVAL-OPEN}}`. There is no Settings card issue: the owner decided on no switch or card (2026-11-18).
 
 Model: the issue for #819 names Sonnet for the build once the design is decided, and Waypoint's `CLAUDE.md` makes Sonnet the default, privacy-sensitive work included; Opus only if Sonnet's attempt keeps missing.
 
@@ -78,12 +78,12 @@ The design (#819, `docs/design/arrival-codes/README.md`, decision 4) needs a str
 **Scope**
 - New `ios/Waypoint/ArrivalPlaces.swift`: from the saved trips, the qualifying bookings (parking; car pickups; hotels), not cancelled, whose window (README, point 5) hasn't ended.
 - For each, the point: `details.address` looked up with `CLGeocoder` (the only file that uses it), else, for a car pickup, the airport's coordinate from `{{ARRIVAL-AIRPORTS}}`; none means the booking is not watched. Radius by kind as in the README.
-- Looked up only while the arrival switch is on, after a successful save in `OfflineSync`, once per distinct address (cached by the SHA-256 of the address text), in a file inside that server's `OfflineStore` folder with `.complete` protection, replaced with each save and deleted by every purge.
+- Looked up only while Waypoint has location permission (While Using or Always; there is no switch of Waypoint's own), after a successful save in `OfflineSync`, once per distinct address (cached by the SHA-256 of the address text), in a file inside that server's `OfflineStore` folder with `.complete` protection, replaced with each save and deleted by every purge.
 - No network request other than the geocoder's; nothing logged.
 - Update `ios/README.md` ("What is here") and `docs/src/content/docs/start/ios.md` with what is sent to Apple (the address text, once per save; owner decision, 2026-11-18) and what never is (the phone's location).
 
 **Out of scope**
-Region monitoring, notifications and the switch (`{{ARRIVAL-WATCH}}`, `{{ARRIVAL-CARD}}`); any server change.
+Region monitoring, notifications and the permission asks (`{{ARRIVAL-WATCH}}`); any server change.
 
 **Acceptance criteria**
 - [ ] `ios/Tests/ArrivalPlacesTests.swift` with a fake geocoder: which bookings qualify, windows, address before airport, a booking with neither left out, the cache reused for the same address, deleted by purge, `.complete` protection.
@@ -103,21 +103,23 @@ Sonnet.
 ## {{ARRIVAL-WATCH}} feat(ios): watch the places and post the arrival notification
 
 **Context**
-The design (#819, `docs/design/arrival-codes/`, frames A1, A2 and README points 2 to 5). `{{ARRIVAL-PLACES}}` gives the places. The iPhone app has no CoreLocation or UserNotifications code today (`ios/README.md`). The saved copy is `.complete`, unreadable while the phone is locked.
+The design (#819, `docs/design/arrival-codes/`, frames A1, A2, C and D and README points 2 to 6). There is no switch or card in Waypoint (owner decision, 2026-11-18): iOS's own permission asks are the opt-in, and iOS Settings or signing out is how to stop it. `{{ARRIVAL-PLACES}}` gives the places. The iPhone app has no CoreLocation or UserNotifications code today (`ios/README.md`). The saved copy is `.complete`, unreadable while the phone is locked.
 
 **Scope**
-- New `ios/Waypoint/ArrivalWatch.swift`: region monitoring for at most 15 places, soonest window first, rebuilt after each save, on becoming active, on each region event and when the switch changes; region ids `arrival-<segment id>` only.
+- The permission asks (C1), from `ArrivalWatch.swift`, with no Waypoint prompt of our own: the first time a save leaves a parking, rental pickup or hotel booking whose window hasn't ended in the saved copy while the app is in the foreground (otherwise at the next activation), ask `requestWhenInUseAuthorization()`; if While Using is granted, `requestAlwaysAuthorization()` straight away (iOS never offers the upgrade by itself and ignores later calls); then notifications with `.alert` only. Each once, recorded in a per-phone flag; never asked while saving is off or nothing qualifies.
+- New `ios/Waypoint/ArrivalWatch.swift`: region monitoring for at most 15 places, soonest window first, only with Always and Precise Location, rebuilt after each save, on becoming active, on each region event and on each authorization change; region ids `arrival-<segment id>` only.
+- Authorization changes, as the README's "No switch" table: location Never or Ask Next Time stops every region, removes pending and delivered arrival notifications and deletes the arrival file and the looked-up coordinates (never a trip or picture); While Using stops regions and notifications and keeps the card; Precise Location off stops all; notifications off stops only the notification. Turning location on again resumes at the next save or activation with no new ask.
 - The arrival file (`.completeUntilFirstUserAuthentication`, inside the server's folder): per watched booking its id, trip id, kind, window as two instants, centre and radius; no name, address or code. Read on a wake-up; the window and the "how often" rule (README point 5) decided from it alone.
-- The notification: `UNUserNotificationCenter`, alerts only (no sound, no badge), `.passive` interruption level, title and body by kind exactly as frame A1a and A1b, `userInfo` holding the segment and trip ids; removed when the window ends. Removed with every pending and delivered arrival notification when the switch goes off or any purge runs (sign-out, 401 or 403, saving off, server change, no server).
-- `Info.plist`: `NSLocationWhenInUseUsageDescription` and `NSLocationAlwaysAndWhenInUseUsageDescription` with the wording in frames C1a and C1b; no background mode beyond what region monitoring needs.
+- The notification: `UNUserNotificationCenter`, alerts only (no sound, no badge), `.passive` interruption level, title and body by kind exactly as frame A1a and A1b, `userInfo` holding the segment and trip ids; removed when the window ends. Removed with every pending and delivered arrival notification, with the arrival file and coordinates, when location is revoked or any purge runs (sign-out, 401 or 403, saving off, server change, no server).
+- `Info.plist`: `NSLocationWhenInUseUsageDescription` and `NSLocationAlwaysAndWhenInUseUsageDescription` with the exact strings in the README's point 3 (frames C1a and C1b); no background mode beyond what region monitoring needs.
 - The app keeps no location history, and nothing about locations or arrivals is logged.
-- Update `ios/README.md` and `docs/src/content/docs/start/ios.md`.
+- Docs: `ios/README.md`, and an "Arrival codes" section in `docs/src/content/docs/start/ios.md` (linked from `offline.md`) saying what it does, what is asked and when, that location never leaves the phone and addresses go to Apple Maps, that there is no switch in Waypoint, and how to stop it in iOS Settings, as the README's "No switch" table.
 
 **Out of scope**
-The Settings card and bridge (`{{ARRIVAL-CARD}}`); opening the code (`{{ARRIVAL-OPEN}}`); Live Activities, Wallet passes; any server change.
+Any Settings card or switch in Waypoint (the owner decided there is none); opening the code (`{{ARRIVAL-OPEN}}`); Live Activities, Wallet passes; any server change.
 
 **Acceptance criteria**
-- [ ] `ios/Tests/ArrivalWatchTests.swift` with a fake location manager and notification centre: the 15 chosen, rebuilds, the window and frequency rules per kind, the notification's text and settings, nothing posted outside a window, everything stopped and deleted by the switch and each purge.
+- [ ] `ios/Tests/ArrivalWatchTests.swift` with a fake location manager and notification centre: the 15 chosen, rebuilds, the window and frequency rules per kind, the notification's text and settings, nothing posted outside a window; the asks made once each, in order, only when a qualifying booking is saved and the app is in the foreground, Always requested only after While Using; each authorization change stopping and deleting what the table says; everything stopped and deleted by each purge.
 - [ ] **No location reaches the server**: `ios/Tests/ArrivalPrivacyTests.swift` drives region events, the in-app check and geocoding with a recording `URLProtocol` and asserts no request goes to the Waypoint server during them and none anywhere carries the test coordinates.
 - [ ] `tests/test_ios_arrival_privacy.py` fails if an `ios/Waypoint/Arrival*.swift` file names `URLSession`, `ServerClient` or `ServerAPI`, if `CLGeocoder` appears outside `ArrivalPlaces.swift`, or if any of them logs (`os_log`, `Logger`, `print`, `NSLog`).
 - [ ] The iOS workflow and `make check` pass. Region wake-up, Precise Location off and timing are listed in the PR as not confirmed on a device.
@@ -127,36 +129,6 @@ The two Swift test files above, `tests/test_ios_arrival_privacy.py`; the iOS wor
 
 **Depends on**
 `{{ARRIVAL-PLACES}}`.
-
-**Model**
-Sonnet.
-
----
-
-## {{ARRIVAL-CARD}} feat: the Arrival codes card in Settings (iPhone app)
-
-**Context**
-The design (#819, `docs/design/arrival-codes/c-settings.html`, signed off on #819). Settings, Offline & notifications (`frontend/src/pages/Settings.svelte`) has the iPhone app's Offline access card (`frontend/src/lib/components/settings/OfflineShellCard.svelte`), talking to the shell over the offline bridge (`frontend/src/lib/offline-shell.ts`, `ios/Waypoint/OfflineBridge.swift`, contract in `ios/README.md`).
-
-**Scope**
-- Bridge: `{type: "arrivalStatus"}` and `{type: "setArrival", on}` replying `{version: 1, on, location: "notAsked"|"denied"|"whenInUse"|"always", precise, notifications: "notAsked"|"denied"|"allowed", saving, watching: [{segmentId, name, day}]}`, and `{type: "openSystemSettings"}`. Turning on asks, from that tap only: `requestWhenInUseAuthorization()` (C1a); when While Using is granted, `requestAlwaysAuthorization()` straight away (C1b, Apple's upgrade prompt; iOS never offers it by itself and ignores later calls); then notifications, alerts only (C1c). Each is asked once; afterwards the card's Open iOS Settings is the only way. Written into `ios/README.md`'s "Offline bridge".
-- The per-phone flag `arrivalCodes` (missing means off); `ServerSession.signOut()` removes it.
-- `frontend/src/lib/components/settings/ArrivalShellCard.svelte`, below the Offline access card, only in the shell (`inShell()`): every state in C0 to C3d, words exactly as drawn (including the two privacy lines), existing tokens and components only. No card in a browser.
-- Docs: `docs/src/content/docs/start/ios.md` gains an "Arrival codes" section.
-
-**Out of scope**
-Watching and notifications (`{{ARRIVAL-WATCH}}`); opening the code (`{{ARRIVAL-OPEN}}`).
-
-**Acceptance criteria**
-- [ ] The UI matches the design signed off on #819; any change to layout, flow or visual style needs the owner's sign-off before merge; the PR shows `make verify` images at phone and desktop width (the card is phone-only in the app; desktop shows the page without it).
-- [ ] `ArrivalShellCard.svelte.test.ts` covers each state and that no card shows outside the shell; `ios/Tests/OfflineBridgeTests.swift` covers the new requests.
-- [ ] `make check` and the iOS workflow pass.
-
-**Tests**
-`frontend/src/lib/components/settings/ArrivalShellCard.svelte.test.ts`, `frontend/src/lib/offline-shell.test.ts`, `ios/Tests/OfflineBridgeTests.swift`; `make verify PAGES="settings"`; `make check`.
-
-**Depends on**
-`{{ARRIVAL-WATCH}}`.
 
 **Model**
 Sonnet.
