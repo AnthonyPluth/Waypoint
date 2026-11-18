@@ -109,7 +109,7 @@ enum ShortcutParameters {
 
 struct OpenTripIntent: AppIntent {
     static var title: LocalizedStringResource = "Open my trip"
-    static var description = IntentDescription("Opens a trip saved on this iPhone in Waypoint.")
+    static var description = IntentDescription("Opens one of your saved trips in Waypoint.")
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
     static var openAppWhenRun: Bool = true
 
