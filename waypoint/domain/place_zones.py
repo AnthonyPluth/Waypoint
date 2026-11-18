@@ -5,7 +5,7 @@ from typing import NamedTuple
 
 from ..storage import db
 from . import airports
-from .us_states import STATE_NAMES, US_NAMES, ZIP_RANGES
+from .us_states import STATE_NAMES as STATE_NAMES, US_NAMES as US_NAMES, ZIP_RANGES as ZIP_RANGES
 
 NY, CHI, DEN, LA = "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"
 
