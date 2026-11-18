@@ -348,7 +348,7 @@ private struct ArrivalAirport: Decodable {
 private struct ArrivalTrip: Decodable {
     let id: Int
     let bookings: [ArrivalSegment]
-    /// The airports' coordinates by code. The optional `airports` list of a saved trip (#847); empty for a copy saved before it.
+    /// The airports' coordinates by code. The optional `airports` list of a saved trip (#861); empty for a copy saved before it.
     let airports: [String: PlacePoint]
 
     private enum EntryKeys: String, CodingKey {
