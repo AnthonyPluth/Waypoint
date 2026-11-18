@@ -1,7 +1,7 @@
 ---
-# vendored from fleet v4.0.0 (plugins/fleet/skills/review-guidance/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v7.1.0 (plugins/fleet/skills/review-guidance/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-review-guidance
-description: Use when a pull request has an "Agent review" or "Second review" comment, when answering review findings, and before pushing a risky change (labelled safety-critical or security, or touching .github/ or .claude/ or the paths the app's second review lists). Says how to fix or answer findings, how to push the fixes, how to start the merge gate after resolving a thread, what never to do with the review labels, and when to run the fleet-reviewer agent first.
+description: Use when a pull request has an "Agent review" or "Second review" comment, when answering review findings, and before pushing a risky change (labelled safety-critical or security, or touching .github/, .claude/ other than a skill's references/ documents, .mcp.json, or the paths the app's second review lists). Says how to fix or answer findings, how to push the fixes, how to start the merge gate after resolving a thread, what never to do with the review labels, and when to run the fleet-reviewer agent first.
 ---
 
 # Answering the reviews
@@ -38,4 +38,4 @@ Never add or remove the `safety-critical` or `security` labels yourself. They de
 
 ## A risky change
 
-A change is risky when it is labelled `safety-critical` or `security`, or touches `.github/`, `.claude/` or the paths the app lists for its second review. Before pushing one, run the `fleet-reviewer` agent on your branch: it runs the first review's prompt on `git diff origin/main...HEAD` and answers with findings in the same shape. Fix what it finds before you push. It is advisory: CI's reviews decide, and a clean local run doesn't excuse a finding they raise.
+A change is risky when it is labelled `safety-critical` or `security`, or touches `.github/`, `.claude/` (anything there but the `.md` documents in a skill's `references/`), `.mcp.json` or the paths the app lists for its second review. Before pushing one, run the `fleet-reviewer` agent on your branch: it runs the first review's prompt on `git diff origin/main...HEAD` and answers with findings in the same shape. Fix what it finds before you push. It is advisory: CI's reviews decide, and a clean local run doesn't excuse a finding they raise.

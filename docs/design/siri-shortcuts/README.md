@@ -33,7 +33,7 @@ Facts from `main` that bind the design:
 - **Times are wall-clock times at the place** (`start_local` in `start_zone`); nothing converts them.
 - **The copy has airport codes, not city names**, for flights (`origin`, `destination`); city names come from the server's `/api/trips/{id}/places`, which isn't saved. A hotel's name is its `origin`, its city its `destination` (the web app's `headline` in `frontend/src/lib/trips.ts`).
 - **Trip pages are hash routes** in the web app: `#trip/{id}` and `#trip/{id}/flight/{segmentId}`.
-- **The app targets iOS 16.0** (`ios/project.yml`), builds with Xcode 26 on `macos-26`, and CI (`.github/workflows/ios.yml`) builds it and runs `WaypointTests` on a simulator, unsigned. App Intents exist from iOS 16.
+- **The app targets iOS 16.0** (`ios/project.yml`), builds with Xcode 27.2 on GitHub's `xcode-27` runner, and CI (`.github/workflows/ios.yml`) builds it and runs `WaypointTests` on a simulator, unsigned. App Intents exist from iOS 16.
 - **The web app's next flight** on Upcoming is the next timed, not-cancelled flight among the trips you can see, whoever is on it; it is not narrowed to the signed-in person's own seat. The saved copy has no `person_id` for "me" (that is in `GET /api/state`, which is not saved).
 
 ## 1. Candidate intents

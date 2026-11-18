@@ -1,5 +1,5 @@
 ---
-# vendored from fleet v4.0.0 (plugins/fleet/skills/verification-loop/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
+# vendored from fleet v7.1.0 (plugins/fleet/skills/verification-loop/SKILL.md) by `fleet sync`; edit it in fleet, not here: `fleet drift` fails on any change
 name: fleet-verification-loop
 description: Use in a repository whose pyproject.toml sets guides under [tool.fleet.verification], to close one verification gap - an issue whose title starts with "Verification gap", a dimension that keeps coming back as not verified, changed paths no guide covers, or a gap the user names. Works it in iterations of one change, one run against the real app and one decision-log row, keeping a change only when the run shows progress, until a fake, flow, fixture or guide step verifies the gap (every new step run once in this session) and the guides checks pass, or it stops after three iterations in a row without progress and says why. One draft pull request per gap.
 ---
