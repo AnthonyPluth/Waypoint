@@ -748,3 +748,240 @@ final class PendingPageTests: XCTestCase {
         XCTAssertNil(pages.take(now: start))
     }
 }
+
+final class OpenTripTests: XCTestCase {
+    private var root: URL!
+    private let home = URL(string: "https://waypoint.example.com")!
+    private let savedAt = AnswerFixtures.date("2026-11-18T03:00")
+
+    override func setUp() {
+        super.setUp()
+        root = FileManager.default.temporaryDirectory.appendingPathComponent("open-trip-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: root)
+        super.tearDown()
+    }
+
+    private func trip(_ id: Int, _ name: String, destination: String?, start: String? = "2026-12-01", end: String? = "2026-12-08") -> SavedTrip {
+        SavedTrip(id: id, name: name, startDate: start, endDate: end, destination: destination)
+    }
+
+    private func service(server: URL?, unlocked: Bool = true, saving: Bool = true) -> TripAnswerService {
+        let suite = "open-trip-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = OfflineSettings(defaults: defaults)
+        settings.set(saving)
+        return TripAnswerService(currentServer: { server }, protectedDataAvailable: { unlocked },
+                                 store: TripFixtures.store(at: root, now: savedAt), settings: settings,
+                                 now: { self.savedAt }, calendar: AnswerFixtures.phone)
+    }
+
+    private func save(_ trips: [[String: Any]]) throws {
+        try TripFixtures.store(at: root, now: savedAt).save(AnswerFixtures.reply(trips), version: 1, for: home)
+    }
+
+    private func trips(_ read: TripsRead) -> [SavedTrip] {
+        if case .trips(let found) = read { return found }
+        return []
+    }
+
+    // MARK: Places and dates
+
+    func testAPlaceIsTheDestinationElseTheName() {
+        XCTAssertEqual(TripPlaces.place(of: trip(1, "Colorado", destination: "Grand Junction")), "Grand Junction")
+        XCTAssertEqual(TripPlaces.place(of: trip(1, "Colorado", destination: nil)), "Colorado")
+        XCTAssertEqual(TripPlaces.place(of: trip(1, "Colorado", destination: "  ")), "Colorado")
+    }
+
+    func testDates() {
+        XCTAssertEqual(TripPlaces.dates(of: trip(1, "T", destination: nil)), "Dec 1 to Dec 8")
+        XCTAssertEqual(TripPlaces.dates(of: trip(1, "T", destination: nil, end: "2026-12-01")), "Dec 1")
+        XCTAssertEqual(TripPlaces.dates(of: trip(1, "T", destination: nil, end: nil)), "Dec 1")
+        XCTAssertNil(TripPlaces.dates(of: trip(1, "T", destination: nil, start: nil)))
+        XCTAssertNil(TripPlaces.dates(of: trip(1, "T", destination: nil, start: "soon")))
+    }
+
+    func testTheEntityHoldsOnlyAnIdAPlaceAndDates() {
+        let entity = TripEntity(trip(4, "Colorado", destination: "Grand Junction"))
+        XCTAssertEqual(entity, TripEntity(id: 4, place: "Grand Junction", dates: "Dec 1 to Dec 8"))
+    }
+
+    func testEntitiesAreSoonestFirstAndTwoTripsToOnePlaceStayTwo() {
+        let later = trip(1, "B", destination: "Grand Junction", start: "2026-12-20", end: "2026-12-27")
+        let sooner = trip(2, "A", destination: "Grand Junction")
+        let entities = TripPlaces.entities(in: [later, sooner])
+        XCTAssertEqual(entities.map(\.id), [2, 1])
+        XCTAssertEqual(entities.map(\.place), ["Grand Junction", "Grand Junction"])
+        XCTAssertEqual(entities.map(\.dates), ["Dec 1 to Dec 8", "Dec 20 to Dec 27"], "Siri tells them apart by their dates")
+    }
+
+    // MARK: Matching
+
+    func testMatchingByDestinationOrNameIgnoringCaseAndAccents() {
+        let all = [trip(1, "Colorado road trip", destination: "Grand Junction"), trip(2, "Lisbon", destination: nil)]
+        XCTAssertEqual(TripPlaces.matching("grand junction", in: all).map(\.id), [1])
+        XCTAssertEqual(TripPlaces.matching("COLORADO ROAD TRIP", in: all).map(\.id), [1])
+        XCTAssertEqual(TripPlaces.matching("Lísbon", in: all).map(\.id), [2])
+        XCTAssertEqual(TripPlaces.matching("Grand", in: all).map(\.id), [1], "a part of the place counts when nothing matches exactly")
+    }
+
+    func testAnExactMatchBeatsAPartialOne() {
+        let all = [trip(1, "A", destination: "Portland, Maine"), trip(2, "B", destination: "Portland")]
+        XCTAssertEqual(TripPlaces.matching("Portland", in: all).map(\.id), [2])
+    }
+
+    func testTwoMatchesAreBothReturnedAndNoneAndEmptyReturnNothing() {
+        let all = [trip(1, "A", destination: "Grand Junction"), trip(2, "B", destination: "Grand Junction", start: "2026-12-20")]
+        XCTAssertEqual(TripPlaces.matching("Grand Junction", in: all).map(\.id), [1, 2])
+        XCTAssertEqual(TripPlaces.matching("Lisbon", in: all), [])
+        XCTAssertEqual(TripPlaces.matching("  ", in: all), [])
+    }
+
+    // MARK: Opening
+
+    func testOpeningASavedTrip() {
+        let saved = trip(3, "Colorado", destination: "Grand Junction")
+        let answer = TripPlaces.open(TripEntity(saved), in: .trips([saved]))
+        XCTAssertEqual(answer, OpenTripAnswer(spoken: "Opening your trip to Grand Junction.", page: "#trip/3"))
+        XCTAssertTrue(PendingPage.isValid(answer.page ?? ""))
+    }
+
+    func testATripThatIsNoLongerSavedSaysSoAndOpensUpcoming() {
+        let gone = TripEntity(id: 9, place: "Lisbon", dates: nil)
+        let other = trip(3, "Colorado", destination: "Grand Junction")
+        let expected = OpenTripAnswer(spoken: "There's no trip to Lisbon saved on this iPhone. Opening Waypoint.", page: nil)
+        XCTAssertEqual(TripPlaces.open(gone, in: .trips([other])), expected)
+        XCTAssertEqual(TripPlaces.open(gone, in: .fixed(.nothingSaved)), expected)
+    }
+
+    func testOtherReasonsForNoTripsAreSaidAsTheyAre() {
+        let picked = TripEntity(id: 1, place: "Lisbon", dates: nil)
+        for answer in [Answer.locked, .notSignedIn, .savingOff, .unreadable] {
+            XCTAssertEqual(TripPlaces.open(picked, in: .fixed(answer)), OpenTripAnswer(spoken: answer.spoken, page: nil))
+        }
+    }
+
+    // MARK: Reading only the saved copy
+
+    func testTheQueryReturnsOnlyTheSavedTrips() async throws {
+        try save([AnswerFixtures.trip(1, "Colorado", [], destination: "Grand Junction"), AnswerFixtures.trip(2, "Oslo", [])])
+        let before = IntentRuntime.service
+        defer { IntentRuntime.service = before }
+        IntentRuntime.service = service(server: home)
+        let query = TripEntityQuery()
+        let suggested = try await query.suggestedEntities()
+        XCTAssertEqual(Set(suggested.map(\.place)), ["Grand Junction", "Oslo"])
+        let matched = try await query.entities(matching: "oslo")
+        XCTAssertEqual(matched.map(\.id), [2])
+        let byId = try await query.entities(for: [1, 99])
+        XCTAssertEqual(byId.map(\.id), [1], "an id that isn't saved is not made up")
+        let none = try await query.entities(matching: "Lisbon")
+        XCTAssertEqual(none, [])
+    }
+
+    func testTheQueryIsEmptyAfterEachKindOfPurge() async throws {
+        try save([AnswerFixtures.trip(1, "Colorado", [], destination: "Grand Junction")])
+        let before = IntentRuntime.service
+        defer { IntentRuntime.service = before }
+        let query = TripEntityQuery()
+        IntentRuntime.service = service(server: home)
+        let saved = try await query.suggestedEntities()
+        XCTAssertEqual(saved.count, 1)
+        // Sign-out and no server: no session.
+        IntentRuntime.service = service(server: nil)
+        let signedOut = try await query.suggestedEntities()
+        XCTAssertEqual(signedOut, [])
+        // Saving off.
+        IntentRuntime.service = service(server: home, saving: false)
+        let off = try await query.suggestedEntities()
+        XCTAssertEqual(off, [])
+        // A locked phone reads nothing.
+        IntentRuntime.service = service(server: home, unlocked: false)
+        let locked = try await query.suggestedEntities()
+        XCTAssertEqual(locked, [])
+        // A changed server: the copy is for another address.
+        IntentRuntime.service = service(server: URL(string: "https://other.example.com")!)
+        let other = try await query.suggestedEntities()
+        XCTAssertEqual(other, [])
+        // A purge of the files (401, 403, saving off, sign-out all end here).
+        IntentRuntime.service = service(server: home)
+        try OfflineStore(root: root).purgeAll()
+        let purged = try await query.suggestedEntities()
+        XCTAssertEqual(purged, [])
+    }
+
+    // MARK: The intent
+
+    func testTheIntentRequiresAuthenticationAndOpensTheApp() {
+        XCTAssertEqual(OpenTripIntent.authenticationPolicy, .requiresAuthentication)
+        XCTAssertTrue(OpenTripIntent.openAppWhenRun)
+    }
+
+    func testTheIntentHoldsTheTripPageAndMakesNoRequest() async throws {
+        try save([AnswerFixtures.trip(1, "Colorado", [], destination: "Grand Junction")])
+        let before = IntentRuntime.service
+        let pages = IntentRuntime.pages
+        defer {
+            IntentRuntime.service = before
+            IntentRuntime.pages = pages
+            URLProtocol.unregisterClass(OpenTripFailingProtocol.self)
+        }
+        IntentRuntime.service = service(server: home)
+        let held = PendingPage()
+        IntentRuntime.pages = held
+        OpenTripFailingProtocol.reset()
+        URLProtocol.registerClass(OpenTripFailingProtocol.self)
+        _ = try await OpenTripIntent(trip: TripEntity(id: 1, place: "Grand Junction", dates: nil)).perform()
+        XCTAssertEqual(held.take(), "#trip/1")
+        _ = try await OpenTripIntent(trip: TripEntity(id: 7, place: "Lisbon", dates: nil)).perform()
+        XCTAssertNil(held.take(), "a trip that isn't saved opens Upcoming, not a page")
+        XCTAssertEqual(OpenTripFailingProtocol.requests, 0)
+    }
+
+    func testNoPrivateValueReachesTheEntitiesOrTheAnswer() async throws {
+        try save([AnswerFixtures.trip(1, "Colorado", [AnswerFixtures.hotel(5, "Hotel Example", "2026-11-18T15:00", "2026-11-20T11:00")],
+                                      destination: "Grand Junction")])
+        let read = await service(server: home).readTrips()
+        let entities = TripPlaces.entities(in: trips(read))
+        let said = TripPlaces.open(entities[0], in: read)
+        let texts = entities.flatMap { [$0.place, $0.dates ?? ""] } + [said.spoken, said.page ?? ""]
+        for text in texts {
+            for canary in AnswerFixtures.canaries { XCTAssertFalse(text.contains(canary), text) }
+        }
+    }
+}
+
+private final class OpenTripFailingProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var seen = 0
+
+    static var requests: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return seen
+    }
+
+    static func reset() {
+        lock.lock()
+        seen = 0
+        lock.unlock()
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        lock.lock()
+        seen += 1
+        lock.unlock()
+        return true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+
+    override func stopLoading() {}
+}

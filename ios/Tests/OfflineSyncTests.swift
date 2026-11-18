@@ -13,6 +13,23 @@ private final class FakeFetching: OfflineFetching, @unchecked Sendable {
     }
 }
 
+private final class ParameterUpdates: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var calls: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func record() {
+        lock.lock()
+        count += 1
+        lock.unlock()
+    }
+}
+
 private final class SyncingProbe: @unchecked Sendable {
     var value = false
 }
@@ -55,13 +72,13 @@ final class OfflineSyncTests: XCTestCase {
     }
 
     private func makeSync(on: Bool = true, server: URL? = nil, bearer: String? = "wpa_token",
-                          tokenError: Error? = nil) -> OfflineSync {
+                          tokenError: Error? = nil, updates: ParameterUpdates? = nil) -> OfflineSync {
         let chosen = server ?? home
         return OfflineSync(store: store, settings: settings(on: on), fetching: fetching,
                            server: { chosen }, bearer: {
                                if let tokenError { throw tokenError }
                                return bearer
-                           })
+                           }, parametersChanged: { updates?.record() })
     }
 
     private func reply(_ names: [String], version: Int = 1) -> Data {
@@ -367,5 +384,76 @@ final class OfflineSyncTests: XCTestCase {
                                                          server: { nil }, bearer: { nil }))
         await session.signOut()
         XCTAssertNil(store.load(server: home))
+    }
+
+    // MARK: Siri's list of places follows the saved trips
+
+    func testEverySaveUpdatesTheShortcutParameters() async {
+        let updates = ParameterUpdates()
+        let sync = makeSync(updates: updates)
+        answer(["Lisbon"])
+        await sync.sync()
+        XCTAssertEqual(updates.calls, 1)
+        answer(["Lisbon", "Oslo"])
+        await sync.sync()
+        XCTAssertEqual(updates.calls, 2)
+    }
+
+    func testAFailedOrRefusedSaveDoesNotUpdateTheParameters() async {
+        let updates = ParameterUpdates()
+        let sync = makeSync(updates: updates)
+        answer([], status: 500)
+        await sync.sync()
+        answer(["Lisbon"], version: 2)
+        await sync.sync()
+        XCTAssertEqual(updates.calls, 0)
+    }
+
+    func testEveryKindOfPurgeUpdatesTheParametersAfterTheCopyIsGone() async {
+        answer(["Lisbon"])
+        let kinds: [(String, (OfflineSync) async -> Void)] = [
+            ("sign-out", { await $0.signedOut() }),
+            ("saving off", { await $0.setSaving(false) }),
+            ("remove", { await $0.remove() }),
+            ("changed server", { [cabin, home] in await $0.serverChanged(from: home, to: cabin) }),
+        ]
+        for (name, purge) in kinds {
+            let updates = ParameterUpdates()
+            let sync = makeSync(updates: updates)
+            await sync.sync()
+            XCTAssertEqual(savedNames(), ["Lisbon"], name)
+            let before = updates.calls
+            await purge(sync)
+            XCTAssertEqual(updates.calls, before + 1, name)
+            XCTAssertEqual(savedNames(), [], name)
+        }
+    }
+
+    func testA401AndA403PurgeAndUpdateTheParameters() async {
+        for status in [401, 403] {
+            let updates = ParameterUpdates()
+            let sync = makeSync(updates: updates)
+            answer(["Lisbon"])
+            await sync.sync()
+            answer([], status: status)
+            await sync.sync()
+            XCTAssertEqual(updates.calls, 2, "\(status)")
+            XCTAssertEqual(savedNames(), [], "\(status)")
+        }
+    }
+
+    func testAnExpiredSessionPurgesAndUpdatesTheParameters() async {
+        let updates = ParameterUpdates()
+        let sync = makeSync(updates: updates, tokenError: ServerError.signedOut)
+        await sync.sync()
+        XCTAssertEqual(updates.calls, 1)
+    }
+
+    func testNoServerPurgesAndUpdatesTheParameters() async {
+        let updates = ParameterUpdates()
+        let sync = OfflineSync(store: store, settings: settings(on: true), fetching: fetching,
+                               server: { nil }, bearer: { "wpa_token" }, parametersChanged: { updates.record() })
+        await sync.sync()
+        XCTAssertEqual(updates.calls, 1)
     }
 }

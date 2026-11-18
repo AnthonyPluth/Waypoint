@@ -93,6 +93,37 @@ struct CheckOutIntent: AppIntent {
     }
 }
 
+/// Gives the system the places a phrase can name (`TripEntityQuery.suggestedEntities`). `OfflineSync` calls it after every save and
+/// every purge, so the list is always the saved trips, and empty when there are none.
+enum ShortcutParameters {
+    static func refresh() {
+        WaypointShortcuts.updateAppShortcutParameters()
+    }
+}
+
+struct OpenTripIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open my trip"
+    static var description = IntentDescription("Opens a trip saved on this iPhone in Waypoint.")
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Trip", requestValueDialog: "Which trip?")
+    var trip: TripEntity
+
+    init() {}
+
+    init(trip: TripEntity) {
+        self.trip = trip
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let read = await IntentRuntime.service.readTrips()
+        let answer = TripPlaces.open(trip, in: read)
+        IntentRuntime.pages.hold(answer.page)
+        return .result(dialog: "\(answer.spoken)")
+    }
+}
+
 /// The phrases work by voice with no setup. Apple needs the app's name in every one.
 struct WaypointShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -120,5 +151,13 @@ struct WaypointShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Check-out",
             systemImageName: "door.left.hand.open")
+        AppShortcut(
+            intent: OpenTripIntent(),
+            phrases: [
+                "Open my trip to \(\.$trip) in \(.applicationName)",
+                "\(.applicationName) open \(\.$trip)",
+            ],
+            shortTitle: "Open my trip",
+            systemImageName: "suitcase.fill")
     }
 }
