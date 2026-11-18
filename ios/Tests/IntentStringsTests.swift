@@ -33,6 +33,7 @@ final class IntentStringsTests: XCTestCase {
             text(NextFlightIntent.description.descriptionText),
             text(TonightStayIntent.description.descriptionText),
             text(CheckOutIntent.description.descriptionText),
+            text(OpenTripIntent.description.descriptionText),
         ]
         for description in descriptions {
             XCTAssertFalse(description.isEmpty)
@@ -45,6 +46,7 @@ final class IntentStringsTests: XCTestCase {
             text(NextFlightIntent.title),
             text(TonightStayIntent.title),
             text(CheckOutIntent.title),
+            text(OpenTripIntent.title),
         ]
         for title in titles {
             XCTAssertEqual(bannedWords(in: title), [], title)

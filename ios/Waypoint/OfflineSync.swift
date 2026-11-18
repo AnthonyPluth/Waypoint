@@ -84,7 +84,8 @@ actor OfflineSync {
 
     static let shared = OfflineSync(
         server: { await ServerSession.shared.server },
-        bearer: { try await ServerSession.shared.offlineBearer() })
+        bearer: { try await ServerSession.shared.offlineBearer() },
+        parametersChanged: { ShortcutParameters.refresh() })
 
     enum Outcome: Equatable {
         case off
@@ -112,6 +113,7 @@ actor OfflineSync {
     private let pageFetching: PageFetching
     private let currentServer: @Sendable () async -> URL?
     private let currentBearer: @Sendable () async throws -> String?
+    private let parametersChanged: @Sendable () -> Void
     private var generation = 0
     nonisolated let state: OfflineSyncState
 
@@ -122,7 +124,8 @@ actor OfflineSync {
          pageFetching: PageFetching = LivePageFetching(),
          state: OfflineSyncState = OfflineSyncState(),
          server: @escaping @Sendable () async -> URL?,
-         bearer: @escaping @Sendable () async throws -> String?) {
+         bearer: @escaping @Sendable () async throws -> String?,
+         parametersChanged: @escaping @Sendable () -> Void = {}) {
         self.store = store
         self.settings = settings
         self.fetching = fetching
@@ -131,6 +134,7 @@ actor OfflineSync {
         self.state = state
         self.currentServer = server
         self.currentBearer = bearer
+        self.parametersChanged = parametersChanged
     }
 
     @discardableResult
@@ -176,6 +180,7 @@ actor OfflineSync {
         guard Self.version(of: reply.data) == Self.supportedVersion else { return .unknownVersion }
         do {
             try store.save(reply.data, version: Self.supportedVersion, for: server)
+            parametersChanged()
             return .saved
         } catch {
             return .failed
@@ -233,6 +238,7 @@ actor OfflineSync {
         state.setFailed(false)
         try? store.purgeAll()
         try? pages.purgeAll()
+        parametersChanged()
     }
 
     func setSaving(_ on: Bool) {

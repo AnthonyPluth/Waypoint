@@ -99,6 +99,38 @@ struct CheckOutIntent: AppIntent {
     }
 }
 
+/// Gives the system the places a phrase can name (`TripEntityQuery.suggestedEntities`). `OfflineSync` calls it after every save and
+/// every purge, so the list is always the saved trips, and empty when there are none.
+enum ShortcutParameters {
+    static func refresh() {
+        WaypointShortcuts.updateAppShortcutParameters()
+    }
+}
+
+struct OpenTripIntent: AppIntent {
+    static var title: LocalizedStringResource = "Open my trip"
+    static var description = IntentDescription("Opens one of your saved trips in Waypoint.")
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+    static var openAppWhenRun: Bool = true
+
+    @Parameter(title: "Trip", requestValueDialog: "Which trip?")
+    var trip: TripEntity
+
+    init() {}
+
+    init(trip: TripEntity) {
+        self.trip = trip
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let read = await IntentRuntime.service.readTrips()
+        let answer = TripPlaces.open(trip, in: read)
+        IntentRuntime.pages.hold(answer.page)
+        if answer.page != nil { await IntentRuntime.openHeldPage() }
+        return .result(dialog: "\(answer.spoken)")
+    }
+}
+
 /// Opens the app at the trip of the current or next parking booking and says only the lot. The parking code is never spoken, shown
 /// or saved here: the web app's booking shows it from the server once the app is open.
 struct OpenParkingIntent: AppIntent {
@@ -144,6 +176,14 @@ struct WaypointShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Check-out",
             systemImageName: "door.left.hand.open")
+        AppShortcut(
+            intent: OpenTripIntent(),
+            phrases: [
+                "Open my trip to \(\.$trip) in \(.applicationName)",
+                "\(.applicationName) open \(\.$trip)",
+            ],
+            shortTitle: "Open my trip",
+            systemImageName: "suitcase.fill")
         AppShortcut(
             intent: OpenParkingIntent(),
             phrases: [
