@@ -2,13 +2,62 @@
   "name": "stats-map-zoom",
   "page": "stats",
   "steps": [
-    { "expect_text": { "selector": "h1", "text": "Stats" } },
-    { "wait_for": "[data-visited]" },
-    { "click_if_present": "button:has-text('Filters')" },
-    { "click": "[role='group'][aria-label='Travelling'] button >> nth=1" },
-    { "click_if_present": "[role='dialog'] button[aria-label='Close']" },
-    { "wait_for": "[data-testid='map-layer']" },
-    { "scroll_to": "#stats-map-slot" },
-    { "screenshot": "map-for-one-person" }
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "wait_for": "[data-kind='polygon']"
+    },
+    {
+      "click_if_present": "button:has-text('Filters')"
+    },
+    {
+      "click": "[role='group'][aria-label='Travelling'] button >> nth=1"
+    },
+    {
+      "click_if_present": "[role='dialog'] button[aria-label='Close']"
+    },
+    {
+      "wait_for": "[data-kind='polygon']"
+    },
+    {
+      "scroll_to": "#stats-map-slot"
+    },
+    {
+      "wait_for": "[data-mapkit][data-polygons='3']"
+    },
+    {
+      "screenshot": "map-for-one-person"
+    },
+    {
+      "click": "[data-mark='airport'] >> nth=0"
+    },
+    {
+      "click": "[data-zoom='in']"
+    },
+    {
+      "click": "[data-zoom='in']"
+    },
+    {
+      "click": "[data-zoom='in']"
+    },
+    {
+      "wait_for": "[data-mapkit][data-polygons='7']"
+    },
+    {
+      "screenshot": "zoomed-into-states"
+    },
+    {
+      "click": "[data-hit][data-kind='polygon'] >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[data-testid='map-trips']"
+    },
+    {
+      "screenshot": "state-trips"
+    }
   ]
 }

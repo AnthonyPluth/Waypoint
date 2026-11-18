@@ -110,4 +110,25 @@ def manage_links(context: Any) -> list[str]:
     return check_manage_links(table, (root / LINKS_TESTS).read_text(encoding="utf-8"))
 
 
-CHECKS = [mail_parsers, dark_only, manage_links]
+SCREENSHOTS = "docs/src/assets/screenshots"
+BLANK_BYTES_PER_PIXEL = 0.01
+
+
+def check_screenshots(images: dict[str, tuple[int, int, int]]) -> list[str]:
+    return [
+        f"{name}: {width}x{height} in {size} bytes: it is one colour (the page hadn't drawn when it was captured); run make verify again"
+        for name, (width, height, size) in sorted(images.items()) if width * height * BLANK_BYTES_PER_PIXEL > size
+    ]
+
+
+def screenshots(context: Any) -> list[str]:
+    root: Path = context.root
+    images: dict[str, tuple[int, int, int]] = {}
+    for path in sorted((root / SCREENSHOTS).glob("*.png")):
+        head = path.read_bytes()[:24]
+        if len(head) == 24 and head[12:16] == b"IHDR":
+            images[f"{SCREENSHOTS}/{path.name}"] = (int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big"), path.stat().st_size)
+    return check_screenshots(images)
+
+
+CHECKS = [mail_parsers, dark_only, manage_links, screenshots]

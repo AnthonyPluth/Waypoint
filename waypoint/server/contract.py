@@ -1218,6 +1218,7 @@ class StatsPlaces(TypedDict):
     cities: list[StatsPlace]
     visits: list[StatsVisit]
     points: list[StatsPlacePoint]
+    states: list[str]
 
 
 class DistanceUnit(TypedDict):

@@ -611,9 +611,16 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#stats`.
 - **Widths:** phone, desktop.
-- **Touches:** `JFK – MCO`.
-- **Expects to see:** `Stats`.
+- **Expects to see:** `Stats`, `JFK`.
 - **Drive it:** `tools/control flow stats-map-details`; or `poetry run python run.py verify --flow stats-map-details`.
+
+#### `stats-map-failed`
+
+- **Starts at:** `#stats`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Stats`.
+- **Console errors it expects:** `net::ERR_BLOCKED_BY_CLIENT`.
+- **Drive it:** `tools/control flow stats-map-failed`; or `poetry run python run.py verify --flow stats-map-failed`.
 
 #### `stats-map-zoom`
 
@@ -622,6 +629,13 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Filters`, `Travelling`, `Close`.
 - **Expects to see:** `Stats`.
 - **Drive it:** `tools/control flow stats-map-zoom`; or `poetry run python run.py verify --flow stats-map-zoom`.
+
+#### `stats-no-key`
+
+- **Starts at:** `#stats`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Stats`, `Where you’ve been`.
+- **Drive it:** `tools/control flow stats-no-key`; or `poetry run python run.py verify --flow stats-no-key`.
 
 #### `year-in-review`
 

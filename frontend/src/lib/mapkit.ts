@@ -1,9 +1,16 @@
 import { apiCall } from "$lib/contract";
 
 export type MkCoordinate = { latitude: number; longitude: number };
-export type MkAnnotation = { coordinate: MkCoordinate; visible: boolean };
-export type MkOverlay = { points: MkCoordinate[] };
+export type MkAnnotation = { coordinate: MkCoordinate; visible: boolean; data?: unknown };
+export type MkOverlay = { points: MkCoordinate[]; data?: unknown; style?: object };
+export type MkEvent = { status?: string; annotation?: MkAnnotation; overlay?: MkOverlay };
 export type MkMap = {
+  isScrollEnabled?: boolean;
+  region?: { span: { latitudeDelta: number; longitudeDelta: number } };
+  addEventListener?(type: string, listener: (event: MkEvent) => void): void;
+  removeEventListener?(type: string, listener: (event: MkEvent) => void): void;
+  selectedAnnotation?: MkAnnotation | null;
+  selectedOverlay?: MkOverlay | null;
   addAnnotation(annotation: MkAnnotation): void;
   removeAnnotation(annotation: MkAnnotation): void;
   addOverlay(overlay: MkOverlay): void;
@@ -17,7 +24,6 @@ export type MkDirections = {
   route(request: MkDirectionsRequest, callback: (error: unknown, response?: { routes?: MkRoute[] } | null) => void): number;
   cancel?(id: number): void;
 };
-export type MkEvent = { status?: string };
 export type Mk = {
   init(options: { authorizationCallback: (done: (token: string) => void) => void; language?: string }): void;
   addEventListener(type: string, listener: (event: MkEvent) => void): void;
@@ -27,7 +33,8 @@ export type Mk = {
   Coordinate: new (latitude: number, longitude: number) => MkCoordinate;
   MapRect: new (x: number, y: number, width: number, height: number) => object;
   Annotation: new (coordinate: MkCoordinate, factory: () => HTMLElement, options?: Record<string, unknown>) => MkAnnotation;
-  PolylineOverlay: new (points: MkCoordinate[], options?: { style?: object }) => MkOverlay;
+  PolylineOverlay: new (points: MkCoordinate[], options?: { style?: object; data?: unknown; enabled?: boolean }) => MkOverlay;
+  PolygonOverlay: new (points: MkCoordinate[][], options?: { style?: object; data?: unknown; enabled?: boolean }) => MkOverlay;
   Style: new (options: Record<string, unknown>) => object;
   Directions?: { new (options?: Record<string, unknown>): MkDirections; Transport: { Automobile: unknown } };
 };

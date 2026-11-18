@@ -3232,6 +3232,13 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "Colorado",
+          "Florida",
+          "New York",
+          "Utah"
         ]
       }
     },
@@ -3643,6 +3650,12 @@
               }
             ]
           }
+        ],
+        "states": [
+          "Colorado",
+          "Florida",
+          "New York",
+          "Utah"
         ]
       }
     },
@@ -3884,6 +3897,10 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "New York"
         ]
       }
     },
@@ -4109,7 +4126,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     },
     "1/all": {
@@ -4708,6 +4728,13 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "Colorado",
+          "Florida",
+          "New York",
+          "Utah"
         ]
       }
     },
@@ -5113,6 +5140,12 @@
               }
             ]
           }
+        ],
+        "states": [
+          "Colorado",
+          "Florida",
+          "New York",
+          "Utah"
         ]
       }
     },
@@ -5354,6 +5387,10 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "New York"
         ]
       }
     },
@@ -5579,7 +5616,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     },
     "2/all": {
@@ -6075,6 +6115,11 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "Florida",
+          "New York"
         ]
       }
     },
@@ -6365,6 +6410,10 @@
               }
             ]
           }
+        ],
+        "states": [
+          "Florida",
+          "New York"
         ]
       }
     },
@@ -6606,6 +6655,10 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "New York"
         ]
       }
     },
@@ -6831,7 +6884,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     },
     "4/all": {
@@ -6991,7 +7047,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     },
     "4/2026": {
@@ -7151,7 +7210,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     },
     "4/2025": {
@@ -7219,7 +7281,8 @@
         "countries": [],
         "cities": [],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": []
       }
     },
     "4/2024": {
@@ -7287,7 +7350,8 @@
         "countries": [],
         "cities": [],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": []
       }
     },
     "3/all": {
@@ -7736,6 +7800,11 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "Florida",
+          "New York"
         ]
       }
     },
@@ -7978,7 +8047,11 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "Florida",
+          "New York"
+        ]
       }
     },
     "3/2025": {
@@ -8219,6 +8292,10 @@
               }
             ]
           }
+        ],
+        "states": [
+          "California",
+          "New York"
         ]
       }
     },
@@ -8444,7 +8521,10 @@
           }
         ],
         "visits": [],
-        "points": []
+        "points": [],
+        "states": [
+          "New York"
+        ]
       }
     }
   },

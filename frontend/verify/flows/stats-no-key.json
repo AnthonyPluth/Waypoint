@@ -1,0 +1,37 @@
+{
+  "name": "stats-no-key",
+  "page": "stats",
+  "mapkit": "none",
+  "steps": [
+    {
+      "expect_text": {
+        "selector": "h1",
+        "text": "Stats"
+      }
+    },
+    {
+      "wait_for": "#places-title"
+    },
+    {
+      "expect_text": {
+        "selector": "#places-title",
+        "text": "Where you’ve been"
+      }
+    },
+    {
+      "wait_for": "dt:has-text('Countries')"
+    },
+    {
+      "wait_for": "dt:has-text('States')"
+    },
+    {
+      "expect_absent": "#stats-map-slot"
+    },
+    {
+      "scroll_to": "#places-title"
+    },
+    {
+      "screenshot": "places-no-key"
+    }
+  ]
+}
