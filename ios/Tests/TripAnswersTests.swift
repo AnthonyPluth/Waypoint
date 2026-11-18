@@ -1021,7 +1021,7 @@ final class OpenTripTests: XCTestCase {
 
     func testTheEntityHoldsOnlyAnIdAPlaceAndDates() {
         let made = TripEntity(trip(4, "Colorado", destination: "Grand Junction"), scope: scope)
-        XCTAssertEqual(entity, entity(4, "Grand Junction", "Dec 1 to Dec 8"))
+        XCTAssertEqual(made, entity(4, "Grand Junction", "Dec 1 to Dec 8"))
     }
 
     func testEntitiesAreSoonestFirstAndTwoTripsToOnePlaceStayTwo() {
@@ -1091,8 +1091,8 @@ final class OpenTripTests: XCTestCase {
         XCTAssertEqual(Set(suggested.map(\.place)), ["Grand Junction", "Oslo"])
         let matched = try await query.entities(matching: "oslo")
         XCTAssertEqual(matched.map(\.tripId), [2])
-        let scope = OfflineStore.folderName(for: home)
-        let byId = try await query.entities(for: ["\(scope):1", "\(scope):99", "other-server:2"])
+        let current = OfflineStore.folderName(for: home)
+        let byId = try await query.entities(for: ["\(current):1", "\(current):99", "other-server:2"])
         XCTAssertEqual(byId.map(\.tripId), [1], "an id that isn't saved, or is another server's, is not made up")
         let none = try await query.entities(matching: "Lisbon")
         XCTAssertEqual(none, [])
