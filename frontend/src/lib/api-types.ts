@@ -584,6 +584,7 @@ export interface OfflineMessages {
 export interface OfflineTrip {
   trip: Trip;
   messages: OfflineMessages[];
+  cities: Record<string, string>;
 }
 
 export interface Ok {

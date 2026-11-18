@@ -10,4 +10,4 @@ from .trips import _trip, viewer
 def api_offline(conn, _q, _b) -> Offline:
     found = offline.projection(conn, viewer(conn), date.today())
     return {"version": offline.VERSION, "trips": [OfflineTrip(trip=_trip(c["trip"]), messages=[OfflineMessages(segment_id=m["segment_id"], emails=[StoredEmail(**e) for e in m["emails"]])
-                                                                for m in c["messages"]]) for c in found["trips"]]}
+                                                                for m in c["messages"]], cities=c["cities"]) for c in found["trips"]]}
