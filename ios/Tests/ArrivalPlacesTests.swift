@@ -4,11 +4,13 @@ import XCTest
 private final class FakeGeocoder: AddressGeocoding, @unchecked Sendable {
     var answers: [String: PlacePoint] = [:]
     var afterAsk: (() -> Void)?
+    var duringAsk: (() async -> Void)?
     private(set) var asked: [String] = []
 
     func point(for address: String) async -> PlacePoint? {
         asked.append(address)
         afterAsk?()
+        await duringAsk?()
         return answers[address]
     }
 }
@@ -151,11 +153,12 @@ final class ArrivalPlacesTests: XCTestCase {
     }
 
     func testACancelledBookingIsLeftOut() async {
-        save([segment(1, "parking", start: "2026-12-01T09:00", end: "2026-12-05T18:00", status: "cancelled", address: "1 Main St"),
+        save([segment(1, "parking", start: "2026-12-01T09:00", end: "2026-12-05T18:00", status: "cancelled", address: "9 Cancelled Rd"),
               parking(2, address: "1 Main St")])
-        geocoder.answers = ["1 Main St": lot]
+        geocoder.answers = ["1 Main St": lot, "9 Cancelled Rd": lot]
         let found = await finder().refresh(server: home)
         XCTAssertEqual(found.map(\.segmentId), [2])
+        XCTAssertFalse(geocoder.asked.contains("9 Cancelled Rd"))
     }
 
     func testQualifiesNeedsNoPermissionAndNoPoint() async {
@@ -185,6 +188,7 @@ final class ArrivalPlacesTests: XCTestCase {
         geocoder.answers = ["1 Main St": lot]
         let after = await finder(now: Self.moment(2026, 12, 5, 18, 1)).refresh(server: home)
         XCTAssertTrue(after.isEmpty)
+        XCTAssertTrue(geocoder.asked.isEmpty)
         let before = await finder(now: Self.moment(2026, 11, 20, 9)).refresh(server: home)
         XCTAssertEqual(before.map(\.segmentId), [1])
     }
@@ -517,6 +521,23 @@ final class ArrivalPlacesTests: XCTestCase {
         await sync.arrivalSettled()
         XCTAssertNotNil(store.loadPlaces(server: home))
         await sync.signedOut()
+        XCTAssertNil(store.loadPlaces(server: home))
+        XCTAssertNil(store.load(server: home))
+    }
+
+    func testAPurgeDuringALookupSendsNothingMoreAndLeavesNoFile() async {
+        geocoder.answers = ["1 Main St": lot, "3 Inn Ave": inn]
+        let sync = makeSync(finder(), data: tripsJSON([parking(1, address: "1 Main St"),
+                                                       segment(2, "hotel", start: "2026-12-01T15:00", end: "2026-12-05T11:00", address: "3 Inn Ave")]))
+        let purged = expectation(description: "purged")
+        geocoder.duringAsk = {
+            await sync.signedOut()
+            purged.fulfill()
+        }
+        await sync.sync()
+        await fulfillment(of: [purged], timeout: 10)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(geocoder.asked.count, 1)
         XCTAssertNil(store.loadPlaces(server: home))
         XCTAssertNil(store.load(server: home))
     }
