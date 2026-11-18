@@ -242,6 +242,58 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
     expect(arrival.target).toBeNull();
   });
 
+  describe("when the saved copy passes its retention deadline while the page stays open", () => {
+    const ended = () => ({ ...saved(), trip: { ...trip([lot]), id: 1, name: "Trip to Denver", start_date: "2026-11-18", end_date: "2026-11-20" } });
+    const deadline = new Date(2026, 10, 24, 0, 0).getTime();
+    afterEach(() => { vi.useRealTimers(); });
+
+    function open() {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(new Date(2026, 10, 22, 12, 0));
+      installShell({ trips: [ended()] });
+      vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
+      return render(TripPage);
+    }
+
+    it("clears it at the deadline, without any other event", async () => {
+      open();
+      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(deadline - Date.now() + 1);
+      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
+      expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
+    });
+
+    it("clears it when the app comes back to the front after the deadline", async () => {
+      open();
+      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      vi.setSystemTime(deadline + 60_000);
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
+    });
+
+    it("keeps it while it is still within its retention", async () => {
+      open();
+      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      vi.setSystemTime(deadline - 60_000);
+      window.dispatchEvent(new Event("focus"));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+    });
+
+    it("does not show a copy the phone handed over after its deadline", async () => {
+      vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+      vi.setSystemTime(deadline + 60_000);
+      installShell({ trips: [ended()] });
+      vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
+      render(TripPage);
+      expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
+      expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
+    });
+  });
+
   it("keeps the error when the server answered, or when this trip is not saved", async () => {
     installShell({ trips: [saved()] });
     vi.mocked(api).mockRejectedValue(Object.assign(new Error("Server error"), { status: 500 }));
