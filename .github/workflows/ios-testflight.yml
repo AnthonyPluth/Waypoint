@@ -26,7 +26,11 @@ jobs:
   upload:
     name: Build and upload to TestFlight
     if: github.ref == 'refs/heads/main'
-    runs-on: macos-26   # hosted: Xcode only runs on macOS; Apple requires the iOS 26 SDK (Xcode 26) to upload
+    # GitHub's hosted Xcode 27 image (actions/runner-images README: "Xcode 27 | arm64 | `xcode-27` or `xcode-27-xlarge`";
+    # images/macos/xcode-27-arm64-Readme.md lists Xcode 27.0, 27.1 (the default) and 27.2 with the iOS 27.0-27.2 SDKs).
+    # fleet checks accepts xcode-<number> since fleet v7.1.0 (AnthonyPluth/fleet#148). Moved from macos-26 early, by the
+    # owner's decision, because macos-26 jobs were going unacquired under GitHub's macOS arm64 capacity limits.
+    runs-on: xcode-27   # hosted: the iOS 27 SDK needs Xcode 27 and macos-26 stops at iOS 26.5
     timeout-minutes: 45
     environment: testflight
     steps:
@@ -60,11 +64,18 @@ jobs:
       - name: Install the packages
         working-directory: ios
         run: npm ci --no-audit --no-fund
-      - name: Require Xcode 26 or later
-        # Apple rejects uploads built with an older SDK; the macos-26 image's default Xcode is 26.x.
+      - name: Select Xcode 27.2 and require the iOS 27 SDK
+        # App Store Connect requires the iOS 27 SDK from April 2027 (ITMS-90725). Xcode 27.2 is a release, not a beta;
+        # the image's default Xcode.app is 27.1. If an upload is refused with ITMS-90534 on 27.2, try Xcode_27.1.app.
         run: |
+          developer_dir=/Applications/Xcode_27.2.app/Contents/Developer
+          [ -d "$developer_dir" ] || { echo "::error::Xcode 27.2 is not at $developer_dir on this runner image."; ls /Applications; exit 1; }
+          echo "DEVELOPER_DIR=$developer_dir" >> "$GITHUB_ENV"
+          export DEVELOPER_DIR="$developer_dir"
           xcodebuild -version
-          [ "$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')" -ge 26 ]
+          [ "$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')" -ge 27 ]
+          sdk=$(xcrun --sdk iphoneos --show-sdk-version)
+          [[ "$sdk" == 27.* ]] || { echo "::error::The iOS SDK is $sdk, not 27.x."; exit 1; }
       - name: Install XcodeGen
         run: brew install xcodegen
       - name: Generate the Xcode project
