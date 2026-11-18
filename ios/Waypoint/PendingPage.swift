@@ -28,6 +28,20 @@ final class PendingPage: @unchecked Sendable {
         }
     }
 
+    /// The page held, without using it up: the shell clears it once it has applied it.
+    func peek(now: Date = Date()) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let held, now.timeIntervalSince(held.at) <= Self.lifetime else { return nil }
+        return held.page
+    }
+
+    func clear() {
+        lock.lock()
+        held = nil
+        lock.unlock()
+    }
+
     func take(now: Date = Date()) -> String? {
         lock.lock()
         defer { lock.unlock() }

@@ -33,8 +33,10 @@ final class ShellViewController: CAPBridgeViewController {
     }
 
     @objc private func openSavedPage(_ note: Notification) {
-        guard !showingCachedPage, let page = note.userInfo?["page"] as? String, PendingPage.isValid(page), let webView else { return }
-        webView.evaluateJavaScript("window.location.hash = '\(page)'", completionHandler: nil)
+        guard let page = PendingPage.shared.peek(), PendingPage.isValid(page), let webView else { return }
+        webView.evaluateJavaScript("window.location.hash = '\(page)'") { _, error in
+            if error == nil { PendingPage.shared.clear() }
+        }
     }
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {

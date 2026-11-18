@@ -688,6 +688,17 @@ final class PendingPageTests: XCTestCase {
         XCTAssertNil(pages.take(now: start))
     }
 
+    func testPeekingKeepsThePageUntilItIsCleared() {
+        let pages = PendingPage()
+        pages.hold("#trip/3", now: start)
+        XCTAssertEqual(pages.peek(now: start.addingTimeInterval(10)), "#trip/3")
+        XCTAssertEqual(pages.peek(now: start.addingTimeInterval(20)), "#trip/3")
+        XCTAssertNil(pages.peek(now: start.addingTimeInterval(PendingPage.lifetime + 1)), "it expires")
+        pages.clear()
+        XCTAssertNil(pages.peek(now: start.addingTimeInterval(20)))
+        XCTAssertNil(pages.take(now: start.addingTimeInterval(20)))
+    }
+
     func testHoldingNothingClearsWhatWasHeld() {
         let pages = PendingPage()
         pages.hold("#trip/3", now: start)
