@@ -1155,6 +1155,36 @@ describe("past trip cards", () => {
     expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168");
   });
 
+  it("asks Apple nothing about a past trip the covers reply doesn't mention, since its coverage is undetermined", async () => {
+    app.state = state({ mapkit: true });
+    const omitted = trip([segment({ id: 71, trip_id: 70, kind: "hotel", start_local: "2026-03-10T15:00", end_local: "2026-03-12T10:00", origin: null, destination: "Denver" }), segment({ id: 72, trip_id: 70, kind: "hotel", start_local: "2026-03-12T15:00", end_local: "2026-03-14T10:00", origin: null, destination: "Boise" })], { id: 70, name: "Omitted", start_date: "2026-03-10", end_date: "2026-03-14" });
+    serve([omitted, ...past()]);
+    coverReply = { trips: [{ trip_id: 31, count: 0, covers: [] }, { trip_id: 32, count: 0, covers: [] }] };
+    render(Trips);
+    await screen.findByRole("link", { name: /^Omitted,/ });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/70/places" || String(path).includes("trip=70"))).toHaveLength(0);
+  });
+
+  it("asks Apple nothing about a trip that becomes past while the page is open and isn't in the covers reply", async () => {
+    vi.setSystemTime(new Date("2026-08-15T12:00:00Z"));
+    app.state = state({ mapkit: true });
+    const ending = trip([segment({ id: 61, trip_id: 61, kind: "hotel", start_local: "2026-08-10T15:00", end_local: "2026-08-15T23:00", origin: null, destination: "Denver" }), segment({ id: 62, trip_id: 61, kind: "hotel", start_local: "2026-08-12T15:00", end_local: "2026-08-15T23:00", origin: null, destination: "Boise" })], { id: 61, name: "Just ended", start_date: "2026-08-10", end_date: "2026-08-15" });
+    serve([ending, ...past()]);
+    coverReply = { trips: [{ trip_id: 31, count: 0, covers: [] }, { trip_id: 32, count: 0, covers: [] }] };
+    const ticks: (() => void)[] = [];
+    const real = globalThis.setInterval;
+    vi.spyOn(globalThis, "setInterval").mockImplementation(((fn: () => void, ms?: number) => { if (ms === 30_000) ticks.push(fn); return real(fn, ms); }) as typeof setInterval);
+    render(Trips);
+    await screen.findByText("Just ended");
+    vi.setSystemTime(new Date("2026-08-16T12:00:00Z"));
+    ticks.forEach((tick) => tick());
+    await screen.findByRole("link", { name: /^Just ended,/ });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/61/places" || String(path).includes("trip=61"))).toHaveLength(0);
+    vi.restoreAllMocks();
+  });
+
   it("leaves the cards without photos, and says nothing, when the covers reply fails", async () => {
     serveCards(Object.assign(new Error("Photos need sign-in"), { status: 404 }));
     render(Trips);
@@ -1195,7 +1225,7 @@ describe("past trip cards", () => {
     await screen.findByText("Card 0");
     await new Promise((r) => setTimeout(r, 300));
     expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots"))).toHaveLength(0);
-    release({ trips: many.filter((t) => t.id % 2 === 0).map((t) => ({ trip_id: t.id, count: 4, covers: [t.id] })) });
+    release({ trips: many.map((t) => (t.id % 2 === 0 ? { trip_id: t.id, count: 4, covers: [t.id] } : { trip_id: t.id, count: 0, covers: [] })) });
     await waitFor(() => expect(container.querySelectorAll("img[src^='https://maps.example/snapshot']").length).toBeGreaterThan(0));
     await new Promise((r) => setTimeout(r, 400));
     const withoutPhotos = many.filter((t) => t.id % 2 === 1).map((t) => t.id);

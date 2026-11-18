@@ -53,6 +53,7 @@
 
   let covers = $state<ReadonlyMap<number, TripCover>>(new Map());
   let coversKnown = $state(false);
+  const withoutPhotos = $derived(!!app.state && (!app.state.user || app.state.user.local));
   let coversTicket = 0;
   async function loadCovers() {
     const mine = ++coversTicket;
@@ -288,7 +289,7 @@
             {#each g.trips as t (t.id)}
               {@const cover = covers.get(t.id)}
               {@const km = distances.get(t.id)}
-              <li class="min-w-0"><PastTripCard trip={t} today={day} photos={cover?.count ?? 0} covers={cover?.covers ?? []} {coversKnown} distance={km && unit ? distanceText(km, unit) : ""} {roomy} /></li>
+              <li class="min-w-0"><PastTripCard trip={t} today={day} photos={cover?.count ?? 0} covers={cover?.covers ?? []} coversKnown={withoutPhotos || (coversKnown && covers.has(t.id))} distance={km && unit ? distanceText(km, unit) : ""} {roomy} /></li>
             {/each}
           </ul>
         </div>
