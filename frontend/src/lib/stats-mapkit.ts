@@ -58,10 +58,9 @@ export function unwrapped(points: LonLat[]): LonLat[] {
   return out;
 }
 
-function glyph(content: SVGElement, radius: number, label: string): HTMLElement {
+function glyph(content: SVGElement, radius: number): HTMLElement {
   const host = document.createElement("div");
   host.style.cssText = "position:relative;width:0;height:0";
-  host.setAttribute("aria-label", label);
   const svg = document.createElementNS(SVG, "svg");
   svg.setAttribute("viewBox", `${-radius} ${-radius} ${radius * 2} ${radius * 2}`);
   svg.setAttribute("width", String(radius * 2));
@@ -144,9 +143,13 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
       ...countryLayer.filter((p) => !(byState && p.id === US_ID)).map((p) => p.overlay),
       ...(byState ? stateLayer.map((p) => p.overlay) : []),
     ]);
+    const stale = [...shown].filter((overlay) => !lines.includes(overlay) && !wanted.has(overlay));
+    const fresh = [...wanted].filter((overlay) => !shown.has(overlay));
+    const missing = lines.some((line) => !shown.has(line));
+    if (stale.length === 0 && fresh.length === 0 && !missing) return;
     for (const line of lines) if (shown.has(line)) { map.removeOverlay(line); shown.delete(line); }
-    for (const overlay of [...shown]) if (!wanted.has(overlay)) { map.removeOverlay(overlay); shown.delete(overlay); }
-    for (const overlay of wanted) if (!shown.has(overlay)) { map.addOverlay(overlay); shown.add(overlay); }
+    for (const overlay of stale) { map.removeOverlay(overlay); shown.delete(overlay); }
+    for (const overlay of fresh) { map.addOverlay(overlay); shown.add(overlay); }
     for (const line of lines) { map.addOverlay(line); shown.add(line); }
   };
 
@@ -220,12 +223,12 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
     for (const s of stayPins) {
       const diamond = shape("rect", { x: -4, y: -4, width: 8, height: 8, transform: "rotate(45)", fill: palette.stay, stroke: palette.sea, "stroke-width": 1.5, "data-stay": s.city });
       const item: Item = { pick: { label: s.label, trips: s.trips }, kind: "stay", mark: diamond };
-      marks.push(new mk.Annotation(coordinate([s.longitude, s.latitude]), () => glyph(diamond, 12, s.label), { data: item, accessibilityLabel: s.label }));
+      marks.push(new mk.Annotation(coordinate([s.longitude, s.latitude]), () => glyph(diamond, 12), { data: item, accessibilityLabel: s.label }));
     }
     for (const d of airports) {
       const circle = shape("circle", { r: d.r, fill: palette.airport, stroke: palette.sea, "stroke-width": 1.5, "data-dot": d.code });
       const item: Item = { pick: { label: d.label, trips: [] }, kind: "airport", mark: circle };
-      marks.push(new mk.Annotation(coordinate([d.longitude, d.latitude]), () => glyph(circle, Math.max(d.r, 9) + 2, d.label), { data: item, accessibilityLabel: d.label }));
+      marks.push(new mk.Annotation(coordinate([d.longitude, d.latitude]), () => glyph(circle, Math.max(d.r, 9) + 2), { data: item, accessibilityLabel: d.label }));
     }
     for (const a of marks) map.addAnnotation(a);
     framed = null;

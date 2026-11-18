@@ -95,13 +95,16 @@
     dragStart(event) {
       if (!this.isScrollEnabled || !this.rect || event.target.closest("[data-zoom]")) return;
       let last = { x: event.clientX, y: event.clientY };
+      let moved = false;
       const move = (e) => {
+        if (!moved && Math.hypot(e.clientX - last.x, e.clientY - last.y) < 3) return;
+        moved = true;
         const scale = Math.min(this.host.clientWidth / this.rect.width, this.host.clientHeight / this.rect.height);
         const dx = (last.x - e.clientX) / scale, dy = (last.y - e.clientY) / scale;
         last = { x: e.clientX, y: e.clientY };
         this.rect = new MapRect((((this.rect.x + dx) % 1) + 1) % 1, Math.max(0, Math.min(1 - this.rect.height, this.rect.y + dy)), this.rect.width, this.rect.height);
       };
-      const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); this.emit("region-change-end"); };
+      const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); if (moved) this.emit("region-change-end"); };
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     }
