@@ -1,3 +1,4 @@
+import UserNotifications
 import WebKit
 import XCTest
 @testable import Waypoint
@@ -296,6 +297,24 @@ final class OfflineShellTests: XCTestCase {
         XCTAssertEqual(webView.url, OfflinePageAddress.home)
         let ran = try await webView.evaluateJavaScript("document.documentElement.dataset.ran") as? String
         XCTAssertEqual(ran, "yes")
+    }
+
+    @MainActor
+    func testTheShellLeavesTheNotificationDelegateToTheArrivalTapHandler() async throws {
+        let server = URL(string: "https://127.0.0.1:\(Self.closedPort())")!
+        let before = (ShellViewController.serverURL, ShellViewController.gate)
+        ShellViewController.serverURL = server
+        ShellViewController.gate = gate
+        let delegateBefore = UNUserNotificationCenter.current().delegate
+        UNUserNotificationCenter.current().delegate = nil
+        defer {
+            (ShellViewController.serverURL, ShellViewController.gate) = before
+            UNUserNotificationCenter.current().delegate = delegateBefore
+        }
+        let controller = ShellViewController()
+        XCTAssertFalse(controller.instanceDescriptor().handleApplicationNotifications)
+        controller.loadViewIfNeeded()
+        XCTAssertTrue(UNUserNotificationCenter.current().delegate === ArrivalTapHandler.shared)
     }
 
     @MainActor
