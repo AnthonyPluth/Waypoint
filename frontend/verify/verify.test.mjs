@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeAirborne, fakeArchive, fakeBookings, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
+import { APPLE_MAPS_URLS, auditable, baseFor, CHROMIUM_ARGS, checksAfter, contextOptions, DEFAULT_VIEWPORTS, fakeAirborne, fakeArchive, fakeBookings, fakeImmichSource, fakeImmichTest, fakeResumeCheck, findChromium, flowProblems, FROZEN_NOW, heroFile, IMAGE_VIEWPORTS, launchOptions, lengthenNames, localBase, OFFLINE_SAVED, OPENED_PAGES, PAGES, pageBase, PHONE_AGENT, readFlows, recheck, runStep, screenshotFile, SIGNED_PAGES, snapshotStandIn, standInForApple, unknownPages, VIEWPORTS, VIRTUAL_AUTHENTICATOR, writesImage } from "./verify.mjs";
 
 describe("lengthenNames", () => {
   it("adds the suffix to the names a list shows, at any depth, and leaves the rest of the reply as it was", () => {
@@ -390,6 +390,27 @@ describe("mapkit flows", () => {
     expect((await answer("blocked", script)).aborted).toBe("blockedbyclient");
     expect((await answer("none", script)).aborted).toBe("blockedbyclient");
     expect((await answer(undefined, "https://cdn.apple-mapkit.com/tiles/1.png")).aborted).toBe("blockedbyclient");
+  });
+  it("answers a snapshot address with a stand-in image of the size asked, and refuses it with no key or a blocked Apple", async () => {
+    const routes = [];
+    const ctx = { route: async (pattern, handler) => routes.push({ pattern, handler }) };
+    const answer = async (mode, url) => {
+      routes.length = 0;
+      await standInForApple(ctx, mode);
+      const out = {};
+      await routes[0].handler({ request: () => ({ url: () => url }), fulfill: (o) => { out.fulfilled = o; }, abort: (reason) => { out.aborted = reason; } });
+      return out;
+    };
+    const snapshot = "https://snapshot.apple-mapkit.com/api/v1/snapshot?center=40.27,-108.43&z=5&size=352x168&scale=2&colorScheme=dark&signature=x";
+    for (const mode of [undefined, "error"]) {
+      const got = await answer(mode, snapshot);
+      expect(got.fulfilled.contentType).toBe("image/svg+xml");
+      expect(got.fulfilled.body).toContain('width="352" height="168"');
+      expect(got.fulfilled.body).toContain("Legal");
+    }
+    for (const mode of ["none", "blocked"]) expect((await answer(mode, snapshot)).aborted).toBe("blockedbyclient");
+    expect((await answer(undefined, "https://snapshot.apple-mapkit.com/api/v2/other")).aborted).toBe("blockedbyclient");
+    expect(snapshotStandIn("not a size")).toContain('width="400" height="200"');
   });
   it("tells the run about every request to an Apple host, so a flow with no key can fail on one", async () => {
     const routes = [];

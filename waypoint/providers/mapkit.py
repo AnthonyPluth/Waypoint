@@ -17,6 +17,14 @@ SCRIPT_URL = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
 SCOPE = "mapkit_js"
 SERVICE_HOSTS = "https://*.apple-mapkit.com"
 TOKEN_LIFETIME = 30 * 60
+SNAPSHOT_HOST = "snapshot.apple-mapkit.com"
+SNAPSHOT_URL = f"https://{SNAPSHOT_HOST}"
+SNAPSHOT_PATH = "/api/v1/snapshot"
+SNAPSHOT_LIFETIME = 2 * 24 * 3600
+SNAPSHOT_SIDES = (50, 640)
+SNAPSHOT_ZOOMS = (3, 20)
+SNAPSHOT_SCALES = (1, 2, 3)
+SNAPSHOT_SCHEMES = ("light", "dark")
 
 
 @dataclass(frozen=True)
@@ -42,6 +50,20 @@ def sign(creds: Credentials, origin: str, now: float) -> tuple[str, int]:
     expires = issued + TOKEN_LIFETIME
     token = es256.sign_jwt(key, header(creds), claims(creds, origin, issued, expires))
     return token, expires
+
+
+def snapshot_url(creds: Credentials, center: tuple[float, float], zoom: int, size: tuple[int, int], scale: int, scheme: str, lang: str, now: float) -> str:
+    width, height = size
+    if not (all(SNAPSHOT_SIDES[0] <= side <= SNAPSHOT_SIDES[1] for side in size) and SNAPSHOT_ZOOMS[0] <= zoom <= SNAPSHOT_ZOOMS[1]
+            and scale in SNAPSHOT_SCALES and scheme in SNAPSHOT_SCHEMES and -90 <= center[0] <= 90 and -180 <= center[1] <= 180):
+        raise ValueError("a snapshot outside what Apple draws")
+    key = serialization.load_pem_private_key(creds.key_pem, password=None)
+    if not isinstance(key, ec.EllipticCurvePrivateKey):
+        raise ValueError("the MapKit key isn't an elliptic-curve key")
+    params = [("center", f"{center[0]:.2f},{center[1]:.2f}"), ("z", str(zoom)), ("size", f"{width}x{height}"), ("scale", str(scale)), ("colorScheme", scheme),
+              ("poi", "0"), ("lang", lang), ("expires", str(int(now) + SNAPSHOT_LIFETIME)), ("teamId", creds.team_id), ("keyId", creds.key_id)]
+    signed = f"{SNAPSHOT_PATH}?{urllib.parse.urlencode(params, safe=',', quote_via=urllib.parse.quote)}"
+    return f"{SNAPSHOT_URL}{signed}&signature={es256.sign_text(key, signed)}"
 
 
 SERVER_HOST = "maps-api.apple.com"

@@ -5,6 +5,7 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "wait_for": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "[data-testid='route-tile'][data-drawn='true']" },
     { "screenshot": "list" },
     { "click": "a[href^='#trip/'] >> nth=1" },
     { "wait_for": "ul[aria-label='Bookings']" },

@@ -590,6 +590,24 @@ class DrivingRoutesForTrips(TypedDict):
     trips: list[TripDrivingRoutes]
 
 
+class MapSnapshotCentre(TypedDict):
+    latitude: float
+    longitude: float
+
+
+class MapSnapshot(TypedDict):
+    trip_id: int
+    url: str
+    center: MapSnapshotCentre
+    zoom: int
+    width: int
+    height: int
+
+
+class MapSnapshots(TypedDict):
+    snapshots: list[MapSnapshot]
+
+
 class DrivingRouteBody(TypedDict):
     start: DrivingPlace
     end: DrivingPlace
