@@ -67,16 +67,22 @@ class Unavailable(ServerError):
     pass
 
 
-def server_claims(creds: Credentials, issued: int, expires: int) -> dict[str, str | int]:
-    return {"iss": creds.team_id, "iat": issued, "exp": expires}
+SERVER_SCOPE = "server_api"
 
 
-def sign_server(creds: Credentials, now: float) -> str:
+def server_claims(creds: Credentials, issued: int, expires: int, scoped: bool = False) -> dict[str, str | int]:
+    claims: dict[str, str | int] = {"iss": creds.team_id, "iat": issued, "exp": expires}
+    if scoped:
+        claims["scope"] = SERVER_SCOPE
+    return claims
+
+
+def sign_server(creds: Credentials, now: float, scoped: bool = False) -> str:
     key = serialization.load_pem_private_key(creds.key_pem, password=None)
     if not isinstance(key, ec.EllipticCurvePrivateKey):
         raise ValueError("the MapKit key isn't an elliptic-curve key")
     issued = int(now)
-    return es256.sign_jwt(key, header(creds), server_claims(creds, issued, issued + TOKEN_LIFETIME))
+    return es256.sign_jwt(key, header(creds), server_claims(creds, issued, issued + TOKEN_LIFETIME, scoped))
 
 
 def _get(path: str, bearer: str) -> Any:
@@ -141,15 +147,18 @@ class Directions:
         self.creds = creds
         self.token: str | None = None
         self.expires = 0.0
+        self.scoped = False
 
     def _access(self, now: float) -> str:
         if self.token is not None and now < self.expires - TOKEN_MARGIN:
             return self.token
         try:
-            signed = sign_server(self.creds, now)
-        except ValueError:
-            raise Refused("the MapKit key can't sign") from None
-        body = _get("/v1/token", signed)
+            body = self._exchange(now)
+        except Refused as e:
+            if self.scoped or not e.expired:
+                raise
+            self.scoped = True
+            body = self._exchange(now)
         token = body.get("accessToken") if isinstance(body, dict) else None
         lifetime = body.get("expiresInSeconds") if isinstance(body, dict) else None
         if not isinstance(token, str) or not token:
@@ -157,6 +166,13 @@ class Directions:
         self.token = token
         self.expires = now + (lifetime if isinstance(lifetime, int | float) and not isinstance(lifetime, bool) and lifetime > 0 else 300)
         return token
+
+    def _exchange(self, now: float) -> Any:
+        try:
+            signed = sign_server(self.creds, now, self.scoped)
+        except ValueError:
+            raise Refused("the MapKit key can't sign") from None
+        return _get("/v1/token", signed)
 
     def route(self, start: tuple[float, float], end: tuple[float, float], now: float) -> list[list[float]] | None:
         query = urllib.parse.urlencode({"origin": f"{start[0]:.6f},{start[1]:.6f}", "destination": f"{end[0]:.6f},{end[1]:.6f}", "transportType": "Automobile"})

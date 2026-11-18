@@ -92,6 +92,31 @@ def _by_countries(trip: trips.TripOut) -> bool:
     return bool(live) and all(s["kind"] == "visit" for s in live)
 
 
+def max_stops(trip: trips.TripOut) -> int:
+    countries = _by_countries(trip)
+    total = 0
+    for s in _live(trip):
+        kind = s["kind"]
+        if kind == "visit":
+            total += 1 if countries else 0
+        elif kind == "parking":
+            continue
+        elif kind in ("flight", "train"):
+            total += 2
+        elif kind == "cruise":
+            total += 2 + len(s["itinerary"])
+        else:
+            total += 1
+    return total
+
+
+MIN_STOPS = 2
+
+
+def worth_locating(trip: trips.TripOut, today: date) -> bool:
+    return bool(trip["end_date"]) and str(trip["end_date"]) < today.isoformat() and max_stops(trip) >= MIN_STOPS
+
+
 def _is_road_trip(trip: trips.TripOut) -> bool:
     return not any(s["kind"] in ("flight", "train", "cruise") for s in _live(trip))
 
@@ -246,7 +271,7 @@ def _fingerprint(trip: trips.TripOut, at_home: Any) -> str:
 
 def missing(conn: db.Connection, today: date, memory: Memory) -> list[Missing]:
     found: list[Missing] = []
-    all_trips = [t for t in reversed(trips.listing(conn, HOUSEHOLD)) if t["end_date"] and t["end_date"] < today.isoformat()]
+    all_trips = [t for t in reversed(trips.listing(conn, HOUSEHOLD)) if worth_locating(t, today)]
     stored: dict[int, set[Key]] = {}
     for row in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_([t["id"] for t in all_trips]))):
         stored.setdefault(row.trip_id, set()).add((row.from_lat, row.from_lon, row.to_lat, row.to_lon))

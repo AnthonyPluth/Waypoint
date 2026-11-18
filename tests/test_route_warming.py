@@ -17,7 +17,7 @@ from tests.test_mapkit import KEY_ID, PEM, PRIVATE, TEAM_ID, parts, verifies
 from tests.test_route_cache import RouteCacheCase
 from tests.test_trip_roads import BOULDER, DENVER, SALT_LAKE
 from waypoint import monitoring, tls
-from waypoint.domain import driving_routes, maps, route_warming, tripmap
+from waypoint.domain import driving_routes, home, maps, route_warming, tripmap
 from waypoint.domain import trips as trip_domain
 from waypoint.providers import mapkit
 from waypoint.server import jobs
@@ -68,6 +68,10 @@ class WarmingCase(RouteCacheCase):
         with db.session() as conn:
             conn.execute(DrivingRoute.__table__.delete())
 
+    def clear_home(self):
+        with db.session() as conn:
+            home.clear(conn)
+
     def road_trip(self, *stays):
         first = self.book("ana", stays[0])
         for s in stays[1:]:
@@ -102,6 +106,19 @@ class FillingTests(WarmingCase):
         self.assertEqual(run(fetch).fetched, 1)
         self.assertEqual(len(fetch.calls), 1)
         self.assertEqual(len(self.rows()), 2)
+
+    def test_one_stay_and_a_home_elsewhere_is_not_a_trip_the_replay_draws_so_nothing_is_asked(self):
+        with db.session() as conn:
+            home.save(conn, {"city": "Denver", "state": "CO", "zip": "80202", "country": "US"})
+        self.addCleanup(self.clear_home)
+        self.road_trip(SALT_LAKE)
+        with db.session() as conn:
+            out = trip_domain.get(conn, route_warming.HOUSEHOLD, trip_domain.listing(conn, route_warming.HOUSEHOLD)[0]["id"])
+            places = tripmap.places(conn, route_warming.HOUSEHOLD, out["id"])
+            self.assertEqual(len(route_warming.drives_of(out, places)), 2)
+        fetch = Fetcher()
+        self.assertEqual(run(fetch).fetched, 0)
+        self.assertEqual(fetch.calls, [])
 
     def test_a_trip_that_has_not_ended_is_left_alone(self):
         self.road_trip(DENVER, SALT_LAKE)
@@ -290,6 +307,16 @@ def stops(segments, places):
 
 
 class StopTests(unittest.TestCase):
+    def test_the_count_of_stops_follows_the_page(self):
+        trip = {"segments": [seg(1, "flight"), seg(2, "train"), seg(3, "cruise", itinerary=[{}, {}]), seg(4, "hotel"), seg(5, "car"), seg(6, "parking"), seg(7, "visit"), seg(8, "hotel", status="cancelled")]}
+        self.assertEqual(route_warming.max_stops(trip), 2 + 2 + 4 + 1 + 1)
+        self.assertEqual(route_warming.max_stops({"segments": [seg(1, "visit"), seg(2, "visit"), seg(3, "parking")]}), 2)
+        trip["end_date"] = "2026-06-01"
+        self.assertTrue(route_warming.worth_locating(trip, date(2026, 6, 2)))
+        self.assertFalse(route_warming.worth_locating(trip, date(2026, 6, 1)))
+        self.assertFalse(route_warming.worth_locating({**trip, "end_date": None}, date(2026, 6, 2)))
+        self.assertFalse(route_warming.worth_locating({"segments": [seg(1, "hotel")], "end_date": "2026-06-01"}, date(2026, 6, 2)))
+
     CITIES = (("Alpha", 40.0, -100.0), ("Beta", 41.0, -99.0), ("Gamma", 43.0, -97.0))
 
     def test_a_flight_has_two_airports_and_a_hotel_reached_by_car_is_a_drive_from_the_landing(self):
@@ -367,6 +394,19 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual((head, claims), ({"alg": "ES256", "kid": KEY_ID, "typ": "JWT"}, {"iss": TEAM_ID, "iat": 1000, "exp": 1000 + mapkit.TOKEN_LIFETIME}))
         self.assertTrue(verifies(token, PRIVATE.public_key()))
 
+    def test_a_token_rejected_without_a_scope_is_signed_again_with_one_and_that_is_remembered(self):
+        client = mapkit.Directions(CREDS)
+        with self.fake(401, self.TOKEN, self.ROUTE, self.ROUTE):
+            self.assertIsNotNone(client.route((1.0, 2.0), (3.0, 4.0), 5000.0))
+            self.assertIsNotNone(client.route((1.0, 2.0), (3.0, 4.0), 5000.0))
+        first, second = (parts(r.get_header("Authorization").split()[1])[1] for r in self.sent[:2])
+        self.assertNotIn("scope", first)
+        self.assertEqual(second["scope"], "server_api")
+        self.assertEqual(len(self.sent), 4)
+        self.assertEqual(parts(mapkit.sign_server(CREDS, 1.0, True))[1]["scope"], "server_api")
+        with self.fake(401, 401), self.assertRaises(mapkit.Refused):
+            mapkit.Directions(CREDS).route((1.0, 2.0), (3.0, 4.0), 5000.0)
+
     def test_a_route_is_asked_for_with_an_access_token_and_comes_back_as_one_line(self):
         with self.fake(self.TOKEN, self.ROUTE):
             got = mapkit.Directions(CREDS).route((1.0, 2.0), (3.0, 4.0), 5000.0)
@@ -391,7 +431,7 @@ class ServerApiTests(unittest.TestCase):
             self.assertEqual(len(mapkit.Directions(CREDS).route((1.0, 2.0), (3.0, 4.0), 5000.0) or []), 3)
 
     def test_401_and_403_are_a_refusal_and_a_second_401_after_a_new_token_is_too(self):
-        for replies in ((401,), (403,), (self.TOKEN, 403), (self.TOKEN, 401, self.TOKEN, 401)):
+        for replies in ((401, 401), (403,), (self.TOKEN, 403), (self.TOKEN, 401, self.TOKEN, 401)):
             with self.fake(*replies), self.assertRaises(mapkit.Refused):
                 mapkit.Directions(CREDS).route((1.0, 2.0), (3.0, 4.0), 5000.0)
 
