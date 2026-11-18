@@ -270,7 +270,7 @@ describe("PastTrip facts", () => {
 describe("PastTrip days", () => {
   const month = (n: number, day: number, extra: Partial<TripPhoto> = {}) => Array.from({ length: n }, (_, i) => shot(1000 * day + i + 1, day, { taken_local: `2026-03-${String(day).padStart(2, "0")}T${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`, ...extra }));
 
-  it("draws a day as a dot on a rail with its date, place and photo count, a route glyph, six photos and a +N tile", async () => {
+  it("draws a day as a dot on a rail with its date, place and photo count, six photos and a +N tile, and no glyph beside it", async () => {
     photos = [...month(3, 1), ...month(38, 2)];
     best = [];
     show();
@@ -281,7 +281,8 @@ describe("PastTrip days", () => {
     expect(two.querySelector(".bg-primary")).toBeTruthy();
     expect(within(two).getByRole("heading", { level: 3, name: "Mon Mar 2" })).toBeTruthy();
     expect(two).toHaveTextContent("Marlow Springs · 38 photos");
-    expect(two.querySelector("svg[aria-hidden='true']")).toBeTruthy();
+    expect(two.querySelector("svg")).toBeNull();
+    expect(two.querySelector("[data-testid=day-glyph]")).toBeNull();
     expect(within(two).getAllByRole("button")).toHaveLength(6);
     expect(within(one).getAllByRole("button")).toHaveLength(3);
   });
@@ -783,14 +784,13 @@ describe("PastTrip on desktop", () => {
       expect(one).toHaveTextContent("Marlow Springs · 40 photos");
     });
 
-    it("draws a day with no rail, dot or route glyph, as the desktop frame does", async () => {
+    it("draws a day with no rail or dot, as the desktop frame does", async () => {
       photos = tiles(5);
       show();
       await settled();
       const [day] = days();
       expect(day.className).not.toContain("border-l-2");
       expect(day.querySelector(".bg-primary")).toBeNull();
-      expect(day.querySelector("[data-testid=day-glyph]")).toBeNull();
     });
 
     it("shows the first three days and Show all N days reveals the rest", async () => {
@@ -895,12 +895,12 @@ describe("PastTrip on desktop", () => {
       vi.stubGlobal("matchMedia", (q: string) => ({ matches: false, media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
     });
 
-    it("is a group named for its pins, with one button per place named by count and place, and Replay trip on it", async () => {
+    it("is a group named Trip map, with Replay trip on it and no pins", async () => {
       show({ trip: flown });
-      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
-      const pin = await within(map).findByRole("button", { name: "38 photos near Marlow Springs" });
-      expect(pin).toHaveTextContent("38");
+      const map = await within(column()).findByRole("group", { name: "Trip map" });
       expect(within(map).getByRole("button", { name: "Replay trip" })).toHaveAttribute("aria-expanded", "false");
+      expect(map.querySelector("[data-pin]")).toBeNull();
+      expect(within(map).queryByRole("button", { name: /photos near/ })).toBeNull();
       expect(within(column()).queryByRole("list", { name: "Map key" })).toBeNull();
       expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(column()).queryByRole("region", { name: "Stops list" })).toBeNull();
@@ -915,9 +915,9 @@ describe("PastTrip on desktop", () => {
       expect(within(column()).queryByRole("list", { name: "Stops in order" })).toBeNull();
       expect(within(column()).queryByRole("button", { name: "Hide replay" })).toBeNull();
       fireEvent.input(slider, { target: { value: "50" } });
-      expect(within(column()).queryByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeNull();
+      expect(within(column()).queryByRole("group", { name: "Trip map" })).toBeNull();
       fireEvent.input(slider, { target: { value: String(SCRUB_STEPS) } });
-      expect(await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+      expect(await within(column()).findByRole("group", { name: "Trip map" })).toBeTruthy();
       expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(column()).getByRole("button", { name: "Replay trip" })).toBeTruthy();
     });
@@ -925,7 +925,7 @@ describe("PastTrip on desktop", () => {
     it("offers no Replay trip to someone who asks for reduced motion, who would have no controls to leave it with", async () => {
       vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("reduce"), media: q, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
       show({ trip: flown });
-      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      const map = await within(column()).findByRole("group", { name: "Trip map" });
       expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
     });
 
@@ -936,24 +936,16 @@ describe("PastTrip on desktop", () => {
       await userEvent.click(await within(column()).findByRole("button", { name: "Replay trip" }));
       await within(column()).findByRole("slider", { name: "Position along the route" });
       act(() => change?.({ matches: true }));
-      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
+      const map = await within(column()).findByRole("group", { name: "Trip map" });
       expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
     });
 
-    it("shows a pin's photos below the map and jumps to them in the days", async () => {
-      show({ trip: flown });
-      await userEvent.click(await within(column()).findByRole("button", { name: "38 photos near Marlow Springs" }));
-      const card = within(column()).getByRole("group", { name: "38 photos near Marlow Springs" });
-      await userEvent.click(within(card).getByRole("button", { name: "Show these photos" }));
-      await waitFor(() => expect(document.activeElement?.hasAttribute("data-photo")).toBe(true));
-    });
-
-    it("has no Replay trip button for a trip with no route, but still a map of where the photos were taken", async () => {
+    it("has no map in the column for a trip with no route, even when its photos have places", async () => {
       show();
-      const map = await within(column()).findByRole("group", { name: "Trip map, photo pins show how many photos are there" });
-      expect(within(map).queryByRole("button", { name: "Replay trip" })).toBeNull();
-      expect(within(map).getByRole("button", { name: "38 photos near Marlow Springs" })).toBeTruthy();
+      await settled();
+      expect(within(column()).queryByRole("group", { name: "Trip map" })).toBeNull();
+      expect(column().querySelector("[data-pin]")).toBeNull();
     });
   });
 });

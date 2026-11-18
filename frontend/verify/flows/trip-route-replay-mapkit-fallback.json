@@ -27,7 +27,7 @@
     },
     {
       "expect_text": {
-        "selector": "[data-testid='stop-list']",
+        "selector": "[data-testid='replay-map']",
         "text": "Orlando"
       }
     },
@@ -38,7 +38,7 @@
       }
     },
     {
-      "wait_for": "[data-testid='stop-list'] li:last-child[data-current='true']"
+      "wait_for": "section[aria-label='Route replay'] button:has-text('Replay')"
     },
     {
       "wait_for": "[data-testid='legs'] path[data-leg]"

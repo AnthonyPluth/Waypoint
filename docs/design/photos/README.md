@@ -8,8 +8,8 @@ A UI issue builds the screens in the file it points at, and lists the accessible
 | --- | --- | --- |
 | a | [a-trip-page.html](a-trip-page.html) | The trip page with the photo strip, and the gallery opened in place and grouped by day, with the far flag and the inferred-location mark |
 | b | [b-photo-viewer.html](b-photo-viewer.html) | The viewer for a photo with GPS, a video placed from the itinerary, and a far photo; Open original |
-| c | [c-trip-map.html](c-trip-map.html) | The route map with photo cluster pins, a tapped pin, and the replay passing a cluster |
-| d | [d-map-pins-only.html](d-map-pins-only.html) | The map of a trip with no placeable booking: photo pins only (decided) |
+| c | [c-trip-map.html](c-trip-map.html) | The route map with photo cluster pins, a tapped pin, and the replay passing a cluster (superseded 2026-11-18: see below) |
+| d | [d-map-pins-only.html](d-map-pins-only.html) | The map of a trip with no placeable booking: photo pins only (decided, then superseded 2026-11-18: see below) |
 | e | [e-trip-summary.html](e-trip-summary.html) | The trip summary line: days, nights, distance in the household unit, states and countries, photos |
 | f | [f-settings-photos.html](f-settings-photos.html) | Settings, Photos: the source cards and the Connect form with its plain-language note |
 | g | [g-empty-states.html](g-empty-states.html) | No library connected (trip page and Settings), connected but nothing synced yet, a trip with no photos, a refused source, an unreachable source |
@@ -50,6 +50,16 @@ The owner signed off on moving the trip page's photo-sharing block behind a butt
 - The desktop popover is non-modal and closes on Escape, an outside click or Tab leaving it. Focus returns to the button on Escape. The sheet is modal.
 - Nothing about who can see what changes.
 - `docs/PHOTOS.md` mentions a one-line row with `Manage` that the code does not have; the build issue corrects it.
+
+## Removed from the completed trip page (owner decision, 2026-11-18)
+
+The owner looked at a completed trip on a phone and decided to remove three things the signed-off designs draw. Where a frame below still shows one, this decision wins.
+
+- **Photo pins.** The numbered white circles on the route replay map (one per cluster of photos, with the count inside, the hollow and far variants, the callout with **Show these photos**, the label card during the replay) and the **Photos**, **Photos placed from the itinerary** and **Far from every booking** entries of the map key are gone, on the bundled map and on Apple's alike. The map is the route alone and is fitted to the stops alone. Frames c (pins, tapped pin, replay passing a cluster) and d (a trip with no placeable booking drawn as pins only) are superseded; a trip with photos but no route to replay now shows no map. The `--map-photo` token stays in the theme for now: nothing uses it, and a token changes only on the owner's say.
+- **The stops list.** The numbered, scrolling list of stops under the Replay controls (phone and desktop) is gone from the completed trip page. The older trip page for the static demo keeps it. The map still labels each stop as the replay reaches it and the slider reads out the stop it is on.
+- **The day glyph.** The small squiggle beside each day on a phone drew no real path, so it is dropped; a day is its dot on the rail, its date, place and count, and its photos.
+
+Photos are reached through the days, **Open gallery**, **View photos** and the viewer.
 
 ## Sharing on a completed trip (decided 2026-11-17, #772)
 
