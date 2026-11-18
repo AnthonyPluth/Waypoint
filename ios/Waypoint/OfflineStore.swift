@@ -19,6 +19,7 @@ final class OfflineStore: @unchecked Sendable {
     private static let tripsFile = "trips.json"
     private static let metaFile = "meta.json"
     private static let placesFile = "arrival-places.json"
+    private static let arrivalFile = "arrival-watch.json"
     private static let stagingPrefix = ".staging-"
 
     private struct Meta: Codable {
@@ -109,6 +110,34 @@ final class OfflineStore: @unchecked Sendable {
         try? files.removeItem(at: folder(for: server).appendingPathComponent(Self.placesFile))
     }
 
+    /// The arrival file (`ArrivalWatch`): the places being watched, for a wake-up while the phone is locked, so it is the one file here that
+    /// iOS can read after the first unlock. It lives in the server's folder, carries through each save and goes with every purge. Never
+    /// written without a saved copy, and read without touching the saved trips.
+    func saveArrival(_ data: Data, for server: URL) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let folder = folder(for: server)
+        guard files.fileExists(atPath: folder.path) else { return }
+        do {
+            try data.write(to: folder.appendingPathComponent(Self.arrivalFile),
+                           options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        } catch {
+            throw OfflineStoreError.cannotWrite
+        }
+    }
+
+    func loadArrival(server: URL) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return try? Data(contentsOf: folder(for: server).appendingPathComponent(Self.arrivalFile))
+    }
+
+    func deleteArrival(server: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? files.removeItem(at: folder(for: server).appendingPathComponent(Self.arrivalFile))
+    }
+
     func purge(server: URL) throws {
         lock.lock()
         defer { lock.unlock() }
@@ -153,6 +182,11 @@ final class OfflineStore: @unchecked Sendable {
                let carried = Self.placesKept(earlier, trips: trips) {
                 try carried.write(to: staging.appendingPathComponent(Self.placesFile), options: .completeFileProtection)
             }
+            if let earlier = try? Data(contentsOf: folder.appendingPathComponent(Self.arrivalFile)),
+               let carried = Self.arrivalKept(earlier, trips: trips) {
+                try carried.write(to: staging.appendingPathComponent(Self.arrivalFile),
+                                  options: .completeFileProtectionUntilFirstUserAuthentication)
+            }
             if files.fileExists(atPath: folder.path) {
                 _ = try files.replaceItemAt(folder, withItemAt: staging)
             } else {
@@ -183,6 +217,18 @@ final class OfflineStore: @unchecked Sendable {
         }
         object["places"] = keptPlaces
         object["geocoded"] = keptLookups
+        return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+
+    /// The arrival file as it stays when the saved trips become `trips`: only the watched places of a trip still saved, none meaning no file.
+    private static func arrivalKept(_ arrival: Data, trips: Data) -> Data? {
+        guard let saved = parse(trips),
+              var object = try? JSONSerialization.jsonObject(with: arrival) as? [String: Any],
+              let listed = object["watched"] as? [[String: Any]] else { return nil }
+        let ids = Set(saved.trips.compactMap { ($0["trip"] as? [String: Any])?["id"] as? Int })
+        let kept = listed.filter { ids.contains(($0["place"] as? [String: Any])?["tripId"] as? Int ?? -1) }
+        guard !kept.isEmpty else { return nil }
+        object["watched"] = kept
         return try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     }
 

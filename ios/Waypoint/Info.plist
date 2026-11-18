@@ -44,6 +44,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Waypoint connects to the server you enter, which may be on your home network.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Waypoint uses your location on this device to tell you when you arrive at a parking lot, rental pickup or hotel on a saved trip, even when Waypoint is closed. Your location is never sent anywhere and is not recorded.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Waypoint uses your location on this device to bring up a booking’s code when you arrive at its parking lot, rental pickup or hotel. Your location is never sent to your Waypoint server or anyone else and is not recorded. Booking addresses are looked up with Apple Maps.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

@@ -13,13 +13,24 @@ struct WaypointApp: App {
         case failed(String)
     }
 
+    init() {
+        ArrivalWatch.listen()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
                 content
             }
             .onChange(of: scenePhase) { newPhase in
-                if newPhase == .active { Task { await returnToForeground() } }
+                if newPhase == .active {
+                    Task {
+                        await ArrivalWatch.shared.foregrounded()
+                        await returnToForeground()
+                    }
+                } else if newPhase == .background {
+                    Task { await ArrivalWatch.shared.backgrounded() }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .webViewUnauthorized)) { _ in
                 Task { await endSession() }
@@ -90,6 +101,7 @@ struct WaypointApp: App {
         if PendingPage.shared.peek() != nil {
             NotificationCenter.default.post(name: .openSavedPage, object: nil)
         }
+        await ArrivalWatch.shared.activated()
         await OfflineSync.shared.sync()
     }
 
