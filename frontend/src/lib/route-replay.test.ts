@@ -335,13 +335,6 @@ describe("the local legs and the camera", () => {
     expect(legs.every((l) => l.d.startsWith("M"))).toBe(true);
   });
 
-  it("fits the map around extra lines it is given as well as the stops", () => {
-    const a = stopsOf(trip([out]), places);
-    const narrow = routeProjection(a, 960, 520);
-    const wide = routeProjection(a, 960, 520, undefined, undefined, [[[10, -100], [60, -60]]]);
-    expect(wide.scale()).toBeLessThan(narrow.scale());
-  });
-
   it("draws a drive as a straight line, and keeps a bow for a train and a cruise", () => {
     const at = (name: string, longitude: number, via: Stop["via"]): Stop => ({ name, city: name, code: null, kind: "place", latitude: 38, longitude, from: "2025-12-05", to: "2025-12-05", via });
     const set = [at("A", -122, null), at("B", -121, null), at("C", -120, "train"), at("D", -119, "cruise")];

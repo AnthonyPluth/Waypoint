@@ -253,6 +253,3 @@ export function savedRoutes(trip: number): Promise<SavedRoutes> {
   forCards.set(trip, job);
   return job;
 }
-
-export const savedRoads = (stops: Stop[], saved: SavedRoutes): (RoutePath | null)[] =>
-  stops.slice(1).map((to, i) => (isDrive(stops[i], to) ? (saved.get(keyOf(stops[i], to)) ?? null) : null));

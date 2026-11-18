@@ -83,7 +83,6 @@ try {
     const past = data.trips.find(trip=>trip.end_date < data.asOf && trip.segments.some(segment=>segment.kind === 'flight'));
     await page.goto(`${origin}${prefix}#trip/${past.id}`);
     await page.locator('h1').first().waitFor();
-    await page.locator('[data-testid="trip-summary"]').first().waitFor();
     assert.equal(await page.getByRole('region',{name:'Route replay'}).count(),0,'a route replay is offered with no MapKit key');
     assert.equal(await page.getByRole('button',{name:'Replay trip'}).count(),0,'Replay trip is offered with no MapKit key');
     assert.equal(await page.locator('[data-mapkit]').count(),0,'an Apple map is drawn with no MapKit key');

@@ -4,9 +4,8 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "wait_for": "ul[aria-label='Past trips in 2026'] a:has-text('Denver') [data-testid='route-tile'][data-drawn='true']" },
-    { "wait_for": "ul[aria-label='Past trips in 2026'] a:has-text('Denver') [data-testid='route-tile'] svg g[fill='none'] path:not([d*='Q'])" },
     { "scroll_to": "ul[aria-label='Past trips in 2026'] a:has-text('Denver')" },
-    { "screenshot": "saved-road-and-arc" },
+    { "screenshot": "straight-drive-and-arc" },
     { "goto": "#trips?year=2025" },
     { "wait_for": "ul[aria-label='Past trips in 2025'] a:has-text('Miami') [data-testid='route-tile'][data-drawn='true']" },
     { "screenshot": "arcs-only" }

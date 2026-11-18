@@ -226,10 +226,9 @@ export function moverAt(leg: Leg, t: number): { x: number; y: number; angle: num
   return { x: now.x, y: now.y, angle: (Math.atan2(ahead.y - behind.y, ahead.x - behind.x) * 180) / Math.PI };
 }
 
-export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, base: () => GeoProjection = geoEqualEarth, lines: number[][][] = []): GeoProjection {
+export function routeProjection(stops: Stop[], width: number, height: number, padding = { x: 100, y: 76 }, base: () => GeoProjection = geoEqualEarth): GeoProjection {
   const points = stops.map(lonLat);
   const geometries: Geometry[] = [{ type: "MultiPoint", coordinates: points }];
-  for (const line of lines) geometries.push({ type: "LineString", coordinates: line.map(([lat, lon]) => [lon, lat]) });
   for (let i = 1; i < points.length; i++) geometries.push({ type: "LineString", coordinates: [points[i - 1], points[i]] });
   const [[west, south], [east, north]] = geoBounds({ type: "GeometryCollection", geometries });
   const spanLon = ((east - west) % 360 + 360) % 360, spanLat = north - south;
