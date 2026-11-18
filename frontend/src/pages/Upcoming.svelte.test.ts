@@ -747,7 +747,7 @@ describe("Upcoming header, review banner and timeline", () => {
 
 describe("Upcoming side column", () => {
   const places = {
-    home: null, stays: [], cities: [], roads: { legs: [], interstates: [] }, boundaries: [],
+    home: null, stays: [], cities: [],
     airports: [{ code: "JFK", city: "New York", latitude: 40.64, longitude: -73.78 }, { code: "LHR", city: "London", latitude: 51.47, longitude: -0.45 }],
   };
   const later = (id: number, name: string, start: string, end: string, destination: string | null) =>

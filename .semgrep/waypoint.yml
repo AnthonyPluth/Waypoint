@@ -419,6 +419,19 @@ rules:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/mapkit.py", "/waypoint/domain/route_warming.py"]
 
+  - id: waypoint-driving-route-rows
+    message: >-
+      Stored Apple roads (the DrivingRoute rows) are read only in waypoint/domain/driving_routes.py (the per-trip and
+      batched lookups and the trip summary's lengths, each checking the viewer, the trip and that the drive's ends are
+      still the trip's stops) and listed for the nightly warming in waypoint/domain/route_warming.py (AGENTS.md, "You
+      see the trips you're on"): add what you need to driving_routes.py instead of querying the rows here.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?:\b(?:select|delete|update|insert)\(\s*DrivingRoute\b|\bDrivingRoute\.(?:trip_id|stored|path|from_lat|from_lon|to_lat|to_lon)\b)
+    paths:
+      include: ["/waypoint/"]
+      exclude: ["/waypoint/domain/driving_routes.py", "/waypoint/domain/route_warming.py", "/waypoint/storage/"]
+
   - id: waypoint-no-telemetry
     message: >-
       Waypoint sends nothing about itself to an outside service: no error reporting, analytics or monitoring SDK (AGENTS.md,

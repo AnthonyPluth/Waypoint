@@ -22,8 +22,6 @@ const places: TripPlaces = {
     { segment_id: 1, latitude: 38.63, longitude: -90.2, precision: "city" },
     { segment_id: 2, latitude: 36.16, longitude: -86.78, precision: "city" },
   ],
-  roads: { legs: [], interstates: [] },
-  boundaries: [],
 };
 const first = segment({ id: 1, kind: "hotel", origin: "Arch Inn", destination: "St. Louis", start_local: "2025-12-05T15:00", start_zone: zone, end_local: "2025-12-06T11:00", end_zone: zone });
 const second = segment({ id: 2, kind: "hotel", origin: "Music Row Inn", destination: "Nashville", start_local: "2025-12-06T15:00", start_zone: zone, end_local: "2025-12-08T11:00", end_zone: zone });

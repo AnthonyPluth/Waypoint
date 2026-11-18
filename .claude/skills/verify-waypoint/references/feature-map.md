@@ -461,14 +461,6 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `13 photos`, `Far from the trip’s bookings`, `of 13`.
 - **Drive it:** `tools/control flow trip-photos`; or `poetry run python run.py verify --flow trip-photos`.
 
-#### `trip-route-replay-backtrack`
-
-- **Starts at:** `#trips`.
-- **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`.
-- **Expects to see:** `Trips`.
-- **Drive it:** `tools/control flow trip-route-replay-backtrack`; or `poetry run python run.py verify --flow trip-route-replay-backtrack`.
-
 #### `trip-route-replay-mapkit-blocked`
 
 - **Starts at:** `#trips`.
@@ -501,22 +493,6 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Orlando`, `Position along the route`.
 - **Expects to see:** `Trips`, `Orlando`, `New York`.
 - **Drive it:** `tools/control flow trip-route-replay`; or `poetry run python run.py verify --flow trip-route-replay`.
-
-#### `trip-state-lines-flight`
-
-- **Starts at:** `#trips`.
-- **Widths:** phone, desktop.
-- **Touches:** `San Francisco`, `Position along the route`.
-- **Expects to see:** `Trips`, `State line`.
-- **Drive it:** `tools/control flow trip-state-lines-flight`; or `poetry run python run.py verify --flow trip-state-lines-flight`.
-
-#### `trip-state-lines`
-
-- **Starts at:** `#trips`.
-- **Widths:** phone, desktop.
-- **Touches:** `Denver`, `Position along the route`.
-- **Expects to see:** `Trips`, `State line`.
-- **Drive it:** `tools/control flow trip-state-lines`; or `poetry run python run.py verify --flow trip-state-lines`.
 
 #### `trip-travellers`
 

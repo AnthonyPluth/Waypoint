@@ -1,7 +1,6 @@
 import unittest
 
-from tests.test_trip_roads import DENVER, SALT_LAKE
-from tests.test_trips import BACK, HOTEL, OUT, RouteCase
+from tests.test_trips import BACK, DENVER, HOTEL, OUT, SALT_LAKE, RouteCase
 
 
 class TripSummaryRouteTests(RouteCase):
@@ -15,9 +14,41 @@ class TripSummaryRouteTests(RouteCase):
         self.assertEqual((got["days"], got["nights"]), (7, 6))
         self.assertEqual(got["kinds"]["hotel"], 2)
         self.assertGreater(got["road_km"], 0)
+        self.assertTrue(got["road_estimated"])
         self.assertEqual(got["flight_km"], 0.0)
         self.assertEqual(got["countries"], ["United States"])
         self.assertEqual(got["photos"], {"total": 0, "inferred": 0})
+
+    def test_a_drive_is_a_straight_line_marked_estimated_until_a_road_is_stored_and_then_the_roads_length(self):
+        first = self.book("ana", DENVER)
+        trip = first["trip_id"]
+        self.book("ana", SALT_LAKE, trip_id=trip)
+        straight = self.summary(trip)
+        self.assertTrue(straight["road_estimated"])
+        self.assertEqual(straight["distance_km"], straight["road_km"])
+        places = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+        a, b = places["stays"][0], places["stays"][1]
+        start, end = ({"latitude": round(p["latitude"], 4), "longitude": round(p["longitude"], 4)} for p in (a, b))
+        path = [[start["latitude"], start["longitude"]], [40.0, -108.0], [41.0, -110.0], [end["latitude"], end["longitude"]]]
+        self.assertEqual(self.ok("ana", "PUT", f"/api/trips/{trip}/driving-routes", {"start": start, "end": end, "path": path}), {"stored": True})
+        got = self.summary(trip)
+        self.assertFalse(got["road_estimated"])
+        self.assertGreater(got["road_km"], straight["road_km"])
+        self.assertEqual(got["distance_km"], got["road_km"])
+
+    def test_a_road_stored_on_another_trip_for_the_same_drive_is_never_counted(self):
+        ana_first = self.book("ana", DENVER)
+        self.book("ana", SALT_LAKE, trip_id=ana_first["trip_id"])
+        ben_first = self.book("ben", DENVER)
+        self.book("ben", SALT_LAKE, trip_id=ben_first["trip_id"])
+        places = self.ok("ben", "GET", f"/api/trips/{ben_first['trip_id']}/places")
+        start, end = ({"latitude": round(p["latitude"], 4), "longitude": round(p["longitude"], 4)} for p in places["stays"][:2])
+        path = [[start["latitude"], start["longitude"]], [40.0, -108.0], [41.0, -110.0], [end["latitude"], end["longitude"]]]
+        self.assertEqual(self.ok("ben", "PUT", f"/api/trips/{ben_first['trip_id']}/driving-routes", {"start": start, "end": end, "path": path}), {"stored": True})
+        theirs, mine = self.summary(ben_first["trip_id"], "ben"), self.summary(ana_first["trip_id"])
+        self.assertFalse(theirs["road_estimated"])
+        self.assertTrue(mine["road_estimated"])
+        self.assertLess(mine["road_km"], theirs["road_km"])
 
     def test_flights_count_their_distance_and_countries(self):
         first = self.book("ana", OUT)
