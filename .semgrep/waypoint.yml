@@ -393,6 +393,32 @@ rules:
       include: ["/waypoint/", "/frontend/src/", "/run.py"]
       exclude: ["/waypoint/providers/mapkit.py", "*.test.ts"]
 
+  - id: waypoint-apple-maps-server-host
+    message: >-
+      Only waypoint/providers/mapkit.py talks to Apple's Maps Server API (maps-api.apple.com), so what a request carries
+      (the start and end of one drive, nothing else), the signed token and the key stay in one place, and nothing reaches
+      Apple from the server unless a MapKit key is configured (AGENTS.md, "You see the trips you're on"): call it rather
+      than naming the host elsewhere.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?i)maps-api\.apple\.com
+    paths:
+      include: ["/waypoint/", "/frontend/src/", "/run.py"]
+      exclude: ["/waypoint/providers/mapkit.py", "*.test.ts"]
+
+  - id: waypoint-apple-directions-caller
+    message: >-
+      Only waypoint/domain/route_warming.py may call mapkit.Directions (and the provider module can't be imported under another name, which would hide a call), so what the server sends Apple (the start and end
+      of a drive of a trip that has ended that the replay would draw, from the nightly job, with a MapKit key active)
+      stays in one place and no route handler or other job sends it coordinates (AGENTS.md, "You see the trips you're
+      on"): add what you need to that job instead.
+    severity: ERROR
+    languages: [generic]
+    pattern-regex: (?:\bmapkit\.Directions\b|from\s+[\w.]*mapkit\s+import\s+[^\n]*\bDirections\b|\bimport\s+[\w.]*mapkit\s+as\b|from\s+[\w.]*providers\s+import\s+[^\n]*\bmapkit\s+as\b)
+    paths:
+      include: ["/waypoint/", "/run.py"]
+      exclude: ["/waypoint/providers/mapkit.py", "/waypoint/domain/route_warming.py"]
+
   - id: waypoint-no-telemetry
     message: >-
       Waypoint sends nothing about itself to an outside service: no error reporting, analytics or monitoring SDK (AGENTS.md,

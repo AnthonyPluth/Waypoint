@@ -96,6 +96,20 @@ MAP_SCRIPT = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
 MAP_CONNECT = "connect-src 'self' https://*.apple-mapkit.com"
 # ok: waypoint-mapkit-hosts
 policy = maps.POLICY
+# ruleid: waypoint-apple-maps-server-host
+DIRECTIONS = "https://maps-api.apple.com/v1/directions"
+# ruleid: waypoint-apple-directions-caller
+asking = mapkit.Directions(creds)
+# ruleid: waypoint-apple-directions-caller
+from ..providers.mapkit import Credentials, Directions
+# ruleid: waypoint-apple-directions-caller
+from ..providers import mapkit as kit
+# ruleid: waypoint-apple-directions-caller
+import waypoint.providers.mapkit as m
+# ruleid: waypoint-apple-directions-caller
+from ..providers.mapkit import Directions as D
+# ok: waypoint-apple-directions-caller
+from ..providers import mapkit
 
 # ruleid: waypoint-flightstatus-hosts
 STATUS_URL = "https://aerodatabox.p.rapidapi.com/flights/number/EX101/2026-11-20"

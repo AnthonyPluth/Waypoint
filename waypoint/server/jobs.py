@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
-from ..domain import flightstatus, photogrants, photoqueue, photosources, photosync, reminders
+from ..domain import flightstatus, photogrants, photoqueue, photosources, photosync, reminders, route_warming
 from ..domain.mail import scan
 from ..providers import gmail
 from ..storage import db, roads, states
@@ -26,6 +27,30 @@ def warm_map_data() -> None:
         states.state_lines()
     except Exception as e:
         monitoring.report(e, values=False)
+
+
+def warm_driving_routes(stop: threading.Event, given: route_warming.Memory) -> bool:
+    try:
+        fetch = route_warming.client(given)
+        if fetch is None:
+            return False
+        outcome = route_warming.run(date.today(), fetch, stop.wait, given, time.time)
+        if outcome.refused:
+            monitoring.log("Driving routes: Apple's Maps Server API didn't accept the MapKit key, so routes aren't being prepared ahead; check that the Maps Server API is enabled for the key.", "warning")
+            return False
+        monitoring.log(f"Driving routes: {outcome.fetched} prepared" + (", more to come." if outcome.left else "."))
+    except Exception as e:
+        monitoring.report(e, values=False)
+    return True
+
+
+def keep_routes_warm(stop: threading.Event, clock: Callable[[], datetime] = datetime.now) -> None:
+    given = route_warming.Memory()
+    while True:
+        if stop.wait(route_warming.seconds_until(clock(), route_warming.hour())):
+            return
+        if not warm_driving_routes(stop, given):
+            return
 
 
 def sweep_lapsed() -> None:
@@ -137,6 +162,7 @@ def start(stop: threading.Event) -> list[threading.Thread]:
                threading.Thread(target=every, args=(FLIGHT_STATUS_EVERY, check_flights), daemon=True, name="flight-status"),
                threading.Thread(target=every, args=(REMINDERS_EVERY, send_reminders), daemon=True, name="reminders"),
                threading.Thread(target=every, args=(SCAN_EVERY, scan_mailboxes, SCAN_FIRST), daemon=True, name="mail-scan"),
+               threading.Thread(target=keep_routes_warm, args=(stop,), daemon=True, name="driving-routes"),
                threading.Thread(target=every, args=(PHOTO_SYNC_EVERY, sync_photos, PHOTO_SYNC_FIRST), daemon=True, name="photo-sync")]
     photoqueue.enable(photosync.start)
     for t in threads:

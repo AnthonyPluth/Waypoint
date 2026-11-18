@@ -268,6 +268,21 @@ def stop_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[roads
     return found
 
 
+def stop_places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
+    at = _locate(conn, viewer, trip_id)
+    if at is None:
+        return None
+    return {
+        "home": at.home,
+        "airports": [{"code": a.code, "city": a.city, "latitude": a.latitude, "longitude": a.longitude} for a in sorted(at.airports, key=lambda a: a.code)],
+        "cities": [{"city": c, "latitude": at.cities[c][0], "longitude": at.cities[c][1]} for c in sorted(at.cities)],
+        "stays": [{"segment_id": g.id, "latitude": g.latitude, "longitude": g.longitude, "precision": cast(Precision, g.geo_precision or "city")}
+                  for g in at.stays if g.latitude is not None and g.longitude is not None],
+        "roads": {"legs": [], "interstates": []},
+        "boundaries": [],
+    }
+
+
 def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
     at = _locate(conn, viewer, trip_id)
     if at is None:

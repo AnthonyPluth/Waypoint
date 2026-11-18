@@ -1,0 +1,1327 @@
+[
+ {
+  "name": "a flight then a hotel reached by car",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "AAA",
+     "destination": "BBB",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn, Main St",
+     "destination": "Gamma",
+     "start_local": "2026-06-01T15:00",
+     "end_local": "2026-06-03T10:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [
+    {
+     "code": "AAA",
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "code": "BBB",
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    }
+   ],
+   "cities": [
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "airport",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "airport",
+    "Beta",
+    "flight",
+    41.0,
+    -99.0
+   ],
+   [
+    "stay",
+    "Inn",
+    null,
+    43.0,
+    -97.0
+   ]
+  ],
+  "drives": [
+   [
+    41.0,
+    -99.0,
+    43.0,
+    -97.0
+   ]
+  ],
+  "max_stops": 3,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a rental car is dropped when the trip flies",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "AAA",
+     "destination": "BBB",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "car",
+     "status": "confirmed",
+     "origin": "Gamma",
+     "destination": "Gamma",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [
+    {
+     "code": "AAA",
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "code": "BBB",
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    }
+   ],
+   "cities": [
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "airport",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "airport",
+    "Beta",
+    "flight",
+    41.0,
+    -99.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 3,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a rental car at a stay already there is dropped",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn",
+     "destination": "Gamma",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "car",
+     "status": "confirmed",
+     "origin": "Gamma",
+     "destination": "Gamma",
+     "start_local": "2026-06-01T12:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 1,
+     "latitude": 43.0,
+     "longitude": -97.0,
+     "precision": "street"
+    },
+    {
+     "segment_id": 2,
+     "latitude": 43.0,
+     "longitude": -97.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "stay",
+    "Inn",
+    null,
+    43.0,
+    -97.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a lone rental car is a stop",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 2,
+     "kind": "car",
+     "status": "confirmed",
+     "origin": "Gamma",
+     "destination": "Gamma",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 2,
+     "latitude": 43.0,
+     "longitude": -97.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "place",
+    "Gamma",
+    null,
+    43.0,
+    -97.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 1,
+  "worth_locating": false,
+  "names": true
+ },
+ {
+  "name": "a train is not a drive",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "train",
+     "status": "confirmed",
+     "origin": "Alpha",
+     "destination": "Beta",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 3,
+     "latitude": 40.0,
+     "longitude": -100.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "place",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "place",
+    "Beta",
+    "train",
+    41.0,
+    -99.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a cruise calls at its ports",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 3,
+     "kind": "cruise",
+     "status": "confirmed",
+     "origin": "Alpha, X",
+     "destination": "Alpha, X",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": [
+      {
+       "name": "Beta",
+       "arrive_local": "2026-06-02T08:00",
+       "depart_local": "2026-06-02T17:00"
+      },
+      {
+       "name": "Gamma",
+       "arrive_local": null,
+       "depart_local": null
+      }
+     ]
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 3,
+     "latitude": 40.0,
+     "longitude": -100.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "place",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "place",
+    "Beta",
+    "cruise",
+    41.0,
+    -99.0
+   ],
+   [
+    "place",
+    "Gamma",
+    "cruise",
+    43.0,
+    -97.0
+   ],
+   [
+    "place",
+    "Alpha",
+    "cruise",
+    40.0,
+    -100.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 4,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "visits only are ordered by date and cancelled ones ignored",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 2,
+     "kind": "visit",
+     "status": "confirmed",
+     "origin": null,
+     "destination": "FR",
+     "start_local": "2026-06-05T00:00",
+     "end_local": "2026-06-06T00:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 1,
+     "kind": "visit",
+     "status": "confirmed",
+     "origin": null,
+     "destination": "DE",
+     "start_local": "2026-06-01T00:00",
+     "end_local": "2026-06-02T00:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 3,
+     "kind": "visit",
+     "status": "cancelled",
+     "origin": null,
+     "destination": "IT",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 4,
+     "kind": "parking",
+     "status": "confirmed",
+     "origin": "Lot",
+     "destination": null,
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [],
+   "stays": [
+    {
+     "segment_id": 1,
+     "latitude": 40.0,
+     "longitude": -100.0,
+     "precision": "street"
+    },
+    {
+     "segment_id": 2,
+     "latitude": 42.0,
+     "longitude": -98.0,
+     "precision": "street"
+    },
+    {
+     "segment_id": 3,
+     "latitude": 45.0,
+     "longitude": -95.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "place",
+    "DE",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "place",
+    "FR",
+    null,
+    42.0,
+    -98.0
+   ]
+  ],
+  "drives": [
+   [
+    40.0,
+    -100.0,
+    42.0,
+    -98.0
+   ]
+  ],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": false
+ },
+ {
+  "name": "a road trip is wrapped at home",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn A",
+     "destination": "Alpha",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn G",
+     "destination": "Gamma",
+     "start_local": "2026-06-03T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": {
+    "city": "Homeville",
+    "latitude": 30.0,
+    "longitude": -90.0
+   },
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 1,
+     "latitude": 40.0,
+     "longitude": -100.0,
+     "precision": "street"
+    },
+    {
+     "segment_id": 2,
+     "latitude": 43.0,
+     "longitude": -97.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "home",
+    "Homeville",
+    null,
+    30.0,
+    -90.0
+   ],
+   [
+    "stay",
+    "Inn A",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "stay",
+    "Inn G",
+    null,
+    43.0,
+    -97.0
+   ],
+   [
+    "home",
+    "Homeville",
+    null,
+    30.0,
+    -90.0
+   ]
+  ],
+  "drives": [
+   [
+    30.0,
+    -90.0,
+    40.0,
+    -100.0
+   ],
+   [
+    40.0,
+    -100.0,
+    43.0,
+    -97.0
+   ],
+   [
+    43.0,
+    -97.0,
+    30.0,
+    -90.0
+   ]
+  ],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a road trip starting at home is wrapped at the end only",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn A",
+     "destination": "Alpha",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn G",
+     "destination": "Gamma",
+     "start_local": "2026-06-03T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": {
+    "city": "Homeville",
+    "latitude": 30.0,
+    "longitude": -90.0
+   },
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 1,
+     "latitude": 30.0,
+     "longitude": -90.0,
+     "precision": "street"
+    },
+    {
+     "segment_id": 2,
+     "latitude": 43.0,
+     "longitude": -97.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "stay",
+    "Inn A",
+    null,
+    30.0,
+    -90.0
+   ],
+   [
+    "stay",
+    "Inn G",
+    null,
+    43.0,
+    -97.0
+   ],
+   [
+    "home",
+    "Homeville",
+    null,
+    30.0,
+    -90.0
+   ]
+  ],
+  "drives": [
+   [
+    30.0,
+    -90.0,
+    43.0,
+    -97.0
+   ],
+   [
+    43.0,
+    -97.0,
+    30.0,
+    -90.0
+   ]
+  ],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a trip with a flight is not wrapped at home",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "AAA",
+     "destination": "BBB",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": {
+    "city": "Homeville",
+    "latitude": 30.0,
+    "longitude": -90.0
+   },
+   "airports": [
+    {
+     "code": "AAA",
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "code": "BBB",
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    }
+   ],
+   "cities": [],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "airport",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "airport",
+    "Beta",
+    "flight",
+    41.0,
+    -99.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "one stay with home elsewhere is not worth locating",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn A",
+     "destination": "Alpha",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": {
+    "city": "Homeville",
+    "latitude": 30.0,
+    "longitude": -90.0
+   },
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [
+    {
+     "segment_id": 1,
+     "latitude": 40.0,
+     "longitude": -100.0,
+     "precision": "street"
+    }
+   ],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "home",
+    "Homeville",
+    null,
+    30.0,
+    -90.0
+   ],
+   [
+    "stay",
+    "Inn A",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "home",
+    "Homeville",
+    null,
+    30.0,
+    -90.0
+   ]
+  ],
+  "drives": [
+   [
+    30.0,
+    -90.0,
+    40.0,
+    -100.0
+   ],
+   [
+    40.0,
+    -100.0,
+    30.0,
+    -90.0
+   ]
+  ],
+  "max_stops": 1,
+  "worth_locating": false,
+  "names": true
+ },
+ {
+  "name": "the same airport twice in a row is one stop",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "AAA",
+     "destination": "BBB",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "BBB",
+     "destination": "AAA",
+     "start_local": "2026-06-01T12:00",
+     "end_local": "2026-06-01T13:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [
+    {
+     "code": "AAA",
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "code": "BBB",
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    }
+   ],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "airport",
+    "Alpha",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "airport",
+    "Beta",
+    "flight",
+    41.0,
+    -99.0
+   ],
+   [
+    "airport",
+    "Alpha",
+    "flight",
+    40.0,
+    -100.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 4,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a place is upgraded to the stop found for it",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "train",
+     "status": "confirmed",
+     "origin": "Beta",
+     "destination": "Alpha",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "flight",
+     "status": "confirmed",
+     "origin": "AAA",
+     "destination": "BBB",
+     "start_local": "2026-06-01T12:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [
+    {
+     "code": "AAA",
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "code": "BBB",
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    }
+   ],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "place",
+    "Beta",
+    null,
+    41.0,
+    -99.0
+   ],
+   [
+    "airport",
+    "Alpha",
+    "train",
+    40.0,
+    -100.0
+   ],
+   [
+    "airport",
+    "Beta",
+    "flight",
+    41.0,
+    -99.0
+   ]
+  ],
+  "drives": [],
+  "max_stops": 4,
+  "worth_locating": true,
+  "names": true
+ },
+ {
+  "name": "a hotel with no stored point falls back to its city",
+  "trip": {
+   "end_date": "2026-06-01",
+   "segments": [
+    {
+     "id": 1,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn A",
+     "destination": "Alpha",
+     "start_local": "2026-06-01T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    },
+    {
+     "id": 2,
+     "kind": "hotel",
+     "status": "confirmed",
+     "origin": "Inn B",
+     "destination": "Beta",
+     "start_local": "2026-06-02T10:00",
+     "end_local": "2026-06-01T11:00",
+     "start_zone": "UTC",
+     "end_zone": "UTC",
+     "itinerary": []
+    }
+   ]
+  },
+  "places": {
+   "home": null,
+   "airports": [],
+   "cities": [
+    {
+     "city": "Alpha",
+     "latitude": 40.0,
+     "longitude": -100.0
+    },
+    {
+     "city": "Beta",
+     "latitude": 41.0,
+     "longitude": -99.0
+    },
+    {
+     "city": "Gamma",
+     "latitude": 43.0,
+     "longitude": -97.0
+    }
+   ],
+   "stays": [],
+   "roads": {
+    "legs": [],
+    "interstates": []
+   },
+   "boundaries": []
+  },
+  "today": "2026-06-02",
+  "stops": [
+   [
+    "stay",
+    "Inn A",
+    null,
+    40.0,
+    -100.0
+   ],
+   [
+    "stay",
+    "Inn B",
+    null,
+    41.0,
+    -99.0
+   ]
+  ],
+  "drives": [
+   [
+    40.0,
+    -100.0,
+    41.0,
+    -99.0
+   ]
+  ],
+  "max_stops": 2,
+  "worth_locating": true,
+  "names": true
+ }
+]

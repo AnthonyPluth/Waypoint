@@ -315,6 +315,7 @@
         "tests/test_api_contract.py",
         "tests/test_home.py",
         "tests/test_route_cache.py",
+        "tests/test_route_warming.py",
         "tests/test_trip_roads.py",
         "tests/test_trip_states.py",
         "tests/test_trips.py"
