@@ -339,20 +339,49 @@ class GoneWithTheMessageTests(Kept):
 
 
 class NeverElsewhereTests(Kept):
-    def test_the_offline_copy_the_calendar_and_an_assistant_never_carry_the_code_or_say_there_is_one(self):
-        self.keep("m1", raw_of("Your parking reservation", {"qr": QR}, text=CANARY_TEXT))
-        stamp = base64.b64encode(QR).decode()
-        shown = trips.listing(self.c, self.jane)
-        feed = calendar.feed(shown, datetime(2026, 10, 20))
-        self.assertIn("Parking: Example Airport Long-Term Lot", feed)
-        self.assertNotIn(stamp[:24], feed)
-        self.assertNotIn("gate", feed.lower())
-        saved = self.read(lambda conn: offline.projection(conn, self.jane, datetime(2026, 12, 2).date()))
-        text = json.dumps(saved)
-        self.assertEqual([s["gate_code"] for s in saved["trips"][0]["trip"]["segments"]], [None])
-        self.assertNotIn(stamp[:24], text)
-        self.assertNotIn("gate_code", json.dumps(mcp_server._without_gate_codes({"trips": [{"segments": [{"id": 1, "gate_code": {"state": "ready"}}]}]})))
-        self.assertEqual(mcp_server._without_gate_codes([{"gate_code": 1, "id": 2}, 3]), [{"id": 2}, 3])
+    TODAY = datetime(2026, 12, 2).date()
+
+    def offline_reply(self, sub: str, app: bool) -> dict:
+        from waypoint.server.api import offline as offline_api
+        _current.user = {"sub": sub, **({"app": True} if app else {})}
+        try:
+            with mock.patch.object(offline_api, "date", types.SimpleNamespace(today=lambda: self.TODAY)):
+                return json.loads(json.dumps(self.read(lambda conn: offline_api.api_offline(conn, {}, {}))))
+        finally:
+            _current.user = None
+
+    def test_the_offline_copy_carries_the_code_for_the_app_only_and_the_calendar_and_an_assistant_never_carry_it_or_say_there_is_one(self):
+        cancelled = self.park({**PARKING, "confirmation": "PK-CANCELLED", "status": "cancelled"})
+        unchosen = self.park({**PARKING, "confirmation": "PK-NONE", "origin": "Unchosen Lot"})
+        with no_leaks(self, *CANARIES, database=self.path):
+            self.keep("m1", raw_of("Your parking reservation", {"qr": QR}, text=CANARY_TEXT))
+            self.keep("m-cancelled", raw_of("Your parking reservation", {"qr": OTHER_QR}, text=CANARY_TEXT), segments=[cancelled])
+            self.assertEqual(self.state(cancelled), ("ready", "2026-10-16"))
+            stamp = base64.b64encode(QR).decode()
+            shown = trips.listing(self.c, self.jane)
+            feed = calendar.feed(shown, datetime(2026, 10, 20))
+            self.assertIn("Parking: Example Airport Long-Term Lot", feed)
+            self.assertNotIn(stamp[:24], feed)
+            self.assertNotIn("gate", feed.lower())
+            mine = self.offline_reply("u-jane", app=True)
+            codes = [c for t in mine["trips"] for c in t["codes"]]
+            self.assertEqual(codes, [{"segment_id": self.segment, "type": "image/png", "data": stamp}])
+            self.assertEqual(base64.b64decode(codes[0]["data"]), QR)
+            states = {s["id"]: s["gate_code"] for t in mine["trips"] for s in t["trip"]["segments"]}
+            self.assertEqual(states[self.segment], {"state": "ready", "day": "2026-10-16"})
+            self.assertEqual(states[cancelled], {"state": "ready", "day": "2026-10-16"})
+            self.assertIsNone(states[unchosen])
+            self.assertNotIn(base64.b64encode(OTHER_QR).decode(), json.dumps(mine))
+            self.assertEqual(self.offline_reply("u-sam", app=True), {"version": 1, "trips": []})
+            browser = self.offline_reply("u-jane", app=False)
+            self.assertEqual([s["gate_code"] for t in browser["trips"] for s in t["trip"]["segments"]], [None, None, None])
+            self.assertTrue(all("codes" not in t for t in browser["trips"]))
+            self.assertNotIn(stamp[:24], json.dumps(browser))
+            saved = self.read(lambda conn: offline.projection(conn, self.jane, self.TODAY))
+            self.assertEqual([s["gate_code"] for t in saved["trips"] for s in t["trip"]["segments"]], [None, None, None])
+            self.assertNotIn(stamp[:24], json.dumps(saved))
+            self.assertNotIn("gate_code", json.dumps(mcp_server._without_gate_codes({"trips": [{"segments": [{"id": 1, "gate_code": {"state": "ready"}}]}]})))
+            self.assertEqual(mcp_server._without_gate_codes([{"gate_code": 1, "id": 2}, 3]), [{"id": 2}, 3])
 
 
 class FollowUpTests(Kept):

@@ -59,7 +59,7 @@ enum IntentRuntime {
 
 struct NextFlightIntent: AppIntent {
     static var title: LocalizedStringResource = "Next flight"
-    static var description = IntentDescription("Says when your next flight leaves, from the trips saved on this iPhone.")
+    static var description = IntentDescription("Says when your next flight leaves, from the trips saved on this phone.")
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     init() {}
@@ -73,7 +73,7 @@ struct NextFlightIntent: AppIntent {
 
 struct TonightStayIntent: AppIntent {
     static var title: LocalizedStringResource = "Tonight's stay"
-    static var description = IntentDescription("Says where you are staying tonight, from the trips saved on this iPhone.")
+    static var description = IntentDescription("Says where you are staying tonight, from the trips saved on this phone.")
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     init() {}
@@ -87,7 +87,7 @@ struct TonightStayIntent: AppIntent {
 
 struct CheckOutIntent: AppIntent {
     static var title: LocalizedStringResource = "Check-out"
-    static var description = IntentDescription("Says when you check out, from the trips saved on this iPhone.")
+    static var description = IntentDescription("Says when you check out, from the trips saved on this phone.")
     static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
 
     init() {}

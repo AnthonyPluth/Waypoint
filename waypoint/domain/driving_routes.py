@@ -16,7 +16,6 @@ MIN_POINTS = 2
 MAX_POINTS = 10_000
 MAX_PATH_BYTES = 400_000
 MAX_DRIVES = 30
-REPLACE_AFTER_SECONDS = 30 * 24 * 3600
 ENDPOINT_REACH_DEGREES = 0.02
 STOP_REACH_DEGREES = 0.001
 PATH_DECIMALS = 6
@@ -124,7 +123,7 @@ def _on_trip(stops: list[tuple[float, float]], drive: Drive) -> bool:
             and any(_near([lat, lon], lat2, lon2, STOP_REACH_DEGREES) for lat, lon in stops))
 
 
-def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], now: float) -> list[CachedRoute] | None:
+def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str]) -> list[CachedRoute] | None:
     stops = tripmap.stop_points(conn, viewer, trip_id)
     if stops is None:
         return None
@@ -134,7 +133,7 @@ def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], 
         return []
     match = or_(*(and_(DrivingRoute.trip_id == trip_id, DrivingRoute.from_lat == a, DrivingRoute.from_lon == b, DrivingRoute.to_lat == c, DrivingRoute.to_lon == d) for a, b, c, d in wanted))
     out: list[CachedRoute] = []
-    for row in conn.orm.scalars(select(DrivingRoute).where(match, DrivingRoute.stored > now - REPLACE_AFTER_SECONDS).order_by(DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)):
+    for row in conn.orm.scalars(select(DrivingRoute).where(match).order_by(DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)):
         lat1, lon1, lat2, lon2 = wanted[(row.from_lat, row.from_lon, row.to_lat, row.to_lon)]
         out.append({"start": {"latitude": lat1, "longitude": lon1}, "end": {"latitude": lat2, "longitude": lon2}, "path": json.loads(row.path)})
     return out
@@ -143,14 +142,14 @@ def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], 
 Key = tuple[int, int, int, int]
 
 
-def paths_for(conn: db.Connection, viewer: Viewer, trip_id: int, keys: set[Key], now: float) -> dict[Key, list[list[float]]] | None:
+def paths_for(conn: db.Connection, viewer: Viewer, trip_id: int, keys: set[Key]) -> dict[Key, list[list[float]]] | None:
     stops = tripmap.stop_points(conn, viewer, trip_id)
     if stops is None:
         return None
     if not keys:
         return {}
     out: dict[Key, list[list[float]]] = {}
-    for row in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id, DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)):
+    for row in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id)):
         key = (row.from_lat, row.from_lon, row.to_lat, row.to_lon)
         if key in keys and _on_trip(stops, (row.from_lat / SCALE, row.from_lon / SCALE, row.to_lat / SCALE, row.to_lon / SCALE)):
             out[key] = json.loads(row.path)
@@ -171,7 +170,7 @@ def store_for(conn: db.Connection, trip_id: int, stops: list[tuple[float, float]
     path = clean_path(raw_path, drive)
     from_lat, from_lon, to_lat, to_lon = _key(drive)
     have = conn.orm.get(DrivingRoute, (trip_id, from_lat, from_lon, to_lat, to_lon))
-    if have is not None and now - have.stored < REPLACE_AFTER_SECONDS:
+    if have is not None:
         return False
     db.upsert(conn, DrivingRoute, {"trip_id": trip_id, "from_lat": from_lat, "from_lon": from_lon, "to_lat": to_lat, "to_lon": to_lon,
                                    "path": json.dumps(path, separators=(",", ":")), "stored": now}, key=["trip_id", "from_lat", "from_lon", "to_lat", "to_lon"])
@@ -197,12 +196,12 @@ def _thin(path: list[list[float]], limit: int = CARD_POINTS) -> list[list[float]
     return [path[round(i * (len(path) - 1) / (limit - 1))] for i in range(limit)]
 
 
-def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], now: float) -> list[TripRoutes]:
+def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str]) -> list[TripRoutes]:
     asked = set(parse_trips(texts))
     seen = sorted(t.id for t in visible_trips(conn, viewer) if t.id in asked)
     if not seen:
         return []
-    rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_(seen), DrivingRoute.stored > now - REPLACE_AFTER_SECONDS)
+    rows = conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id.in_(seen))
                             .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)).all()
     stops: dict[int, list[tuple[float, float]]] = {}
     for trip_id in sorted({row.trip_id for row in rows}):

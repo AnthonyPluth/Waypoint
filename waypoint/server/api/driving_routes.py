@@ -11,7 +11,7 @@ from .trips import NO_TRIP, viewer
 def api_driving_routes(conn, q, _b, trip_id) -> DrivingRoutes:
     who, this = viewer(conn), row_id(trip_id, NO_TRIP)
     try:
-        found = driving_routes.cached(conn, who, this, q.get("drive", []), time.time())
+        found = driving_routes.cached(conn, who, this, q.get("drive", []))
     except driving_routes.Invalid as e:
         raise ApiError(str(e)) from None
     if found is None:
@@ -21,7 +21,7 @@ def api_driving_routes(conn, q, _b, trip_id) -> DrivingRoutes:
 
 def api_driving_routes_for_trips(conn, q, _b) -> DrivingRoutesForTrips:
     try:
-        return {"trips": driving_routes.cached_for_trips(conn, viewer(conn), q.get("trip", []), time.time())}
+        return {"trips": driving_routes.cached_for_trips(conn, viewer(conn), q.get("trip", []))}
     except driving_routes.Invalid as e:
         raise ApiError(str(e)) from None
 

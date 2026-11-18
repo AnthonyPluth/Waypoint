@@ -1,3 +1,4 @@
+import base64
 import json
 import secrets
 import time
@@ -10,15 +11,22 @@ from waypoint import oidc
 from waypoint.domain import loyalty, offline, people
 from waypoint.domain.visibility import Viewer
 from waypoint.server import ROUTES
-from waypoint.storage import db, secretbox, stored_mail
+from waypoint.server.api.offline import api_offline
+from waypoint.server.common import _current
+from waypoint.storage import db, gate_codes, secretbox, stored_mail
 from waypoint.storage.models import AuthSession, Mailbox, Person, Segment, Trip, User
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, fetch
+from tests.test_gate_codes import png
 
 MESSAGE_CANARY = "message-canary-7c41e9"
 AIRLINE_CANARY = "AIRLINE-CANARY-82913746"
 TRAVELER_CANARY = "TRAVELER-CANARY-55120987"
 TODAY = date.today()
+PICTURE_CANARY = b"CANARY-OFFLINE-PIXELS-5Q8W"
+PICTURE = png(290, 290, PICTURE_CANARY)
+PARKING = {"kind": "parking", "origin": "Example Airport Long-Term Lot", "provider": "Example Parking", "confirmation": "PK30417",
+           "start_zone": "America/New_York", "end_zone": "America/New_York"}
 
 
 def flight(start: date, end: date | None = None, **more):
@@ -172,6 +180,48 @@ class OfflineRouteTests(ServerCase):
             stored_mail.put(conn, box, f"m{segment_id}", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-10-01",
                                                           "text": text, "html": f"<p>{text}</p>", "truncated": False}, 1.0, pictures)   # type: ignore[arg-type]
             stored_mail.link(conn, segment_id, box, f"m{segment_id}")   # type: ignore[arg-type]
+
+    def parking(self, who: str, start: date, end: date, ready: bool, **more) -> dict:
+        got = self.trip_with(who, start, end, {**PARKING, "start_local": f"{start.isoformat()}T05:15", "end_local": f"{end.isoformat()}T03:00", **more},
+                             [{"person_id": self.person[who]}])
+        if ready:
+            with db.session() as conn:
+                box = conn.execute(insert(Mailbox).values(owner_sub=f"sub-{who}", address=f"{who}{got['id']}@gmail.example", token=secretbox.encrypt("t"),
+                                                          status="connected", created=1.0)).lastrowid
+                self.assertTrue(gate_codes.offer(conn, got["id"], box, [{"type": "image/png", "data": PICTURE}], "2026-10-16", 1.0))   # type: ignore[arg-type]
+        return got
+
+    def with_the_app_token(self, who: str) -> dict:
+        _current.user = {"sub": f"sub-{who}", "app": True}
+        try:
+            with db.session() as conn:
+                return json.loads(json.dumps(api_offline(conn, {}, {})))
+        finally:
+            _current.user = None
+
+    def test_the_apps_reply_keeps_the_gate_codes_state_and_carries_the_picture_of_a_ready_parking_booking(self):
+        ready = self.parking("ana", days(1), days(3), True)
+        waiting = self.parking("ana", days(1), days(3), False, confirmation="PK99999", origin="Other Lot")
+        self.book("ana", flight(days(1), days(3)), [{"person_id": self.person["ana"]}])
+        got = self.with_the_app_token("ana")
+        self.assertEqual(got["version"], 1)
+        [trip] = [t for t in got["trips"] if t["trip"]["id"] == ready["trip_id"]]
+        segments = {s["id"]: s for s in trip["trip"]["segments"]}
+        self.assertEqual(segments[ready["id"]]["gate_code"], {"state": "ready", "day": "2026-10-16"})
+        self.assertEqual(trip["codes"], [{"segment_id": ready["id"], "type": "image/png", "data": base64.b64encode(PICTURE).decode()}])
+        [other] = [t for t in got["trips"] if t["trip"]["id"] == waiting["trip_id"]]
+        self.assertEqual(other["trip"]["segments"][0]["gate_code"], None)
+        self.assertEqual(other["codes"], [])
+        flights = [s for t in got["trips"] for s in t["trip"]["segments"] if s["kind"] == "flight"]
+        self.assertEqual([s["gate_code"] for s in flights], [None])
+
+    def test_a_browser_sessions_reply_blanks_the_gate_code_and_has_no_codes(self):
+        self.parking("ana", days(1), days(3), True)
+        got = self.ok("ana")
+        [trip] = got["trips"]
+        self.assertEqual([s["gate_code"] for s in trip["trip"]["segments"]], [None])
+        self.assertNotIn("codes", trip)
+        self.assertNotIn(base64.b64encode(PICTURE).decode()[:24], json.dumps(got))
 
     def test_the_route_needs_sign_in(self):
         status, _ = self.req("GET", "/api/offline")
