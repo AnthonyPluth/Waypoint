@@ -12,7 +12,11 @@ from tests.test_mapkit import KEY_ID, PEM, PRIVATE, TEAM_ID, Keys, key_line, unb
 from tests.test_trips import BOULDER, DENVER, HOTEL, SALT_LAKE, RouteCase
 
 PHOENIX = {**DENVER, "origin": "Desert Inn", "destination": "Phoenix", "start_local": "2026-06-08T15:00", "end_local": "2026-06-10T10:00"}
+from sqlalchemy import select
+
 from waypoint.domain import map_snapshots, maps
+from waypoint.storage import db
+from waypoint.storage.models import Segment
 from waypoint.providers import mapkit
 from waypoint.server import mcp_access, mcp_http
 
@@ -88,6 +92,18 @@ class FitTests(unittest.TestCase):
     def test_places_spread_wide_but_all_near_the_first_are_judged_by_the_widest_pair(self):
         self.assertIsNotNone(map_snapshots.fit([(39.74, -104.99), (39.80, -104.90), (39.76, -104.95), (39.9, -105.1)], 358, 168))
 
+    def test_two_places_either_side_of_the_date_line_are_one_regional_map(self):
+        found = map_snapshots.fit([(-17.755, 177.443), (-16.69, -179.877)], 358, 168)
+        self.assertIsNotNone(found)
+        self.assertGreaterEqual(found.zoom, 5)
+        self.assertEqual((found.width, found.height), (358, 168))
+        self.assertTrue(found.longitude > 178 or found.longitude < -179.5, found)
+        self.assertTrue(-180 <= found.longitude <= 180)
+
+    def test_unwrapping_picks_the_shortest_interval(self):
+        self.assertEqual(sorted(map_snapshots._unwrapped([177.4, -179.9])), [177.4, 180.1])
+        self.assertEqual(map_snapshots._unwrapped([-73.78, -0.45]), [-73.78, -0.45])
+
     def test_the_zoom_never_passes_city_level(self):
         found = map_snapshots.fit([(39.74, -104.99), (40.10, -104.9)], 358, 168)
         self.assertTrue(7 <= found.zoom <= map_snapshots.MAX_ZOOM)
@@ -122,9 +138,20 @@ class FitTests(unittest.TestCase):
         found = map_snapshots.fit([(39.74, -104.99), (40.76, -111.89)], 358, 168)
         self.assertEqual((found.width, found.height), (358, 168))
 
-    def test_a_trip_too_wide_even_for_a_640_pixel_image_at_zoom_3_is_no_map(self):
-        self.assertIsNone(map_snapshots.fit([(51.47, -0.45), (-33.94, 151.18)], 358, 168))
-        self.assertIsNone(map_snapshots.fit([(33.94, -118.4), (-33.94, 151.18)], 358, 168))
+    def test_a_very_wide_trip_gets_a_640_pixel_zoom_3_image_centred_on_the_route_and_clipped(self):
+        found = map_snapshots.fit([(37.62, -122.38), (51.47, -0.45)], 352, 168)
+        self.assertEqual((found.zoom, found.width), (3, 640))
+        self.assertAlmostEqual(found.width / found.height, 352 / 168, delta=0.02)
+        self.assertAlmostEqual(found.longitude, -61.4, delta=1)
+        wide = map_snapshots.fit([(51.47, -0.45), (-33.94, 151.18)], 352, 168)
+        self.assertEqual((wide.zoom, wide.width), (3, 640))
+
+    def test_a_route_over_the_pacific_is_centred_across_the_date_line(self):
+        found = map_snapshots.fit([(33.94, -118.4), (-33.94, 151.18)], 352, 168)
+        self.assertEqual(found.zoom, 3)
+        self.assertAlmostEqual(found.longitude, -163.6, delta=1)
+        tokyo = map_snapshots.fit([(37.62, -122.38), (35.55, 139.78)], 352, 168)
+        self.assertTrue(tokyo.longitude > 170 or tokyo.longitude < -170, tokyo)
 
 
 class SnapshotCase(RouteCase, Keys):
@@ -184,13 +211,14 @@ class RouteTests(SnapshotCase):
         lonely = self.book("ana", DENVER)["trip_id"]
         self.assertEqual(self.snapshots("ana", lonely), (200, {"snapshots": []}))
 
-    def test_a_transatlantic_trip_gets_a_larger_image_at_zoom_3_and_one_too_wide_for_that_is_left_out(self):
+    def test_a_transatlantic_trip_gets_a_larger_image_at_zoom_3_and_a_wider_one_a_clipped_640_pixel_image(self):
         flown = self.book("ana", {**HOTEL, "kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10"})["trip_id"]
         [snap] = self.snapshots("ana", flown)[1]["snapshots"]
         self.assertEqual((snap["zoom"], snap["width"] > 358, max(snap["width"], snap["height"]) <= 640), (3, True, True))
         self.assertEqual(dict(query_of(snap["url"]))["size"], f"{snap['width']}x{snap['height']}")
         far = self.book("ana", {**HOTEL, "kind": "flight", "origin": "LHR", "destination": "SYD", "start_local": "2026-07-01T19:00", "end_local": "2026-07-02T07:10"})["trip_id"]
-        self.assertEqual(self.snapshots("ana", far), (200, {"snapshots": []}))
+        [wide] = self.snapshots("ana", far)[1]["snapshots"]
+        self.assertEqual((wide["zoom"], wide["width"]), (3, 640))
 
     def test_two_stays_in_one_metro_still_get_a_map(self):
         near = {**DENVER, "origin": "Boulder Inn", "destination": "Boulder", "start_local": "2026-06-04T15:00", "end_local": "2026-06-06T10:00"}
@@ -207,6 +235,15 @@ class RouteTests(SnapshotCase):
         self.assertTrue(any(s["longitude"] > 100 for s in places["stays"]))
         after = self.snapshots("ana", trip)[1]["snapshots"][0]
         self.assertEqual((after["center"], after["zoom"]), (before["center"], before["zoom"]))
+
+    def test_a_train_with_a_stored_arrival_has_two_stops_and_a_map(self):
+        trip = self.book("ana", {"kind": "train", "origin": "Denver", "destination": "Nowhere Station", "start_local": "2026-06-02T08:00", "end_local": "2026-06-02T12:00",
+                                 "start_zone": "America/Denver", "end_zone": "America/Denver"})["trip_id"]
+        with db.session() as conn:
+            for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id == trip)):
+                seg.latitude, seg.longitude, seg.geo_precision = 40.76, -111.89, "address"
+        [snap] = self.snapshots("ana", trip)[1]["snapshots"]
+        self.assertLess(snap["center"]["longitude"], -105.5)
 
     def test_a_cruise_gets_a_map_from_its_ports(self):
         cruise = self.book("ana", {"kind": "cruise", "origin": "Miami", "destination": "Miami", "start_local": "2026-06-01T16:00", "end_local": "2026-06-08T07:00", "start_zone": "America/New_York", "end_zone": "America/New_York",

@@ -23,6 +23,33 @@ describe("projecting a place onto Apple's snapshot", () => {
     expect(project({ latitude: 45, longitude: 0 }, frame({ ...flat, zoom: 3 })).y - 50).toBeCloseTo((project({ latitude: 45, longitude: 0 }, frame(flat)).y - 50) * 8, 6);
   });
 
+  it("draws two places either side of the date line next to each other, the way the server fitted them", () => {
+    const fiji = frame({ center: { latitude: -17.2, longitude: 179.8 }, zoom: 6, width: 352, height: 168 });
+    const nadi = project({ latitude: -17.755, longitude: 177.443 }, fiji);
+    const taveuni = project({ latitude: -16.69, longitude: -179.877 }, fiji);
+    expect(nadi.x).toBeGreaterThan(0);
+    expect(taveuni.x).toBeLessThan(352);
+    expect(taveuni.x).toBeGreaterThan(nadi.x);
+    expect(project({ latitude: -17.2, longitude: -180.2 }, fiji).x).toBeCloseTo(176, 3);
+  });
+
+  it("puts the ends of a route wider than the image outside it, to be clipped, centred on the route", () => {
+    const wide = frame({ center: { latitude: 45, longitude: -61.4 }, zoom: 3, width: 640, height: 306 });
+    const sfo = project({ latitude: 37.62, longitude: -122.38 }, wide);
+    const lhr = project({ latitude: 51.47, longitude: -0.45 }, wide);
+    expect(sfo.x).toBeLessThan(0);
+    expect(lhr.x).toBeGreaterThan(640);
+    expect(lhr.x - 320).toBeCloseTo(320 - sfo.x, -1);
+  });
+
+  it("measures across the Pacific, not the long way round", () => {
+    const pacific = frame({ center: { latitude: 0, longitude: -175 }, zoom: 3, width: 640, height: 306 });
+    const la = project({ latitude: 34, longitude: -118.4 }, pacific);
+    const sydney = project({ latitude: -33.9, longitude: 151.2 }, pacific);
+    expect(sydney.x).toBeLessThan(la.x);
+    expect(la.x - sydney.x).toBeLessThan(640);
+  });
+
   it("stretches north-south the way Mercator does: a degree of latitude is taller far from the equator", () => {
     const south = frame({ center: { latitude: 10, longitude: 0 }, zoom: 6 }), north = frame({ center: { latitude: 60, longitude: 0 }, zoom: 6 });
     const tall = (f: Frame) => project({ latitude: f.center.latitude - 1, longitude: 0 }, f).y - project({ latitude: f.center.latitude + 1, longitude: 0 }, f).y;

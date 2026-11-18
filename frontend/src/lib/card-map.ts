@@ -16,8 +16,10 @@ const worldY = (latitude: number): number => {
 
 export function project(place: Place, frame: Frame): Spot {
   const scale = 2 ** frame.zoom;
+  const across = worldX(place.longitude) - worldX(frame.center.longitude);
+  const near = across - Math.round(across / WORLD) * WORLD;
   return {
-    x: frame.width / 2 + (worldX(place.longitude) - worldX(frame.center.longitude)) * scale,
+    x: frame.width / 2 + near * scale,
     y: frame.height / 2 + (worldY(place.latitude) - worldY(frame.center.latitude)) * scale,
   };
 }

@@ -20,8 +20,6 @@ DEFAULT_LANG = "en-US"
 PADDING = 28
 DAY = 86_400
 CENTRE_DECIMALS = 2
-APART_KM = 1.0
-EARTH_KM = 6371.0088
 MAX_LATITUDE = 85.0511
 KEPT = 2048
 _LANG = re.compile(r"[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}")
@@ -67,12 +65,6 @@ def _ground(x: float, y: float) -> tuple[float, float]:
     return latitude, longitude
 
 
-def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
-    (lat1, lon1), (lat2, lon2) = a, b
-    h = math.sin(math.radians(lat2 - lat1) / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
-    return 2 * EARTH_KM * math.asin(min(1.0, math.sqrt(h)))
-
-
 def _unwrapped(longitudes: list[float]) -> list[float]:
     ordered = sorted(longitudes)
     gaps = [(ordered[(i + 1) % len(ordered)] - ordered[i]) % 360 for i in range(len(ordered))]
@@ -81,7 +73,7 @@ def _unwrapped(longitudes: list[float]) -> list[float]:
 
 
 def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | None:
-    if not any(_km(a, b) >= APART_KM for i, a in enumerate(points) for b in points[i + 1:]):
+    if len(points) < 2:
         return None
     wrapped = _unwrapped([lon for _, lon in points])
     ground = [_world(lat, lon) for (lat, _), lon in zip(points, wrapped, strict=True)]
@@ -94,9 +86,12 @@ def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | Non
         scale = 2 ** zoom
         if reach_x * scale <= width / 2 - PADDING and reach_y * scale <= height / 2 - PADDING:
             return Fit(latitude, longitude, zoom, width, height)
-    shrink = max(1.0, reach_x * 2 ** MIN_ZOOM / (width / 2 - PADDING), reach_y * 2 ** MIN_ZOOM / (height / 2 - PADDING))
+    shrink = max(1.0, reach_x * 2 ** MIN_ZOOM / max(width / 2 - PADDING, 1.0), reach_y * 2 ** MIN_ZOOM / max(height / 2 - PADDING, 1.0))
     wide, tall = math.ceil(width * shrink), math.ceil(height * shrink)
-    return Fit(latitude, longitude, MIN_ZOOM, wide, tall) if max(wide, tall) <= MAX_SIDE else None
+    if max(wide, tall) > MAX_SIDE:
+        grow = MAX_SIDE / max(wide, tall)
+        wide, tall = max(MIN_SIDE, math.floor(wide * grow)), max(MIN_SIDE, math.floor(tall * grow))
+    return Fit(latitude, longitude, MIN_ZOOM, wide, tall)
 
 
 def parse_side(texts: list[str], what: str) -> int:

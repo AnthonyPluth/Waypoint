@@ -1114,6 +1114,17 @@ describe("past trip cards", () => {
     expect(within(beach()).getAllByTestId("route-tile")).toHaveLength(1);
   });
 
+  it("asks Apple for nothing, for any card, when the covers reply fails, since a card may have photos it can't see", async () => {
+    app.state = state({ mapkit: true });
+    serveCards(Object.assign(new Error("down"), { status: 500 }));
+    const base = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation(async (path, opts) => (String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots") ? Promise.reject(new Error("must not be asked")) : base(path, opts)) as never);
+    render(Trips);
+    await screen.findByRole("link", { name: /^Beach,/ });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots"))).toHaveLength(0);
+  });
+
   it("leaves the cards without photos, and says nothing, when the covers reply fails", async () => {
     serveCards(Object.assign(new Error("Photos need sign-in"), { status: 404 }));
     render(Trips);
