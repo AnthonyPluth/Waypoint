@@ -1,6 +1,6 @@
 # Siri and Shortcuts in the iPhone app
 
-Exploration for [#820](https://github.com/AnthonyPluth/Waypoint/issues/820). Nothing here is built. The owner chose which intents to build and how they speak on 2026-11-18 ("Owner decisions" below). The look of the frames, the phrases and the wording are **not signed off yet**, and the questions still open are at the end. The mock frames are self-contained HTML pages (vector only, no raster images, dark only, phone width 390 px only), using Waypoint's tokens from `frontend/src/app.css` and adding none. Every trip, hotel, flight and time in them is made up. The system parts of each frame (Siri's glow, the unlock prompt, the Shortcuts app) are drawn roughly, only to place Waypoint's card; Apple draws them, not us.
+Exploration for [#820](https://github.com/AnthonyPluth/Waypoint/issues/820). Nothing here is built. The owner chose which intents to build and how they speak on 2026-11-18 ("Owner decisions" below). The owner signed off the frames and their wording on 2026-11-18 ([#820](https://github.com/AnthonyPluth/Waypoint/issues/820#issuecomment-6980575505)); the build issues are #840 to #843 (below), and the points still open are at the end. The mock frames are self-contained HTML pages (vector only, no raster images, dark only, phone width 390 px only), using Waypoint's tokens from `frontend/src/app.css` and adding none. Every trip, hotel, flight and time in them is made up. The system parts of each frame (Siri's glow, the unlock prompt, the Shortcuts app) are drawn roughly, only to place Waypoint's card; Apple draws them, not us.
 
 | Screen | File | What it shows |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Owner context (2026-11-18): interested in Siri; no Live Activities; doesn't want
 ## Owner decisions (2026-11-18, in chat on PR #831)
 
 1. **Build A (next flight), B (tonight's stay, with check-out), C (parking code) and D (open my trip to a place).** E (live flight status) is not built, so no intent calls the server.
-2. **Spoken answers use city names**, not the flight number and the zone's name: "Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time." The saved copy has airport codes only, so `GET /api/offline` first carries the cities of each saved trip's airports, and the app keeps them with the rest of the copy. That is its own build issue, which the intents depend on ({{OFFLINE-CITIES}} below).
+2. **Spoken answers use city names**, not the flight number and the zone's name: "Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time." The saved copy has airport codes only, so `GET /api/offline` first carries the cities of each saved trip's airports, and the app keeps them with the rest of the copy. That is its own build issue, which the intents depend on (#840 below).
 3. **"My next flight" is anyone's flight on a trip the person is on**, the same rule as Upcoming's next flight. No `person_id` is needed.
 4. **Siri's own handling is accepted.** The spoken request and answer pass through Apple's Siri, as Apple's Siri settings describe. The never-spoken list is unchanged: confirmation codes, gates, loyalty numbers, seats, rooms and other travellers' names (with the rest of section 3's list).
 
@@ -56,7 +56,7 @@ Apple's way in is App Intents. Each intent below is an `AppIntent` in the app ta
 
 | Intent | Saved copy alone | Needs the server |
 | --- | --- | --- |
-| A Next flight | Yes, once the copy carries the airports' cities ({{OFFLINE-CITIES}}): the next timed, not-cancelled flight in the saved trips, anyone's on a trip the person is on, from its booked times (the same rule as Upcoming's next flight). Untimed flights (`details.time_unknown`) are skipped. A flight in a trip further out than the saved window isn't seen, so the answer says "in the trips saved on this iPhone" when there is none. A copy saved before the cities were added speaks the flight number instead, until the next online open replaces it. | The cities, once, in the saved copy (`GET /api/offline`), not at the moment of asking. |
+| A Next flight | Yes, once the copy carries the airports' cities (#840): the next timed, not-cancelled flight in the saved trips, anyone's on a trip the person is on, from its booked times (the same rule as Upcoming's next flight). Untimed flights (`details.time_unknown`) are skipped. A flight in a trip further out than the saved window isn't seen, so the answer says "in the trips saved on this iPhone" when there is none. A copy saved before the cities were added speaks the flight number instead, until the next online open replaces it. | The cities, once, in the saved copy (`GET /api/offline`), not at the moment of asking. |
 | B Tonight's stay | Yes. The two phrases select differently. **Tonight:** a not-cancelled hotel whose nights include tonight (tonight is today in the hotel's own zone: check-in day on or before today, check-out day after it), else the next saved stay. **Check-out:** the not-cancelled stay under way now, from its check-in time until its check-out time (`start_local` to `end_local`, wall-clock in the hotel's zone). So at 8 am on check-out morning it is still that stay, until 11 am. With two under way it is the one that checks out first; past the check-out time, or with none under way, it is the next saved stay. | Nothing. |
 | C Parking code | Finding the parking booking: yes. | The QR code itself, as today, once the app is open. |
 | D Open my trip | Yes: the saved trips' names and destinations. A trip outside the saved window can't be named by voice (the app could still open it online). | Nothing. |
@@ -70,7 +70,7 @@ The rules for every intent:
 - **What is never spoken:** a confirmation code or record locator, a gate, a loyalty or Known Traveler number (never in the copy anyway), a parking code, a seat, a room number, a phone number, a street address, an email's subject or text, other travellers' names. What can be spoken: the departure and arrival cities, the day and the time, the hotel's name and city, the parking lot's name, the trip's destination or name (and the flight number, only for a copy saved before it carried cities). A spoken answer can be heard by anyone nearby, so it says only what a person needs to act on.
 - **What is never on the card**, though the phone is unlocked: a confirmation code, a gate, the QR code, loyalty and Known Traveler numbers, a seat or room number, email text. The card is a glance, not the booking: the app (one tap) shows the rest, behind its own screens as today. The street address of a stay is on B's card (open question 3). No seat is on A's card: the flight is anyone's on the trip (owner's decision), so there is no one seat to show.
 - **Only the signed-in person's saved trips.** An intent reads only `OfflineStore` for the server in `ServerSession.shared.server`, the same folder the bridge reads, and only while that session exists. Signed out, there is no copy (sign-out deletes it) and no answer: "Sign in to Waypoint on this iPhone first." The copy holds only trips that person may see (`domain/offline.py`, through `visibility`), so nothing else can be answered.
-- **Nothing new sent to the server, and nothing to anyone else.** A, B, C and D make no network request: the answer code takes the saved copy and the clock and has no `ServerClient`. C and D open the app, which then does what it does on any open (load the server, refresh the copy). E would have been the exception and is not built. The cities come with the saved copy the app already fetches ({{OFFLINE-CITIES}}): reference data about airports on bookings the person can already see, with no new request.
+- **Nothing new sent to the server, and nothing to anyone else.** A, B, C and D make no network request: the answer code takes the saved copy and the clock and has no `ServerClient`. C and D open the app, which then does what it does on any open (load the server, refresh the copy). E would have been the exception and is not built. The cities come with the saved copy the app already fetches (#840): reference data about airports on bookings the person can already see, with no new request.
 - **Nothing handed to the system's indexes.** No `IndexedEntity` or Core Spotlight items, no `IntentDonationManager` donations, no `NSUserActivity` carrying a trip, and no Apple Intelligence schemas (`AssistantSchemas`), so trip names, places and times are not put into Spotlight's index or Siri's suggestions. The App Shortcuts themselves (the phrases and the action names) do show in Spotlight and Shortcuts; they hold no trip data. D is the one exception, now chosen: a voice phrase with a trip in it needs the saved trips' places given to the system's phrase list (`updateAppShortcutParameters()`), on the phone. They are replaced on every save and cleared on every purge (sign-out, 401 or 403, saving off, a changed server). Only the saved trips' destinations and names are given, never a booking.
 - **Apple's side, accepted by the owner (2026-11-18).** Siri turns speech into text on the phone for most requests on recent iPhones, but Apple says some requests are sent to its servers, and a person who opted into "Improve Siri & Dictation" shares audio with Apple. Nothing read for this note says whether the dialog text an App Intent returns leaves the phone; that is still worth confirming on a device. The owner accepted that the request and answer pass through Siri, with the never-spoken list unchanged.
 
@@ -88,7 +88,7 @@ Per intent:
 
 **Where the code goes.** In the app target, `ios/Waypoint/`, not an App Intents extension: an extension runs in its own process and would need the saved trips moved to an App Group container, which changes where the copy lives (the promises name the app's own private storage). Intents in the app target run in the app's process, in the background unless they open the app.
 
-- `SavedTripsReader.swift`: decodes the saved copy into a small read model of only what the intents use (trip id, name, dates; per booking id, kind, status, start and end with zones, origin, destination, `provider`, and from `details` only `flight_number`, `address` and `time_unknown`; and each saved trip's `cities`, from {{OFFLINE-CITIES}}). It never decodes `confirmation`, `manage_url`, `travelers`, seats, rooms, phone numbers or the emails, so they can't reach an answer by accident. It reads through `SavedTrips.read(_:server:)`, like the bridge.
+- `SavedTripsReader.swift`: decodes the saved copy into a small read model of only what the intents use (trip id, name, dates; per booking id, kind, status, start and end with zones, origin, destination, `provider`, and from `details` only `flight_number`, `address` and `time_unknown`; and each saved trip's `cities`, from #840). It never decodes `confirmation`, `manage_url`, `travelers`, seats, rooms, phone numbers or the emails, so they can't reach an answer by accident. It reads through `SavedTrips.read(_:server:)`, like the bridge.
 - `TripAnswers.swift`: pure functions from that model, the clock and the phone's time zone to an `Answer` (the spoken text, the card's fields and the page to open), plus the fixed answers for locked, signed out, saving off, nothing saved and nothing found. No `URLSession`, no `ServerClient`, no Keychain.
 - `WaypointIntents.swift`: the `AppIntent`s and the `AppShortcutsProvider`, thin wrappers that read the session, call `TripAnswers` and return its dialog and card. Opening the app at a page sets the web view's address (as `ShellViewController.serverURL` does at launch), with `#trip/{id}`.
 - `TripAnswerCard.swift`: the SwiftUI card.
@@ -124,13 +124,20 @@ The first draft recommended A and B as the smallest first set. They answer from 
 - **D, open my trip** gives the saved trips' places to the system's phrase list on the phone. It must replace that list on every save and empty it on every purge, which its build issue tests.
 - **City names** need the saved copy to carry the cities of its airports first, so the build starts with that server change.
 
-Build order: {{OFFLINE-CITIES}}, then {{SIRI-ANSWERS}} (A and B), then {{SIRI-PARKING}} (C) and {{SIRI-OPEN-TRIP}} (D), which can be built at the same time as each other.
+Build order: #840, then #841 (A and B), then #842 (C) and #843 (D), which can be built at the same time as each other.
 
 ## Draft build issues
 
-These are not opened yet. They are drafts written in the `fleet-agent-task` sections, using the owner's decisions above and the defaults for what is still open. The model is Sonnet, per `CLAUDE.md`'s routing (privacy-sensitive work included) and the issue's own Model line. Before any issue that draws the card ({{SIRI-ANSWERS}}) merges, the owner signs off on the card's design: the frames here are not signed off.
+Opened on 2026-11-18, after the owner's sign-off (https://github.com/AnthonyPluth/Waypoint/issues/820#issuecomment-6980575505). The opened issues are the source from now on; the drafts below are kept as written, with their keys replaced by the issue numbers. The model is Sonnet for each, per `CLAUDE.md`'s routing (privacy-sensitive work included) and the issue's own Model line.
 
-### {{OFFLINE-CITIES}} feat: the saved trips carry the cities of their airports
+| Order | Issue | What | Depends on |
+| --- | --- | --- | --- |
+| 1 | #840 | The saved trips carry the cities of their airports | Nothing |
+| 2 | #841 | Next flight and tonight's stay (A, B) | #840 |
+| 3 | #842 | Parking code (C) | #841 |
+| 3 | #843 | Open my trip to a place (D) | #841 |
+
+### #840 feat: the saved trips carry the cities of their airports
 
 **Context**
 On #820 the owner chose spoken Siri answers with city names ("leaves Denver for Grand Junction"); design: `docs/design/siri-shortcuts/README.md`. The saved copy is the `GET /api/offline` reply (`waypoint/server/api/offline.py`, `waypoint/domain/offline.py`, contract `Offline` and `OfflineTrip` in `waypoint/server/contract.py`). It holds each flight's airports as codes (`origin`, `destination`) only. The airports table has the city of each code (`waypoint/domain/airports.py`, `lookup`). The iPhone app saves the reply as raw JSON (`ios/Waypoint/OfflineStore.swift`) when `version` is 1 (`OfflineSync.supportedVersion`). The bridge's `load` (`ios/Waypoint/OfflineBridge.swift`) passes each saved trip to the web app unchanged. The browser saves the same reply through `frontend/src/lib/offline.ts`.
@@ -143,7 +150,7 @@ On #820 the owner chose spoken Siri answers with city names ("leaves Denver for 
 - Docs: `docs/src/content/docs/start/offline.md` ("What is saved": "the cities of the trip's airports") and the reply shape under "The reply, and the iPhone app".
 
 **Out of scope**
-The Siri intents ({{SIRI-ANSWERS}}). Station or port cities for trains and cruises. City names anywhere else in the web app.
+The Siri intents (#841). Station or port cities for trains and cruises. City names anywhere else in the web app.
 
 **Acceptance criteria**
 - [ ] `tests/test_offline.py` shows `cities` holds exactly the cities of the saved trip's own flight airports. A booking the viewer can't see, and a trip they aren't on, adds nothing.
@@ -160,10 +167,10 @@ Nothing.
 **Model**
 Sonnet: a small additive field on a privacy-sensitive route, held by the existing offline tests.
 
-### {{SIRI-ANSWERS}} feat(ios): Siri and Shortcuts answers for the next flight and tonight's stay
+### #841 feat(ios): Siri and Shortcuts answers for the next flight and tonight's stay
 
 **Context**
-On #820 the owner chose these intents. The design is in `docs/design/siri-shortcuts/README.md`, with frames `a-answers.html` and `b-states.html`. The iPhone app keeps the signed-in person's upcoming trips as the raw `GET /api/offline` reply in `ios/Waypoint/OfflineStore.swift`, read through `SavedTrips.read(_:server:)` in `ios/Waypoint/OfflineBridge.swift`. The files have `.complete` file protection, so they can't be read while the phone is locked. Since {{OFFLINE-CITIES}}, each saved trip carries `cities`. The app targets iOS 16.0 (`ios/project.yml`). CI (`.github/workflows/ios.yml`, "iOS build and tests") builds it and runs `WaypointTests` on a simulator.
+On #820 the owner chose these intents. The design is in `docs/design/siri-shortcuts/README.md`, with frames `a-answers.html` and `b-states.html`. The iPhone app keeps the signed-in person's upcoming trips as the raw `GET /api/offline` reply in `ios/Waypoint/OfflineStore.swift`, read through `SavedTrips.read(_:server:)` in `ios/Waypoint/OfflineBridge.swift`. The files have `.complete` file protection, so they can't be read while the phone is locked. Since #840, each saved trip carries `cities`. The app targets iOS 16.0 (`ios/project.yml`). CI (`.github/workflows/ios.yml`, "iOS build and tests") builds it and runs `WaypointTests` on a simulator.
 
 **Scope**
 - `ios/Waypoint/SavedTripsReader.swift`: a `Decodable` read model of the saved copy. It decodes only:
@@ -173,7 +180,7 @@ On #820 the owner chose these intents. The design is in `docs/design/siri-shortc
   It does not decode `confirmation`, `manage_url`, `travelers`, any other `details` key or `messages`. It reads through `SavedTrips.read` for `ServerSession.shared.server`.
 - `ios/Waypoint/TripAnswers.swift`: pure functions returning an `Answer` (spoken text, card fields, page to open) for "next flight" and "tonight's stay". It also returns the fixed answers for: not signed in, saving off, nothing saved, saved copy unreadable, nothing found, and read failed (locked). The wording is exactly as in the frames.
   - **Times:** the booking's wall-clock time in its own zone, spoken as "local time" after the departure city, never converted.
-  - **Next flight:** the next flight on any saved trip (anyone's, the Upcoming rule) that has a time, isn't cancelled and hasn't departed. It is spoken with the departure and arrival cities from `cities`. When a city is missing (a copy saved before {{OFFLINE-CITIES}}), the flight number is spoken instead.
+  - **Next flight:** the next flight on any saved trip (anyone's, the Upcoming rule) that has a time, isn't cancelled and hasn't departed. It is spoken with the departure and arrival cities from `cities`. When a city is missing (a copy saved before #840), the flight number is spoken instead.
   - **Tonight's stay**, for the tonight phrase: a hotel that isn't cancelled whose nights include today in the hotel's zone (check-in day on or before today, check-out day after it), else the next saved stay.
   - **Check-out**, for the check-out phrase: the stay under way now, from its check-in time until its check-out time, as wall-clock times in the hotel's zone. So on check-out morning it is still that stay until the check-out time. With two under way it is the one that checks out first; past the check-out time, or with none under way, it is the next saved stay.
   - **Both:** the street address is on the card, never spoken.
@@ -185,7 +192,7 @@ On #820 the owner chose these intents. The design is in `docs/design/siri-shortc
 - Docs: `ios/README.md` ("What is here", "Not built yet") and a "Siri and Shortcuts" section in `docs/src/content/docs/start/ios.md`. They say what each intent answers: from the saved trips only, with the phone unlocked, and what is never spoken.
 
 **Out of scope**
-Parking code ({{SIRI-PARKING}}), open my trip ({{SIRI-OPEN-TRIP}}), live flight status (not chosen), location-triggered codes (separate issue), Live Activities, Wallet, widgets, any server change.
+Parking code (#842), open my trip (#843), live flight status (not chosen), location-triggered codes (separate issue), Live Activities, Wallet, widgets, any server change.
 
 **Acceptance criteria**
 - [ ] "iOS build and tests" passes, including the new tests.
@@ -200,12 +207,12 @@ Parking code ({{SIRI-PARKING}}), open my trip ({{SIRI-OPEN-TRIP}}), live flight 
 Add `ios/Tests/TripAnswersTests.swift`, with fixtures like `TripFixtures` in `ios/Tests/OfflineBridgeTests.swift`. Run "iOS build and tests".
 
 **Depends on**
-{{OFFLINE-CITIES}}, and the owner's sign-off on the card's frames.
+#840, (the card's frames are signed off on #820).
 
 **Model**
 Sonnet: the design and privacy choices are settled on #820, and the rest follows the existing Swift patterns.
 
-### {{SIRI-PARKING}} feat(ios): a Siri and Shortcuts action that opens the parking booking
+### #842 feat(ios): a Siri and Shortcuts action that opens the parking booking
 
 **Context**
 Intent C in `docs/design/siri-shortcuts/README.md`, chosen by the owner on 2026-11-18. A parking booking's QR code is served only by `GET /api/segments/{id}/code` and is never saved on the phone. The web app's booking shows it behind **Show QR code** (`frontend/src/lib/components/GateCode.svelte`).
@@ -229,12 +236,12 @@ Showing or speaking the code from Siri, saving the code on the phone, location t
 Extend `ios/Tests/TripAnswersTests.swift`.
 
 **Depends on**
-{{SIRI-ANSWERS}}.
+#841.
 
 **Model**
-Sonnet: one more intent on the pattern {{SIRI-ANSWERS}} sets.
+Sonnet: one more intent on the pattern #841 sets.
 
-### {{SIRI-OPEN-TRIP}} feat(ios): "Open my trip to a place" in Siri and Shortcuts
+### #843 feat(ios): "Open my trip to a place" in Siri and Shortcuts
 
 **Context**
 Intent D in `docs/design/siri-shortcuts/README.md`, chosen by the owner on 2026-11-18. For one phrase to name a trip ("Open my trip to Grand Junction in Waypoint"), the place must be one of the App Shortcut's parameter values, given to the system with `updateAppShortcutParameters()`. Saves and purges happen in `ios/Waypoint/OfflineSync.swift`.
@@ -260,7 +267,7 @@ Trips outside the saved copy, Spotlight indexing (`IndexedEntity`), donations.
 Extend `ios/Tests/TripAnswersTests.swift` and `ios/Tests/OfflineSyncTests.swift`.
 
 **Depends on**
-{{SIRI-ANSWERS}}.
+#841.
 
 **Model**
 Sonnet: the privacy rule (replace on save, empty on purge) is settled here, and the tests hold it.
@@ -273,5 +280,6 @@ Decided on 2026-11-18 (see "Owner decisions"): which intents (A, B, C, D), city 
 2. **The zone in spoken times.** Default: always said, as "local time" after the departure city. Leave it out when the place is in the phone's own zone?
 3. **The stay's street address.** Default: on the card, never spoken. Name and city only?
 4. **An old copy.** Default: the age is on the card only. Should the spoken answer say "as of Monday" too?
-5. **Version of the saved copy.** {{OFFLINE-CITIES}} keeps `version` 1 because the field is additive, and a bump would stop every not-yet-updated app from saving. Bump to 2 anyway?
-6. **The look of the frames** (`a-answers.html`, `b-states.html`): not signed off yet.
+5. **Version of the saved copy.** #840 keeps `version` 1 because the field is additive, and a bump would stop every not-yet-updated app from saving. Bump to 2 anyway?
+
+Signed off on 2026-11-18 (https://github.com/AnthonyPluth/Waypoint/issues/820#issuecomment-6980575505): the look of the frames (`a-answers.html`, `b-states.html`) and their wording. The open points above are listed in the issues they affect (#840, #841, #842, #843), which build the default unless the owner answers on #820 first.
