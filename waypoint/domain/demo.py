@@ -317,8 +317,9 @@ def _two_readings(today: date) -> list[ai.Suggestion]:
     arrive, leave = today + timedelta(days=20), today + timedelta(days=23)
     stay: ai.Suggestion = {"kind": "hotel", "provider": "Harbour Lodge", "origin": "Harbour Lodge", "address": "7 Quay Street, Bristol, UK",
                            "start_local": f"{arrive:%Y-%m-%d}T15:00", "end_local": f"{leave:%Y-%m-%d}T11:00"}
-    return [{**stay, "confirmation": "DEMO55", "sources": {"confirmation": "Reservation", "origin": "property"}, "parsed": True},
-            {**stay, "confirmation": "DEMO56", "start_zone": "Europe/London", "sources": {"confirmation": "Itinerary"}}]
+    read: ai.Suggestion = {**stay, "confirmation": "DEMO55", "sources": {"confirmation": "Reservation", "origin": "property"}, "parsed": True}
+    said: ai.Suggestion = {**stay, "confirmation": "DEMO56", "start_zone": "Europe/London", "sources": {"confirmation": "Itinerary"}}
+    return review.keeping_fixed([read], [said])[1]
 
 
 def _on(*ids: int | None, seats: tuple[str, ...] = ()) -> list[trips.TravelerIn]:
