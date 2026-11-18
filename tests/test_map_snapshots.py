@@ -117,9 +117,20 @@ class FitTests(unittest.TestCase):
             self.assertLessEqual(abs(x - cx) * 2 ** found.zoom, 358 / 2 - 20)
             self.assertLessEqual(abs(y - cy) * 2 ** found.zoom, 168 / 2 - 20)
 
-    def test_fewer_than_two_places_or_one_place_twice_is_no_map(self):
+    def test_no_place_or_one_place_is_no_map(self):
         self.assertIsNone(map_snapshots.fit([], 358, 168))
         self.assertIsNone(map_snapshots.fit([(39.74, -104.99)], 358, 168))
+
+    def test_a_tiny_route_is_a_city_level_map(self):
+        found = map_snapshots.fit([(39.74, -104.99), (39.7401, -104.9901)], 358, 168)
+        self.assertEqual((found.zoom, found.width, found.height), (12, 358, 168))
+
+    def test_a_short_card_does_not_divide_by_zero(self):
+        for size in ((358, 56), (56, 56), (56, 168)):
+            found = map_snapshots.fit([(39.74, -104.99), (40.76, -111.89)], *size)
+            self.assertIsNotNone(found, size)
+            self.assertTrue(map_snapshots.MIN_SIDE <= found.width <= map_snapshots.MAX_SIDE, (size, found))
+            self.assertTrue(map_snapshots.MIN_SIDE <= found.height <= map_snapshots.MAX_SIDE, (size, found))
 
     def test_a_trip_wider_than_zoom_3_shows_gets_a_larger_image_at_zoom_3_to_show_scaled_down(self):
         found = map_snapshots.fit([(40.64, -73.78), (51.47, -0.45)], 358, 168)

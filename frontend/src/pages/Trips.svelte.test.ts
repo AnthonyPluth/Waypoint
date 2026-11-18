@@ -1125,6 +1125,36 @@ describe("past trip cards", () => {
     expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots"))).toHaveLength(0);
   });
 
+  it("keeps asking Apple for nothing about a trip with photos when a later reload's covers reply fails", async () => {
+    panes.two = true;
+    app.state = state({ mapkit: true });
+    serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+    const base = vi.mocked(api).getMockImplementation()!;
+    let failCovers = false;
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/photos/trip-covers" && failCovers) throw Object.assign(new Error("down"), { status: 500 });
+      const one = /^\/api\/trips\/(\d+)$/.exec(String(path));
+      if (one && opts?.method === "POST") return { ...london, name: (opts.body as { name: string }).name } as never;
+      if (one && one[1] === "1") return london as never;
+      if (path === "/api/trips") return { trips: [london, ...past()] } as never;
+      return base(path, opts);
+    });
+    render(Trips);
+    const pane = await screen.findByRole("region", { name: "Selected trip" });
+    await within(beach()).findByTestId("photo-pill");
+    const u = user();
+    failCovers = true;
+    vi.mocked(api).mockClear();
+    await u.click(await within(pane).findByRole("button", { name: "Edit trip details" }));
+    await u.clear(within(pane).getByLabelText("Name"));
+    await u.type(within(pane).getByLabelText("Name"), "Renamed");
+    await u.click(within(pane).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(vi.mocked(api).mock.calls.some(([path]) => path === "/api/photos/trip-covers")).toBe(true));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/31/places" || String(path).includes("trip=31"))).toHaveLength(0);
+    expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168");
+  });
+
   it("leaves the cards without photos, and says nothing, when the covers reply fails", async () => {
     serveCards(Object.assign(new Error("Photos need sign-in"), { status: 404 }));
     render(Trips);

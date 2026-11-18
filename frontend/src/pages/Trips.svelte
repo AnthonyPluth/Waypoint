@@ -63,7 +63,7 @@
       covers = new Map(found.trips.map((c) => [c.trip_id, c]));
       coversKnown = true;
     } catch {
-      if (mine === coversTicket) covers = new Map();
+      if (mine === coversTicket && !coversKnown) covers = new Map();
     }
   }
 
