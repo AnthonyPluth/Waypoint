@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Siri answers: next flight and tonight's stay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --chart-3: #4fd1b0;
+  --kind-flight: var(--primary); --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+h1, h2, h3, p, ul, ol, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.doc { max-width: 1360px; margin: 0 auto; padding: 28px max(16px, env(safe-area-inset-left, 0px)) 120px; display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a { color: var(--status-info-ink); }
+.proposed { color: var(--signal-ink); background: var(--signal-soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.sec { display: flex; flex-direction: column; gap: 18px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.lede code, .spec code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.fig { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "“" "”"; }
+
+/* The phone: a dimmed home screen with Siri on top. The system parts are rough; Apple draws them. */
+.dev { position: relative; width: 390px; max-width: 100%; height: 844px; flex: none; overflow: hidden; border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%);
+  background: radial-gradient(120% 70% at 20% 10%, #1b2440 0%, transparent 60%), radial-gradient(90% 60% at 90% 90%, #14302a 0%, transparent 60%), #07090e; }
+.dev.short { height: 600px; }
+.status { display: flex; justify-content: space-between; padding: 16px 30px 0; font-size: 15px; font-weight: 600; }
+.home { position: absolute; inset: 70px 22px auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 26px 18px; filter: blur(5px); opacity: .45; }
+.home i { aspect-ratio: 1; border-radius: 16px; background: rgb(255 255 255 / 12%); }
+.glow { position: absolute; inset: 0; border-radius: 30px; pointer-events: none; box-shadow: inset 0 0 0 3px rgb(143 194 255 / 45%), inset 0 0 28px 6px rgb(190 120 255 / 30%), inset 0 0 60px 10px rgb(79 157 255 / 18%); }
+.sys { position: absolute; left: 10px; right: 10px; top: 54px; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+.bubble { align-self: flex-end; max-width: 80%; background: rgb(255 255 255 / 10%); backdrop-filter: blur(20px); border-radius: 18px; padding: 8px 14px; font-size: 14px; color: var(--muted-foreground); }
+.said { background: rgb(28 31 40 / 82%); backdrop-filter: blur(24px); border-radius: 22px; padding: 12px 14px; display: flex; gap: 10px; align-items: flex-start; font-size: 15px; box-shadow: 0 0 0 1px rgb(255 255 255 / 6%); }
+.appic { width: 22px; height: 22px; border-radius: 6px; background: #0e1320; display: grid; place-items: center; flex: none; margin-top: 1px; box-shadow: 0 0 0 1px rgb(255 255 255 / 10%); }
+.appic svg { width: 14px; height: 14px; }
+.syslabel { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: rgb(255 255 255 / 35%); }
+
+/* Waypoint's card (ours) */
+.wcard { background: var(--card); border: 1px solid var(--border); border-radius: 22px; box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.wcard .hd { display: flex; align-items: center; gap: 10px; }
+.kind { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; flex: none; }
+.kind.flight { background: var(--kind-flight-soft); color: var(--kind-flight); }
+.kind.stay { background: var(--kind-stay-soft); color: var(--kind-stay); }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.hd .grow { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.hd b { font-weight: 600; font-size: 15px; }
+.route { display: grid; grid-template-columns: auto 1fr auto; align-items: end; gap: 12px; }
+.code { font-family: var(--mono); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.tm { font-family: var(--mono); font-size: 13px; margin-top: 6px; }
+.zn { font-size: 12px; color: var(--muted-foreground); }
+.line { height: 2px; margin-bottom: 26px; background: repeating-linear-gradient(90deg, var(--muted-foreground) 0 4px, transparent 4px 9px); opacity: .6; position: relative; }
+.line svg { position: absolute; left: 50%; top: -8px; width: 18px; height: 18px; color: var(--status-info-ink); transform: translateX(-50%) rotate(90deg); fill: currentColor; stroke: none; }
+.r { text-align: right; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; font-size: 14px; }
+.facts dt { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); }
+.facts dd { margin: 0; font-family: var(--mono); font-size: 13.5px; }
+.ft { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted-foreground); border-top: 1px solid var(--border); padding-top: 9px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 99px; font-size: 12px; font-weight: 600; padding: 2px 10px; width: fit-content; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.chip.info { background: var(--status-info-soft); color: var(--status-info-ink); }
+.chip.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.chip.quiet { background: var(--status-quiet-soft); color: var(--status-quiet-ink); }
+.addr { font-size: 14px; color: var(--muted-foreground); }
+
+/* Shortcuts app, roughly */
+.sc { position: absolute; inset: 0; background: #000; padding: 60px 16px 0; display: flex; flex-direction: column; gap: 14px; }
+.sc h3 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+.sc .approw { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 17px; }
+.sc .approw .appic { width: 30px; height: 30px; border-radius: 8px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile { border-radius: 18px; padding: 14px; min-height: 104px; display: flex; flex-direction: column; justify-content: space-between; font-weight: 600; font-size: 15px; background: linear-gradient(160deg, #2f62d8, #1d3f99); }
+.tile.stay { background: linear-gradient(160deg, #1f9e80, #136150); }
+.tile svg { width: 24px; height: 24px; }
+.sc .muted { color: #8e8e93; font-size: 13px; }
+</style>
+</head>
+<body>
+<main class="doc">
+<header class="dochead">
+  <h1>Siri answers: next flight and tonight's stay</h1>
+  <p>Mock frames for the two intents <a href="README.md">the write-up</a> recommends building first (<a href="https://github.com/AnthonyPluth/Waypoint/issues/820">#820</a>). Phone width only, dark only. Every flight, hotel and time is made up. Everything here comes from the trips saved on the phone: no request goes to the server.</p>
+  <p class="proposed">Proposed, not signed off. The owner picks the intents, the phrases and the wording in chat on #820.</p>
+</header>
+<section class="sec">
+  <div class="sechead"><span class="letter">A</span><h2>Next flight</h2></div>
+  <p class="lede">Spoken: the flight number, the day and time, and the zone's name. On the card: the route as airport codes, the booked wall-clock times with each airport's zone, the trip and how old the saved copy is. Never a confirmation code, gate, seat or traveller's name. Tap opens the flight in the app.</p>
+  <div class="frames"><figure class="fig"><figcaption>A1 · later this week</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“When is my next flight in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 214, leaves Thursday at 7:40 am, Denver time.</span></p>
+    <section class="wcard" aria-label="Next flight, EA 214, Denver to Grand Junction">
+      <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Thu Jun 12</span><b>EA 214</b></span><span class="chip quiet">Booked times</span></div>
+      <div class="route">
+        <div><div class="code">DEN</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+        <div class="r"><div class="code">GJT</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+      </div>
+      <div class="ft"><span>Trip: Grand Junction</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>A2 · today</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Waypoint next flight”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your flight, EA 214, leaves today at 7:40 am, Denver time, in 3 hours.</span></p>
+    <section class="wcard" aria-label="Next flight, EA 214, Denver to Grand Junction">
+      <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Today</span><b>EA 214</b></span><span class="chip info">In 3 h</span></div>
+      <div class="route">
+        <div><div class="code">DEN</div><div class="tm">7:40 am <span class="zn">MDT</span></div></div>
+        <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+        <div class="r"><div class="code">GJT</div><div class="tm">8:45 am <span class="zn">MDT</span></div></div>
+      </div>
+      <div class="ft"><span>Trip: Grand Junction</span><span>Saved 20 min ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>A3 · across zones</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“When do I fly in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Your next flight, EA 88, leaves Monday at 6:05 pm, Denver time.</span></p>
+    <section class="wcard" aria-label="Next flight, EA 88, Denver to New York JFK">
+      <div class="hd"><span class="kind flight"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></span><span class="grow"><span class="eyebrow">Next flight · Mon Jun 16</span><b>EA 88</b></span><span class="chip quiet">Booked times</span></div>
+      <div class="route">
+        <div><div class="code">DEN</div><div class="tm">6:05 pm <span class="zn">MDT</span></div></div>
+        <div class="line" aria-hidden="true"><svg  aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg></div>
+        <div class="r"><div class="code">JFK</div><div class="tm">11:52 pm <span class="zn">EDT</span></div></div>
+      </div>
+      <div class="ft"><span>Trip: Grand Junction</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure></div>
+  <div class="spec"><div><h3>Spoken</h3><ul><li><q>Your next flight, EA 214, leaves Thursday at 7:40 am, Denver time.</q> The day is <q>today</q>, <q>tomorrow</q> or the weekday within a week, else the date.</li><li>Today adds <q>in 3 hours</q> (or <q>in 40 minutes</q>).</li><li>The zone's name comes from the departure's IANA zone (<code>America/Denver</code> → Denver). Never converted to the phone's zone.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Next flight · Thu Jun 12</q>, the flight number, a chip: <q>Booked times</q>, or <q>In 3 h</q> on the day.</li><li>Codes in Geist Mono 28 px; times 13 px with the zone abbreviation of each airport.</li><li>Footer: the trip's name, and <q>Saved 2 hours ago</q> from the copy's <code>savedAt</code>.</li></ul></div><div><h3>Not shown</h3><ul><li>Confirmation code, gate, terminal, seat, cabin, travellers, live status.</li><li>City names: the saved copy has airport codes only (open question 5).</li></ul></div></div>
+</section>
+<section class="sec">
+  <div class="sechead"><span class="letter">B</span><h2>Tonight's stay, and check-out</h2></div>
+  <p class="lede">One intent behind two phrases. Spoken: the hotel's name and city, and the check-out day and time. On the card, never spoken: the street address. Never a room number, confirmation code or phone number.</p>
+  <div class="frames"><figure class="fig"><figcaption>B1 · where am I staying tonight</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“Where am I staying tonight in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>Tonight you're staying at Hotel Example in Grand Junction. You check out Sunday at 11 am.</span></p>
+    <section class="wcard" aria-label="Tonight's stay, Hotel Example, Grand Junction">
+      <div class="hd"><span class="kind stay"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 20V6M2 16h20v4M22 16v-4a3 3 0 0 0-3-3h-8v7M6.5 12.5a1.5 1.5 0 1 0 0-.01"/></svg></span><span class="grow"><span class="eyebrow">Tonight</span><b>Hotel Example</b></span><span class="chip info">Night 2 of 3</span></div>
+      <p class="addr">100 Example Avenue, Grand Junction</p>
+      <dl class="facts"><div><dt>Check-in</dt><dd>Thu Jun 12<br>3:00 pm</dd></div><div><dt>Check-out</dt><dd>Sun Jun 15<br>11:00 am</dd></div></dl>
+      <div class="ft"><span>MDT, the hotel's time</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure><figure class="fig"><figcaption>B2 · when do I check out</figcaption><div class="dev">
+  <div class="status" aria-hidden="true"><span>9:41</span><span>5G</span></div>
+  <div class="home" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="glow" aria-hidden="true"></div>
+  <div class="sys">
+    <p class="bubble">“When do I check out in Waypoint”</p>
+    <p class="said"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span>You check out of Hotel Example on Sunday at 11 am.</span></p>
+    <section class="wcard" aria-label="Tonight's stay, Hotel Example, Grand Junction">
+      <div class="hd"><span class="kind stay"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 20V6M2 16h20v4M22 16v-4a3 3 0 0 0-3-3h-8v7M6.5 12.5a1.5 1.5 0 1 0 0-.01"/></svg></span><span class="grow"><span class="eyebrow">Check-out Sunday</span><b>Hotel Example</b></span><span class="chip info">Night 2 of 3</span></div>
+      <p class="addr">100 Example Avenue, Grand Junction</p>
+      <dl class="facts"><div><dt>Check-in</dt><dd>Thu Jun 12<br>3:00 pm</dd></div><div><dt>Check-out</dt><dd>Sun Jun 15<br>11:00 am</dd></div></dl>
+      <div class="ft"><span>MDT, the hotel's time</span><span>Saved 2 hours ago</span></div>
+    </section>
+  </div>
+  <p class="syslabel">Siri and its glow are the system's; the card is Waypoint's</p>
+</div></figure></div>
+  <div class="spec"><div><h3>Rules</h3><ul><li>Tonight is today in the hotel's own zone; the stay covers it when check-in is on or before today and check-out after it.</li><li>No stay tonight: <q>You have no stay tonight. Your next stay is Hotel Example, from Thursday.</q> with the same card.</li><li>Times are the hotel's wall-clock times.</li></ul></div><div><h3>Card</h3><ul><li>Eyebrow <q>Tonight</q> (or <q>Check-out Sunday</q>), the hotel's name, a chip <q>Night 2 of 3</q>.</li><li>The address from <code>details.address</code>; check-in and check-out; footer with the zone and the copy's age.</li></ul></div></div>
+</section>
+<section class="sec">
+  <div class="sechead"><span class="letter">C</span><h2>In the Shortcuts app</h2></div>
+  <p class="lede">Two actions, no more. They show under Waypoint in Shortcuts and in Spotlight as actions; no trip is ever indexed.</p>
+  <div class="frames"><figure class="fig"><figcaption>C1 · Shortcuts, App Shortcuts for Waypoint</figcaption><div class="dev short"><div class="sc">
+  <div class="status" aria-hidden="true" style="position:absolute;top:0;left:0;right:0"><span>9:41</span><span>5G</span></div>
+  <h3>Shortcuts</h3>
+  <div class="approw"><span class="appic"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M18 22L24 43L32 29L40 43L46 22" fill="none" stroke="#f2a516" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Waypoint</div>
+  <div class="tiles">
+    <div class="tile"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></svg><span>Next flight</span></div>
+    <div class="tile stay"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M2 20V6M2 16h20v4M22 16v-4a3 3 0 0 0-3-3h-8v7M6.5 12.5a1.5 1.5 0 1 0 0-.01"/></svg><span>Tonight's stay</span></div>
+  </div>
+  <p class="muted">Say “When is my next flight in Waypoint” or “Where am I staying tonight in Waypoint”.</p>
+</div><p class="syslabel">The Shortcuts app is the system's</p></div></figure></div>
+  <div class="spec"><div><h3>Why two</h3><ul><li>The owner doesn't want clutter: check-out is a phrase of the stay intent, not a third tile.</li><li>Parking, open my trip and live status are left out of the first set (see the write-up).</li></ul></div></div>
+</section>
+</main>
+</body>
+</html>
