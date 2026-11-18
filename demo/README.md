@@ -34,4 +34,4 @@ Pages Source must be **GitHub Actions**, and the `github-pages` environment only
 
 ## Apple's maps
 
-The demo has no MapKit token and draws no Apple map. A way to give it one, a static, domain-restricted MapKit JS token that only `main`'s Docs build reads from a protected environment, is proposed on [#834](https://github.com/AnthonyPluth/Waypoint/issues/834) and waits for the owner's sign-off: see [Apple's maps in the demo](../docs/src/content/docs/contributing/demo-maps.md) and [the options](../docs/design/demo-maps/README.md).
+The static demo shows no maps and no route replay, and no Apple token or key is made for it: the owner decided this on [#834](https://github.com/AnthonyPluth/Waypoint/issues/834#issuecomment-6982585262) (option C, 2026-11-18), and the MapKit-only renderer ([#836](https://github.com/AnthonyPluth/Waypoint/issues/836)) builds it. See [Maps in the demo](../docs/src/content/docs/contributing/demo-maps.md) and [the options that were weighed](../docs/design/demo-maps/README.md).
