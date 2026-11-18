@@ -66,7 +66,7 @@ struct SavedBooking: Decodable, Equatable {
             flightNumber = try? details.decodeIfPresent(String.self, forKey: .flightNumber)
             address = try? details.decodeIfPresent(String.self, forKey: .address)
             let flag: String? = try? details.decodeIfPresent(String.self, forKey: .timeUnknown)
-            timeUnknown = !(flag ?? "").isEmpty
+            timeUnknown = flag == "yes"   // exactly "yes", as `untimed` in waypoint/domain/trips.py and frontend/src/lib/trips.ts
         } else {
             flightNumber = nil
             address = nil

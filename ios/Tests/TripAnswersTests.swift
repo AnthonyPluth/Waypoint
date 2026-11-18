@@ -159,6 +159,38 @@ final class TripAnswersTests: XCTestCase {
                                              provider: "Provider Example", flightNumber: "EA 214", address: nil, timeUnknown: false))
     }
 
+    func testOnlyTheExactValueYesMarksTheTimesUnknown() throws {
+        func read(_ flag: String?) throws -> Bool {
+            var segment = AnswerFixtures.flight(12, "2026-11-20T07:40", "2026-11-20T08:45")
+            var details = segment["details"] as! [String: Any]
+            details["time_unknown"] = flag
+            segment["details"] = details
+            let copy = try saved([AnswerFixtures.trip(1, "Trip", [segment])])
+            return try XCTUnwrap(copy.trips.first?.bookings.first).timeUnknown
+        }
+        XCTAssertTrue(try read("yes"))
+        XCTAssertFalse(try read("no"))
+        XCTAssertFalse(try read(nil))
+        XCTAssertFalse(try read(""))
+        XCTAssertFalse(try read("maybe"))
+        XCTAssertFalse(try read("YES"))
+    }
+
+    func testAFlightMarkedNoForUnknownTimeIsStillTheNextFlightAndAHotelKeepsItsCheckOutTime() throws {
+        var flight = AnswerFixtures.flight(13, "2026-11-20T07:40", "2026-11-20T08:45")
+        var flightDetails = flight["details"] as! [String: Any]
+        flightDetails["time_unknown"] = "no"
+        flight["details"] = flightDetails
+        var stay = AnswerFixtures.hotel(5, "Hotel Example", "2026-11-17T15:00", "2026-11-20T11:00")
+        var stayDetails = stay["details"] as! [String: Any]
+        stayDetails["time_unknown"] = "no"
+        stay["details"] = stayDetails
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [flight, stay])])
+        let subject = answers(at: AnswerFixtures.date("2026-11-18T20:00"))
+        XCTAssertEqual(subject.nextFlight(copy).page, "#trip/1/flight/13")
+        XCTAssertEqual(subject.tonight(copy).spoken, "Tonight you're staying at Hotel Example in Grand Junction. You check out Friday at 11 am.")
+    }
+
     func testTheReaderSkipsABookingItCannotReadAndKeepsTheRest() throws {
         var broken = AnswerFixtures.flight(13, "2026-11-20T09:00", "2026-11-20T10:00")
         broken["start_zone"] = nil
