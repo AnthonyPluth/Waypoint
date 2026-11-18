@@ -328,10 +328,17 @@ class OfflineMessages(TypedDict):
     emails: list[StoredEmail]
 
 
+class OfflinePicture(TypedDict):
+    segment_id: int
+    type: str
+    data: str
+
+
 class OfflineTrip(TypedDict):
     trip: Trip
     messages: list[OfflineMessages]
     cities: dict[str, str]
+    codes: NotRequired[list[OfflinePicture]]
 
 
 class Offline(TypedDict):

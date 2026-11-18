@@ -176,6 +176,38 @@ final class OfflineSyncTests: XCTestCase {
         XCTAssertEqual(fetching.calls.first?.bearer, "wpa_token")
     }
 
+    func testSyncSavesTheGateCodeAndPictureWithTheTripsAndAsksForNothingElse() async throws {
+        fetching.result = .success((TripFixtures.replyWithCode("Lisbon"), 200))
+        let outcome = await makeSync().sync()
+        XCTAssertEqual(outcome, .saved)
+        let saved = try XCTUnwrap(store.load(server: home))
+        let root = try XCTUnwrap(try JSONSerialization.jsonObject(with: saved.json) as? [String: Any])
+        let entry = try XCTUnwrap((root["trips"] as? [[String: Any]])?.first)
+        let codes = try XCTUnwrap(entry["codes"] as? [[String: Any]])
+        XCTAssertEqual(codes.first?["segment_id"] as? Int, 5)
+        XCTAssertEqual(codes.first?["data"] as? String, TripFixtures.pictureData)
+        let segments = try XCTUnwrap((entry["trip"] as? [String: Any])?["segments"] as? [[String: Any]])
+        XCTAssertEqual((segments.first?["gate_code"] as? [String: Any])?["state"] as? String, "ready")
+        XCTAssertEqual(fetching.calls.count, 1)
+        XCTAssertEqual(fetching.calls.first?.server, home)
+    }
+
+    func testTheNextSaveReplacesThePictureAndASignOutOrA401DeletesIt() async throws {
+        fetching.result = .success((TripFixtures.replyWithCode("Lisbon"), 200))
+        let sync = makeSync()
+        await sync.sync()
+        fetching.result = .success((TripFixtures.replyWithCode("Lisbon", picture: false), 200))
+        await sync.sync()
+        let replaced = try XCTUnwrap(store.load(server: home))
+        XCTAssertFalse(String(decoding: replaced.json, as: UTF8.self).contains(TripFixtures.pictureData))
+        fetching.result = .success((TripFixtures.replyWithCode("Lisbon"), 200))
+        await sync.sync()
+        fetching.result = .success((Data(), 401))
+        let outcome = await sync.sync()
+        XCTAssertEqual(outcome, .unauthorized)
+        XCTAssertNil(store.load(server: home))
+    }
+
     func testSyncReplacesTheSavedSet() async {
         answer(["Lisbon", "Oslo"])
         let sync = makeSync()

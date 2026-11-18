@@ -6682,6 +6682,26 @@
         ],
         "additionalProperties": false
       },
+      "OfflinePicture": {
+        "type": "object",
+        "properties": {
+          "segment_id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "type",
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "OfflineTrip": {
         "type": "object",
         "properties": {
@@ -6698,6 +6718,12 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
+            }
+          },
+          "codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfflinePicture"
             }
           }
         },

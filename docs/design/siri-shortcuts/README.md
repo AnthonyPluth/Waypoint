@@ -46,7 +46,7 @@ Apple's way in is App Intents. Each intent below is an `AppIntent` in the app ta
 | --- | --- | --- | --- | --- |
 | A | **Next flight** | "When is my next flight in Waypoint", "Waypoint next flight", "When do I fly in Waypoint" | "Your next flight leaves Denver for Grand Junction on Thursday at 7:40 am, local time." Today: "Your flight leaves Denver for Grand Junction today at 7:40 am, local time, in 3 hours." (Owner's decision: city names.) | Card: flight number, `DEN → GJT` with each city, departs and arrives as wall-clock times with each airport's zone, the trip name, "Booked times · saved 2 hours ago". Tap opens `#trip/{id}/flight/{segmentId}`. |
 | B | **Tonight's stay** (also answers "when do I check out") | "Where am I staying tonight in Waypoint", "When do I check out in Waypoint", "Waypoint hotel" | "Tonight you're staying at Hotel Example in Grand Junction. You check out Sunday at 11 am." Check-out phrase: "You check out of Hotel Example on Sunday at 11 am." | Card: hotel name and city, the street address (on screen only), check-in and check-out with the hotel's zone, nights. Tap opens `#trip/{id}`. |
-| C | **Parking code** | "Show my parking code in Waypoint", "Waypoint parking" | "Opening your parking at Lot Example." Never the code, never the confirmation. | Opens the app at the parking booking, where the existing **Show QR code** button is. The QR code comes from the server (`GET /api/segments/{id}/code`) and is never saved on the phone, so with no connection the booking opens without it. |
+| C | **Parking code** | "Show my parking code in Waypoint", "Waypoint parking" | "Opening your parking at Lot Example." Never the code, never the confirmation. | Opens the app at the parking booking, where the existing **Show QR code** button is. Siri never carries the code: **Show QR code** fetches it from the server (`GET /api/segments/{id}/code`), and with no connection the dialog shows the picture saved with the trips (owner decision, #819, 2026-11-18). |
 | D | **Open my trip to a place** | "Open my trip to \<place\> in Waypoint", "Waypoint open \<place\>" | "Opening your trip to Grand Junction." | Opens `#trip/{id}`. \<place\> is a trip from the saved copy, matched by its name or destination. |
 | E | **Live flight status** (as asked: "is my flight on time"; not chosen) | "Is my flight on time in Waypoint" | "Your flight to Grand Junction is delayed 35 minutes; it now leaves at 8:15 am." | Card like A with the status pill. Needs the server (below). |
 
@@ -58,7 +58,7 @@ Apple's way in is App Intents. Each intent below is an `AppIntent` in the app ta
 | --- | --- | --- |
 | A Next flight | Yes, once the copy carries the airports' cities (#840): the next timed, not-cancelled flight in the saved trips, anyone's on a trip the person is on, from its booked times (the same rule as Upcoming's next flight). Untimed flights (`details.time_unknown`) are skipped. A flight in a trip further out than the saved window isn't seen, so the answer says "in the trips saved on this iPhone" when there is none. A copy saved before the cities were added speaks the flight number instead, until the next online open replaces it. | The cities, once, in the saved copy (`GET /api/offline`), not at the moment of asking. |
 | B Tonight's stay | Yes. The two phrases select differently. **Tonight:** a not-cancelled hotel whose nights include tonight (tonight is today in the hotel's own zone: check-in day on or before today, check-out day after it), else the next saved stay. **Check-out:** the not-cancelled stay under way now, from its check-in time until its check-out time (`start_local` to `end_local`, wall-clock in the hotel's zone). So at 8 am on check-out morning it is still that stay, until 11 am. With two under way it is the one that checks out first; past the check-out time, or with none under way, it is the next saved stay. | Nothing. |
-| C Parking code | Finding the parking booking: yes. | The QR code itself, as today, once the app is open. |
+| C Parking code | Finding the parking booking: yes. | The QR code itself: **Show QR code** fetches it once the app is open, or shows the picture saved with the trips. |
 | D Open my trip | Yes: the saved trips' names and destinations. A trip outside the saved window can't be named by voice (the app could still open it online). | Nothing. |
 | E Live status | No: live status is never saved, and the gate is never in the copy. | `GET /api/flight-status` with the app's token, a native request the app doesn't make today. It sends nothing new to the server (the server already holds the booking and the status), but it is a new request at a new moment, which the issue rules out ("nothing new is sent to the server") unless the owner decides otherwise. |
 
@@ -120,7 +120,7 @@ Per intent:
 
 The first draft recommended A and B as the smallest first set. They answer from the saved trips alone, with no network, so they work in the air and at a hotel with bad Wi-Fi. They need the phone unlocked, and they hand no trip data to Spotlight or Siri's suggestions. On 2026-11-18 the owner chose A, B, C and D, and not E (see "Owner decisions"). What that adds:
 
-- **C, parking code** only opens the app at the parking booking. The code itself still comes from the server once the app is open, so at a gate with no signal the booking opens without it. Location-triggered codes stay a separate issue.
+- **C, parking code** only opens the app at the parking booking. Siri never carries the code: once the app is open **Show QR code** fetches it from the server, and at a gate with no signal the dialog shows the picture saved with the trips. Location-triggered codes stay a separate issue.
 - **D, open my trip** gives the saved trips' places to the system's phrase list on the phone. It must replace that list on every save and empty it on every purge, which its build issue tests.
 - **City names** need the saved copy to carry the cities of its airports first, so the build starts with that server change.
 
@@ -215,7 +215,7 @@ Sonnet: the design and privacy choices are settled on #820, and the rest follows
 ### #842 feat(ios): a Siri and Shortcuts action that opens the parking booking
 
 **Context**
-Intent C in `docs/design/siri-shortcuts/README.md`, chosen by the owner on 2026-11-18. A parking booking's QR code is served only by `GET /api/segments/{id}/code` and is never saved on the phone. The web app's booking shows it behind **Show QR code** (`frontend/src/lib/components/GateCode.svelte`).
+Intent C in `docs/design/siri-shortcuts/README.md`, chosen by the owner on 2026-11-18. A parking booking's QR code is served by `GET /api/segments/{id}/code` and, in the iPhone app, also saved with the trips (owner decision, #819, 2026-11-18); Siri never carries it. The web app's booking shows it behind **Show QR code** (`frontend/src/lib/components/GateCode.svelte`).
 
 **Scope**
 - `OpenParkingIntent` in `ios/Waypoint/WaypointIntents.swift`:
