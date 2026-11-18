@@ -29,6 +29,16 @@ The saved trips are files in the app's private storage inside its sandbox, prote
 
 With no connection, the app shows the saved trips, read-only, instead of an error, from a copy of your server's public web app files that it keeps beside them (code only, no trip data and no token, deleted with the saved trips). Nothing is shown this way unless a trip is saved, and what appears is described under [With no connection, in the app](/Waypoint/start/offline/#with-no-connection-in-the-app). Starting the app with no connection works the same way when trips and the files are saved: the app waits about 5 seconds for the server to start its web session, then opens the saved page without a cookie or token, and goes back to the server (with a fresh web session) when it answers again. With nothing saved, or an error that isn't a lost connection, it shows the error as before; a 401 or 403 from the server signs you out and deletes the saved trips. Unit tests cover this; it has not yet been confirmed on a phone in airplane mode.
 
+## Finding the places of your bookings
+
+For the arrival codes planned in [#819](https://github.com/AnthonyPluth/Waypoint/issues/819), the app finds a street-level point for each parking lot, rental pickup and hotel on your saved trips, because the points your server keeps are only a postcode or city centre. This is the first part (#848); nothing is watched and no notification appears yet.
+
+- **What is sent to Apple:** the text of the booking’s address, to Apple’s geocoder (the same service behind Apple Maps), from the phone, once for each distinct address, again only if Apple could not find it or the copy was removed in between. This is the owner’s decision of 2026-11-18. Nothing else goes with it.
+- **What is never sent:** the phone’s location. It is not sent to Apple, to your server or to anyone, and nothing is logged. Your server is not involved, and no other request is made.
+- **When:** only while Waypoint has location permission (While Using or Always; there is no switch of Waypoint’s own), after each successful save of the trips. Without permission nothing is looked up and any earlier result is deleted. The app does not ask for permission yet.
+- **Which bookings:** parking, rental pickups and hotels that aren’t cancelled and whose window hasn’t ended. A rental pickup with no address that can be found uses its airport’s coordinate when the saved trip has it (a later change adds airports to the saved copy). A booking with neither is left out.
+- **Where it is kept:** one file beside the saved trips, under the same file protection. It holds each place’s coordinates, circle and window, and the lookups cached by a hash of the address text, never the address itself. It is replaced with each save and deleted whenever the saved trips are (sign-out, a 401 or 403, saving switched off, a changed server address, 3 days after the trip ends).
+
 ## Siri and Shortcuts
 
 You can ask Siri about your next flight and your hotel, by voice or from the Shortcuts app. Every phrase includes the app's name, which Apple requires:

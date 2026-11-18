@@ -18,6 +18,7 @@ final class OfflineStore: @unchecked Sendable {
 
     private static let tripsFile = "trips.json"
     private static let metaFile = "meta.json"
+    private static let placesFile = "arrival-places.json"
     private static let stagingPrefix = ".staging-"
 
     private struct Meta: Codable {
@@ -82,6 +83,32 @@ final class OfflineStore: @unchecked Sendable {
         return parsed.trips.compactMap { ($0["trip"] as? [String: Any])?["name"] as? String }
     }
 
+    /// The arrival places file (`ArrivalPlaces`) lives in the server's folder beside the saved trips, so every purge and every expiry takes it
+    /// with them. It is never written without a saved copy, and a save of the trips carries it over (the lookups it caches are kept).
+    func savePlaces(_ data: Data, for server: URL) throws {
+        lock.lock()
+        defer { lock.unlock() }
+        let folder = folder(for: server)
+        guard files.fileExists(atPath: folder.path) else { return }
+        do {
+            try data.write(to: folder.appendingPathComponent(Self.placesFile), options: [.atomic, .completeFileProtection])
+        } catch {
+            throw OfflineStoreError.cannotWrite
+        }
+    }
+
+    func loadPlaces(server: URL) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return try? Data(contentsOf: folder(for: server).appendingPathComponent(Self.placesFile))
+    }
+
+    func deletePlaces(server: URL) {
+        lock.lock()
+        defer { lock.unlock() }
+        try? files.removeItem(at: folder(for: server).appendingPathComponent(Self.placesFile))
+    }
+
     func purge(server: URL) throws {
         lock.lock()
         defer { lock.unlock() }
@@ -122,6 +149,9 @@ final class OfflineStore: @unchecked Sendable {
             try files.createDirectory(at: staging, withIntermediateDirectories: false, attributes: protection)
             try trips.write(to: staging.appendingPathComponent(Self.tripsFile), options: .completeFileProtection)
             try meta.write(to: staging.appendingPathComponent(Self.metaFile), options: .completeFileProtection)
+            if let places = try? Data(contentsOf: folder.appendingPathComponent(Self.placesFile)) {
+                try places.write(to: staging.appendingPathComponent(Self.placesFile), options: .completeFileProtection)
+            }
             if files.fileExists(atPath: folder.path) {
                 _ = try files.replaceItemAt(folder, withItemAt: staging)
             } else {

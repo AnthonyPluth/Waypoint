@@ -110,6 +110,8 @@ actor OfflineSync {
     private let fetching: OfflineFetching
     private let pages: OfflinePages
     private let pageFetching: PageFetching
+    private let arrival: ArrivalPlaces
+    private var arrivalTask: Task<Void, Never>?
     private let currentServer: @Sendable () async -> URL?
     private let currentBearer: @Sendable () async throws -> String?
     private var generation = 0
@@ -120,6 +122,7 @@ actor OfflineSync {
          fetching: OfflineFetching = LiveOfflineFetching(),
          pages: OfflinePages = .shared,
          pageFetching: PageFetching = LivePageFetching(),
+         arrival: ArrivalPlaces? = nil,
          state: OfflineSyncState = OfflineSyncState(),
          server: @escaping @Sendable () async -> URL?,
          bearer: @escaping @Sendable () async throws -> String?) {
@@ -128,6 +131,7 @@ actor OfflineSync {
         self.fetching = fetching
         self.pages = pages
         self.pageFetching = pageFetching
+        self.arrival = arrival ?? ArrivalPlaces(store: store)
         self.state = state
         self.currentServer = server
         self.currentBearer = bearer
@@ -176,6 +180,7 @@ actor OfflineSync {
         guard Self.version(of: reply.data) == Self.supportedVersion else { return .unknownVersion }
         do {
             try store.save(reply.data, version: Self.supportedVersion, for: server)
+            findArrivalPlaces(server: server)
             return .saved
         } catch {
             return .failed
@@ -228,8 +233,22 @@ actor OfflineSync {
         return reply.data
     }
 
+    /// After a save, in the background: the lookups can take a while and must not hold the save's result. A purge cancels it.
+    private func findArrivalPlaces(server: URL) {
+        arrivalTask?.cancel()
+        let finder = arrival
+        arrivalTask = Task { _ = await finder.refresh(server: server) }
+    }
+
+    /// Waits for the lookups started by the last save.
+    func arrivalSettled() async {
+        await arrivalTask?.value
+    }
+
     func purge() {
         generation += 1
+        arrivalTask?.cancel()
+        arrivalTask = nil
         state.setFailed(false)
         try? store.purgeAll()
         try? pages.purgeAll()

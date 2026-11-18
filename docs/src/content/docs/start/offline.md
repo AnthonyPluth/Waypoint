@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you and never sent anywhere else. In a browser they are always encrypted on the device and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. The iPhone app keeps its own copy, in files protected by the phone, and works differently (see [In the iPhone app](#in-the-iphone-app)).
+Waypoint can keep your upcoming trips on your phone or computer, so their confirmation codes, times and places are there at the airport and in the air. The copies are shown only to you and never sent anywhere else, with one exception in the iPhone app: once location is allowed, it sends the text of a booking’s address to Apple to find its place on the phone (never the phone’s location; see [Finding the places of your bookings](/Waypoint/start/ios/#finding-the-places-of-your-bookings)). In a browser they are always encrypted on the device and opened only with the device’s own check: Face ID, Touch ID, a fingerprint reader, Windows Hello, or the screen lock code where that is what the device offers. The iPhone app keeps its own copy, in files protected by the phone, and works differently (see [In the iPhone app](#in-the-iphone-app)).
 
 ## Setting it up
 
