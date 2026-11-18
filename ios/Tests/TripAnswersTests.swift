@@ -5,7 +5,7 @@ import XCTest
 /// its segments, the messages and the cities beside the trip) and carry canary values wherever a private value could be.
 enum AnswerFixtures {
     static let canaries = ["CANARYCONF", "CANARYSEAT", "CANARYROOM", "CANARYPHONE", "CANARYTERM", "CANARYGATE", "CANARYTRAVELLER",
-                           "CANARYMANAGE", "CANARYSUBJECT", "CANARYEMAIL"]
+                           "CANARYMANAGE", "CANARYSUBJECT", "CANARYEMAIL", "CANARYCODE", "CANARYSPACE"]
 
     static let denver = "America/Denver"
     static let newYork = "America/New_York"
@@ -46,9 +46,16 @@ enum AnswerFixtures {
         return segment(id, "hotel", start, end, startZone: zone, endZone: zone, origin: name, destination: city, status: status, details: details)
     }
 
+    static func parking(_ id: Int, _ lot: String?, _ start: String, _ end: String, zone: String = denver, status: String = "confirmed",
+                        provider: String? = "Provider Example") -> [String: Any] {
+        let details: [String: Any] = ["address": "1 Lot Road, Grand Junction", "space": "CANARYSPACE", "code": "CANARYCODE", "phone": "CANARYPHONE"]
+        return segment(id, "parking", start, end, startZone: zone, endZone: zone, origin: lot, destination: nil, status: status,
+                       details: details, provider: provider)
+    }
+
     static func segment(_ id: Int, _ kind: String, _ start: String, _ end: String, startZone: String, endZone: String, origin: String?,
-                        destination: String?, status: String, details: [String: Any]) -> [String: Any] {
-        ["id": id, "trip_id": 1, "kind": kind, "status": status, "confirmation": "CANARYCONF", "provider": "Provider Example",
+                        destination: String?, status: String, details: [String: Any], provider: String? = "Provider Example") -> [String: Any] {
+        ["id": id, "trip_id": 1, "kind": kind, "status": status, "confirmation": "CANARYCONF", "provider": orNull(provider),
          "start_local": start, "start_zone": startZone, "end_local": end, "end_zone": endZone,
          "origin": orNull(origin), "destination": orNull(destination), "details": details,
          "manage_url": "https://example.com/CANARYMANAGE",
@@ -559,6 +566,126 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(answers(at: now).tonight(copy).card?.chip, AnswerCard.Chip(text: "Old copy", tone: .warn))
     }
 
+    // MARK: Parking
+
+    private let lotExample = AnswerFixtures.parking(40, "Lot Example", "2026-11-17T09:00", "2026-11-20T18:00")
+
+    func testTheCurrentParkingBookingOpensItsTripAndSaysOnlyTheLot() throws {
+        let copy = try saved([AnswerFixtures.trip(1, "Grand Junction", denverGJ + [lotExample])])
+        let answer = answers(at: wednesday5am).parking(copy)
+        XCTAssertEqual(answer.kind, .parking)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Example.")
+        XCTAssertEqual(answer.page, "#trip/1")
+        XCTAssertNil(answer.card)
+    }
+
+    func testTheLotIsTheOriginElseTheProviderElseParking() throws {
+        let named = try saved([AnswerFixtures.trip(1, "Trip", [lotExample])])
+        XCTAssertEqual(answers(at: wednesday5am).parking(named).spoken, "Opening your parking at Lot Example.")
+        let provider = try saved([AnswerFixtures.trip(1, "Trip", [AnswerFixtures.parking(41, nil, "2026-11-17T09:00", "2026-11-20T18:00")])])
+        XCTAssertEqual(answers(at: wednesday5am).parking(provider).spoken, "Opening your parking at Provider Example.")
+        let blank = try saved([AnswerFixtures.trip(1, "Trip", [AnswerFixtures.parking(42, "  ", "2026-11-17T09:00", "2026-11-20T18:00", provider: nil)])])
+        XCTAssertEqual(answers(at: wednesday5am).parking(blank).spoken, "Opening your parking at Parking.")
+    }
+
+    func testBeforeEntryItIsTheNextBookingAndTheEarliestOneWins() throws {
+        let sooner = AnswerFixtures.parking(43, "Lot Sooner", "2026-11-22T09:00", "2026-11-23T18:00")
+        let furtherOut = AnswerFixtures.parking(44, "Lot Further", "2026-12-02T09:00", "2026-12-03T18:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Far", [furtherOut]), AnswerFixtures.trip(2, "Near", [sooner])])
+        let answer = answers(at: wednesday5am).parking(copy)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Sooner.")
+        XCTAssertEqual(answer.page, "#trip/2")
+    }
+
+    func testTheCurrentBookingBeatsALaterOne() throws {
+        let later = AnswerFixtures.parking(45, "Lot Later", "2026-11-22T09:00", "2026-11-23T18:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Later", [later]), AnswerFixtures.trip(2, "Now", [lotExample])])
+        let answer = answers(at: wednesday5am).parking(copy)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Example.")
+        XCTAssertEqual(answer.page, "#trip/2")
+    }
+
+    func testWithTwoCurrentTheOneThatEndsFirstIsOpened() throws {
+        let endsSooner = AnswerFixtures.parking(46, "Lot Ends First", "2026-11-18T01:00", "2026-11-19T18:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Long", [lotExample]), AnswerFixtures.trip(2, "Short", [endsSooner])])
+        let answer = answers(at: wednesday5am).parking(copy)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Ends First.")
+        XCTAssertEqual(answer.page, "#trip/2")
+    }
+
+    func testEntryIsFromTheMomentItStartsAndExitIsUntilTheMomentItEnds() throws {
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [lotExample])])
+        let atEntry = answers(at: AnswerFixtures.date("2026-11-17T09:00")).parking(copy)
+        XCTAssertEqual(atEntry.spoken, "Opening your parking at Lot Example.")
+        let justBefore = answers(at: AnswerFixtures.date("2026-11-17T08:59")).parking(copy)
+        XCTAssertEqual(justBefore.spoken, "Opening your parking at Lot Example.", "before entry it is the next booking, the same one")
+        let beforeExit = answers(at: AnswerFixtures.date("2026-11-20T17:59")).parking(copy)
+        XCTAssertEqual(beforeExit.spoken, "Opening your parking at Lot Example.")
+        let atExit = answers(at: AnswerFixtures.date("2026-11-20T18:00")).parking(copy)
+        XCTAssertEqual(atExit, .noParking)
+    }
+
+    func testAfterExitItIsTheNextBookingOrNone() throws {
+        let next = AnswerFixtures.parking(47, "Lot Next", "2026-12-04T09:00", "2026-12-05T18:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [lotExample, next])])
+        let after = answers(at: AnswerFixtures.date("2026-11-21T10:00")).parking(copy)
+        XCTAssertEqual(after.spoken, "Opening your parking at Lot Next.")
+        let past = answers(at: AnswerFixtures.date("2026-12-06T10:00")).parking(copy)
+        XCTAssertEqual(past, .noParking)
+    }
+
+    func testACancelledBookingIsNeverOpened() throws {
+        let cancelled = AnswerFixtures.parking(48, "Lot Cancelled", "2026-11-17T09:00", "2026-11-20T18:00", status: "cancelled")
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [cancelled])])
+        XCTAssertEqual(answers(at: wednesday5am).parking(copy), .noParking)
+        let withOther = try saved([AnswerFixtures.trip(1, "Trip", [cancelled, AnswerFixtures.parking(49, "Lot Next", "2026-11-24T09:00", "2026-11-25T18:00")])])
+        XCTAssertEqual(answers(at: wednesday5am).parking(withOther).spoken, "Opening your parking at Lot Next.")
+    }
+
+    func testNoParkingAtAllSaysSo() throws {
+        let copy = try saved([AnswerFixtures.trip(1, "Grand Junction", denverGJ + [example])])
+        let answer = answers(at: wednesday5am).parking(copy)
+        XCTAssertEqual(answer, .noParking)
+        XCTAssertEqual(answer.spoken, "There's no parking in the trips saved on this iPhone.")
+        XCTAssertNil(answer.card)
+        XCTAssertNil(answer.page)
+    }
+
+    func testABookingWithNoTimesIsCurrentFromItsFirstDayThroughItsLastDay() throws {
+        let dated = AnswerFixtures.parking(50, "Lot Dated", "2026-11-18T00:00", "2026-11-20T00:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [dated])])
+        let first = answers(at: AnswerFixtures.date("2026-11-18T00:30")).parking(copy)
+        XCTAssertEqual(first.page, "#trip/1")
+        let last = answers(at: AnswerFixtures.date("2026-11-20T23:30")).parking(copy)
+        XCTAssertEqual(last.spoken, "Opening your parking at Lot Dated.")
+        let after = answers(at: AnswerFixtures.date("2026-11-21T00:30")).parking(copy)
+        XCTAssertEqual(after, .noParking)
+        let before = answers(at: AnswerFixtures.date("2026-11-17T23:30")).parking(copy)
+        XCTAssertEqual(before.spoken, "Opening your parking at Lot Dated.", "the day before it is the next booking, the same one")
+    }
+
+    func testTheTimesAreTheLotsOwnZoneAndNotThePhones() throws {
+        let lot = AnswerFixtures.parking(51, "Lot Eastern", "2026-11-18T07:00", "2026-11-18T09:00", zone: AnswerFixtures.newYork)
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [lot])])
+        let during = answers(at: AnswerFixtures.date("2026-11-18T08:00", AnswerFixtures.newYork)).parking(copy)
+        XCTAssertEqual(during.spoken, "Opening your parking at Lot Eastern.", "08:00 at the lot is 13:00 on the phone, after the booking's wall clock end")
+    }
+
+    func testNoPrivateValueReachesTheSpokenParkingAnswer() throws {
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [lotExample, AnswerFixtures.parking(52, nil, "2026-12-04T09:00", "2026-12-05T18:00")])])
+        var checked = 0
+        for now in ["2026-11-16T10:00", "2026-11-18T05:00", "2026-11-21T10:00", "2026-12-04T10:00", "2026-12-06T10:00"].map({ AnswerFixtures.date($0) }) {
+            let answer = answers(at: now).parking(copy)
+            for text in AnswerFixtures.everything(in: answer) {
+                for hidden in AnswerFixtures.canaries + ["1 Lot Road", "Grand Junction", "Trip"] {
+                    XCTAssertFalse(text.contains(hidden), "\(hidden) found in \(text)")
+                }
+                checked += 1
+            }
+        }
+        XCTAssertEqual(checked, 5)
+    }
+
     // MARK: Never spoken, never on the card
 
     func testNoPrivateValueReachesAnySpokenAnswerOrCardField() throws {
@@ -580,7 +707,7 @@ final class TripAnswersTests: XCTestCase {
     }
 
     func testTheFixedAnswersHoldNoTripData() {
-        for answer in [Answer.locked, .notSignedIn, .savingOff, .nothingSaved, .unreadable, .noFlight, .noStayTonight, .noStayToCheckOutOf] {
+        for answer in [Answer.locked, .notSignedIn, .savingOff, .nothingSaved, .unreadable, .noFlight, .noStayTonight, .noStayToCheckOutOf, .noParking] {
             XCTAssertNil(answer.card)
             XCTAssertNil(answer.page)
         }
@@ -617,11 +744,20 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(tonight, .noStayTonight)
         let out = await service(server: home).answer(.checkOut)
         XCTAssertEqual(out, .noStayToCheckOutOf)
+        let parked = await service(server: home).answer(.parking)
+        XCTAssertEqual(parked, .noParking)
+    }
+
+    func testTheParkingQuestionAnswersFromTheSavedTrips() async throws {
+        try save([AnswerFixtures.trip(1, "Grand Junction", denverGJ + [lotExample])])
+        let answer = await service(server: home).answer(.parking)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Example.")
+        XCTAssertEqual(answer.page, "#trip/1")
     }
 
     func testALockedPhoneAnswersLockedWithoutReadingAnything() async throws {
         try save([AnswerFixtures.trip(1, "Grand Junction", denverGJ)])
-        for question in [TripAnswerService.Question.nextFlight, .tonight, .checkOut] {
+        for question in [TripAnswerService.Question.nextFlight, .tonight, .checkOut, .parking] {
             let answer = await service(server: home, unlocked: false).answer(question)
             XCTAssertEqual(answer, .locked)
         }
@@ -636,9 +772,17 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(off, .savingOff)
         let nothing = await service(server: home).answer(.nextFlight)
         XCTAssertEqual(nothing, .nothingSaved)
+        let signedOutParking = await service(server: nil).answer(.parking)
+        XCTAssertEqual(signedOutParking, .notSignedIn)
+        let offParking = await service(server: home, saving: false).answer(.parking)
+        XCTAssertEqual(offParking, .savingOff)
+        let nothingParking = await service(server: home).answer(.parking)
+        XCTAssertEqual(nothingParking, .nothingSaved)
         try save([AnswerFixtures.trip(1, "Trip", denverGJ)], version: 2)
         let unreadable = await service(server: home).answer(.checkOut)
         XCTAssertEqual(unreadable, .unreadable)
+        let unreadableParking = await service(server: home).answer(.parking)
+        XCTAssertEqual(unreadableParking, .unreadable)
     }
 
     func testACopyForAnotherServerAnswersNothingSaved() async throws {
@@ -653,10 +797,18 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(NextFlightIntent.authenticationPolicy, .requiresAuthentication)
         XCTAssertEqual(TonightStayIntent.authenticationPolicy, .requiresAuthentication)
         XCTAssertEqual(CheckOutIntent.authenticationPolicy, .requiresAuthentication)
+        XCTAssertEqual(OpenParkingIntent.authenticationPolicy, .requiresAuthentication)
+    }
+
+    func testOnlyTheParkingIntentOpensTheApp() {
+        XCTAssertTrue(OpenParkingIntent.openAppWhenRun)
+        XCTAssertFalse(NextFlightIntent.openAppWhenRun)
+        XCTAssertFalse(TonightStayIntent.openAppWhenRun)
+        XCTAssertFalse(CheckOutIntent.openAppWhenRun)
     }
 
     func testRunningTheIntentsMakesNoRequest() async throws {
-        try save([AnswerFixtures.trip(1, "Grand Junction", denverGJ + [example])])
+        try save([AnswerFixtures.trip(1, "Grand Junction", denverGJ + [example, lotExample])])
         let before = IntentRuntime.service
         let pages = IntentRuntime.pages
         defer {
@@ -671,6 +823,7 @@ final class TripAnswersTests: XCTestCase {
         _ = try await NextFlightIntent().perform()
         _ = try await TonightStayIntent().perform()
         _ = try await CheckOutIntent().perform()
+        _ = try await OpenParkingIntent().perform()
         XCTAssertEqual(FailingProtocol.requests, 0)
     }
 
@@ -689,6 +842,24 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(held.take(), "#trip/1/flight/13")
         _ = try await TonightStayIntent().perform()
         XCTAssertNil(held.take(), "an answer with no card opens nothing")
+    }
+
+    func testTheParkingIntentHoldsTheTripPageOfTheBookingAndNothingWithNoParking() async throws {
+        let before = IntentRuntime.service
+        let pages = IntentRuntime.pages
+        defer {
+            IntentRuntime.service = before
+            IntentRuntime.pages = pages
+        }
+        let held = PendingPage()
+        IntentRuntime.pages = held
+        try save([AnswerFixtures.trip(7, "Grand Junction", denverGJ + [lotExample])])
+        IntentRuntime.service = service(server: home)
+        _ = try await OpenParkingIntent().perform()
+        XCTAssertEqual(held.take(), "#trip/7")
+        try save([AnswerFixtures.trip(7, "Grand Junction", denverGJ)])
+        _ = try await OpenParkingIntent().perform()
+        XCTAssertNil(held.take(), "no parking opens no page")
     }
 }
 

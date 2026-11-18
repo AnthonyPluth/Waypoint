@@ -54,7 +54,7 @@ struct AnswerCard: Equatable {
 
 struct Answer: Equatable {
     enum Kind: Equatable {
-        case flight, stay, noFlight, noStay
+        case flight, stay, noFlight, noStay, parking, noParking
         case locked, notSignedIn, savingOff, nothingSaved, unreadable
     }
 
@@ -76,6 +76,7 @@ struct Answer: Equatable {
     static let noFlight = fixed(.noFlight, "There's no upcoming flight in the trips saved on this iPhone.")
     static let noStayTonight = fixed(.noStay, "There's no stay tonight or later in the trips saved on this iPhone.")
     static let noStayToCheckOutOf = fixed(.noStay, "There's no stay to check out of in the trips saved on this iPhone.")
+    static let noParking = fixed(.noParking, "There's no parking in the trips saved on this iPhone.")
 }
 
 /// A booking's wall-clock time as the saved copy holds it (`2026-12-01T19:00`): never converted, only compared with another
@@ -377,6 +378,49 @@ struct TripAnswers {
             footer: "\(abbreviation(stay.zone, at: stay.checkIn)), the hotel's time",
             saved: age.card)
         return Answer(kind: .stay, spoken: spoken, card: card, page: "#trip/\(stay.trip.id)")
+    }
+
+    // MARK: Parking
+
+    private struct Parking {
+        let trip: SavedTrip
+        let booking: SavedBooking
+        let start: WallClock
+        let end: WallClock
+        let zone: TimeZone
+        let entry: Date
+        let exit: Date
+        let timed: Bool
+
+        var lot: String { clean(booking.origin) ?? clean(booking.provider) ?? "Parking" }
+    }
+
+    /// The parking booking that is current (its entry passed and its exit not yet, as wall-clock times in the lot's zone; one with no
+    /// times from its first day to the end of its last), the one that ends first if two are; else the next one. Not cancelled. The
+    /// answer is only the lot's name and the trip to open: the code comes from the server once the app is open, never from here.
+    func parking(_ copy: SavedCopy) -> Answer {
+        var found: [Parking] = []
+        for trip in copy.trips {
+            for booking in trip.bookings where booking.kind == "parking" && !booking.isCancelled {
+                guard let start = WallClock(booking.startLocal), let end = WallClock(booking.endLocal) else { continue }
+                let place = zone(booking.startZone)
+                guard let entry = instant(start, in: place), let exit = instant(end, in: zone(booking.endZone)) else { continue }
+                found.append(Parking(trip: trip, booking: booking, start: start, end: end, zone: place,
+                                     entry: entry, exit: exit, timed: !booking.datedOnly))
+            }
+        }
+        let current = found.filter { booking in
+            if booking.timed { return booking.entry <= now && now < booking.exit }
+            let today = wall(of: now, in: booking.zone)
+            return booking.start.dayNumber <= today.dayNumber && today.dayNumber <= booking.end.dayNumber
+        }
+        let next = found.filter { booking in
+            booking.timed ? booking.entry > now : booking.start.dayNumber > wall(of: now, in: booking.zone).dayNumber
+        }
+        let chosen = current.min(by: { ($0.exit, $0.trip.id, $0.booking.id) < ($1.exit, $1.trip.id, $1.booking.id) })
+            ?? next.min(by: { ($0.entry, $0.trip.id, $0.booking.id) < ($1.entry, $1.trip.id, $1.booking.id) })
+        guard let chosen else { return .noParking }
+        return Answer(kind: .parking, spoken: "Opening your parking at \(chosen.lot).", card: nil, page: "#trip/\(chosen.trip.id)")
     }
 
     // MARK: Time zones

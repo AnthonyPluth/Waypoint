@@ -6,7 +6,7 @@ import UIKit
 /// folder the bridge reads, and makes no network request: it has no `ServerClient` and no `URLSession`.
 struct TripAnswerService {
     enum Question: Equatable {
-        case nextFlight, tonight, checkOut
+        case nextFlight, tonight, checkOut, parking
     }
 
     var currentServer: @Sendable () async -> URL?
@@ -40,6 +40,7 @@ struct TripAnswerService {
             case .nextFlight: return answers.nextFlight(copy)
             case .tonight: return answers.tonight(copy)
             case .checkOut: return answers.checkOut(copy)
+            case .parking: return answers.parking(copy)
             }
         }
     }
@@ -93,6 +94,23 @@ struct CheckOutIntent: AppIntent {
     }
 }
 
+/// Opens the app at the trip of the current or next parking booking and says only the lot. The parking code is never spoken, shown
+/// or saved here: the web app's booking shows it from the server once the app is open.
+struct OpenParkingIntent: AppIntent {
+    static var title: LocalizedStringResource = "Parking code"
+    static var description = IntentDescription("Opens your parking booking in Waypoint, where its QR code is.")
+    static var authenticationPolicy: IntentAuthenticationPolicy = .requiresAuthentication
+    static var openAppWhenRun: Bool = true
+
+    init() {}
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        let answer = await IntentRuntime.service.answer(.parking)
+        IntentRuntime.pages.hold(answer.page)
+        return .result(dialog: "\(answer.spoken)")
+    }
+}
+
 /// The phrases work by voice with no setup. Apple needs the app's name in every one.
 struct WaypointShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -120,5 +138,13 @@ struct WaypointShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Check-out",
             systemImageName: "door.left.hand.open")
+        AppShortcut(
+            intent: OpenParkingIntent(),
+            phrases: [
+                "Show my parking code in \(.applicationName)",
+                "\(.applicationName) parking",
+            ],
+            shortTitle: "Parking code",
+            systemImageName: "parkingsign")
     }
 }
