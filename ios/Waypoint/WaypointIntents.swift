@@ -184,6 +184,7 @@ struct WaypointShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Open my trip",
             systemImageName: "suitcase.fill")
+        AppShortcut(
             intent: OpenParkingIntent(),
             phrases: [
                 "Show my parking code in \(.applicationName)",
