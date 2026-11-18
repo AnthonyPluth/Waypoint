@@ -581,10 +581,17 @@ export interface OfflineMessages {
   emails: StoredEmail[];
 }
 
+export interface OfflinePicture {
+  segment_id: number;
+  type: string;
+  data: string;
+}
+
 export interface OfflineTrip {
   trip: Trip;
   messages: OfflineMessages[];
   cities: Record<string, string>;
+  codes?: OfflinePicture[];
 }
 
 export interface Ok {

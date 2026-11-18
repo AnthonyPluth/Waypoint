@@ -252,7 +252,7 @@ class Handler(BaseHTTPRequestHandler):
             if access is None or not access.has(mcp_oauth.APP_SCOPE):
                 return None
             name = oidc.user_name(conn, access.sub)
-        return {"sub": access.sub, "email": access.email, "name": name, "grant_id": access.grant_id}
+        return {"sub": access.sub, "email": access.email, "name": name, "grant_id": access.grant_id, "app": True}
 
     def _app_session(self) -> None:
         if self.headers.get("X-Waypoint") != "1":
