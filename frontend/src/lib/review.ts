@@ -1,6 +1,7 @@
 import type { Stats } from "./api-types";
 import { comparisons, count, countryName, distance, duration } from "./stats";
-import { MAP_HEIGHT, MAP_WIDTH, mapData, outlinePaths, visitedPoints, worldProjection, type Country } from "./map";
+import { visitedPoints, type Country } from "./map";
+import { MAP_HEIGHT, MAP_WIDTH, mapData, outlinePaths, worldProjection } from "./review-map";
 
 export type ReviewFacts = {
   year: number;

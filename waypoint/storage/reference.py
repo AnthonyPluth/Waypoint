@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import gzip
+import math
 import re
 import unicodedata
 from functools import cache
 from pathlib import Path
+from typing import NamedTuple
 
 HERE = Path(__file__).resolve().parent
 
@@ -129,3 +131,42 @@ def us_state_points() -> dict[str, tuple[float, float]]:
             if country == "US" and state and population > largest.get(state, (0.0, 0.0, -1))[2]:
                 largest[state] = (lat, lon, population)
     return {state: (lat, lon) for state, (lat, lon, _) in largest.items()}
+
+
+class Nearby(NamedTuple):
+    country: str
+    state: str | None
+    postal: str | None
+    airport: str | None
+
+
+@cache
+def _place_grid() -> dict[tuple[int, int], tuple[tuple[float, float, Nearby], ...]]:
+    found: dict[tuple[int, int], list[tuple[float, float, Nearby]]] = {}
+
+    def add(lat: float, lon: float, place: Nearby) -> None:
+        found.setdefault((math.floor(lat), math.floor(lon)), []).append((lat, lon, place))
+    for row in _rows("places.tsv.gz"):
+        if row[0] == "Z" and len(row) >= 5:
+            add(float(row[3]), float(row[4]), Nearby(row[1], None, row[2], None))
+        elif row[0] == "C" and len(row) >= 6:
+            add(float(row[3]), float(row[4]), Nearby(row[1], row[5].partition("|")[0] or None, None, None))
+    for row in _rows("airports.tsv.gz"):
+        if len(row) >= 7 and row[3] and row[5] and row[6]:
+            add(float(row[5]), float(row[6]), Nearby(row[3], None, None, row[0]))
+    return {cell: tuple(rows) for cell, rows in found.items()}
+
+
+def nearest_place(latitude: float, longitude: float, within_km: float) -> Nearby | None:
+    grid = _place_grid()
+    scale = max(math.cos(math.radians(latitude)), 0.2)
+    cells = min(math.ceil(within_km / (111.0 * scale)) + 1, 8)
+    best: tuple[float, str, Nearby] | None = None
+    for dy in range(-cells, cells + 1):
+        for dx in range(-cells, cells + 1):
+            for lat, lon, place in grid.get((math.floor(latitude) + dy, math.floor(longitude) + dx), ()):
+                km = math.hypot((lat - latitude) * 111.0, (lon - longitude) * 111.0 * scale)
+                key = (km, place.country + (place.postal or place.airport or place.state or ""))
+                if km <= within_km and (best is None or key < (best[0], best[1])):
+                    best = (km, key[1], place)
+    return best[2] if best else None

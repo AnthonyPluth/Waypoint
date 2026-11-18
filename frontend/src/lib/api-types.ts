@@ -1222,6 +1222,7 @@ export interface StatsPlaces {
   cities: StatsPlace[];
   visits: StatsVisit[];
   points: StatsPlacePoint[];
+  states: string[];
 }
 
 export interface StatsRoute {

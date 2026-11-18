@@ -17,8 +17,8 @@ class Checks(unittest.TestCase):
         for check in ac.CHECKS:
             self.assertEqual(check(context()), [], check.__name__)
 
-    def test_the_three_checks_are_registered(self):
-        self.assertEqual([c.__name__ for c in ac.CHECKS], ["mail_parsers", "dark_only", "manage_links"])
+    def test_the_checks_are_registered(self):
+        self.assertEqual([c.__name__ for c in ac.CHECKS], ["mail_parsers", "dark_only", "manage_links", "screenshots"])
 
 
 class MailParsers(unittest.TestCase):
@@ -139,3 +139,26 @@ class ManageLinks(unittest.TestCase):
             (root / ac.LINKS_TESTS).write_text("")
             [problem] = ac.manage_links(context(root))
         self.assertIn("couldn't read MANAGE", problem)
+
+
+class Screenshots(unittest.TestCase):
+    def test_a_large_image_that_is_a_few_bytes_is_one_colour_and_a_real_page_is_not(self):
+        problems = ac.check_screenshots({"stats-desktop-hero.png": (1280, 800, 3900), "stats-phone-hero.png": (440, 956, 61000), "stats-desktop.png": (1280, 5541, 430000)})
+        self.assertEqual(len(problems), 1)
+        self.assertIn("stats-desktop-hero.png", problems[0])
+        self.assertIn("one colour", problems[0])
+
+    def test_a_blank_png_in_the_folder_is_found(self):
+        import struct
+        import zlib
+        with tempfile.TemporaryDirectory() as d:
+            folder = Path(d) / ac.SCREENSHOTS
+            folder.mkdir(parents=True)
+            rows = b"".join(b"\x00" + b"\x07\x09\x0e" * 1280 for _ in range(800))
+
+            def chunk(kind, data):
+                return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+            png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 1280, 800, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b"")
+            (folder / "stats-desktop.png").write_bytes(png)
+            [problem] = ac.screenshots(context(Path(d)))
+        self.assertIn("stats-desktop.png", problem)

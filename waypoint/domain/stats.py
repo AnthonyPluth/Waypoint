@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 
 from ..storage import db, geocode, reference
 from ..storage.models import Airline, Airport
-from . import people, seatmaps, trippeople, trips, visibility
+from . import people, seatmaps, trippeople, trips, us_states, visibility
 from .chains import clean, hotel_chain
 from .visibility import Viewer
 
@@ -200,6 +200,7 @@ class PlaceStats(TypedDict):
     cities: list[Place]
     visits: list[VisitPoint]
     points: list[PlacePoint]
+    states: list[str]
 
 
 class Stats(TypedDict):
@@ -611,7 +612,31 @@ def _places(flights: Sequence[Seg], stays: Sequence[Seg], known: Mapping[str, Ai
         return sorted(({"name": n, "first_visit": min(days), "visits": visits(kind, n)}
                        for n, days in found.items()), key=lambda p: (p["first_visit"], p["name"]))
     return {"countries": listed(countries, "country"), "cities": listed(cities, "city"),
-            "visits": sorted(points.values(), key=lambda p: (p["country"], p["state"] or "")), "points": list(points_of_call)}
+            "visits": sorted(points.values(), key=lambda p: (p["country"], p["state"] or "")), "points": list(points_of_call), "states": []}
+
+
+NEAREST_KM = 100.0
+
+
+def _visited_states(airports: Sequence[AirportVisit], pins: Sequence[StayPin], places: PlaceStats) -> list[str]:
+    found: set[str] = set()
+    named = reference.airport_states()
+    for a in airports:
+        if a["country"] != "US":
+            continue
+        if (state := us_states.counted(named.get(a["code"]))) or (a["latitude"] is not None and a["longitude"] is not None
+                                               and (state := us_states.state_at(a["latitude"], a["longitude"], NEAREST_KM))):
+            found.add(state)
+    for pin in pins:
+        if pin["country"] in (None, "US") and (state := us_states.state_at(pin["latitude"], pin["longitude"], NEAREST_KM)):
+            found.add(state)
+    for point in places["points"]:
+        if state := us_states.state_at(point["latitude"], point["longitude"], NEAREST_KM):
+            found.add(state)
+    for visit in places["visits"]:
+        if visit["country"] == "US" and visit["state"] and (state := us_states.counted(us_states.STATE_NAMES.get(visit["state"]))):
+            found.add(state)
+    return sorted(found, key=str.casefold)
 
 
 def _years(live: Sequence[Seg]) -> list[int]:
@@ -643,10 +668,12 @@ def build(segments: Iterable[Seg], known: Mapping[str, Airport], airlines: Mappi
     visits = [s for s in live if s.kind == "visit" and any(_in(d, year) for d in _days(s))]
     rest = [s for s in live if s.kind in ("car", "train", "parking", "cruise")]
     stays_in = [s for s in stays if year is None or any(_in(d, year) for d in _nights(s))]
-    return {"years": _years(live), "flights": _flights(flights, known, airlines, trip_names),
-            "stays": _stays(stays_in, year, city_countries, city_points, trip_names),
-            "cars": _cars(cars, year), "cruises": _cruises(cruises, year),
-            "parking": _parking(spots, year), "places": _places(flights, stays_in, known, city_countries, visits, trip_names, _place_points(rest, year, trip_names))}
+    flown = _flights(flights, known, airlines, trip_names)
+    stayed = _stays(stays_in, year, city_countries, city_points, trip_names)
+    places = _places(flights, stays_in, known, city_countries, visits, trip_names, _place_points(rest, year, trip_names))
+    places["states"] = _visited_states(flown["airports"], stayed["pins"], places)
+    return {"years": _years(live), "flights": flown, "stays": stayed, "cars": _cars(cars, year), "cruises": _cruises(cruises, year),
+            "parking": _parking(spots, year), "places": places}
 
 
 def compute(conn: db.Connection, viewer: Viewer, person_id: int | None, year: int | None, now: datetime) -> Stats | None:
