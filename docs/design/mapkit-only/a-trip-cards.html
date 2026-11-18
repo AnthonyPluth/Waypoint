@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MapKit only: Trip cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap">
+<style>
+[hidden]{display:none!important}
+:root {
+  color-scheme: dark;
+  --background: #07090e; --foreground: #f3f5f9; --card: #12151d; --popover: #181c26;
+  --primary: #4f9dff; --primary-foreground: #04101f; --action: #3563e0;
+  --secondary: #1a1e29; --muted-foreground: #9aa4b8; --accent: #1a1e29; --destructive: #ff7b72;
+  --border: #232837; --input: #2c3243; --ring: #4f9dff;
+  --signal: #f6b73c; --signal-soft: #34270c; --signal-ink: #ffd58a;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --elevation-3: 0 0 0 1px rgb(255 255 255 / 7%), 0 28px 60px -20px rgb(0 0 0 / 90%);
+  --status-ok-soft: #0f2a1b; --status-ok-ink: #7ee0a5;
+  --status-warn-soft: var(--signal-soft); --status-warn-ink: var(--signal-ink);
+  --status-bad-soft: #3a1512; --status-bad-ink: #ff9d96;
+  --status-info-soft: #11233d; --status-info-ink: #8fc2ff;
+  --status-quiet-soft: var(--secondary); --status-quiet-ink: var(--muted-foreground);
+  --surface-2: var(--popover); --surface-3: #1f2433;
+  --chart-1: #4f9dff; --chart-2: #f6b73c; --chart-3: #4fd1b0; --chart-4: #c79bff; --chart-5: #ff8fab; --chart-6: #9be15d;
+  --kind-flight: var(--primary); --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
+  --kind-stay: var(--chart-3); --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
+  --kind-train: var(--chart-4); --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
+  --kind-car: var(--signal); --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
+  --kind-cruise: var(--chart-5); --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
+  --kind-parking: var(--chart-6); --kind-parking-soft: color-mix(in srgb, var(--kind-parking) 15%, transparent);
+  --kind-quiet: var(--muted-foreground); --kind-quiet-soft: var(--surface-3);
+  --avatar-1: #1d3a63; --avatar-1-ink: #d6e6ff; --avatar-2: #14463c; --avatar-2-ink: #c9f3e6;
+  --map-sea: #0b0e15; --map-land: #1c2230; --map-border: #343c52; --map-visited: #3d7bc7;
+  --map-route: #8fc2ff; --map-airport: #f6b73c; --map-stay: #4fd1b0; --map-photo: var(--foreground);
+  --doc-bg: #0c0e14; --doc-line: #1b2030;
+  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--doc-bg); color: var(--foreground); font-family: var(--sans); font-size: 15px; line-height: 1.5; letter-spacing: -0.006em; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--doc-bg); }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--ring) 60%, transparent); outline-offset: 2px; }
+.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.doc { max-width: 1360px; margin: 0 auto; padding-block: 28px 120px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 56px; }
+.dochead { display: flex; flex-direction: column; gap: 14px; max-width: 72ch; }
+.dochead h1 { font-size: 2.5rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 600; text-wrap: balance; }
+.dochead p { color: var(--muted-foreground); }
+.dochead a, .lede a { color: var(--status-info-ink); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 10px 12px; background: color-mix(in srgb, var(--doc-bg) 88%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--doc-line); border-radius: 16px; }
+.segc { display: inline-flex; padding: 3px; gap: 3px; border-radius: 12px; background: var(--secondary); border: 1px solid var(--input); }
+.segc button { border: 0; background: transparent; border-radius: 9px; padding: 8px 14px; font-size: 14px; font-weight: 600; cursor: pointer; color: var(--muted-foreground); min-height: 40px; }
+.segc button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.bar .toc { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; }
+.bar .toc a { color: var(--muted-foreground); padding: 4px 0; }
+.bar .toc a:hover, .bar .toc a[aria-current] { color: var(--foreground); }
+.checks { border: 1px solid var(--doc-line); border-radius: 16px; padding: 18px 20px; background: var(--card); display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
+.checks h2 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--signal-ink); }
+.checks ol { list-style: decimal; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.checks li::marker { color: var(--muted-foreground); }
+.sec { display: flex; flex-direction: column; gap: 18px; scroll-margin-top: 90px; }
+.sechead { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; border-top: 1px solid var(--doc-line); padding-top: 22px; }
+.sechead .letter { font-family: var(--mono); font-size: 13px; color: var(--signal-ink); background: var(--signal-soft); border-radius: 8px; padding: 2px 8px; }
+.sechead h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -0.02em; font-weight: 650; }
+.sec > p.lede { color: var(--muted-foreground); max-width: 78ch; }
+.stage { overflow-x: auto; padding-bottom: 6px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+body.desk .frames { flex-direction: column; flex-wrap: nowrap; }
+body.desk [data-w="phone"] { display: none; }
+body:not(.desk) [data-w="desk"] { display: none; }
+.fig { display: flex; flex-direction: column; gap: 8px; }
+.fig > figcaption { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; }
+.spec > div { border: 1px solid var(--doc-line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.spec h3 { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.spec ul { display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.spec li { overflow-wrap: anywhere; }
+.spec code, .checks code, .lede code, .dochead code { font-family: var(--mono); font-size: 12.5px; color: var(--status-info-ink); }
+.spec q { color: var(--foreground); font-weight: 600; quotes: "\201C" "\201D"; }
+
+.dev { position: relative; width: 390px; flex: none; overflow: hidden; background: var(--background); border: 1px solid var(--border); border-radius: 30px; box-shadow: 0 30px 60px -30px rgb(0 0 0 / 80%); }
+body.desk .dev { width: 1280px; border-radius: 14px; }
+body.desk .dev.frag { width: 960px; }
+body.desk .dev.col { width: 400px; }
+.dev.tall { height: 844px; }
+.dev.taller { height: 900px; }
+.dev.sheetdev { height: 760px; background: var(--popover); border-radius: 26px; }
+body.desk .dev.panel { height: 800px; }
+
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+.meta { color: var(--muted-foreground); font-size: 13px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; font-size: 14px; font-weight: 600; min-height: 44px; padding: 0 14px; border: 1px solid var(--input); background: var(--secondary); color: var(--foreground); cursor: pointer; white-space: nowrap; }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.icon { width: 44px; padding: 0; }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 99px; font-size: 12px; font-weight: 600; padding: 3px 10px; width: fit-content; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.chip.warn { background: var(--status-warn-soft); color: var(--status-warn-ink); }
+.chip.bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.chip.info { background: var(--status-info-soft); color: var(--status-info-ink); }
+.avs { display: inline-flex; }
+.av { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 700; border: 2px solid var(--card); }
+.av + .av { margin-left: -7px; }
+.a1 { background: var(--avatar-1); color: var(--avatar-1-ink); }
+.a2 { background: var(--avatar-2); color: var(--avatar-2-ink); }
+.kind { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; flex: none; }
+.k-flight { background: var(--kind-flight-soft); color: var(--kind-flight); }
+.k-stay { background: var(--kind-stay-soft); color: var(--kind-stay); }
+.k-car { background: var(--kind-car-soft); color: var(--kind-car); }
+.k-train { background: var(--kind-train-soft); color: var(--kind-train); }
+.k-cruise { background: var(--kind-cruise-soft); color: var(--kind-cruise); }
+.k-parking { background: var(--kind-parking-soft); color: var(--kind-parking); }
+.k-quiet { background: var(--kind-quiet-soft); color: var(--kind-quiet); }
+.code { font-family: var(--mono); letter-spacing: .04em; color: var(--foreground); }
+
+.ph { position: relative; overflow: hidden; background-size: cover; }
+.s1 { background: radial-gradient(circle at 78% 26%,#fff1c9 0 5%,transparent 5.6%),radial-gradient(90% 55% at 18% 110%,#7a3b22 0 58%,transparent 59%),radial-gradient(70% 45% at 88% 114%,#a4502b 0 55%,transparent 56%),linear-gradient(180deg,#f0a56a 0%,#e9845a 45%,#b95c3b 100%); }
+.s2 { background: radial-gradient(circle at 70% 38%,#ffe9c2 0 6%,transparent 6.8%),radial-gradient(120% 55% at 30% 112%,#14202e 0 60%,transparent 61%),linear-gradient(180deg,#f4b183 0%,#c0546a 48%,#2a2f55 100%); }
+.s3 { background: radial-gradient(100% 60% at 25% 112%,#1c3b32 0 60%,transparent 61%),radial-gradient(80% 50% at 85% 112%,#2a5a49 0 58%,transparent 59%),linear-gradient(180deg,#a9dccf 0%,#58a08a 100%); }
+.s4 { background: radial-gradient(60% 70% at 35% 105%,#eef4ff 0 38%,transparent 39%),radial-gradient(50% 60% at 75% 108%,#dfe9fb 0 36%,transparent 37%),radial-gradient(120% 40% at 50% 120%,#1d2b45 0 60%,transparent 61%),linear-gradient(180deg,#bcd8ff 0%,#6d9be0 100%); }
+.s5 { background: radial-gradient(circle at 18% 72%,#ffd58a 0 1.4%,transparent 1.9%),radial-gradient(circle at 34% 80%,#ffd58a 0 1.2%,transparent 1.7%),radial-gradient(circle at 58% 70%,#ffe3b3 0 1.4%,transparent 1.9%),radial-gradient(circle at 76% 84%,#ffd58a 0 1.2%,transparent 1.7%),linear-gradient(180deg,#0e1a33 0%,#31407a 70%,#101733 100%); }
+.s6 { background: radial-gradient(90% 30% at 40% 78%,#e9fffb 0 46%,transparent 47%),linear-gradient(180deg,#bff3e6 0%,#2aa9a0 55%,#0d4f58 100%); }
+.scrim { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(7,9,14,0) 38%,rgba(7,9,14,.84) 100%); }
+.cap { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; flex-direction: column; gap: 2px; color: #fff; }
+.cap h3, .cap h1 { margin: 0; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.cap h3 { font-size: 19px; }
+.cap .meta { color: #e1e6f0; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 600; background: rgba(7,9,14,.72); color: #fff; }
+.pill .ic { width: 13px; height: 13px; }
+.mosaic { position: relative; display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; }
+.mosaic > .big { grid-row: 1 / 3; }
+.mosaic > .scrim { right: 34%; }
+
+.pcard { display: block; border-radius: 20px; overflow: hidden; background: var(--card); border: 1px solid var(--border); box-shadow: var(--shadow); }
+.pcard:hover { background: var(--surface-3); }
+.foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; }
+.stat { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 13px; color: var(--muted-foreground); }
+.stat b { color: var(--foreground); font-weight: 600; }
+.yearh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.yearh h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.cards { display: flex; flex-direction: column; gap: 14px; }
+.pad { padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+.pagetitle { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pagetitle h1 { font-size: 2.25rem; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; }
+.up { display: flex; min-height: 92px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow); overflow: hidden; }
+.up .stub { width: 76px; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px dashed var(--border); text-align: center; }
+.up .stub b { font-size: 26px; line-height: 1; }
+.up .stub span { font-size: 13px; font-weight: 600; letter-spacing: .06em; color: var(--signal); }
+.up .body { padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.up .body b { font-size: 17px; letter-spacing: -0.015em; }
+.more-link { align-self: flex-start; color: var(--primary); font-size: 14px; font-weight: 600; padding: 8px 4px; background: none; border: 0; cursor: pointer; }
+
+.page { display: flex; flex-direction: column; gap: 20px; background: var(--background); padding: 16px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: relative; }
+.back { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 14px; min-height: 44px; }
+.hero { position: relative; display: grid; gap: 2px; border-radius: 22px; overflow: hidden; border: 1px solid var(--border); }
+.hero .cap { left: 18px; right: 18px; bottom: 16px; gap: 4px; }
+.hero .cap h1 { font-size: 24px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 650; }
+.hero .cap .meta { font-size: 14px; }
+.facts { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.stats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; color: var(--muted-foreground); }
+.stats > div { display: inline; }
+.stats dd { display: inline; }
+.stats b { color: var(--foreground); font-weight: 650; }
+.facts2 { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 14px; color: var(--muted-foreground); }
+.facts2 b { color: var(--foreground); font-weight: 650; }
+.list { border: 1px solid var(--border); border-radius: 18px; background: var(--card); overflow: hidden; }
+.rowb { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-top: 0; cursor: pointer; }
+.rowb:last-child { border-bottom: 0; }
+.rowb:hover, .rowb.sel { background: var(--surface-3); }
+.rowb .t { min-width: 0; flex: 1 1 0; display: flex; flex-direction: column; }
+.rowb .t b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rowb .chev { color: var(--muted-foreground); }
+.kinds { display: inline-flex; gap: 4px; }
+.sech { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sech h2 { font-size: 17px; font-weight: 650; letter-spacing: -0.015em; }
+.timeline { display: flex; flex-direction: column; gap: 22px; }
+.day { position: relative; margin-left: 6px; padding-left: 20px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+.day .dot { position: absolute; left: -8px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--primary); border: 3px solid var(--background); }
+.dayh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 2px 6px; }
+.dayh b { font-size: 14px; font-weight: 650; }
+.day .dayh { padding: 0; align-items: center; }
+.day .dayh h3 { margin: 0; font-size: 16px; font-weight: 650; line-height: 1.3; }
+.glyph { width: 48px; height: 30px; padding: 3px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); flex: none; }
+.grid { display: grid; gap: 3px; border-radius: 14px; overflow: hidden; }
+.tile { position: relative; display: block; aspect-ratio: 1/1; overflow: hidden; border: 0; padding: 0; cursor: pointer; width: 100%; }
+.tile .more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(7,9,14,.62); color: #fff; font-weight: 700; font-size: 15px; }
+.mapbox { position: relative; overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background: var(--map-sea); }
+.mapbox svg { display: block; width: 100%; height: 100%; }
+.pin { position: absolute; transform: translate(-50%,-50%); display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--map-photo); color: #07090e; font: 700 10px var(--sans); box-shadow: 0 0 0 3px rgba(11,14,21,.7); }
+.stay { position: absolute; transform: translate(-50%,-50%); width: 10px; height: 10px; border-radius: 50%; background: var(--map-stay); box-shadow: 0 0 0 3px rgba(11,14,21,.7); }
+.menu { position: absolute; right: 0; top: 48px; z-index: 4; min-width: 220px; padding: 6px; border-radius: 14px; background: var(--popover); border: 1px solid var(--border); box-shadow: var(--elevation-3); display: flex; flex-direction: column; }
+.menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
+.menu button:hover { background: var(--surface-3); }
+.menu button.bad { color: var(--status-bad-ink); }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; width: 100%; }
+
+.shade { position: absolute; inset: 0; background: rgba(3,4,6,.6); z-index: 2; }
+.dim { opacity: .55; }
+.sheet { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; background: var(--popover); border-radius: 26px 26px 0 0; box-shadow: 0 -20px 60px -20px rgba(0,0,0,.9); display: flex; flex-direction: column; overflow: hidden; }
+.sheet.free { position: relative; border-radius: 26px; box-shadow: none; height: 100%; }
+.grab { display: flex; justify-content: center; padding: 10px 0 2px; }
+.grab span { width: 40px; height: 5px; border-radius: 5px; background: var(--map-border); }
+.shead { display: flex; align-items: center; gap: 12px; padding: 6px 16px 12px; }
+.shead .ttl { min-width: 0; flex: 1 1 0; }
+.shead h2 { font-size: 19px; font-weight: 650; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.shead .meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp { padding: 14px 16px 6px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); }
+.grp + .list { border-radius: 0; border-left: 0; border-right: 0; background: transparent; }
+.badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 600; width: fit-content; }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
+.b-bad { background: var(--status-bad-soft); color: var(--status-bad-ink); }
+.dl { margin: 0; border-top: 1px solid var(--border); }
+.dl > div { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.dl > div:last-child { border-bottom: 0; }
+.dl dt { flex: none; padding-top: 2px; }
+.dl dd { text-align: right; font-size: 15px; font-weight: 500; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.dl dd.col { flex-direction: column; align-items: flex-end; }
+.dl .strike { text-decoration: line-through; color: var(--muted-foreground); }
+.copy { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--input); background: var(--secondary); color: var(--foreground); cursor: pointer; font-size: 13px; font-weight: 600; flex: none; }
+.copy .ic { width: 14px; height: 14px; }
+.panelside { position: absolute; z-index: 3; top: 0; right: 0; bottom: 0; width: 460px; background: var(--popover); border-left: 1px solid var(--border); box-shadow: -30px 0 60px -30px rgba(0,0,0,.9); display: flex; flex-direction: column; }
+.panelside .shead { padding: 22px 24px 16px; gap: 14px; }
+.panelside .shead h2 { font-size: 22px; }
+.panelside .dlwrap { padding: 0 24px; }
+.panelside .dl > div { padding: 13px 0; }
+.deskcols { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 24px; align-items: start; }
+.deskcols .left { display: flex; flex-direction: column; gap: 18px; position: sticky; top: 16px; }
+.deskpage { padding: 28px 40px; gap: 20px; }
+@media (max-width: 480px) { .doc { gap: 40px; } .dochead h1 { font-size: 2rem; } }
+
+/* Apple's map, drawn as a stand-in: a real tile can't be committed */
+.amap { position: relative; overflow: hidden; background: #1b1f27; }
+.amap > svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.amap .attr { position: absolute; left: 8px; bottom: 6px; font: 600 10px var(--sans); color: rgb(255 255 255 / 72%); letter-spacing: .01em; }
+.amap .legal { position: absolute; right: 8px; bottom: 6px; font: 500 9px var(--sans); color: rgb(255 255 255 / 55%); text-decoration: underline; }
+.amap .zoomc { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; border-radius: 9px; overflow: hidden; background: rgb(40 44 54 / 92%); box-shadow: 0 1px 4px rgb(0 0 0 / 50%); }
+.amap .zoomc span { width: 34px; height: 34px; display: grid; place-items: center; color: #e8eaef; }
+.amap .zoomc span + span { border-top: 1px solid rgb(255 255 255 / 12%); }
+.tag { position: absolute; z-index: 3; font: 600 10.5px var(--mono); letter-spacing: .02em; padding: 2px 7px; border-radius: 6px; background: var(--signal-soft); color: var(--signal-ink); border: 1px solid color-mix(in srgb, var(--signal) 40%, transparent); white-space: nowrap; }
+.kt { position: absolute; inset: 0; background: var(--surface-3); }
+.kt .kinds { position: absolute; top: 12px; right: 12px; }
+.kt.half .kinds { opacity: .5; }
+.skel { border-radius: 16px; background: var(--secondary); }
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.stile { border: 1px solid var(--border); background: var(--card); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.stile .v { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.slist { border: 1px solid var(--border); border-radius: 16px; background: var(--card); }
+.slist > div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+.slist > div:last-child { border-bottom: 0; }
+.caption { border: 1px solid var(--border); border-radius: 14px; background: var(--card); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.ctrls { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--card); }
+.slider { flex: 1; height: 4px; border-radius: 4px; background: var(--input); position: relative; }
+.slider i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--primary); }
+.slider b { position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%); box-shadow: 0 1px 3px rgb(0 0 0 / 60%); }
+.quiet { color: var(--muted-foreground); font-size: 14px; }
+.note { border: 1px dashed color-mix(in srgb, var(--signal) 55%, transparent); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--signal-ink); background: color-mix(in srgb, var(--signal-soft) 50%, transparent); }
+.set { border: 1px solid var(--border); border-radius: 18px; background: var(--card); overflow: hidden; }
+.set .row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.set .row:last-child { border-bottom: 0; }
+.set .row .t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.set .row .t b { font-size: 15px; font-weight: 600; }
+.lnk { color: var(--status-info-ink); font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+.cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.cmp th, .cmp td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--doc-line); }
+.cmp th { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 600; }
+.cmp td:first-child { color: var(--muted-foreground); width: 150px; }
+.cmp .rec { color: var(--status-ok-ink); }
+.band { position: absolute; left: 0; right: 0; border-left: 4px solid; padding-left: 8px; font: 600 11px var(--sans); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m6 4 14 8-14 8z"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+<symbol id="i-merge" viewBox="0 0 24 24"><path d="M6 3v6a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4M6 21V9M18 3v10"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+<symbol id="i-flight" viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z"/></symbol>
+<symbol id="i-stay" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
+<symbol id="i-car" viewBox="0 0 24 24"><path d="M5 17H3v-5l2-5h12l3 5h1v5h-2M7 17h8M9 17h6"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
+<symbol id="i-train" viewBox="0 0 24 24"><path d="M6 3h12a2 2 0 0 1 2 2v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5a2 2 0 0 1 2-2zM4 11h16M8 21l2-3M16 21l-2-3"/></symbol>
+<symbol id="i-cruise" viewBox="0 0 24 24"><path d="M2 20c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 4-1M4 17l-1-5h18l-1 5M12 12V4M12 4l5 3-5 2"/></symbol>
+<symbol id="i-parking" viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM10 17V7h3a3 3 0 0 1 0 6h-3"/></symbol>
+<symbol id="i-visit" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol><symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></symbol><symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol><symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></symbol></defs></svg>
+<div class="doc">
+  <header class="dochead">
+    <p class="eyebrow">Waypoint · issue <a href="https://github.com/AnthonyPluth/Waypoint/issues/828">#828</a> · for the owner’s sign-off (not signed off)</p>
+    <h1>MapKit only: Trip cards</h1>
+    <p>How the Past trips cards show Apple’s map, at phone width (390 px) and desktop width (1280 px; the 960 px content column). Drawn with Waypoint’s tokens (<code>frontend/src/app.css</code>), dark only. Apple’s map is a stylised stand-in (a real tile can’t be committed); the yellow tags are notes for the reader, not part of the app. Every name and place is made up. See <a href="README.md">the README</a> for the inventory, privacy statement and build plan.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="a-trip-cards.html" aria-current="page">a Trip cards</a><a href="b-stats-map.html">b Stats map</a><a href="c-replay-no-key.html">c Replay with no key</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>Past cards with a map on Apple’s snapshot, the loading state, and the photo and one-stop cards that never ask Apple (a1).</li><li>No key, or a failed map: the card’s kinds tile, the same size, no message (a2).</li><li>How many maps load on a long list, and the three options weighed, with the recommendation (a3).</li><li>Upcoming cards, the trip page and the footer are unchanged and not drawn here.</li></ol>
+  </section>
+  <section class="sec" id="a" aria-labelledby="a-title">
+    <div class="sechead"><span class="letter">a</span><h2 id="a-title">Past cards on Apple’s map</h2></div>
+    <p class="lede">Only a Past card with no photos the viewer may see and a route of two or more stops gets a map. The map is Apple’s static snapshot of the trip’s area (option A, recommended); Waypoint draws the route and the stops on top in its own map tokens, using Apple’s stored road for a drive when there is one. While the image loads the card shows its kinds tile with the icons at half strength; the image fades in over 200 ms (no fade with reduced motion). The footer, the scrim, the name and the link are unchanged from the signed-off Past card (#705, #708).</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>a1 · Phone: the four kinds of Past card</figcaption><div class="dev "><div class="pad"><div class="pagetitle"><h1>Trips</h1><span class="btn icon" role="button" tabindex="0" aria-label="Add" style="background:var(--primary);color:var(--primary-foreground);border-color:transparent"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></div><div style="display:flex;flex-direction:column;gap:14px"><h2 class="eyebrow">Past</h2><div class="yearh"><h2>2025</h2><span class="meta">4 trips · 87 photos</span></div><div class="cards"><a class="pcard" href="#" aria-label="Harbour lights weekend, Sep 3–6, 3 nights, 41 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="mosaic" style="height:100%"><div class="ph s1 big"></div><div class="ph s4"></div><div class="ph s3"></div><div class="scrim"></div><div class="cap" style="right:36%"><h3 style="font-size:19px">Harbour lights weekend</h3></div><span class="pill" style="position:absolute;top:10px;right:10px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>87</span></div><span class="tag" style="top:10px;left:10px">photos: Apple not asked</span></div><div class="foot"><span class="stat"><b>Sep 3–6</b><span>3 nights</span><span>41 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Coast road loop, Jul 18–23, 5 nights, about 612 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="amap" style="position:absolute;inset:0"><svg viewBox="0 0 400 168" preserveAspectRatio="none" aria-hidden="true"><rect width="400" height="168" fill="#1d222b"/><ellipse cx="181" cy="94" rx="85" ry="39" fill="#1f2a26"/><ellipse cx="203" cy="99" rx="41" ry="40" fill="#1f2a26"/><ellipse cx="252" cy="133" rx="36" ry="32" fill="#1f2a26"/><path d="M227 -5 L247 28 L240 56 L198 84 L258 112 L257 140 L237 168 L405 173 L405 -5 Z" fill="#13202f"/><ellipse cx="106" cy="109" rx="24" ry="8" fill="#13202f"/><path d="M6 89 Q97 5 24 32" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M186 74 Q256 84 337 87" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M265 77 Q398 141 111 168" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M283 53 Q28 129 92 49" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M160 142 Q339 0 155 161" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M84 153 Q159 12 188 165" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M252 131 Q133 162 108 15" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M303 20 Q24 134 99 17" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M71 94 Q293 22 179 32" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M257 20 Q108 163 168 36" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M321 51 Q158 144 354 35" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M257 17 Q103 130 396 36" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M132 50 Q233 41 29 15" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M241 62 Q193 97 181 161" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M101 31 Q327 42 268 153" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M7 124 Q380 148 409 33" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M64 71 Q385 40 259 7" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M79 43 Q117 29 388 100" fill="none" stroke="#3a4150" stroke-width="2.2"/><text x="40" y="40" font-family="Geist, system-ui, sans-serif" font-size="9" font-weight="500" fill="#8a93a6" letter-spacing=".02em">Ridgefield</text><text x="250" y="150" font-family="Geist, system-ui, sans-serif" font-size="9" font-weight="500" fill="#8a93a6" letter-spacing=".02em">Pine Hollow</text><path d="M70 120 L150 92 L230 108 L300 70" fill="none" stroke="var(--map-stay)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="70" cy="120" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="150" cy="92" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="230" cy="108" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="300" cy="70" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/></svg><span class="attr"> Maps</span><span class="legal">Legal</span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Coast road loop</h3></div><span class="tag" style="top:10px;left:10px">Apple snapshot + Waypoint’s route</span></div><div class="foot"><span class="stat"><b>Jul 18–23</b><span>5 nights</span><span>about 612 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Lake country drive, May 2–5, 3 nights, about 388 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="kt half"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Lake country drive</h3></div><span class="tag" style="top:10px;left:10px">loading</span></div><div class="foot"><span class="stat"><b>May 2–5</b><span>3 nights</span><span>about 388 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Conference week, Mar 9–13, 4 nights, 1,020 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Conference week</h3></div><span class="tag" style="top:10px;left:10px">1 stop: no map</span></div><div class="foot"><span class="stat"><b>Mar 9–13</b><span>4 nights</span><span>1,020 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a></div></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>a1 · Desktop: two across</figcaption><div class="dev frag"><div class="pad" style="padding:28px 32px;gap:22px"><div class="pagetitle"><h1>Trips</h1><span class="btn icon" role="button" tabindex="0" aria-label="Add" style="background:var(--primary);color:var(--primary-foreground);border-color:transparent"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></div><div style="display:flex;flex-direction:column;gap:14px"><h2 class="eyebrow">Past</h2><div class="yearh"><h2>2025</h2><span class="meta">4 trips · 87 photos</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px"><a class="pcard" href="#" aria-label="Harbour lights weekend, Sep 3–6, 3 nights, 41 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="mosaic" style="height:100%"><div class="ph s1 big"></div><div class="ph s4"></div><div class="ph s3"></div><div class="scrim"></div><div class="cap" style="right:36%"><h3 style="font-size:21px">Harbour lights weekend</h3><span class="meta">Lisbon</span></div><span class="pill" style="position:absolute;top:10px;right:10px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>87</span></div><span class="tag" style="top:10px;left:10px">photos: Apple not asked</span></div><div class="foot"><span class="stat"><b>Sep 3–6</b><span>3 nights</span><span>41 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Coast road loop, Jul 18–23, 5 nights, about 612 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="amap" style="position:absolute;inset:0"><svg viewBox="0 0 640 220" preserveAspectRatio="none" aria-hidden="true"><rect width="640" height="220" fill="#1d222b"/><ellipse cx="290" cy="123" rx="85" ry="39" fill="#1f2a26"/><ellipse cx="325" cy="129" rx="41" ry="40" fill="#1f2a26"/><ellipse cx="403" cy="174" rx="36" ry="32" fill="#1f2a26"/><path d="M364 -5 L395 37 L383 73 L317 110 L413 147 L411 183 L379 220 L375 257 L645 225 L645 -5 Z" fill="#13202f"/><ellipse cx="67" cy="133" rx="38" ry="11" fill="#13202f"/><path d="M338 13 Q19 102 122 53" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M282 185 Q320 146 332 141" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M293 61 Q538 156 638 219" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M202 51 Q490 88 185 15" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M542 85 Q0 46 613 186" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M583 103 Q47 138 627 87" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M498 59 Q617 167 56 73" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M76 54 Q510 39 65 13" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M358 98 Q84 142 122 161" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M75 93 Q621 177 136 59" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M195 195 Q547 141 135 87" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M64 218 Q495 72 136 57" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M190 16 Q156 132 58 128" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M238 100 Q368 191 614 106" fill="none" stroke="#2a303c" stroke-width="1"/><path d="M19 34 Q160 42 635 180" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M137 207 Q565 133 438 209" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M69 23 Q153 155 395 212" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M34 181 Q112 158 549 65" fill="none" stroke="#3a4150" stroke-width="2.2"/><text x="64" y="40" font-family="Geist, system-ui, sans-serif" font-size="9" font-weight="500" fill="#8a93a6" letter-spacing=".02em">Ridgefield</text><text x="400" y="150" font-family="Geist, system-ui, sans-serif" font-size="9" font-weight="500" fill="#8a93a6" letter-spacing=".02em">Pine Hollow</text><path d="M112 120 L240 92 L368 108 L480 70" fill="none" stroke="var(--map-stay)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="112" cy="120" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="240" cy="92" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="368" cy="108" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/><circle cx="480" cy="70" r="4" fill="var(--map-stay)" stroke="#0b0e15" stroke-width="2"/></svg><span class="attr"> Maps</span><span class="legal">Legal</span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Coast road loop</h3><span class="meta">Oregon</span></div><span class="tag" style="top:10px;left:10px">Apple snapshot + Waypoint’s route</span></div><div class="foot"><span class="stat"><b>Jul 18–23</b><span>5 nights</span><span>about 612 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Lake country drive, May 2–5, 3 nights, about 388 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="kt half"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Lake country drive</h3><span class="meta">Michigan</span></div><span class="tag" style="top:10px;left:10px">loading</span></div><div class="foot"><span class="stat"><b>May 2–5</b><span>3 nights</span><span>about 388 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Conference week, Mar 9–13, 4 nights, 1,020 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Conference week</h3><span class="meta">Denver</span></div><span class="tag" style="top:10px;left:10px">1 stop: no map</span></div><div class="foot"><span class="stat"><b>Mar 9–13</b><span>4 nights</span><span>1,020 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a></div></div></div></div></figure></div></div>
+    <div class="spec"><div><h3>Accessible names</h3><ul><li>Unchanged: each card is one link named <q>Coast road loop, Jul 18–23, 5 nights, about 612 mi, Ada Brook and June Brook</q>; the map image is decorative (<code>alt=""</code>, inside the <code>aria-hidden</code> media box).</li></ul></div><div><h3>Tokens and components</h3><ul><li><code>RouteTile.svelte</code> hosts an <code>&lt;img loading="lazy" referrerpolicy="no-referrer"&gt;</code> and an SVG overlay: the route in <code>--map-stay</code> (drives) and <code>--map-route</code> (flights), stops in <code>--map-stay</code>, a 2 px <code>--map-sea</code> ring. No new token.</li><li>Kinds tile: today’s <code>bg-surface-3</code> with <code>TripKinds</code> top right; at 50% opacity while loading.</li></ul></div><div><h3>What Apple is sent</h3><ul><li>The card’s centre and zoom (no closer than city level, zoom 12) and its size, from the viewer’s browser, for cards within about a screen of view. Never the stops, the path, a name or a date.</li><li>The photo card and the one-stop card ask Apple nothing.</li></ul></div></div>
+  </section>
+  <section class="sec" id="a2" aria-labelledby="a2-title">
+    <div class="sechead"><span class="letter">a2</span><h2 id="a2-title">No key, or the map fails</h2></div>
+    <p class="lede">With no MapKit key on the server, or when a card’s snapshot address can’t be had or its image fails (Apple refuses, the network drops, the day’s allowance is spent), the card shows the kinds tile at full strength: the same tile it shows today for a trip it can’t place. No message, no retry until the page is reloaded, and no change of the card’s size, so the list never shifts.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>a2 · Phone: no key, or the map failed</figcaption><div class="dev "><div class="pad"><div class="pagetitle"><h1>Trips</h1><span class="btn icon" role="button" tabindex="0" aria-label="Add" style="background:var(--primary);color:var(--primary-foreground);border-color:transparent"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></div><div style="display:flex;flex-direction:column;gap:14px"><h2 class="eyebrow">Past</h2><div class="yearh"><h2>2025</h2><span class="meta">4 trips · 87 photos</span></div><div class="cards"><a class="pcard" href="#" aria-label="Harbour lights weekend, Sep 3–6, 3 nights, 41 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="mosaic" style="height:100%"><div class="ph s1 big"></div><div class="ph s4"></div><div class="ph s3"></div><div class="scrim"></div><div class="cap" style="right:36%"><h3 style="font-size:19px">Harbour lights weekend</h3></div><span class="pill" style="position:absolute;top:10px;right:10px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>87</span></div></div><div class="foot"><span class="stat"><b>Sep 3–6</b><span>3 nights</span><span>41 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Coast road loop, Jul 18–23, 5 nights, about 612 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Coast road loop</h3></div><span class="tag" style="top:10px;left:10px">no key → kinds tile</span></div><div class="foot"><span class="stat"><b>Jul 18–23</b><span>5 nights</span><span>about 612 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Lake country drive, May 2–5, 3 nights, about 388 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Lake country drive</h3></div><span class="tag" style="top:10px;left:10px">image failed → kinds tile</span></div><div class="foot"><span class="stat"><b>May 2–5</b><span>3 nights</span><span>about 388 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Conference week, Mar 9–13, 4 nights, 1,020 mi, Ada Brook and June Brook"><div style="position:relative;height:168px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:19px">Conference week</h3></div><span class="tag" style="top:10px;left:10px">1 stop: no map</span></div><div class="foot"><span class="stat"><b>Mar 9–13</b><span>4 nights</span><span>1,020 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a></div></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>a2 · Desktop: no key, or the map failed</figcaption><div class="dev frag"><div class="pad" style="padding:28px 32px;gap:22px"><div class="pagetitle"><h1>Trips</h1><span class="btn icon" role="button" tabindex="0" aria-label="Add" style="background:var(--primary);color:var(--primary-foreground);border-color:transparent"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span></div><div style="display:flex;flex-direction:column;gap:14px"><h2 class="eyebrow">Past</h2><div class="yearh"><h2>2025</h2><span class="meta">4 trips · 87 photos</span></div><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px"><a class="pcard" href="#" aria-label="Harbour lights weekend, Sep 3–6, 3 nights, 41 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="mosaic" style="height:100%"><div class="ph s1 big"></div><div class="ph s4"></div><div class="ph s3"></div><div class="scrim"></div><div class="cap" style="right:36%"><h3 style="font-size:21px">Harbour lights weekend</h3><span class="meta">Lisbon</span></div><span class="pill" style="position:absolute;top:10px;right:10px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg>87</span></div></div><div class="foot"><span class="stat"><b>Sep 3–6</b><span>3 nights</span><span>41 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Coast road loop, Jul 18–23, 5 nights, about 612 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Coast road loop</h3><span class="meta">Oregon</span></div><span class="tag" style="top:10px;left:10px">no key → kinds tile</span></div><div class="foot"><span class="stat"><b>Jul 18–23</b><span>5 nights</span><span>about 612 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Lake country drive, May 2–5, 3 nights, about 388 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-car" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Lake country drive</h3><span class="meta">Michigan</span></div><span class="tag" style="top:10px;left:10px">image failed → kinds tile</span></div><div class="foot"><span class="stat"><b>May 2–5</b><span>3 nights</span><span>about 388 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a><a class="pcard" href="#" aria-label="Conference week, Mar 9–13, 4 nights, 1,020 mi, Ada Brook and June Brook"><div style="position:relative;height:220px;overflow:hidden" aria-hidden="true"><div class="kt"><span class="kinds"><span class="kind k-flight" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-flight"/></svg></span><span class="kind k-stay" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-stay"/></svg></span></span></div><div class="scrim"></div><div class="cap" style="right:14px"><h3 style="font-size:21px">Conference week</h3><span class="meta">Denver</span></div><span class="tag" style="top:10px;left:10px">1 stop: no map</span></div><div class="foot"><span class="stat"><b>Mar 9–13</b><span>4 nights</span><span>1,020 mi</span></span><span class="avs" aria-hidden="true"><span class="av a1">AB</span><span class="av a2">JB</span></span></div></a></div></div></div></div></figure></div></div>
+    <div class="spec"><div><h3>Rule</h3><ul><li>No key: <code>app.state.mapkit</code> is false, so no card asks for an address or an image, and the page’s CSP names no Apple host.</li><li>Failure: <code>onerror</code> on the image, or the batch route answers without the trip; the tile stays.</li></ul></div><div><h3>Copy</h3><ul><li>None. The docs say maps need a MapKit key (frame c4).</li></ul></div></div>
+  </section>
+  <section class="sec" id="a3" aria-labelledby="a3-title">
+    <div class="sechead"><span class="letter">a3</span><h2 id="a3-title">How many maps load, and the options weighed</h2></div>
+    <p class="lede">On phone the list shows the newest year and loads the next near the bottom; on desktop every year. Either way only the cards within about a screen of the viewport ask for an image (the browser’s lazy loading), and the batch route signs the addresses of the cards on screen, at most 12 at a time. A household with 150 past trips, half with photos, that scrolls the whole list loads at most 75 images, once each a day.</p>
+    <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>a3 · Phone: what loads on a long list</figcaption><div class="dev "><div style="position:relative;height:1010px;background:var(--background)"><div style="position:absolute;left:0;right:0;top:380px;height:400px;background:color-mix(in srgb,var(--primary) 9%,transparent)"></div><div style="position:absolute;left:16px;right:16px;top:16px;height:52px;border-radius:12px;background:#2b2440;opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">photos: no request</div><div style="position:absolute;left:16px;right:16px;top:78px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot shown</div><div style="position:absolute;left:16px;right:16px;top:140px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot shown</div><div style="position:absolute;left:16px;right:16px;top:202px;height:52px;border-radius:12px;background:#2b2440;opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">photos: no request</div><div style="position:absolute;left:16px;right:16px;top:264px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot shown</div><div style="position:absolute;left:16px;right:16px;top:326px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">1 stop: no request</div><div style="position:absolute;left:16px;right:16px;top:388px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot requested (lazy, ahead)</div><div style="position:absolute;left:16px;right:16px;top:450px;height:52px;border-radius:12px;background:#2b2440;opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">photos: no request</div><div style="position:absolute;left:16px;right:16px;top:512px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot requested (lazy, ahead)</div><div style="position:absolute;left:16px;right:16px;top:574px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot requested (lazy, ahead)</div><div style="position:absolute;left:16px;right:16px;top:636px;height:52px;border-radius:12px;background:#2b2440;opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">photos: no request</div><div style="position:absolute;left:16px;right:16px;top:698px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot requested (lazy, ahead)</div><div style="position:absolute;left:16px;right:16px;top:760px;height:52px;border-radius:12px;background:var(--surface-3);opacity:1;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">snapshot requested (lazy, ahead)</div><div style="position:absolute;left:16px;right:16px;top:822px;height:52px;border-radius:12px;background:#2b2440;opacity:.35;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">photos: no request</div><div style="position:absolute;left:16px;right:16px;top:884px;height:52px;border-radius:12px;background:var(--surface-3);opacity:.35;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">not requested yet</div><div style="position:absolute;left:16px;right:16px;top:946px;height:52px;border-radius:12px;background:var(--surface-3);opacity:.35;display:flex;align-items:center;padding:0 12px;font-size:12.5px;color:var(--muted-foreground)">not requested yet</div><div style="position:absolute;left:0;right:0;top:380px;border-top:2px solid var(--primary)"></div><span class="tag" style="top:356px;right:16px">bottom of the screen</span><div style="position:absolute;left:0;right:0;top:780px;border-top:2px dashed var(--primary)"></div><span class="tag" style="top:756px;right:16px">end of the lazy band</span></div></div></figure><figure class="fig" data-w="desk"><figcaption>a3 · Desktop: the options weighed</figcaption><div class="dev frag"><div style="padding:24px 28px;background:var(--background)"><table class="cmp"><thead><tr><th></th><th>A. Static snapshot <span class="rec">(recommended)</span></th><th>B. Live map per card</th><th>C. Snapshot, live on focus</th></tr></thead><tbody><tr><td>Scrolling</td><td>Smooth: lazy <code>&lt;img&gt;</code>, decoded off the main thread</td><td>A WebGL renderer each; more than 4 or 5 on a phone janks or loses the GL context</td><td>As A, plus a swap that can flash</td></tr><tr><td>How many load</td><td>Cards within about a screen of view, one image each, cached by the browser</td><td>Capped by hand (at most 4 alive); a fast scroll shows blank tiles</td><td>As A</td></tr><tr><td>Apple’s daily allowance</td><td>25,000 unique snapshots</td><td>250,000 map views</td><td>Both</td></tr><tr><td>What Apple is sent</td><td>Centre, zoom, size; no stop, no path</td><td>Tiles of the area; Apple’s script is handed the stops and path</td><td>Both</td></tr><tr><td>Server work</td><td>Signs each address with the MapKit key (new route)</td><td>None new</td><td>As A</td></tr><tr><td>Needs Apple’s script</td><td>No</td><td>Yes</td><td>Yes</td></tr><tr><td>To confirm</td><td>Apple’s snapshot parameters, <code>expires</code>, and drawing on top of a snapshot</td><td>Memory on older phones</td><td>Both</td></tr></tbody></table></div></div></figure></div></div>
+    <div class="spec"><div><h3>On phone</h3><ul><li>The comparison table is in the README (and on the desktop toggle of this page).</li></ul></div><div><h3>Recommendation</h3><ul><li>A: the snapshot, with Waypoint’s overlay. It scrolls like today’s cards, sends Apple only the area and works before MapKit JS has loaded. It is the owner’s call (README question 1).</li></ul></div></div>
+  </section>
+
+</div>
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+  document.querySelectorAll('[aria-modal="true"]').forEach(function (dlg) {
+    var dev = dlg.closest(".dev");
+    if (!dev) return;
+    Array.prototype.forEach.call(dev.children, function (el) {
+      if (el === dlg || el.classList.contains("shade")) return;
+      el.inert = true;
+      el.setAttribute("aria-hidden", "true");
+    });
+  });
+})();
+</script>
+
+
+</body>
+</html>
