@@ -9,7 +9,7 @@
       }
     },
     {
-      "wait_for": "[data-kind='country']"
+      "wait_for": "[data-kind='polygon']"
     },
     {
       "long_names": ", Santa Cruz / Monterey Bay KOA Holiday Resort, Cape Hatteras / Outer Banks"

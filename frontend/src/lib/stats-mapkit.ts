@@ -18,7 +18,8 @@ export type StatsMapOptions = {
   onpick: (pick: Pick | null) => void;
   onfailure: () => void;
 };
-export type StatsMap = { show(data: StatsMapData): void; destroy(): void };
+export type Described = { label: string; kind: "airport" | "route" | "stay" | "country" | "state" };
+export type StatsMap = { show(data: StatsMapData): void; describe(drawn: object): Described | null; destroy(): void };
 
 export const DEFAULT_PALETTE: Palette = { visited: "#3d7bc7", route: "#8fc2ff", airport: "#f6b73c", stay: "#4fd1b0", sea: "#0b0e15" };
 export const STATES_BELOW_DEGREES = 40;
@@ -99,6 +100,7 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
   let states: Country[] | null = null;
   let asked = 0;
   let selected: Item | null = null;
+  let items = new WeakMap<object, Item>();
 
   const fail = () => { if (!over) onfailure(); };
   const guard = <T>(work: () => T): T | undefined => {
@@ -108,8 +110,9 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
   const polygon = (feature: Country, pick: Pick, kind: Item["kind"]): MkOverlay | null => {
     const rings = toOverlays(feature);
     if (rings.length === 0) return null;
-    const item: Item = { pick, kind };
-    return new mk.PolygonOverlay(rings.map((ring) => ring.map(coordinate)), { style: regionStyle(false), data: item, enabled: true });
+    const overlay = new mk.PolygonOverlay(rings.map((ring) => ring.map(coordinate)), { style: regionStyle(false), enabled: true });
+    items.set(overlay, { pick, kind });
+    return overlay;
   };
   const regionStyle = (on: boolean) => new mk.Style({
     fillColor: palette.visited, fillOpacity: FILL_OPACITY, strokeColor: on ? "#ffffff" : palette.visited, strokeOpacity: on ? 1 : EDGE_OPACITY, lineWidth: on ? 2 : 1,
@@ -121,18 +124,18 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
   const choose = (next: Item | null) => {
     if (selected && selected !== next) {
       mark(selected, false);
-      const old = [...countryLayer, ...stateLayer].find((p) => p.overlay.data === selected);
+      const old = [...countryLayer, ...stateLayer].find((p) => items.get(p.overlay) === selected);
       if (old) guard(() => { old.overlay.style = regionStyle(false); });
     }
     selected = next;
     if (next) {
       mark(next, true);
-      const now = [...countryLayer, ...stateLayer].find((p) => p.overlay.data === next);
+      const now = [...countryLayer, ...stateLayer].find((p) => items.get(p.overlay) === next);
       if (now) guard(() => { now.overlay.style = regionStyle(true); });
     }
     onpick(next ? next.pick : null);
   };
-  const itemOf = (event: MkEvent): Item | null => (((event.annotation ?? event.overlay) as { data?: unknown } | undefined)?.data as Item | undefined) ?? null;
+  const itemOf = (event: MkEvent): Item | null => { const drawn = event.annotation ?? event.overlay; return drawn ? items.get(drawn) ?? null : null; };
   const picked = (event: MkEvent) => { if (!over) choose(itemOf(event)); };
   const dropped = () => { if (!over) choose(null); };
 
@@ -196,7 +199,7 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
     for (const overlay of shown) { try { map.removeOverlay(overlay); } catch { continue; } }
     shown = new Set();
     for (const a of marks) { try { map.removeAnnotation(a); } catch { continue; } }
-    marks = []; lines = []; countryLayer = []; stateLayer = [];
+    marks = []; lines = []; countryLayer = []; stateLayer = []; items = new WeakMap();
   };
 
   const draw = () => {
@@ -215,20 +218,25 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
       if (overlay) countryLayer.push({ overlay, id });
     }
     buildStates();
-    lines = flown.map((a) => new mk.PolylineOverlay(unwrapped(greatCircle(a.from, a.to)).map(coordinate), {
-      style: new mk.Style({ strokeColor: palette.route, strokeOpacity: 0.85, lineWidth: a.width, lineCap: "round", lineJoin: "round" }),
-      data: { pick: { label: a.label, trips: a.trips }, kind: "route" } satisfies Item, enabled: true,
-    }));
+    lines = flown.map((a) => {
+      const line = new mk.PolylineOverlay(unwrapped(greatCircle(a.from, a.to)).map(coordinate), {
+        style: new mk.Style({ strokeColor: palette.route, strokeOpacity: 0.85, lineWidth: a.width, lineCap: "round", lineJoin: "round" }), enabled: true,
+      });
+      items.set(line, { pick: { label: a.label, trips: a.trips }, kind: "route" });
+      return line;
+    });
     layers();
     for (const s of stayPins) {
-      const diamond = shape("rect", { x: -4, y: -4, width: 8, height: 8, transform: "rotate(45)", fill: palette.stay, stroke: palette.sea, "stroke-width": 1.5, "data-stay": s.city });
-      const item: Item = { pick: { label: s.label, trips: s.trips }, kind: "stay", mark: diamond };
-      marks.push(new mk.Annotation(coordinate([s.longitude, s.latitude]), () => glyph(diamond, 12), { data: item, accessibilityLabel: s.label }));
+      const diamond = shape("rect", { x: -4, y: -4, width: 8, height: 8, transform: "rotate(45)", fill: palette.stay, stroke: palette.sea, "stroke-width": 1.5, "data-mark": "stay" });
+      const pin = new mk.Annotation(coordinate([s.longitude, s.latitude]), () => glyph(diamond, 12));
+      items.set(pin, { pick: { label: s.label, trips: s.trips }, kind: "stay", mark: diamond });
+      marks.push(pin);
     }
     for (const d of airports) {
-      const circle = shape("circle", { r: d.r, fill: palette.airport, stroke: palette.sea, "stroke-width": 1.5, "data-dot": d.code });
-      const item: Item = { pick: { label: d.label, trips: [] }, kind: "airport", mark: circle };
-      marks.push(new mk.Annotation(coordinate([d.longitude, d.latitude]), () => glyph(circle, Math.max(d.r, 9) + 2), { data: item, accessibilityLabel: d.label }));
+      const circle = shape("circle", { r: d.r, fill: palette.airport, stroke: palette.sea, "stroke-width": 1.5, "data-mark": "airport" });
+      const dot = new mk.Annotation(coordinate([d.longitude, d.latitude]), () => glyph(circle, Math.max(d.r, 9) + 2));
+      items.set(dot, { pick: { label: d.label, trips: [] }, kind: "airport", mark: circle });
+      marks.push(dot);
     }
     for (const a of marks) map.addAnnotation(a);
     framed = null;
@@ -243,6 +251,10 @@ export function createStatsMap(mk: Mk, host: HTMLElement, options: StatsMapOptio
       selected = null;
       onpick(null);
       guard(() => { clear(); draw(); });
+    },
+    describe(drawn) {
+      const item = items.get(drawn);
+      return item ? { label: item.pick.label, kind: item.kind } : null;
     },
     destroy() {
       over = true;

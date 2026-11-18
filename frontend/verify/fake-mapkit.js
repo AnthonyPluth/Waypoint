@@ -133,7 +133,7 @@
         if (!n) {
           n = document.createElementNS(SVG, polygon ? "path" : "polyline");
           n.setAttribute("data-overlay", "");
-          if (o.data && o.data.kind) { n.setAttribute("data-kind", o.data.kind); n.setAttribute("data-label", o.data.pick.label); }
+          n.setAttribute("data-kind", polygon ? "polygon" : "polyline");
           if (o.enabled) {
             n.style.pointerEvents = polygon ? "visiblePainted" : "stroke";
             n.addEventListener("click", (event) => { event.stopPropagation(); this.select(o); });
@@ -156,15 +156,14 @@
         }
         if (polygon) n.setAttribute("d", o.points.map((ring) => "M" + ringOf(ring).join("L") + "Z").join(" "));
         else n.setAttribute("points", ringOf(o.points).join(" "));
-        if (o.enabled && o.data && o.data.kind) {
+        if (o.enabled) {
           let hit = this.nodes.get(n);
           if (!hit) {
             hit = document.createElementNS(SVG, "circle");
             hit.setAttribute("r", polygon ? "6" : "10");
             hit.setAttribute("fill", "transparent");
             hit.setAttribute("data-hit", "");
-            hit.setAttribute("data-kind", o.data.kind);
-            hit.setAttribute("data-label", o.data.pick.label);
+            hit.setAttribute("data-kind", polygon ? "polygon" : "polyline");
             hit.style.pointerEvents = "all";
             hit.addEventListener("click", (event) => { event.stopPropagation(); this.select(o); });
             this.lines.append(hit);
@@ -174,6 +173,7 @@
           const mid = at(o.__hit);
           hit.setAttribute("cx", mid.x.toFixed(1));
           hit.setAttribute("cy", mid.y.toFixed(1));
+          hit.style.display = mid.x >= 0 && mid.x <= w && mid.y >= 0 && mid.y <= h ? "" : "none";
         }
       }
       for (const a of this.annotations) {
@@ -182,7 +182,7 @@
           n = document.createElement("div");
           n.style.cssText = "position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer";
           n.append(a.factory());
-          if (a.data) n.addEventListener("click", (event) => { event.stopPropagation(); this.select(a); });
+          n.addEventListener("click", (event) => { event.stopPropagation(); this.select(a); });
           this.marks.append(n);
           this.nodes.set(a, n);
         }

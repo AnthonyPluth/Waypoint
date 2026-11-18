@@ -30,6 +30,7 @@ US_NAMES = {
 }
 
 STATE_NAMES = {code: name.title().replace(" Of ", " of ") for name, code in US_NAMES.items()}
+DISTRICT = "District of Columbia"
 
 
 @cache
@@ -43,13 +44,17 @@ def _state_of_zip3() -> dict[str, str]:
     return found
 
 
+def counted(name: str | None) -> str | None:
+    return None if name == DISTRICT else name
+
+
 def state_at(latitude: float, longitude: float, within_km: float) -> str | None:
     near = reference.nearest_place(latitude, longitude, within_km)
     if near is None or near.country != "US":
         return None
     if near.state:
-        return STATE_NAMES.get(near.state)
+        return counted(STATE_NAMES.get(near.state))
     if near.postal:
         code = _state_of_zip3().get(near.postal[:3])
-        return STATE_NAMES.get(code) if code else None
-    return reference.airport_states().get(near.airport or "")
+        return counted(STATE_NAMES.get(code)) if code else None
+    return counted(reference.airport_states().get(near.airport or ""))

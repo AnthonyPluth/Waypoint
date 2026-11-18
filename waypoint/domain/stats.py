@@ -624,7 +624,7 @@ def _visited_states(airports: Sequence[AirportVisit], pins: Sequence[StayPin], p
     for a in airports:
         if a["country"] != "US":
             continue
-        if (state := named.get(a["code"])) or (a["latitude"] is not None and a["longitude"] is not None
+        if (state := us_states.counted(named.get(a["code"]))) or (a["latitude"] is not None and a["longitude"] is not None
                                                and (state := us_states.state_at(a["latitude"], a["longitude"], NEAREST_KM))):
             found.add(state)
     for pin in pins:
@@ -634,7 +634,7 @@ def _visited_states(airports: Sequence[AirportVisit], pins: Sequence[StayPin], p
         if state := us_states.state_at(point["latitude"], point["longitude"], NEAREST_KM):
             found.add(state)
     for visit in places["visits"]:
-        if visit["country"] == "US" and visit["state"] and (state := us_states.STATE_NAMES.get(visit["state"])):
+        if visit["country"] == "US" and visit["state"] and (state := us_states.counted(us_states.STATE_NAMES.get(visit["state"]))):
             found.add(state)
     return sorted(found, key=str.casefold)
 

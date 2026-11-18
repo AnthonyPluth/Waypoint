@@ -7,9 +7,15 @@ vi.mock("$lib/map", async (original) => {
   const real = await original<typeof import("$lib/map")>();
   return { ...real, loadDetailedCountries: vi.fn(real.loadCountries), loadStates: vi.fn(real.loadStates) };
 });
+const made = vi.hoisted(() => [] as unknown[]);
+vi.mock("$lib/stats-mapkit", async (original) => {
+  const real = await original<typeof import("$lib/stats-mapkit")>();
+  return { ...real, createStatsMap: (...args: Parameters<typeof real.createStatsMap>) => { const map = real.createStatsMap(...args); made.push(map); return map; } };
+});
 vi.mock("$lib/mapkit", async (original) => ({ ...(await original<typeof import("$lib/mapkit")>()), loadMapkit: vi.fn() }));
 
 import { loadDetailedCountries, loadStates } from "$lib/map";
+import type { StatsMap } from "$lib/stats-mapkit";
 import { loadMapkit } from "$lib/mapkit";
 import { viewport } from "$lib/phone.svelte";
 import { fake, fakeMaps, type FakeMap, type FakeOverlay } from "../../test/fake-mapkit";
@@ -35,11 +41,11 @@ const london = { city: "London", country: "GB", latitude: 51.47, longitude: -0.4
   trips: [{ trip_id: 4, name: "Trip to London", start: "2026-06-02", end: "2026-06-08" }, { trip_id: 12, name: "Back to London", start: "2027-01-02", end: "2027-01-05" }] };
 const trip = (id: number, name: string) => ({ trip_id: id, name, start: "2026-07-01", end: "2026-07-08" });
 
-type Item = { pick: { label: string; trips: unknown[] }; kind: string };
-const items = (map: FakeMap, kind: string) => [...map.overlays].map((o) => o.data as Item).filter((i) => i.kind === kind);
-const labels = (map: FakeMap, kind: string) => items(map, kind).map((i) => i.pick.label).sort();
-const overlayOf = (map: FakeMap, kind: string, label: string) => [...map.overlays].find((o) => (o.data as Item).kind === kind && (o.data as Item).pick.label === label) as FakeOverlay;
-const annotationOf = (map: FakeMap, text: string) => [...map.annotations].find((a) => (a.data as Item).pick.label.startsWith(text))!;
+const described = (drawn: object) => (made[made.length - 1] as StatsMap).describe(drawn);
+const items = (map: FakeMap, kind: string) => [...map.overlays].map((o) => described(o)).filter((i) => i?.kind === kind) as { label: string; kind: string }[];
+const labels = (map: FakeMap, kind: string) => items(map, kind).map((i) => i.label).sort();
+const overlayOf = (map: FakeMap, kind: string, label: string) => [...map.overlays].find((o) => described(o)?.kind === kind && described(o)?.label === label) as FakeOverlay;
+const annotationOf = (map: FakeMap, text: string) => [...map.annotations].find((a) => described(a)?.label.startsWith(text))!;
 const ready = async (): Promise<FakeMap> => {
   await waitFor(() => expect(fake.maps).toHaveLength(1));
   return fake.last();
@@ -47,6 +53,7 @@ const ready = async (): Promise<FakeMap> => {
 
 beforeEach(() => {
   fake.reset();
+  made.length = 0;
   vi.mocked(loadDetailedCountries).mockClear();
   vi.mocked(loadStates).mockClear();
   vi.mocked(loadMapkit).mockReset();
@@ -62,7 +69,7 @@ describe("StatsMapKit", () => {
     const map = await ready();
     expect(screen.queryByLabelText("Loading the map")).toBeNull();
     expect(map.options).toMatchObject({ colorScheme: "dark", showsZoomControl: true, showsPointsOfInterest: false, showsMapTypeControl: false });
-    expect(screen.getByRole("img", { name: "Map of the visited countries and states, flights, airports and stays" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Map of the visited countries and states, flights, airports and stays" })).toBeTruthy();
   });
 
   it("hands MapKit only the airports, arcs and stays drawn and the outlines of the visited countries, never an unvisited one", async () => {
@@ -71,8 +78,8 @@ describe("StatsMapKit", () => {
     await waitFor(() => expect(items(map, "country")).toHaveLength(3));
     expect(labels(map, "country")).toEqual(["Japan", "United Kingdom", "United States of America"]);
     expect(labels(map, "route")).toEqual(["JFK – NRT: 2 flights"]);
-    expect([...map.annotations].map((a) => (a.data as Item).kind).sort()).toEqual(["airport", "airport", "stay"]);
-    expect([...map.annotations].map((a) => (a.data as Item).pick.label).sort()).toEqual([
+    expect([...map.annotations].map((a) => described(a)?.kind).sort()).toEqual(["airport", "airport", "stay"]);
+    expect([...map.annotations].map((a) => described(a)?.label).sort()).toEqual([
       "JFK · New York · John F. Kennedy International Airport: 6 visits", "London: 2 stays, 6 nights", "NRT · Tokyo · Narita International Airport: 2 visits",
     ]);
     expect(map.overlays.size).toBe(4);
@@ -86,8 +93,25 @@ describe("StatsMapKit", () => {
     const style = overlayOf(map, "country", "Japan").options.style!.options;
     expect(style).toMatchObject({ fillOpacity: 0.35, strokeOpacity: 0.7, lineWidth: 1 });
     expect(style.fillColor).toBe(style.strokeColor);
-    const order = [...map.overlays].map((o) => (o.data as Item).kind);
+    const order = [...map.overlays].map((o) => described(o)?.kind);
     expect(order.lastIndexOf("country")).toBeLessThan(order.indexOf("route"));
+  });
+
+  it("hands MapKit only geometry and style: no name, count, date or trip, on an overlay, an annotation or its element", async () => {
+    render(StatsMapKit, { flights, stays: [london], onfailure: vi.fn() });
+    const map = await ready();
+    await waitFor(() => expect(items(map, "country")).toHaveLength(3));
+    for (const o of map.overlays) {
+      expect(o.data).toBeUndefined();
+      expect(Object.keys(o.options).sort().filter((k) => k !== "style" && k !== "enabled")).toEqual([]);
+    }
+    for (const a of map.annotations) {
+      expect(a.data).toBeUndefined();
+      expect(a.options).toEqual({});
+      expect(a.factory().outerHTML).not.toMatch(/JFK|NRT|London|Tokyo|New York|visits?\b|nights?\b|Trip/i);
+    }
+    const handed = JSON.stringify([...map.overlays].map((o) => ({ points: o.points, style: o.options.style }))) + JSON.stringify([...map.annotations].map((a) => a.coordinate));
+    expect(handed).not.toMatch(/Trip|London|Tokyo|JFK|NRT|visit|night/);
   });
 
   it("shades a country only remembered by a past visit, and no state for a US one", async () => {

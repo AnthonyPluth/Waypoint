@@ -66,7 +66,7 @@
   <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" aria-busy="true" aria-label="Loading the map"></div>
 {:else}
   <div>
-    <div bind:this={host} class="relative h-[260px] overflow-hidden rounded-[18px] border border-border bg-map-sea shadow-elevation-1 md:h-[500px]" data-mapkit="true" role="img" aria-label="Map of the visited countries and states, flights, airports and stays"></div>
+    <div bind:this={host} class="relative h-[260px] overflow-hidden rounded-[18px] border border-border bg-map-sea shadow-elevation-1 md:h-[500px]" data-mapkit="true" role="group" aria-label="Map of the visited countries and states, flights, airports and stays"></div>
     <p class="mt-2 min-h-5 text-sm text-muted-foreground" aria-live="polite">
       {#if picked}<span class="font-medium text-foreground">{picked.label}</span>
       {:else}Tap a country, state, airport, route or stay to see its trips.{/if}

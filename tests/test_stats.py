@@ -495,6 +495,20 @@ class VisitedStatesTests(StatsCase):
     def test_a_tijuana_rental_counts_no_us_state(self):
         self.assertEqual(self.car("Tijuana, Mexico", "America/Tijuana"), [])
 
+    def test_washington_dc_is_not_a_state(self):
+        self.assertEqual(self.car("Washington, DC", "America/New_York"), [])
+
+    def test_a_dc_visit_adds_no_state(self):
+        self.add(self.jane, {**VISIT_AK, "details": {"state": "DC"}}, travelers=self.on(self.jane.person_id))
+        self.assertEqual(self.states(), [])
+
+    def test_arlington_across_the_river_still_counts_virginia(self):
+        self.assertEqual(self.car("Arlington, VA", "America/New_York"), ["Virginia"])
+
+    def test_the_district_has_no_state_and_a_point_in_it_adds_none(self):
+        self.assertIsNone(us_states.state_at(38.8977, -77.0365, 100.0))
+        self.assertEqual(us_states.state_at(38.8816, -77.091, 100.0), "Virginia")
+
     def test_a_point_is_placed_by_the_nearest_known_place_and_only_when_that_is_in_the_us(self):
         for lat, lon, state in ((42.3314, -83.0457, "Michigan"), (47.6062, -122.3321, "Washington"), (32.7157, -117.1647, "California"), (39.74, -104.99, "Colorado"), (61.2, -149.9, "Alaska")):
             self.assertEqual(us_states.state_at(lat, lon, 100.0), state, (lat, lon))

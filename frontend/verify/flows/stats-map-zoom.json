@@ -9,7 +9,7 @@
       }
     },
     {
-      "wait_for": "[data-kind='country']"
+      "wait_for": "[data-kind='polygon']"
     },
     {
       "click_if_present": "button:has-text('Filters')"
@@ -21,7 +21,7 @@
       "click_if_present": "[role='dialog'] button[aria-label='Close']"
     },
     {
-      "wait_for": "[data-kind='country']"
+      "wait_for": "[data-kind='polygon']"
     },
     {
       "scroll_to": "#stats-map-slot"
@@ -30,7 +30,7 @@
       "screenshot": "map-for-one-person"
     },
     {
-      "click": "[data-dot='JFK']"
+      "click": "[data-mark='airport'] >> nth=0"
     },
     {
       "click": "[data-zoom='in']"
@@ -42,13 +42,13 @@
       "click": "[data-zoom='in']"
     },
     {
-      "wait_for": "[data-kind='state']"
+      "wait_for": "[data-hit][data-kind='polygon'] >> visible=true"
     },
     {
       "screenshot": "zoomed-into-states"
     },
     {
-      "click": "[data-hit][data-kind='state'][data-label='New York']"
+      "click": "[data-hit][data-kind='polygon'] >> visible=true >> nth=0"
     },
     {
       "wait_for": "[data-testid='map-trips']"

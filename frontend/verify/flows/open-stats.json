@@ -9,7 +9,7 @@
       }
     },
     {
-      "wait_for": "[data-kind='country']"
+      "wait_for": "[data-kind='polygon']"
     },
     {
       "scroll_to": "#stats-map-slot"

@@ -9,13 +9,13 @@
       }
     },
     {
-      "wait_for": "[data-kind='country']"
+      "wait_for": "[data-kind='polygon']"
     },
     {
       "scroll_to": "#stats-map-slot"
     },
     {
-      "click": "[data-hit][data-kind='route'][data-label^='JFK – MCO']"
+      "click": "[data-hit][data-kind='polyline'] >> visible=true >> nth=0"
     },
     {
       "wait_for": "[data-testid='map-trips']"
@@ -24,7 +24,7 @@
       "screenshot": "route-trips"
     },
     {
-      "click": "[data-dot='JFK']"
+      "click": "[data-mark='airport'] >> nth=0"
     },
     {
       "expect_text": {
@@ -36,7 +36,7 @@
       "screenshot": "airport"
     },
     {
-      "click": "[data-hit][data-kind='country'] >> nth=0"
+      "click": "[data-hit][data-kind='polygon'] >> visible=true >> nth=0"
     },
     {
       "wait_for": "[data-testid='map-trips']"
