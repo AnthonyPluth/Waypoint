@@ -411,11 +411,13 @@ final class OfflineSyncTests: XCTestCase {
 
     func testEveryKindOfPurgeUpdatesTheParametersAfterTheCopyIsGone() async {
         answer(["Lisbon"])
+        let oldServer = home
+        let newServer = cabin
         let kinds: [(String, (OfflineSync) async -> Void)] = [
-            ("sign-out", { await $0.signedOut() }),
-            ("saving off", { await $0.setSaving(false) }),
-            ("remove", { await $0.remove() }),
-            ("changed server", { [cabin, home] in await $0.serverChanged(from: home, to: cabin) }),
+            ("sign-out", { sync in await sync.signedOut() }),
+            ("saving off", { sync in await sync.setSaving(false) }),
+            ("remove", { sync in await sync.remove() }),
+            ("changed server", { sync in await sync.serverChanged(from: oldServer, to: newServer) }),
         ]
         for (name, purge) in kinds {
             let updates = ParameterUpdates()
@@ -444,7 +446,7 @@ final class OfflineSyncTests: XCTestCase {
 
     func testAnExpiredSessionPurgesAndUpdatesTheParameters() async {
         let updates = ParameterUpdates()
-        let sync = makeSync(updates: updates, tokenError: ServerError.signedOut)
+        let sync = makeSync(tokenError: ServerError.signedOut, updates: updates)
         await sync.sync()
         XCTAssertEqual(updates.calls, 1)
     }
