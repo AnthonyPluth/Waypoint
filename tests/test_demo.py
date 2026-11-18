@@ -1,5 +1,4 @@
 import json
-import time
 from datetime import UTC, date, datetime
 
 from collections import Counter
@@ -40,7 +39,7 @@ class DemoTests(DbCase):
         (row,) = list(self.c.orm.scalars(select(DrivingRoute)))
         self.assertEqual(len(json.loads(row.path)), 5)
         household = Viewer(None, household=True)
-        found = driving_routes.cached_for_trips(self.c, household, [str(row.trip_id)], time.time())
+        found = driving_routes.cached_for_trips(self.c, household, [str(row.trip_id)])
         self.assertEqual([t["trip_id"] for t in found], [row.trip_id])
         self.assertEqual(len(found[0]["routes"]), 1)
 

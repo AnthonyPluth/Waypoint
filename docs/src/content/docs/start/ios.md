@@ -29,6 +29,21 @@ The saved trips are files in the app's private storage inside its sandbox, prote
 
 With no connection, the app shows the saved trips, read-only, instead of an error, from a copy of your server's public web app files that it keeps beside them (code only, no trip data and no token, deleted with the saved trips). Nothing is shown this way unless a trip is saved, and what appears is described under [With no connection, in the app](/Waypoint/start/offline/#with-no-connection-in-the-app). Starting the app with no connection works the same way when trips and the files are saved: the app waits about 5 seconds for the server to start its web session, then opens the saved page without a cookie or token, and goes back to the server (with a fresh web session) when it answers again. With nothing saved, or an error that isn't a lost connection, it shows the error as before; a 401 or 403 from the server signs you out and deletes the saved trips. Unit tests cover this; it has not yet been confirmed on a phone in airplane mode.
 
+## Siri and Shortcuts
+
+You can ask Siri about your next flight and your hotel, by voice or from the Shortcuts app. Every phrase includes the app's name, which Apple requires:
+
+- **Next flight:** "When is my next flight in Waypoint", "Waypoint next flight" or "When do I fly in Waypoint". Siri says where it leaves from and goes to, the day and the time, as the departure airport's local time ("Your next flight leaves Denver for Grand Junction on Friday at 7:40 am, local time."). It is the next flight on any trip saved on the phone, whoever is on it. A phone that saved its trips before the app kept airport cities says the flight number instead of the cities.
+- **Tonight's stay:** "Where am I staying tonight in Waypoint" or "Waypoint hotel". Siri says the hotel, its city and when you check out. With no stay tonight it says your next one.
+- **Check-out:** "When do I check out in Waypoint". Siri says when you check out of the stay you are in, up to its check-out time in the hotel's own time zone; after that it names your next stay.
+- **Parking code:** "Show my parking code in Waypoint" or "Waypoint parking". Siri says "Opening your parking at" and the lot's name, and opens Waypoint at the trip of the parking booking you are in (its entry passed, its exit not yet), else the next one, where **Show QR code** is. It never says or shows the code or the confirmation, and the code is not saved on the phone: it comes from your server once the app is open, so with no connection the booking opens without it. With no parking in the saved trips Siri says so and Waypoint still opens.
+
+Siri answers only from the trips saved on the phone (see [Saved trips](#saved-trips)), so it makes no request to your server and works with no connection. The answer is as old as the last time you opened Waypoint online: the card under Siri's answer says how old, and says to open Waypoint once the copy is a day old. It needs saving to be on, and a signed-in app.
+
+The phone must be unlocked: Siri asks for the unlock first, and the saved trips can't be read while it is locked. A HomePod can't unlock your phone, so it gets no answer.
+
+Siri never says a confirmation code, a gate, a loyalty or Known Traveler number, a seat, a room, a phone number, a street address or another traveller's name. The card shows the stay's street address, the flight number, the times and the trip's name, and tapping it opens the booking in the app. Waypoint gives no trip to Spotlight, Siri's suggestions or Apple Intelligence. What you say and what Siri answers pass through Apple's Siri, as Apple's Siri settings describe.
+
 ## Ending it
 
 The app's access ends when you can no longer sign in to Waypoint (you are taken off `OIDC_ALLOWED_EMAILS`, or, with groups, your last sign-in is older than `WAYPOINT_SESSION_DAYS`), or when the app drops the connection: it does so by itself when the server says the sign-in is no longer valid or when Waypoint answers 401 while you are using the app, and **Use another Waypoint** on its error screen signs out too. Each of these shows a "You are signed out of Waypoint" screen, and **Sign in** on it asks for the address again. There is no sign-out button in Settings yet. Unlike an assistant, the app does not appear under **Settings → Assistants**.
