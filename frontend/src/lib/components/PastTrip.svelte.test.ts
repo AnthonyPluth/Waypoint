@@ -1061,4 +1061,15 @@ describe("PastTrip when the map fails after the replay showed", () => {
     const facts = within(column).getByTestId("trip-summary");
     await waitFor(() => expect(document.activeElement).toBe(facts));
   });
+
+  it("on a phone with photos takes Replay trip away once the map has failed", async () => {
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show({ trip: flown });
+    await userEvent.click(await screen.findByRole("button", { name: "Replay trip" }));
+    await screen.findByRole("region", { name: "Route replay" });
+    maps.fail();
+    expect(await screen.findByText("The map couldn’t load")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+  });
 });

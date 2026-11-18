@@ -27,7 +27,7 @@
   const available = $derived(maps != null && !lost);
 
   $effect(() => {
-    const count = wanted && (maps != null || lost) ? stops.length : 0;
+    const count = wanted && maps != null && !lost ? stops.length : 0;
     untrack(() => onstops?.(count));
   });
 
