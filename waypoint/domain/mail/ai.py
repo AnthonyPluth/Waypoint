@@ -26,7 +26,7 @@ MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
-NEEDS_AI = "Reading email with AI needs an Ollama address and model in Settings → AI."
+NEEDS_AI = "Reading email with AI needs an Ollama address and model in Settings → Mail & review → AI."
 
 
 class AiError(Exception):

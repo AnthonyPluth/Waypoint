@@ -96,7 +96,7 @@
 
   const SHOWN: Record<string, string[]> = { flight: ["flight_number", "cabin"], hotel: ["address", "phone"], car: ["phone"], train: ["address"], parking: ["address"], cruise: ["address", "phone", "room", "ship", "deck"] };
   const detailLabel = (kind: string, key: string) => DETAILS[kind as Kind].find(([k]) => k === key)?.[1] ?? key;
-  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; travelers: { name: string; seat: string }[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean };
+  type Draft = { item: ReviewItem; pick: number; suggested: boolean; kind: string; provider: string; confirmation: string; origin: string; destination: string; start: string; end: string; startZone: string; endZone: string; details: Record<string, string>; read: string[]; travelers: { name: string; seat: string }[]; sources: Record<string, string>; cost: string; currency: string; addressField: boolean; other?: Draft };
   const detailsOf = (s: ReviewItem["suggestions"][number]): Record<string, string> => ({ address: s.address ?? "", phone: s.phone ?? "", room: s.room ?? "", ship: s.ship ?? "", deck: s.deck ?? "", flight_number: s.flight_number ?? "", cabin: s.cabin ?? "" });
   const suggestedDraft = (item: ReviewItem, s: ReviewItem["suggestions"][number], pick: number): Draft => ({
     item, pick, suggested: true, kind: s.kind, provider: s.provider ?? providerFrom(item.sender_domain), confirmation: s.confirmation ?? "", origin: s.origin,
@@ -104,6 +104,30 @@
     read: Object.entries(detailsOf(s)).filter(([, v]) => v).map(([k]) => k), travelers: (s.travelers ?? []).map((t) => ({ ...t })), sources: s.sources ?? {},
     cost: s.price_minor && s.price_currency ? amountText(s.price_minor, s.price_currency) : "", currency: s.price_currency ?? DEFAULT_CURRENCY,
     addressField: s.kind === "car" && differs(s.address, s.origin) });
+  type Reading = ReviewItem["suggestions"][number];
+  type Held = { s: Reading; pick: number };
+  const readings = (item: ReviewItem): { main: Held; other?: Held }[] => {
+    const all: Held[] = item.suggestions.map((s, n) => ({ s, pick: n + 1 }));
+    const out: { main: Held; other?: Held }[] = [];
+    const seen = new Set<number>();
+    for (const one of all) {
+      if (seen.has(one.pick)) continue;
+      const same = all.filter((x) => x.s.kind === one.s.kind);
+      const email = same.filter((x) => x.s.parsed);
+      const said = same.filter((x) => !x.s.parsed);
+      const [first] = email;
+      const [second] = said;
+      if (first && second && email.length === 1 && said.length === 1) {
+        seen.add(first.pick);
+        seen.add(second.pick);
+        out.push({ main: first, other: second });
+      } else {
+        seen.add(one.pick);
+        out.push({ main: one });
+      }
+    }
+    return out;
+  };
   const handDraft = (item: ReviewItem): Draft => ({ item, pick: 0, suggested: false, kind: "flight", provider: providerFrom(item.sender_domain), confirmation: "", origin: "", destination: "", start: "", end: "", startZone: "", endZone: "", details: {}, read: [], travelers: [], sources: {}, cost: "", currency: DEFAULT_CURRENCY, addressField: false });
   let drafts = $state<Draft[]>([]);
   let joining = $state<{ legs: Draft[]; bodies: SegmentBody[]; found: (ReviewCandidate | null)[] } | null>(null);
@@ -128,7 +152,11 @@
     addedIds = [];
     addedPicks = [];
     joining = null;
-    drafts = use && item.suggestions.length ? item.suggestions.map((s, n) => suggestedDraft(item, s, n + 1)) : [handDraft(item)];
+    drafts = use && item.suggestions.length ? readings(item).map(({ main, other }) => {
+      const made = suggestedDraft(item, main.s, main.pick);
+      if (other) made.other = suggestedDraft(item, other.s, other.pick);
+      return made;
+    }) : [handDraft(item)];
     baseline = fingerprints();
     formError = "";
     void peek(item);
@@ -137,6 +165,14 @@
     if (showFields) return;
     pane = "booking";
     flushSync();
+  };
+  const useReading = (leg: Draft) => {
+    const other = leg.other;
+    const at = drafts.indexOf(leg);
+    if (!other || at < 0) return;
+    other.other = leg;
+    drafts[at] = other;
+    leg.other = undefined;
   };
   const dropLeg = (leg: Draft) => { drafts = drafts.filter((d) => d !== leg); };
   const addedLegs = new WeakSet<Draft>();
@@ -388,6 +424,16 @@
 
 {#snippet legFields(d: Draft)}
   {@const labels = placeLabels(d.kind)}
+  {#if d.other}
+    {@const fromEmail = Boolean(d.item.suggestions[d.pick - 1]?.parsed)}
+    <div class="flex flex-col gap-2" role="group" aria-label="Which reading is right?" data-testid="readings">
+      <p class="text-sm text-muted-foreground">Waypoint read this booking two ways and they didn’t line up. Pick the one that matches the email; it is added as one booking.</p>
+      <div class="grid grid-cols-2 gap-1 rounded-xl bg-secondary p-1">
+        <Button type="button" size="sm" variant={fromEmail ? "default" : "ghost"} aria-pressed={fromEmail} disabled={saving} onclick={() => { if (!fromEmail) useReading(d); }}>Read from the email</Button>
+        <Button type="button" size="sm" variant={fromEmail ? "ghost" : "default"} aria-pressed={!fromEmail} disabled={saving} onclick={() => { if (fromEmail) useReading(d); }}>AI suggestion</Button>
+      </div>
+    </div>
+  {/if}
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">What is it?</span>
     <select value={d.kind} onchange={(e) => { kindChanged(d, e.currentTarget.value); d.kind = e.currentTarget.value; }} class={selectClass}>{#each KINDS as [key, name] (key)}<option value={key}>{name}</option>{/each}</select></label>
   <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Provider</span>
@@ -498,7 +544,7 @@
     <div class="min-w-0 basis-full">
       <p class="break-words font-medium">{subject(item)}</p>
       <p class="break-words text-sm text-muted-foreground">{[item.received && `Sent ${item.received}`, item.mine ? `to ${item.address}` : `in ${item.owner}’s mailbox, shared with the household`].filter(Boolean).join(" · ")}</p>
-      <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">{item.suggestions[0].parsed ? "Read from the email" : "AI suggestion"}</Badge>{/if}{#if item.auto_read && item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">read automatically</Badge>{/if}</p>
+      <p class="mt-1"><Badge variant="secondary">{REASONS[item.reason]}</Badge>{#if item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">{readings(item).some((r) => r.other) ? "Read two ways" : item.suggestions[0].parsed ? "Read from the email" : "AI suggestion"}</Badge>{/if}{#if item.auto_read && item.suggestions.length && item.reason !== "generic"} <Badge variant="outline">read automatically</Badge>{/if}</p>
       {#if item.suggestion_error}<p class="mt-1 text-sm text-muted-foreground" role="status">{item.suggestion_error}</p>{/if}
       {#if item.count > 1}
         <details class="mt-2 text-sm" data-testid="same-reservation">
@@ -513,7 +559,8 @@
     </div>
     <div class="flex basis-full flex-wrap items-center gap-2">
       {#if item.suggestions.length}
-        <Button size="sm" onclick={() => startAdd(item, true)} aria-label={`${item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}: “${subject(item)}”`}>{item.suggestions.length > 1 ? `Check ${item.suggestions.length} suggestions` : "Check suggestion"}</Button>
+        {@const count = readings(item).length}
+        <Button size="sm" onclick={() => startAdd(item, true)} aria-label={`${count > 1 ? `Check ${count} suggestions` : "Check suggestion"}: “${subject(item)}”`}>{count > 1 ? `Check ${count} suggestions` : "Check suggestion"}</Button>
       {:else}
         <Button size="sm" onclick={() => startAdd(item)} aria-label={`Add by hand: “${subject(item)}”`}>Add by hand</Button>
       {/if}

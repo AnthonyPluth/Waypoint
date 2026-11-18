@@ -144,12 +144,26 @@ class ReadSuggestionTests(ScanAiCase):
                                                        "start_local": "2027-03-05T15:00", "end_local": "2027-03-09T15:00",
                                                        "start_zone": "America/Chicago", "address": "1 Example Avenue"}]})
         self.add_mail("spot", FIXTURE.read_bytes().replace(b"<p>Rental ID: 100200300</p>", b"<p>Rental ID: 100200300</p><p>Itinerary: 555000111</p>"))
-        result = self.scan()
+        with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
+            result = self.scan()
         self.assertEqual((result.bookings, result.review), (0, 1))
         [item] = self.items()
         self.assertEqual(item["reason"], "incomplete")
         self.assertEqual(sorted((s["confirmation"], bool(s.get("parsed"))) for s in item["suggestions"]), [("100200300", True), ("555000111", False)])
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(Segment)).scalar()), 0)
+
+    def test_an_ai_reading_of_a_kind_the_reader_did_not_find_is_filed_beside_the_readers_stay(self):
+        self.turn_on()
+        self.fake.content = json.dumps({"bookings": [{"kind": "hotel", "provider": "Example Inn", "confirmation": "555000111", "origin": "Example Inn",
+                                                       "start_local": "2027-03-05T15:00", "end_local": "2027-03-09T11:00",
+                                                       "start_zone": "America/Chicago", "address": "2 Example Road, Austin, TX 78701"}]})
+        self.add_mail("spot", FIXTURE.read_bytes().replace(b"<p>Rental ID: 100200300</p>", b"<p>Rental ID: 100200300</p><p>Itinerary: 555000111</p>"))
+        with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
+            result = self.scan()
+        self.assertEqual(result.bookings, 1)
+        [item] = self.items()
+        self.assertEqual([(s["kind"], s["confirmation"], bool(s.get("parsed"))) for s in item["suggestions"]], [("parking", "100200300", True)])
+        self.assertEqual(self.read(lambda conn: list(conn.execute(select(Segment.kind, Segment.confirmation)))), [("hotel", "555000111")])
 
     def test_a_cancellation_that_cannot_be_placed_waits_without_a_suggestion(self):
         self.add_mail("cancel", (FIXTURE.parent / "cancellation.eml").read_bytes())
