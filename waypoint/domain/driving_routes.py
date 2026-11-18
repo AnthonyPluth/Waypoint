@@ -154,8 +154,12 @@ def store(conn: db.Connection, viewer: Viewer, trip_id: int, start: Any, end: An
     places = tripmap.places(conn, viewer, trip_id)
     if places is None:
         return None
+    return store_for(conn, trip_id, _stops(places), start, end, raw_path, now)
+
+
+def store_for(conn: db.Connection, trip_id: int, stops: list[tuple[float, float]], start: Any, end: Any, raw_path: Any, now: float) -> bool:
     drive = drive_of(start, end)
-    if not _on_trip(_stops(places), drive):
+    if not _on_trip(stops, drive):
         raise Invalid("That isn't a drive of this trip")
     path = clean_path(raw_path, drive)
     from_lat, from_lon, to_lat, to_lon = _key(drive)

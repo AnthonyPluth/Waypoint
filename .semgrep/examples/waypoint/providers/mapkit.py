@@ -3,3 +3,5 @@
 SCRIPT_URL = "https://cdn.apple-mapkit.com/mk/x/mapkit.js"
 # ok: waypoint-mapkit-hosts
 SERVICE_HOSTS = "https://*.apple-mapkit.com"
+# ok: waypoint-apple-maps-server-host
+SERVER_HOST = "maps-api.apple.com"
