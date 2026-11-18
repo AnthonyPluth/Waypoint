@@ -8,10 +8,12 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import type { Trip as TripT } from "$lib/api-types";
+import { arrival } from "$lib/arrival.svelte";
 import { route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { offline } from "$lib/offline.svelte";
 import { lock, save, saveAll, setUp } from "$lib/offline-vault";
+import { installShell } from "../test/fake-shell";
 import { installDevice, type Behaviour, type Device } from "../test/webauthn";
 import { segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
@@ -217,5 +219,51 @@ describe("Trip: the saved offline copy", () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to Springfield" });
     expect(await screen.findByText(/also saved: “Trip to Paris”/)).toBeInTheDocument();
+  });
+});
+
+describe("Trip: a warm iPhone app that lost its connection", () => {
+  const lot = segment({
+    id: 5, trip_id: 1, kind: "parking", origin: "Harbour Parking, Lot B", provider: null, destination: null, confirmation: "HP-48213",
+    start_local: "2099-12-01T09:00", start_zone: "America/Denver", end_local: "2099-12-05T18:00", end_zone: "America/Denver", details: {}, gate_code: { state: "ready", day: "2026-10-16" },
+  });
+  const saved = (id = 1) => ({ savedAt: Date.now(), messages: [], codes: [{ segment_id: 5, type: "image/png", data: "QUJD" }], trip: { ...trip([lot]), id, name: "Trip to Denver" } });
+
+  afterEach(() => { arrival.target = null; });
+
+  it("shows the saved trip, and opens the booking’s code the notification was for, instead of a connection error", async () => {
+    installShell({ trips: [saved()] });
+    arrival.target = { segmentId: 5, tripId: 1, at: Date.now() };
+    vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
+    render(TripPage);
+    expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+    expect(screen.queryByText("Failed to fetch")).not.toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "QR code" })).toBeInTheDocument();
+    expect(arrival.target).toBeNull();
+  });
+
+  it("keeps the error when the server answered, or when this trip is not saved", async () => {
+    installShell({ trips: [saved()] });
+    vi.mocked(api).mockRejectedValue(Object.assign(new Error("Server error"), { status: 500 }));
+    const { unmount } = render(TripPage);
+    expect(await screen.findByText("Server error")).toBeInTheDocument();
+    unmount();
+    vi.unstubAllGlobals();
+    installShell({ trips: [saved(2)] });
+    vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
+    render(TripPage);
+    expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
+  });
+
+  it("keeps the error when the saved trips cannot be read, and in a browser", async () => {
+    const shell = installShell({ trips: [saved()] });
+    shell.replies.set("load", { version: 9, trips: [] });
+    vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
+    const { unmount } = render(TripPage);
+    expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
+    unmount();
+    vi.unstubAllGlobals();
+    render(TripPage);
+    expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
   });
 });

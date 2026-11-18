@@ -16,6 +16,7 @@ final class ShellViewController: CAPBridgeViewController {
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
+        descriptor.handleApplicationNotifications = false
         if let url = Self.serverURL {
             descriptor.serverURL = url.absoluteString
             // A tap on a Siri card that launched the app: open the page it names (only `#trip/...` routes pass).
@@ -29,7 +30,18 @@ final class ShellViewController: CAPBridgeViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        ArrivalTapHandler.install()
         NotificationCenter.default.addObserver(self, selector: #selector(openSavedPage(_:)), name: .openSavedPage, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(arrivalTapped(_:)), name: .openArrival, object: nil)
+    }
+
+    /// A tap on an arrival notification: the ids wait in `PendingArrival`, and the page is told to ask for them (it also asks once when it
+    /// starts, which covers a tap that launched the app).
+    @objc private func arrivalTapped(_ note: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let webView = self?.webView, PendingArrival.shared.isWaiting() else { return }
+            webView.evaluateJavaScript(PendingArrival.eventScript, completionHandler: nil)
+        }
     }
 
     @objc private func openSavedPage(_ note: Notification) {

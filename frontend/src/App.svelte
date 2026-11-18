@@ -9,6 +9,7 @@
   import OfflineApp from "$lib/components/OfflineApp.svelte";
   import * as Alert from "$lib/components/ui/alert";
   import * as Card from "$lib/components/ui/card";
+  import { listenForArrival } from "$lib/arrival.svelte";
   import { anyDirty } from "$lib/drafts.svelte";
   import { preloadMapkit } from "$lib/mapkit";
   import { pageFor } from "$lib/nav";
@@ -43,6 +44,8 @@
     const handle = window.setTimeout(run, 2000);
     return () => window.clearTimeout(handle);
   }
+
+  $effect(() => listenForArrival());
 
   const mapkitOn = $derived(!!app.state?.user && app.state.mapkit === true && !app.offline);
   $effect(() => {

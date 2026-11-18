@@ -13,12 +13,11 @@
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
 
-  type Props = { segment: Segment; now: number; onchanged?: () => void };
-  let { segment, now, onchanged }: Props = $props();
+  type Props = { segment: Segment; now: number; onchanged?: () => void; showing?: boolean; buttons?: boolean; readOnly?: boolean };
+  let { segment, now, onchanged, showing = $bindable(false), buttons = true, readOnly = false }: Props = $props();
 
   type Picture = { email: number; image: number; src: string };
 
-  let showing = $state(false);
   let choosing = $state(false);
   let src = $state<string | null>(null);
   let failed = $state(false);
@@ -113,13 +112,13 @@
   });
 </script>
 
-{#if live && code}
+{#if buttons && live && code}
   {#if code.state === "ready"}
     <Button bind:ref={showButton} variant="outline" size="sm" aria-label={`Show QR code for ${lot}`} onclick={() => open(showButton)}>Show QR code</Button>
-    {#if segment.has_email}
+    {#if segment.has_email && !readOnly}
       <Button bind:ref={chooseButton} variant="ghost" size="sm" aria-label={`Choose another picture for the code of ${lot}`} onclick={() => { returnTo = chooseButton; choosing = true; }}>Choose another picture</Button>
     {/if}
-  {:else}
+  {:else if !readOnly}
     <Button bind:ref={chooseButton} variant="outline" size="sm" aria-label={`Choose the code for ${lot}`} onclick={() => { returnTo = chooseButton; choosing = true; }}>Choose the code</Button>
   {/if}
 {/if}
