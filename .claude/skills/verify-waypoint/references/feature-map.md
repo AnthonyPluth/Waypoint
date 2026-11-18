@@ -706,7 +706,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#review`.
 - **Widths:** phone, desktop.
-- **Touches:** `Check suggestion`.
+- **Touches:** `Check suggestion: “Your booking is confirmed`.
 - **Expects to see:** `Review`, `Add to my trips`.
 - **Drive it:** `tools/control flow read-from-email`; or `poetry run python run.py verify --flow read-from-email`.
 
@@ -779,6 +779,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Add by hand`.
 - **Expects to see:** `Review`.
 - **Drive it:** `tools/control flow review-side-by-side`; or `poetry run python run.py verify --flow review-side-by-side`.
+
+#### `review-two-readings`
+
+- **Starts at:** `#review`.
+- **Widths:** phone, desktop.
+- **Touches:** `Check suggestion: “Your stay at Harbour Lodge`, `AI suggestion`.
+- **Expects to see:** `Review`, `Read two ways`, `Pick the one that matches the email`, `Add to my trips`.
+- **Drive it:** `tools/control flow review-two-readings`; or `poetry run python run.py verify --flow review-two-readings`.
 
 #### `review-view-email`
 
