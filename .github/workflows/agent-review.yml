@@ -4,11 +4,11 @@ name: Agent review
 # .github/workflows/agent-review.yml; docs/agent-review.md there). The independent first review of every pull request
 # is off, fleet's default since v2.0.0 (no "Agent review" status, no comment); Codex reviews every pull request instead.
 # A risky pull request (labelled safety-critical or security, or changing .github/**, .claude/** other than the .md
-# documents in a skill's references/, .mcp.json or one of the files below: fleet's second-review-always default
-# since v6.0.0) is read by a fresh Claude Code session against main's AGENTS.md, .github/agent-review/context.md and
-# .github/agent-review/invariants.md, as the "Second review" status; one that isn't risky gets a passing "Second
-# review" saying so, without running Claude, so only a risky pull request needs the ANTHROPIC_API_KEY or
-# CLAUDE_CODE_OAUTH_TOKEN secret. The merge gate requires "Second review".
+# documents in a skill's references/ (the owner's narrowing, AnthonyPluth/fleet#140), .mcp.json or one of the files
+# below: fleet's second-review-always default since v6.0.0) is read by a fresh Claude Code session against main's
+# AGENTS.md, .github/agent-review/context.md and .github/agent-review/invariants.md, as the "Second review" status; one
+# that isn't risky gets a passing "Second review" saying so, without running Claude, so only a risky pull request needs
+# the ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN secret. The merge gate requires "Second review".
 #
 # This caller declares the triggers (a called workflow can't) and passes the two secrets by name (secrets: inherit
 # would hand over every secret). pull_request_target runs main's copy of this file and of fleet's workflow at the pin
@@ -49,17 +49,20 @@ jobs:
       budget-usd: ${{ vars.AGENT_REVIEW_BUDGET_USD || '3' }}
       max-turns: ${{ vars.AGENT_REVIEW_MAX_TURNS || '60' }}
       # A change to one of these files is risky and gets the second review, beside the labels (safety-critical,
-      # security) and .github/**, .claude/** (all but the .md documents under .claude/skills/*/references/, such as
-      # verify-waypoint's regenerated feature map) and .mcp.json, which always count. The list is short on purpose (#518): the exact
-      # files that directly implement the security promises (sign-in, outbound TLS, visibility, a trip's people, loyalty
-      # numbers, a trip's photos and their grants and proxy, the offline copy and its encrypted store, log scrubbing),
-      # the mail review and assist modules and the two handlers that serve a kept message (server/api/review.py,
-      # server/api/trips.py), the assistant's mail-scope gate (server/mcp_access.py, MAIL_READABLE), the Semgrep rules,
-      # SECURITY.md and the image's Dockerfile. It doesn't name every file a promise depends on: every other mail
-      # module, handler, provider and the storage layer rely on Codex's review and the CI checks, and a pull request
-      # touching one gets the second review only when labelled. The full set of invariants, and the checks that hold
-      # each, is in .github/agent-review/invariants.md, which the second review reads. tests/test_agent_review_paths.py
-      # checks each file listed here exists.
+      # security) and fleet's second-review-always default, which always counts: .github/**, .claude/** and .mcp.json,
+      # except the .md documents under .claude/skills/*/references/ (verify-waypoint's regenerated feature map, say).
+      # That exception is the owner's, in AnthonyPluth/fleet#140: "The owner has asked for exactly this narrowing:
+      # `.claude/skills/*/references/**/*.md` stops being always risky by default, for every app." A skill's SKILL.md,
+      # the settings, hooks, agents, commands, CLAUDE.md and AGENTS.md under .claude/ stay risky. The list is short on
+      # purpose (#518): the exact files that directly implement the security promises (sign-in, outbound TLS,
+      # visibility, a trip's people, loyalty numbers, a trip's photos and their grants and proxy, the offline copy and
+      # its encrypted store, log scrubbing), the mail review and assist modules and the two handlers that serve a kept
+      # message (server/api/review.py, server/api/trips.py), the assistant's mail-scope gate (server/mcp_access.py,
+      # MAIL_READABLE), the Semgrep rules, SECURITY.md and the image's Dockerfile. It doesn't name every file a promise
+      # depends on: every other mail module, handler, provider and the storage layer rely on Codex's review and the CI
+      # checks, and a pull request touching one gets the second review only when labelled. The full set of invariants,
+      # and the checks that hold each, is in .github/agent-review/invariants.md, which the second review reads.
+      # tests/test_agent_review_paths.py checks each file listed here exists.
       second-review-paths: |
         waypoint/oidc.py
         waypoint/tls.py
