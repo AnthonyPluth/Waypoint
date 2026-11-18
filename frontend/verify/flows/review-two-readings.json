@@ -1,0 +1,18 @@
+{
+  "name": "review-two-readings",
+  "page": "review",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Review" } },
+    { "wait_for": "[data-testid='review-item']" },
+    { "expect_text": { "selector": "body", "text": "Read two ways" } },
+    { "screenshot": "list" },
+    { "click": "button[aria-label^='Check suggestion: “Your stay at Harbour Lodge']" },
+    { "wait_for": "[data-testid='readings']" },
+    { "expect_text": { "selector": "[data-testid='readings']", "text": "Pick the one that matches the email" } },
+    { "scroll_to": "[data-testid='readings']" },
+    { "screenshot": "alternatives" },
+    { "click": "[data-testid='readings'] >> button:has-text('AI suggestion')" },
+    { "expect_text": { "selector": "form", "text": "Add to my trips" } },
+    { "screenshot": "ai-reading" }
+  ]
+}

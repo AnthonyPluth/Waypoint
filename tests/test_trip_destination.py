@@ -11,6 +11,7 @@ from tests.test_mail_ai import serve_fake_ai
 from tests.test_trips import Household, RouteCase
 from waypoint.domain import place_zones, regions, trips
 from waypoint.domain.mail import ai
+from waypoint.server.api import trips as trips_api
 from waypoint.storage import db, reference
 from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import Airport
@@ -388,7 +389,8 @@ class SuggestRouteTests(RouteCase):
     def test_it_refuses_while_the_ai_fallback_is_off_and_asks_nothing(self):
         trip_id = self.trip()
         status, got = self.suggest("ana", trip_id)
-        self.assertEqual((status, got), (400, {"error": "Suggestions need an Ollama address and model in Settings → AI."}))
+        self.assertEqual((status, got), (400, {"error": trips_api.NO_AI}))
+        self.assertIn("Settings → Mail & review → AI", trips_api.NO_AI)
         self.assertEqual(self.fake.requests, [])
 
     def test_a_trip_with_no_places_is_refused_before_anything_is_sent(self):

@@ -37,7 +37,7 @@ sender = found.sender_domain
 # scan._read is the one caller of ai.suggest: nothing else in scan.py, and no other name for it.
 def _read(cfg, text, timeout):
     try:
-        # ok: waypoint-ai-suggest-caller
+        # ok: waypoint-ai-suggest-caller-in-scan
         reading = ai.suggest(cfg, text, timeout)
     except ai.AiError:
         reading = None
@@ -45,19 +45,35 @@ def _read(cfg, text, timeout):
 
 
 def _ask(cfg, text):
-    # ruleid: waypoint-ai-suggest-caller
+    # ruleid: waypoint-ai-suggest-caller-in-scan
     return ai.suggest(cfg, text)
 
 
 def _fill_gaps(cfg, text):
-    # ruleid: waypoint-ai-suggest-caller
+    # ruleid: waypoint-ai-suggest-caller-in-scan
     reading = ai.suggest(cfg, text, 5)
     return _read(cfg, text, 5) or reading
 
 
-# ruleid: waypoint-ai-suggest-caller
+# ruleid: waypoint-ai-suggest-import
 from .ai import suggest
-# ruleid: waypoint-ai-suggest-caller
+# ruleid: waypoint-ai-suggest-import
+from .ai import (
+    Config,
+    suggest,
+)
+# ruleid: waypoint-ai-suggest-import
+from .ai import (Config, suggest)
+# ruleid: waypoint-ai-suggest-import
 from . import ai as mail_ai
-# ok: waypoint-ai-suggest-caller
+# ruleid: waypoint-ai-suggest-import
+from . import (
+    ai as mail_ai,
+)
+# ok: waypoint-ai-suggest-import
 from . import ai
+# ok: waypoint-ai-suggest-import
+from .ai import (
+    Config,
+    suggest_later,
+)

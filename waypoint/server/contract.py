@@ -200,6 +200,7 @@ class AiSuggestion(TypedDict):
     price_currency: NotRequired[str]
     sources: NotRequired[dict[str, str]]
     parsed: NotRequired[bool]
+    alternative: NotRequired[int]
 
 
 class ReviewOther(TypedDict):

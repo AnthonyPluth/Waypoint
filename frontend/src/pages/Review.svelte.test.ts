@@ -917,6 +917,89 @@ describe("Review: a booking Waypoint read but couldn’t place", () => {
   });
 });
 
+describe("Review: a stay read two ways", () => {
+  const email = { kind: "parking" as const, provider: "SpotHero", confirmation: "100200300", origin: "Example Plaza Garage", start_local: "2027-03-05T15:00:00",
+    end_local: "2027-03-09T15:00:00", address: "1 Example Avenue", sources: {}, parsed: true, alternative: 1 } as unknown as ReviewItem["suggestions"][number];
+  const said = { kind: "parking" as const, provider: "SpotHero", confirmation: "555000111", origin: "Example Plaza Garage", start_local: "2027-03-05T15:00",
+    end_local: "2027-03-09T15:00", start_zone: "America/Chicago", address: "1 Example Avenue", sources: {}, alternative: 1 } as unknown as ReviewItem["suggestions"][number];
+
+  it("offers the email’s reading and the AI’s as alternatives for one booking, not as two bookings", async () => {
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
+    render(ReviewPage);
+    await screen.findByTestId("review-item");
+    expect(screen.getByText("Read two ways")).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
+    expect(screen.queryByText(/Booking 1 of 2/)).toBeNull();
+    expect(screen.queryByTestId("leg")).toBeNull();
+    const choice = screen.getByRole("group", { name: "Which reading is right?" });
+    expect(within(choice).getByRole("button", { name: "Read from the email" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(choice).getByRole("button", { name: "AI suggestion" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByLabelText("Confirmation code")).toHaveValue("100200300");
+    await userEvent.click(within(choice).getByRole("button", { name: "AI suggestion" }));
+    expect(screen.getByLabelText("Confirmation code")).toHaveValue("555000111");
+    expect(within(choice).getByRole("button", { name: "AI suggestion" })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
+    await waitFor(() => expect(calls.filter(([path, method]) => path === "/api/segments" && method === "POST")).toHaveLength(1));
+    expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({ confirmation: "555000111", start_zone: "America/Chicago" })]);
+  });
+
+  it("takes both readings of the pair off the item once either is added, and keeps the booking that failed", async () => {
+    secondSegmentFails = "The flight was refused.";
+    const flight = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15",
+      end_local: "2026-12-02T10:05" } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said, flight] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    await userEvent.click(screen.getByRole("button", { name: "AI suggestion" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 bookings" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?suggestion=1&suggestion=2", "DELETE", undefined]));
+    secondSegmentFails = "";
+    await settled();
+    expect(held.items[0]?.suggestions).toEqual([flight]);
+  });
+
+  it("keeps edits to a reading when going back to the other one and back", async () => {
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
+    await userEvent.type(screen.getByLabelText("Confirmation code"), "X");
+    await userEvent.click(screen.getByRole("button", { name: "AI suggestion" }));
+    await userEvent.click(screen.getByRole("button", { name: "Read from the email" }));
+    expect(screen.getByLabelText("Confirmation code")).toHaveValue("100200300X");
+  });
+
+  it("pairs readings only when the server marked them as two readings of one booking, never by their shape", async () => {
+    const unmarked = { ...said, alternative: undefined } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, unmarked] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    expect(screen.queryByRole("group", { name: "Which reading is right?" })).toBeNull();
+    expect(screen.queryByText("Read two ways")).toBeNull();
+  });
+
+  it("keeps a second reading of the reader’s as its own booking beside a marked pair of the same kind", async () => {
+    const another = { ...email, confirmation: "100200999", alternative: undefined } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [another, email, said] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    expect(screen.getAllByRole("group", { name: "Which reading is right?" })).toHaveLength(1);
+  });
+
+  it("still lists readings of different kinds as separate bookings", async () => {
+    const hotel = { ...said, kind: "hotel" as const } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, hotel] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    expect(screen.getAllByTestId("leg")).toHaveLength(2);
+    expect(screen.queryByRole("group", { name: "Which reading is right?" })).toBeNull();
+  });
+});
+
 describe("Review: the message beside the form", () => {
   it("shows the message's subject above its text beside the form", async () => {
     vi.mocked(api).mockImplementation(async (path: string) => (path.endsWith("/preview") ? { subject: "Your itinerary", text: "Gate B12", html: null, truncated: false }

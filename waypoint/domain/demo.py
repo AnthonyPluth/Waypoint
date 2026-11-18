@@ -313,6 +313,15 @@ def _round_trip(today: date) -> list[ai.Suggestion]:
              "cabin": "Economy", "start_local": f"{back:%Y-%m-%d}T16:20", "end_local": f"{back:%Y-%m-%d}T21:50"}]
 
 
+def _two_readings(today: date) -> list[ai.Suggestion]:
+    arrive, leave = today + timedelta(days=20), today + timedelta(days=23)
+    stay: ai.Suggestion = {"kind": "hotel", "provider": "Harbour Lodge", "origin": "Harbour Lodge", "address": "7 Quay Street, Bristol, UK",
+                           "start_local": f"{arrive:%Y-%m-%d}T15:00", "end_local": f"{leave:%Y-%m-%d}T11:00"}
+    read: ai.Suggestion = {**stay, "confirmation": "DEMO55", "sources": {"confirmation": "Reservation", "origin": "property"}, "parsed": True}
+    said: ai.Suggestion = {**stay, "confirmation": "DEMO56", "start_zone": "Europe/London", "sources": {"confirmation": "Itinerary"}}
+    return review.keeping_fixed([read], [said])[1]
+
+
 def _on(*ids: int | None, seats: tuple[str, ...] = ()) -> list[trips.TravelerIn]:
     out: list[trips.TravelerIn] = [{"person_id": i, "name": None} for i in ids]
     for traveler, seat in zip(out, seats, strict=False):
@@ -385,6 +394,10 @@ def seed(conn: db.Connection, today: date | None = None) -> int:
     stored_mail.put(conn, box.id, "demo-read-lodging", _message("seaside-stays.example", 2, today, "Your booking is confirmed",
                                                                ("Confirmation number: DEMO88", "Property: Seaside Inn", "Address: 12 Beach Road, Brighton, UK",
                                                                 "Check-in: made-up date after 3:00 PM", "Check-out: made-up date 11:00 AM")), 0.0)
+    review.add(conn, box.id, "demo-two-readings", "example-lodge.example", (today - timedelta(days=1)).isoformat(), "incomplete", scanned - 86400, gap="no place")
+    review.set_suggestions(conn, box.id, "demo-two-readings", _two_readings(today), None)
+    stored_mail.put(conn, box.id, "demo-two-readings", _message("example-lodge.example", 1, today, "Your stay at Harbour Lodge: made-up details",
+                                                               ("Hello Jane,", "Your stay at Harbour Lodge is booked.", "Reservation: DEMO55", "Itinerary: DEMO56")), 0.0)
     review.add(conn, box.id, "demo-round-trip", "example-card-travel.example", (today - timedelta(days=3)).isoformat(), "no_markup", 0.0)
     review.set_suggestions(conn, box.id, "demo-round-trip", _round_trip(today), None, auto=True)
     stored_mail.put(conn, box.id, "demo-round-trip", _message("example-card-travel.example", 3, today, "Your flights are booked: made-up details",

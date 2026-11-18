@@ -12,7 +12,7 @@
       "wait_for": "text=Read from the email"
     },
     {
-      "click": "button[aria-label^='Check suggestion']:visible"
+      "click": "button[aria-label^='Check suggestion: “Your booking is confirmed']:visible"
     },
     {
       "wait_for": "form[data-editor] .ring-2"
