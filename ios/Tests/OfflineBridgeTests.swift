@@ -215,11 +215,13 @@ final class OfflineBridgeTests: XCTestCase {
         try store.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
         _ = try await ask(["type": "setSaving", "on": false])
         XCTAssertNil(store.load(server: home))
-        XCTAssertTrue(trips(try await ask(["type": "load"])).isEmpty)
+        let loaded = trips(try await ask(["type": "load"]))
+        XCTAssertTrue(loaded.isEmpty)
         try store.save(TripFixtures.replyWithCode("Lisbon"), version: 1, for: home)
         _ = try await ask(["type": "remove"])
         XCTAssertNil(store.load(server: home))
-        XCTAssertTrue(trips(try await ask(["type": "load"])).isEmpty)
+        let reloaded = trips(try await ask(["type": "load"]))
+        XCTAssertTrue(reloaded.isEmpty)
     }
 
     func testLoadDropsThePictureWithATripThatEndedMoreThanThreeDaysAgo() async throws {
