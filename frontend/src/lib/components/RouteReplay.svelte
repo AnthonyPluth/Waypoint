@@ -16,7 +16,15 @@
   const eligible = $derived(worthLocating(trip, today));
   const stops = $derived(eligible && places ? stopsOf(trip, places) : []);
   const year = $derived(Number(today.slice(0, 4)));
-  const online = $derived(!app.offline && (typeof navigator === "undefined" || navigator.onLine !== false));
+  let connected = $state(typeof navigator === "undefined" || navigator.onLine !== false);
+  $effect(() => {
+    const set = () => { connected = navigator.onLine !== false; };
+    set();
+    window.addEventListener("online", set);
+    window.addEventListener("offline", set);
+    return () => { window.removeEventListener("online", set); window.removeEventListener("offline", set); };
+  });
+  const online = $derived(!app.offline && connected);
   const wanted = $derived(app.state?.mapkit === true && online && stops.length >= 2);
 
   let maps = $state<Maps | null | undefined>(undefined);
@@ -36,6 +44,12 @@
     untrack(() => onmap?.(on));
   });
 
+  $effect(() => {
+    const session = maps;
+    if (!session || lost) return;
+    return session.onFailure(() => void failed());
+  });
+
   let askedFor: number | null = null;
   $effect(() => {
     const id = trip.id;
@@ -51,8 +65,10 @@
   });
 
   async function failed() {
+    if (lost) return;
     if (!appeared) { maps = null; return; }
-    const inside = !!section && section.contains(document.activeElement);
+    const active = document.activeElement;
+    const inside = (!!section && section.contains(active)) || (!!wrapId && active?.getAttribute("aria-controls") === wrapId);
     lost = true;
     appeared = false;
     if (!inside) return;

@@ -334,3 +334,52 @@ describe("RouteReplay when the map fails after it showed", () => {
     expect(frames).toHaveLength(0);
   });
 });
+
+describe("RouteReplay when the connection or MapKit changes while it is waiting", () => {
+  it("stops being offered when the shared MapKit session fails while the replay is hidden", async () => {
+    const onstops = vi.fn();
+    render(RouteReplay, { trip: trip([there, home]), now: after, shown: false, onstops });
+    await waitFor(() => expect(onstops.mock.calls.at(-1)?.[0]).toBeGreaterThan(1));
+    maps.fail();
+    await waitFor(() => expect(onstops).toHaveBeenLastCalledWith(0));
+    expect(fake.maps).toHaveLength(0);
+    expect(screen.queryByText(LINE)).toBeNull();
+  });
+
+  it("shows only one quiet line, not none, when it fails while shown", async () => {
+    render(RouteReplay, { trip: trip([there, home]), now: after });
+    await screen.findByRole("button", { name: "Pause" });
+    maps.fail();
+    expect(await screen.findByText(LINE)).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText(LINE)).toBeTruthy();
+  });
+
+  it("goes when the browser goes offline, and comes back when it is online again", async () => {
+    vi.mocked(api).mockImplementation((async (path: string) => (path === "/api/state" ? state({ mapkit: true }) : places)) as never);
+    const onstops = vi.fn();
+    render(RouteReplay, { trip: trip([there, home]), now: after, onstops });
+    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    vi.stubGlobal("navigator", { ...navigator, onLine: false, language: "en-US" });
+    window.dispatchEvent(new Event("offline"));
+    await waitFor(() => expect(region()).toBeNull());
+    expect(onstops).toHaveBeenLastCalledWith(0);
+    vi.stubGlobal("navigator", { ...navigator, onLine: true, language: "en-US" });
+    window.dispatchEvent(new Event("online"));
+    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+  });
+
+  it("does not mount a map that finishes loading after the browser went offline", async () => {
+    let load: (found: Maps | null) => void = () => {};
+    vi.mocked(loadMapkit).mockReturnValue(new Promise((resolve) => { load = resolve; }));
+    render(RouteReplay, { trip: trip([there, home]), now: after });
+    await waitFor(() => expect(loadMapkit).toHaveBeenCalled());
+    vi.stubGlobal("navigator", { ...navigator, onLine: false, language: "en-US" });
+    window.dispatchEvent(new Event("offline"));
+    await tick();
+    load(maps);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(region()).toBeNull();
+    expect(fake.maps).toHaveLength(0);
+  });
+});
