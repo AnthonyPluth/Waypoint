@@ -465,7 +465,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Orlando`, `Position along the route`.
+- **Touches:** `Orlando`.
 - **Expects to see:** `Trips`.
 - **Console errors it expects:** `net::ERR_BLOCKED_BY_CLIENT`.
 - **Drive it:** `tools/control flow trip-route-replay-mapkit-blocked`; or `poetry run python run.py verify --flow trip-route-replay-mapkit-blocked`.
@@ -474,8 +474,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Orlando`, `Position along the route`.
-- **Expects to see:** `Trips`, `Orlando`.
+- **Touches:** `Orlando`.
+- **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow trip-route-replay-mapkit-fallback`; or `poetry run python run.py verify --flow trip-route-replay-mapkit-fallback`.
 
 #### `trip-route-replay-mapkit`
@@ -485,6 +485,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `Orlando`, `Position along the route`.
 - **Expects to see:** `Trips`, `Orlando`, `New York`.
 - **Drive it:** `tools/control flow trip-route-replay-mapkit`; or `poetry run python run.py verify --flow trip-route-replay-mapkit`.
+
+#### `trip-route-replay-no-key`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Orlando`.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow trip-route-replay-no-key`; or `poetry run python run.py verify --flow trip-route-replay-no-key`.
 
 #### `trip-route-replay`
 
