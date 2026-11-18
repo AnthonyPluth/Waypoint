@@ -751,11 +751,19 @@ describe("Review: the AI’s suggestion", () => {
     expect(body).toMatchObject({ price: { amount_minor: 124000, currency: "USD" } });
   });
 
+  it("takes only digits, commas and points in the cost", async () => {
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
+    await userEvent.type(screen.getByLabelText("Cost amount"), "$1x2,5a0");
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("12,50");
+  });
+
   it("refuses a cost it can't read and posts nothing", async () => {
     held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
-    await userEvent.type(screen.getByLabelText("Cost amount"), "abc");
+    await userEvent.type(screen.getByLabelText("Cost amount"), "1.2.3");
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
     expect(await screen.findByText("Enter the cost as an amount like 1240.00 and a three-letter currency code like USD")).toBeInTheDocument();
     expect(calls.some(([p]) => p === "/api/segments" || p.endsWith("/same"))).toBe(false);

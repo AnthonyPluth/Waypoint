@@ -50,7 +50,7 @@
   import { draftGuard, leave } from "$lib/drafts.svelte";
   import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
-  import { amountText } from "$lib/money";
+  import { amountChars, amountText } from "$lib/money";
   import { carAddress, differs, DEFAULT_CURRENCY, DETAILS, KINDS as FORM_KINDS, priceOf, SAME_AS_PICKUP, SEAT_LIMIT, type Kind } from "$lib/segment-form";
   import { apiCall } from "$lib/contract";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
@@ -407,7 +407,7 @@
   {#if d.kind === "flight"}<FlightLength origin={d.origin} destination={d.destination} start={d.start} end={d.end} />{/if}
   <div class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Cost</span>
     <div class="flex gap-3">
-      <Input class={`min-w-0 flex-1 ${d.cost ? "ring-2 ring-primary" : ""}`} bind:value={d.cost} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" />
+      <Input class={`min-w-0 flex-1 ${d.cost ? "ring-2 ring-primary" : ""}`} bind:value={d.cost} oninput={(e) => { const clean = amountChars(e.currentTarget.value); if (clean !== e.currentTarget.value) e.currentTarget.value = clean; d.cost = clean; }} inputmode="decimal" autocomplete="off" spellcheck={false} placeholder="1,240.00" aria-label="Cost amount" />
       <Input class="w-24 uppercase" bind:value={d.currency} maxlength={3} autocomplete="off" spellcheck={false} placeholder="USD" aria-label="Cost currency" />
     </div></div>
   {#if d.kind === "hotel" || d.kind === "parking"}

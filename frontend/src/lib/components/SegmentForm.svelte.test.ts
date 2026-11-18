@@ -115,9 +115,30 @@ describe("SegmentForm: the cost", () => {
     expect(screen.getByLabelText("Cost currency")).toHaveValue("GBP");
     expect(screen.queryByText(/Read from an email/)).toBeNull();
   });
+  it("takes only digits, commas and points as the amount is typed", async () => {
+    mount(draft("hotel"));
+    const field = screen.getByLabelText("Cost amount");
+    await userEvent.type(field, "12a€ 4$0.5x0");
+    expect(field).toHaveValue("1240.50");
+  });
+  it("strips letters and symbols from a pasted amount and keeps the digits", async () => {
+    mount(draft("hotel"));
+    const field = screen.getByLabelText("Cost amount");
+    await userEvent.click(field);
+    await userEvent.paste("USD $1,240.00");
+    expect(field).toHaveValue("1,240.00");
+  });
+  it("still opens a booking whose stored amount isn't plain digits, and refuses to save it unchanged", async () => {
+    const onsaved = vi.fn();
+    mount(draft("hotel", { start_zone: "Europe/London", cost: "call for price" }), onsaved);
+    expect(screen.getByLabelText("Cost amount")).toHaveValue("call for price");
+    await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
+    expect(await screen.findByText(/Enter the cost as an amount like 1240.00/)).toBeInTheDocument();
+    expect(onsaved).not.toHaveBeenCalled();
+  });
   it("refuses an amount it can't read, before saving", async () => {
     const onsaved = vi.fn();
-    mount(draft("hotel", { start_zone: "Europe/London", cost: "abc" }), onsaved);
+    mount(draft("hotel", { start_zone: "Europe/London", cost: "1.2.3" }), onsaved);
     await userEvent.click(screen.getByRole("button", { name: "Add booking" }));
     expect(await screen.findByText(/Enter the cost as an amount like 1240.00/)).toBeInTheDocument();
     expect(onsaved).not.toHaveBeenCalled();
