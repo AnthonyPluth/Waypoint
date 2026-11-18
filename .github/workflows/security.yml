@@ -39,7 +39,7 @@ jobs:
       security-events: write   # the SARIF uploads
       actions: read            # Scorecard
       id-token: write          # Scorecard publishes its results
-    uses: AnthonyPluth/fleet/.github/workflows/security.yml@f16f119c4547b7c4524a44c26d708b51522210e4   # v4.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/security.yml@1ba44a8f0b92f5205e9be1501979b6ac9cd9377e   # v5.0.0
     with:
       code-paths: ^(waypoint|frontend/src|\.semgrep)/
       semgrep-paths: waypoint run.py frontend/src

@@ -32,7 +32,7 @@ jobs:
     name: Control smoke
     permissions:
       contents: read
-    uses: AnthonyPluth/fleet/.github/workflows/verify.yml@f16f119c4547b7c4524a44c26d708b51522210e4   # v4.0.0
+    uses: AnthonyPluth/fleet/.github/workflows/verify.yml@1ba44a8f0b92f5205e9be1501979b6ac9cd9377e   # v5.0.0
     with:
       make-target: control-smoke
       timeout-minutes: 20
