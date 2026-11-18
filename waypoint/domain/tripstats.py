@@ -104,12 +104,12 @@ def _path_km(path: list[list[float]]) -> float:
     return sum(stats.distance_km((a[0], a[1]), (b[0], b[1])) for a, b in itertools.pairwise(path))
 
 
-def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int, now: float) -> tuple[float, bool]:
+def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int) -> tuple[float, bool]:
     trip, places = trips.get(conn, viewer, trip_id), tripmap.places(conn, viewer, trip_id)
     if trip is None or places is None:
         return 0.0, False
     drives = route_warming.drives_of(trip, places)
-    stored = driving_routes.paths_for(conn, viewer, trip_id, {route_warming.key_of(d) for d in drives}, now) or {}
+    stored = driving_routes.paths_for(conn, viewer, trip_id, {route_warming.key_of(d) for d in drives}) or {}
     total, estimated = 0.0, False
     for drive in drives:
         path = stored.get(route_warming.key_of(drive))
@@ -186,14 +186,14 @@ def _kinds(live: Sequence[Segment]) -> KindCounts:
             "cruise": found["cruise"], "parking": found["parking"], "visit": found["visit"]}
 
 
-def summary(conn: db.Connection, viewer: Viewer, trip_id: int, now: float) -> TripSummary | None:
+def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | None:
     trip = visibility.visible_trip(conn, viewer, trip_id)
     if trip is None:
         return None
     booked = visibility.visible_segments(conn, viewer, [trip_id])
     live = [s for s in booked if s.status != "cancelled"]
     flight_km, airport_countries = _flight_km(conn, live)
-    road_km, estimated = _road_km(conn, viewer, trip_id, now)
+    road_km, estimated = _road_km(conn, viewer, trip_id)
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
     return {"days": _days(trip.start_date, trip.end_date) if live or not booked else 0, "nights": _nights(live),
