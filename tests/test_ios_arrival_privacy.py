@@ -9,8 +9,9 @@ WATCH_FILE = IOS / "Waypoint" / "ArrivalWatch.swift"
 DESIGN = IOS.parent / "docs" / "design" / "arrival-codes" / "README.md"
 LOCATION_FIXES = re.compile(
     r"\b(startUpdatingLocation|startMonitoringSignificantLocationChanges|requestLocation|didUpdateLocations|allowsBackgroundLocationUpdates"
-    r"|startRangingBeacons|CLLocationUpdate|CLServiceSession|CLMonitor)\b|\.location\b"
+    r"|startRangingBeacons|CLLocationUpdate|CLServiceSession|CLMonitor)\b"
 )
+LOCATION_PROPERTY = re.compile(r"\.location\b")
 NETWORK = re.compile(r"\b(URLSession|ServerClient|ServerAPI|URLRequest|NWConnection|WKWebView)\b")
 LOGGING = re.compile(r"\b(os_log|Logger|NSLog|OSLog)\b|\bprint\s*\(|\bdebugPrint\s*\(|\bdump\s*\(")
 
@@ -42,14 +43,20 @@ class ArrivalPrivacyTests(unittest.TestCase):
         for path in swift_files(IOS / "Waypoint"):
             if path.name.startswith("Arrival"):
                 text = path.read_text()
+                self.assertIsNone(LOCATION_FIXES.search(text), f"{path.name} asks for a location fix")
                 if path != GEOCODING_FILE:
-                    self.assertIsNone(LOCATION_FIXES.search(text), f"{path.name} reads the phone's location")
+                    self.assertIsNone(LOCATION_PROPERTY.search(text), f"{path.name} reads the phone's location")
 
     def test_the_regions_are_named_arrival_and_the_segment_id_only(self):
         text = WATCH_FILE.read_text()
         self.assertEqual(re.findall(r'regionPrefix = "([^"]*)"', text), ["arrival-"])
         self.assertEqual(len(re.findall(r"CLCircularRegion\(", text)), 1)
         self.assertIn("identifier: id)", text)
+
+    def test_the_launch_opens_only_through_the_launch_guard(self):
+        app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
+        self.assertNotIn("task { await open() }", app)
+        self.assertIn("LaunchGuard.mayOpen(", app)
 
     def test_the_usage_strings_are_the_signed_off_ones_and_no_background_mode_is_declared(self):
         plist = plistlib.loads((IOS / "Waypoint" / "Info.plist").read_bytes())
@@ -66,7 +73,7 @@ class ArrivalPrivacyTests(unittest.TestCase):
         self.assertIsNotNone(LOGGING.search("Logger(subsystem: x)"))
         self.assertIsNone(LOGGING.search("let blueprint = 1"))
         self.assertIsNotNone(LOCATION_FIXES.search("manager.startUpdatingLocation()"))
-        self.assertIsNotNone(LOCATION_FIXES.search("let here = manager.location"))
+        self.assertIsNotNone(LOCATION_PROPERTY.search("let here = manager.location"))
         self.assertIsNone(LOCATION_FIXES.search("let place = ArrivalPlace(kind: .parking)"))
 
 

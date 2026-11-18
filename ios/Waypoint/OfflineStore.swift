@@ -62,6 +62,7 @@ final class OfflineStore: @unchecked Sendable {
         defer { lock.unlock() }
         let folder = folder(for: server)
         guard files.fileExists(atPath: folder.path) else { return nil }
+        if isLocked(folder) { return nil }
         guard let stored = try? Data(contentsOf: folder.appendingPathComponent(Self.tripsFile)),
               let metaData = try? Data(contentsOf: folder.appendingPathComponent(Self.metaFile)),
               let meta = try? JSONDecoder().decode(Meta.self, from: metaData),
@@ -73,6 +74,34 @@ final class OfflineStore: @unchecked Sendable {
             try? write(trips: kept, meta: metaData, to: folder)
         }
         return OfflineSnapshot(json: kept, version: meta.version, savedAt: meta.savedAt)
+    }
+
+    /// Whether the saved copy exists but iOS will not let it be read now (the phone is locked, so a background launch for a region sees
+    /// this). A copy in that state is kept: `load` answers nil for it without deleting anything.
+    func isLocked(server: URL) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isLocked(folder(for: server))
+    }
+
+    private func isLocked(_ folder: URL) -> Bool {
+        let file = folder.appendingPathComponent(Self.tripsFile)
+        guard files.fileExists(atPath: file.path) else { return false }
+        do {
+            _ = try Data(contentsOf: file)
+            return false
+        } catch {
+            return Self.refusesToRead(error as NSError)
+        }
+    }
+
+    private static func refusesToRead(_ error: NSError) -> Bool {
+        if error.domain == NSCocoaErrorDomain, error.code == NSFileReadNoPermissionError { return true }
+        let underneath = error.userInfo[NSUnderlyingErrorKey] as? NSError
+        let refused = [Int(EPERM), Int(EACCES)]
+        if error.domain == NSPOSIXErrorDomain { return refused.contains(error.code) }
+        if let underneath, underneath.domain == NSPOSIXErrorDomain { return refused.contains(underneath.code) }
+        return false
     }
 
     func savedAt(server: URL) -> Date? {

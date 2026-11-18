@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct WaypointApp: App {
@@ -42,7 +43,7 @@ struct WaypointApp: App {
     private var content: some View {
         switch phase {
         case .starting:
-            ProgressView().task { await open() }
+            ProgressView().task(id: scenePhase) { await openIfAllowed() }
         case .connect:
             ConnectView { await open() }
         case .signedOut:
@@ -62,6 +63,12 @@ struct WaypointApp: App {
             }
             .padding()
         }
+    }
+
+    @MainActor
+    private func openIfAllowed() async {
+        guard LaunchGuard.mayOpen(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
+        await open()
     }
 
     @MainActor

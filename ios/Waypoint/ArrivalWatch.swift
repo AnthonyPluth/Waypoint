@@ -29,6 +29,9 @@ protocol ArrivalLocationManaging: LocationPermission, AnyObject {
 
 final class LiveArrivalLocations: NSObject, ArrivalLocationManaging, CLLocationManagerDelegate, @unchecked Sendable {
     private let manager = CLLocationManager()
+    private let lock = NSLock()
+    private var pendingStarts: Set<String> = []
+    private var pendingStops: Set<String> = []
     var onEvent: (@Sendable (ArrivalLocationEvent) -> Void)?
 
     override init() {
@@ -52,7 +55,14 @@ final class LiveArrivalLocations: NSObject, ArrivalLocationManaging, CLLocationM
 
     var hasPreciseLocation: Bool { manager.accuracyAuthorization == .fullAccuracy }
 
-    var monitoredIds: [String] { manager.monitoredRegions.map(\.identifier) }
+    /// What the system holds, plus starts and minus stops that were asked for and have not run on the main queue yet, so a read right after a
+    /// call sees the call.
+    var monitoredIds: [String] {
+        let held = Set(manager.monitoredRegions.map(\.identifier))
+        lock.lock()
+        defer { lock.unlock() }
+        return held.union(pendingStarts).subtracting(pendingStops).sorted()
+    }
 
     func requestWhenInUse() {
         DispatchQueue.main.async { [manager] in manager.requestWhenInUseAuthorization() }
@@ -66,14 +76,30 @@ final class LiveArrivalLocations: NSObject, ArrivalLocationManaging, CLLocationM
         let region = CLCircularRegion(center: CLLocationCoordinate2D(latitude: latitude, longitude: longitude), radius: radius, identifier: id)
         region.notifyOnEntry = true
         region.notifyOnExit = false
-        DispatchQueue.main.async { [manager] in manager.startMonitoring(for: region) }
+        lock.lock()
+        pendingStarts.insert(id)
+        pendingStops.remove(id)
+        lock.unlock()
+        DispatchQueue.main.async { [self, manager] in
+            manager.startMonitoring(for: region)
+            lock.lock()
+            pendingStarts.remove(id)
+            lock.unlock()
+        }
     }
 
     func stopMonitoring(id: String) {
-        DispatchQueue.main.async { [manager] in
+        lock.lock()
+        pendingStops.insert(id)
+        pendingStarts.remove(id)
+        lock.unlock()
+        DispatchQueue.main.async { [self, manager] in
             for region in manager.monitoredRegions where region.identifier == id {
                 manager.stopMonitoring(for: region)
             }
+            lock.lock()
+            pendingStops.remove(id)
+            lock.unlock()
         }
     }
 
@@ -197,6 +223,12 @@ struct ArrivalFileContent: Codable, Equatable {
 enum ArrivalRules {
     static let parkingRepeat: TimeInterval = 4 * 3600
 
+    /// A rental pickup or hotel that has notified is done: it keeps its history and its delivered notification until the window ends, but no
+    /// longer holds a region.
+    static func finished(_ watched: ArrivalWatched) -> Bool {
+        watched.notifiedAt != nil && watched.place.kind != .parking
+    }
+
     static func shouldNotify(_ watched: ArrivalWatched, at now: Date) -> Bool {
         let place = watched.place
         guard now >= place.opens, now < place.closes else { return false }
@@ -264,6 +296,8 @@ actor ArrivalWatch: ArrivalWatching {
     private var foreground = false
     private var chain: Chain = .idle
     private var epoch = 0
+    private var refreshing = false
+    private var refreshQueued = false
 
     init(store: OfflineStore = .shared,
          places: ArrivalPlaces,
@@ -376,6 +410,19 @@ actor ArrivalWatch: ArrivalWatching {
     // MARK: What is watched
 
     private func refresh(server: URL) async {
+        if refreshing {
+            refreshQueued = true
+            return
+        }
+        refreshing = true
+        repeat {
+            refreshQueued = false
+            await refreshOnce(server: server)
+        } while refreshQueued
+        refreshing = false
+    }
+
+    private func refreshOnce(server: URL) async {
         let started = epoch
         guard settings.isOn else {
             await withdraw(server: server)
@@ -434,21 +481,24 @@ actor ArrivalWatch: ArrivalWatching {
         let found = await places.places(server: server)
         guard started == epoch else { return }
         let current = now()
-        let chosen = found.filter { $0.closes > current }
-            .sorted { ($0.opens, $0.tripId, $0.segmentId) < ($1.opens, $1.tripId, $1.segmentId) }
-            .prefix(Self.maxRegions)
         let earlier = readFile(server: server)?.watched ?? []
-        let watched = chosen.map { place -> ArrivalWatched in
+        let upcoming = found.filter { $0.closes > current }
+            .sorted { ($0.opens, $0.tripId, $0.segmentId) < ($1.opens, $1.tripId, $1.segmentId) }
+        let history = upcoming.map { place -> ArrivalWatched in
             let same = earlier.first { $0.place.segmentId == place.segmentId && $0.place.opens == place.opens && $0.place.closes == place.closes }
             return ArrivalWatched(place: place, notifiedAt: same?.notifiedAt)
         }
-        write(ArrivalFileContent(version: Self.fileVersion, watched: watched), server: server)
-        let wanted = Set(chosen.map { Self.regionId($0.segmentId) })
+        let chosen = history.filter { !ArrivalRules.finished($0) }.prefix(Self.maxRegions)
+        let finished = history.filter(ArrivalRules.finished)
+        write(ArrivalFileContent(version: Self.fileVersion, watched: Array(chosen) + finished), server: server)
+        let wanted = Set(chosen.map { Self.regionId($0.place.segmentId) })
+        let delivered = wanted.union(finished.map { Self.regionId($0.place.segmentId) })
         let monitored = Set(locations.monitoredIds.filter { $0.hasPrefix(Self.regionPrefix) })
         for id in monitored where !wanted.contains(id) {
             locations.stopMonitoring(id: id)
         }
-        for place in chosen {
+        for watched in chosen {
+            let place = watched.place
             let id = Self.regionId(place.segmentId)
             let before = earlier.first { $0.place.segmentId == place.segmentId }?.place
             let unchanged = before.map { $0.latitude == place.latitude && $0.longitude == place.longitude && $0.radius == place.radius } ?? false
@@ -456,7 +506,7 @@ actor ArrivalWatch: ArrivalWatching {
                 locations.monitor(id: id, latitude: place.latitude, longitude: place.longitude, radius: place.radius)
             }
         }
-        await removeNotifications { !wanted.contains($0) }
+        await removeNotifications { !delivered.contains($0) }
     }
 
     /// With the saved trips unreadable (the phone is locked), only what the arrival file says: places whose window has ended are dropped, their
@@ -465,7 +515,8 @@ actor ArrivalWatch: ArrivalWatching {
         guard var file = readFile(server: server) else { return }
         let current = now()
         let kept = file.watched.filter { $0.place.closes > current }
-        let wanted = Set(kept.map { Self.regionId($0.place.segmentId) })
+        let wanted = Set(kept.filter { !ArrivalRules.finished($0) }.map { Self.regionId($0.place.segmentId) })
+        let delivered = Set(kept.map { Self.regionId($0.place.segmentId) })
         for id in locations.monitoredIds where id.hasPrefix(Self.regionPrefix) && !wanted.contains(id) {
             locations.stopMonitoring(id: id)
         }
@@ -473,7 +524,7 @@ actor ArrivalWatch: ArrivalWatching {
             file.watched = kept
             write(file, server: server)
         }
-        await removeNotifications { !wanted.contains($0) }
+        await removeNotifications { !delivered.contains($0) }
     }
 
     // MARK: A region event
@@ -482,14 +533,20 @@ actor ArrivalWatch: ArrivalWatching {
         guard regionId.hasPrefix(Self.regionPrefix), let segmentId = Int(regionId.dropFirst(Self.regionPrefix.count)) else { return }
         guard settings.isOn, locations.authorization == .always, locations.hasPreciseLocation,
               let server = await currentServer() else { return }
-        if var file = readFile(server: server),
+        let started = epoch
+        if let file = readFile(server: server),
            let index = file.watched.firstIndex(where: { $0.place.segmentId == segmentId }),
            ArrivalRules.shouldNotify(file.watched[index], at: now()),
            await notifications.allowsAlerts() {
-            let at = now()
-            file.watched[index].notifiedAt = at
-            write(file, server: server)
-            await notifications.post(ArrivalNotice(file.watched[index].place))
+            let entry = file.watched[index]
+            guard started == epoch, settings.isOn, locations.authorization == .always, locations.hasPreciseLocation,
+                  var current = readFile(server: server),
+                  let position = current.watched.firstIndex(where: { $0.place == entry.place }),
+                  ArrivalRules.shouldNotify(current.watched[position], at: now()) else { return }
+            current.watched[position].notifiedAt = now()
+            write(current, server: server)
+            await notifications.post(ArrivalNotice(entry.place))
+            if started != epoch { await notifications.remove(ids: [Self.regionId(segmentId)]) }
         }
         if await protectedDataAvailable() {
             await rebuild(server: server)

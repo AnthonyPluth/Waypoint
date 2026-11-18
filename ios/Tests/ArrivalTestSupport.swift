@@ -38,11 +38,15 @@ final class FakeArrivalLocations: ArrivalLocationManaging, @unchecked Sendable {
 
 final class FakeArrivalNotifications: ArrivalNotifying, @unchecked Sendable {
     var allowed = true
+    var beforeAllowsAlerts: (() async -> Void)?
     private(set) var requested = 0
     private(set) var posted: [ArrivalNotice] = []
     private(set) var current: [String] = []
 
-    func allowsAlerts() async -> Bool { allowed }
+    func allowsAlerts() async -> Bool {
+        await beforeAllowsAlerts?()
+        return allowed
+    }
 
     func requestAlerts() async {
         requested += 1

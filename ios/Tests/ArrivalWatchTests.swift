@@ -519,4 +519,105 @@ final class ArrivalWatchTests: XCTestCase {
         await sync.arrivalSettled()
         XCTAssertEqual(watcher.clears, 1)
     }
+
+    // MARK: Interleavings, one-shot bookings, what the file keeps
+
+    func testAPurgeDuringTheNotificationSettingsCheckPostsNothing() async {
+        let phone = await watching()
+        phone.notifications.beforeAllowsAlerts = { await phone.watch.cleared() }
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
+        XCTAssertEqual(phone.notifications.posted.count, 0)
+        XCTAssertEqual(phone.notifications.current, [])
+    }
+
+    func testAPurgeThatAlsoDeletesTheFilesDuringTheCheckPostsNothing() async {
+        let phone = await watching()
+        phone.notifications.beforeAllowsAlerts = {
+            await phone.watch.cleared()
+            try? phone.store.purgeAll()
+        }
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
+        XCTAssertEqual(phone.notifications.posted.count, 0)
+        XCTAssertEqual(phone.notifications.current, [])
+    }
+
+    func testLocationRevokedDuringTheNotificationSettingsCheckPostsNothing() async {
+        let phone = await watching()
+        phone.notifications.beforeAllowsAlerts = { phone.locations.authorization = .whenInUse }
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
+        XCTAssertEqual(phone.notifications.posted.count, 0)
+    }
+
+    func testAFinishedOneShotBookingReleasesItsRegionButKeepsItsHistoryAndNotification() async throws {
+        let phone = makeRig()
+        var segments: [[String: Any]] = []
+        for id in 1...16 {
+            let day = String(format: "2026-12-%02d", id)
+            segments.append(ArrivalFixtures.segment(id, "hotel", start: "\(day)T15:00", end: "2026-12-30T11:00", address: "\(id) Inn Ave"))
+            phone.geocoder.answers["\(id) Inn Ave"] = PlacePoint(latitude: 39.0 + Double(id) / 100, longitude: -105.0)
+        }
+        phone.save(segments)
+        await phone.watch.saved(server: phone.home)
+        XCTAssertEqual(phone.locations.monitoredIds.count, 15)
+        XCTAssertFalse(phone.locations.monitoredIds.contains("arrival-16"))
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 13))
+        XCTAssertEqual(phone.notifications.current, ["arrival-1"])
+        XCTAssertEqual(phone.locations.monitoredIds.count, 15)
+        XCTAssertFalse(phone.locations.monitoredIds.contains("arrival-1"))
+        XCTAssertTrue(phone.locations.monitoredIds.contains("arrival-16"))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let file = try decoder.decode(ArrivalFileContent.self, from: Data(try XCTUnwrap(phone.arrivalText).utf8))
+        XCTAssertNotNil(file.watched.first { $0.place.segmentId == 1 }?.notifiedAt)
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 14))
+        XCTAssertEqual(phone.notifications.posted.count, 1)
+        phone.clock.date = ArrivalFixtures.moment(2026, 12, 2, 1)
+        await phone.watch.activated()
+        XCTAssertFalse(phone.notifications.current.contains("arrival-1"))
+    }
+
+    func testAParkingBookingKeepsItsRegionAfterNotifying() async {
+        let phone = await watching()
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
+        XCTAssertTrue(phone.locations.monitoredIds.contains("arrival-1"))
+    }
+
+    func testTheArrivalFileHoldsNoInstantButTheWindowAndWhenAnAlertLastFired() async throws {
+        let phone = await watching()
+        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
+        let text = try XCTUnwrap(phone.arrivalText)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)))
+        var found: [(String, String)] = []
+        func collect(_ value: Any, key: String?) {
+            if let dictionary = value as? [String: Any] {
+                for (name, inner) in dictionary { collect(inner, key: name) }
+            } else if let list = value as? [Any] {
+                for inner in list { collect(inner, key: key) }
+            } else if let string = value as? String, let key {
+                found.append((key, string))
+            }
+        }
+        collect(object, key: nil)
+        XCTAssertEqual(Set(found.map { $0.0 }), ["kind", "opens", "closes", "notifiedAt"])
+        let alerts = found.filter { $0.0 == "notifiedAt" }.map { $0.1 }
+        XCTAssertEqual(alerts, [ISO8601DateFormatter().string(from: ArrivalFixtures.moment(2026, 12, 1, 8))])
+    }
+
+    func testRegionStartsAndStopsAreSeenByTheNextReadBeforeTheSystemHasRunThem() {
+        let live = LiveArrivalLocations()
+        live.monitor(id: "arrival-9", latitude: 39.7, longitude: -104.9, radius: 250)
+        XCTAssertTrue(live.monitoredIds.contains("arrival-9"))
+        live.stopMonitoring(id: "arrival-9")
+        XCTAssertFalse(live.monitoredIds.contains("arrival-9"))
+    }
+
+    func testTwoRefreshesAtOnceLookEachAddressUpOnce() async {
+        let phone = makeRig()
+        answers(phone.geocoder)
+        phone.save([ArrivalFixtures.parking()])
+        async let first: Void = phone.watch.saved(server: phone.home)
+        async let second: Void = phone.watch.activated()
+        _ = await (first, second)
+        XCTAssertEqual(phone.geocoder.asked.filter { $0 == "1 Main St" }.count, 1)
+    }
 }

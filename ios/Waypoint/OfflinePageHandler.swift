@@ -8,6 +8,7 @@ struct OfflineGate {
     let pages: OfflinePages
 
     func canShowCachedPage(for server: URL) -> Bool {
+        if store.isLocked(server: server) { return false }
         guard SavedTrips.read(store, server: server) != nil else {
             pages.purge(server: server)
             return false
