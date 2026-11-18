@@ -393,7 +393,7 @@ rules:
       on"): add what you need to that job instead.
     severity: ERROR
     languages: [generic]
-    pattern-regex: \bmapkit\.Directions\b
+    pattern-regex: (?:\bmapkit\.Directions\b|from\s+[\w.]*mapkit\s+import\s+[^\n]*\bDirections\b)
     paths:
       include: ["/waypoint/", "/run.py"]
       exclude: ["/waypoint/providers/mapkit.py", "/waypoint/domain/route_warming.py"]

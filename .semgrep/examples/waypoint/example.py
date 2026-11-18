@@ -100,6 +100,8 @@ policy = maps.POLICY
 DIRECTIONS = "https://maps-api.apple.com/v1/directions"
 # ruleid: waypoint-apple-directions-caller
 asking = mapkit.Directions(creds)
+# ruleid: waypoint-apple-directions-caller
+from ..providers.mapkit import Credentials, Directions
 
 # ruleid: waypoint-flightstatus-hosts
 STATUS_URL = "https://aerodatabox.p.rapidapi.com/flights/number/EX101/2026-11-20"

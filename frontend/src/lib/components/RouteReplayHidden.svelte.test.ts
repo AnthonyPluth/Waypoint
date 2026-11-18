@@ -55,7 +55,7 @@ describe("RouteReplay when it is not shown", () => {
 
   it("draws the compact trip map without asking for Apple's script or drawing a MapKit map, however long it stays", async () => {
     const { rerender } = render(RouteReplay, { trip: trip([there, home]), now: after, shown: true, compact: true });
-    expect(await screen.findByRole("group", { name: "Trip map, photo pins show how many photos are there" })).toBeTruthy();
+    expect(await screen.findByRole("group", { name: "Trip map" })).toBeTruthy();
     await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
     await new Promise((r) => setTimeout(r, 30));
     expect(loadMapkit).not.toHaveBeenCalled();

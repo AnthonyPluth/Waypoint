@@ -576,7 +576,24 @@ describe("the boarding-pass variant", () => {
     render(PassCard, board({}, { confirmation: code }));
     const button = screen.getByRole("button", { name: `Copy confirmation code ${code}` });
     expect(button).toHaveClass("break-all", "max-w-full");
-    expect(button.closest("dd")?.parentElement).toHaveClass("phone:col-span-4");
+    expect(button.closest("dd")?.parentElement).toHaveClass("phone:basis-full");
+  });
+  it("spreads the stub's details across the full phone width instead of clustering them in quarter columns (owner, 2026-11-18)", () => {
+    const { container } = render(PassCard, board({}, { kind: "hotel", confirmation: "23794412", details: { address: "Duluth, MN", room: "412" }, travelers: [] }));
+    const facts = container.querySelector("[data-stub] dl");
+    expect(facts).toHaveClass("phone:flex", "phone:flex-wrap", "phone:justify-between");
+    expect(facts?.className).not.toMatch(/phone:grid-cols/);
+    const code = screen.getByRole("button", { name: "Copy confirmation code 23794412" }).closest("dd")?.parentElement;
+    expect(code?.className).not.toMatch(/phone:col-span/);
+    expect(screen.getByText("Address").closest("div")).not.toHaveClass("phone:basis-full");
+  });
+  it("lines every stub value up on the same row on a phone, whatever its height (owner, 2026-11-18)", () => {
+    const { container } = render(PassCard, board({}, { kind: "hotel", confirmation: "G20417", price: { amount_minor: 31000, currency: "GBP", source: "email" }, details: { address: "Camden, London", room: "412" }, travelers: [] }));
+    const facts = container.querySelector("[data-stub] dl");
+    expect(facts).toHaveClass("phone:items-start");
+    const values = [...(facts?.querySelectorAll("dd") ?? [])];
+    expect(values.length).toBeGreaterThanOrEqual(3);
+    for (const dd of values) expect(dd).toHaveClass("phone:min-h-11", "phone:items-center");
   });
   it("keeps the live status between the route and the actions", () => {
     const live = createRawSnippet(() => ({ render: () => "<p>live area</p>" }));

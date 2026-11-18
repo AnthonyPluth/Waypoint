@@ -257,9 +257,7 @@ describe("TripPhotos", () => {
     await waitFor(() => expect(document.activeElement).toBe(second));
   });
 
-  describe("linked from the map", () => {
-    const clustered = () => [...many(30, 10), photo(40, { taken_local: "2026-03-02T08:00", cluster: 1 }), photo(41, { taken_local: "2026-03-02T09:00", cluster: 1 }), photo(42, { taken_local: "2026-03-01T05:00", cluster: 0 })];
-
+  describe("handed to the page", () => {
     it("hands the loaded reply to the page, and takes it back when the trip changes or the request fails", async () => {
       photos = many(2);
       const onloaded = vi.fn();
@@ -272,41 +270,6 @@ describe("TripPhotos", () => {
       await waitFor(() => expect(screen.getByText("Couldn’t load the photos on this trip.")).toBeTruthy());
       expect(onloaded).toHaveBeenCalledExactlyOnceWith(null);
     });
-
-    it("opens the gallery past the first days, scrolls to a cluster's first photo and focuses it", async () => {
-      photos = clustered();
-      const scroll = vi.fn();
-      Element.prototype.scrollIntoView = scroll;
-      const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
-      await section();
-      await view.component.showCluster(1);
-      expect(screen.getByRole("button", { name: "Show fewer" }).getAttribute("aria-expanded")).toBe("true");
-      await waitFor(() => expect(document.activeElement?.getAttribute("data-photo")).toBe("40"));
-      expect(scroll).toHaveBeenCalled();
-      expect(screen.getByText("Showing 2 photos from the map, from 8:00 AM")).toBeTruthy();
-      delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-    });
-
-    it("does nothing for a cluster with no photos in the reply", async () => {
-      photos = many(3);
-      const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
-      await section();
-      await view.component.showCluster(9);
-      expect(screen.queryByRole("button", { name: "Show fewer" })).toBeNull();
-    });
-  });
-});
-
-describe("TripPhotos in days, Show these photos", () => {
-  it("opens the viewer at the photo of a cluster that is past the six shown for its day", async () => {
-    photos = many(8, 8).map((p, i) => ({ ...p, cluster: i === 7 ? 0 : null }));
-    const view = render(TripPhotos, { trip: roadTrip, people: [ada], now: after, timeline: true });
-    await section();
-    await waitFor(() => expect(document.querySelectorAll("[data-photo]")).toHaveLength(6));
-    expect(document.querySelector('[data-photo="8"]')).toBeNull();
-    await (view.component as unknown as { showCluster: (n: number) => Promise<void> }).showCluster(0);
-    const viewer = await screen.findByRole("dialog");
-    expect(within(viewer).getByText("Photo 8 of 8")).toBeTruthy();
   });
 });
 
