@@ -285,7 +285,7 @@ def missing(conn: db.Connection, today: date, memory: Memory) -> list[Missing]:
         if memory.settled.get(trip["id"]) == mark:
             continue
         try:
-            places = tripmap.stop_places(conn, HOUSEHOLD, trip["id"])
+            places = tripmap.places(conn, HOUSEHOLD, trip["id"])
             stops = stops_of(trip, places) if places is not None else []
         except Exception as e:
             monitoring.report(e, values=False)

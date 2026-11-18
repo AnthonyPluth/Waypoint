@@ -8,8 +8,7 @@ from sqlalchemy import select
 
 from tests.privacy import no_leaks
 from tests.shared import DbCase, add_database
-from tests.test_trip_roads import DENVER, SALT_LAKE
-from tests.test_trips import HOTEL, RouteCase
+from tests.test_trips import DENVER, HOTEL, SALT_LAKE, RouteCase
 from waypoint.domain import driving_routes, people, tripmap
 from waypoint.domain.visibility import Viewer
 from waypoint.storage import backup, db
@@ -159,16 +158,15 @@ class CostTests(RouteCacheCase):
         with db.session() as conn:
             conn.execute(DrivingRoute.__table__.delete())
 
-    def test_looking_up_storing_and_the_batch_never_work_out_the_trips_roads_or_state_lines(self):
+    def test_looking_up_storing_and_the_batch_work_from_the_stop_points_and_never_the_places(self):
         trip, drive = self.trip_with_a_drive()
-        with (mock.patch.object(tripmap, "road_legs", side_effect=AssertionError("worked out the roads")) as roads,
-              mock.patch.object(tripmap, "state_lines", side_effect=AssertionError("worked out the state lines")) as lines):
+        with mock.patch.object(tripmap, "places", side_effect=AssertionError("worked out the places")) as places:
             self.assertEqual(self.look_up("ana", trip, drive), (200, {"routes": []}))
             self.assertEqual(self.put("ana", trip, drive), (200, {"stored": True}))
             self.assertEqual(self.look_up("ana", trip, drive)[1]["routes"], [{**drive, "path": line(drive)}])
             self.assertEqual(len(self.call("ana", "GET", f"/api/driving-routes?trip={trip}")[1]["trips"]), 1)
             self.assertEqual(self.put("ana", trip, {**drive, "end": {"latitude": 30.0, "longitude": -90.0}})[0], 400)
-        self.assertEqual((roads.call_count, lines.call_count), (0, 0))
+        self.assertEqual(places.call_count, 0)
 
     def test_the_stops_a_drive_may_run_between_are_the_places_the_map_shows(self):
         trip, _drive = self.trip_with_a_drive()

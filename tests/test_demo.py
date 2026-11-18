@@ -38,7 +38,7 @@ class DemoTests(DbCase):
     def test_keeps_the_road_of_one_of_the_road_trips_two_drives_for_the_trips_cards(self):
         demo.seed(self.c, date(2026, 10, 5))
         (row,) = list(self.c.orm.scalars(select(DrivingRoute)))
-        self.assertGreater(len(json.loads(row.path)), 10)
+        self.assertEqual(len(json.loads(row.path)), 5)
         household = Viewer(None, household=True)
         found = driving_routes.cached_for_trips(self.c, household, [str(row.trip_id)], time.time())
         self.assertEqual([t["trip_id"] for t in found], [row.trip_id])

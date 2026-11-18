@@ -19,7 +19,7 @@ const places: TripPlaces = {
     { code: "MSP", city: "Minneapolis", latitude: 44.8848, longitude: -93.2223 },
     { code: "SFO", city: "San Francisco", latitude: 37.6213, longitude: -122.379 },
   ],
-  cities: [], stays: [], roads: { legs: [], interstates: [] }, boundaries: [],
+  cities: [], stays: [],
 };
 const there = segment({ id: 1, origin: "MSP", destination: "SFO", start_local: "2025-12-05T08:00", start_zone: "America/Chicago", end_local: "2025-12-05T10:30", end_zone: "America/Los_Angeles" });
 const home = segment({ id: 2, origin: "SFO", destination: "MSP", start_local: "2025-12-11T13:00", start_zone: "America/Los_Angeles", end_local: "2025-12-11T18:50", end_zone: "America/Chicago" });

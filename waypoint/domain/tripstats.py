@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import itertools
+import json
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date, timedelta
@@ -9,11 +11,10 @@ from typing import TypedDict
 from sqlalchemy import select
 
 from ..storage import db, geocode, reference
-from ..storage.models import Airport, Segment
-from . import photos, place_zones, stats, tripmap, trips, visibility
+from ..storage.models import Airport, DrivingRoute, Segment
+from . import photos, place_zones, route_warming, stats, tripmap, trips, visibility
 from .visibility import Viewer
 
-KM_PER_MILE = 1.609344
 UNSURE_MATCH = "far"
 OWNER = "owner"
 INFERRED = "inferred"
@@ -100,15 +101,23 @@ def _flight_km(conn: db.Connection, live: Sequence[Segment]) -> tuple[float, set
     return total, {a.country for a in known.values()}
 
 
-def _road_km(live: Sequence[Segment]) -> tuple[float, bool]:
-    located = {s.id: (s.latitude, s.longitude) for s in live if s.kind != "flight" and s.latitude is not None and s.longitude is not None}
-    stops: list[tripmap.Stop] = [(s.id, s.kind, trips.instant(s.start_local, s.start_zone)) for s in live]
+def _path_km(path: list[list[float]]) -> float:
+    return sum(stats.distance_km((a[0], a[1]), (b[0], b[1])) for a, b in itertools.pairwise(path))
+
+
+def _road_km(conn: db.Connection, viewer: Viewer, trip_id: int) -> tuple[float, bool]:
+    trip, places = trips.get(conn, viewer, trip_id), tripmap.places(conn, viewer, trip_id)
+    if trip is None or places is None:
+        return 0.0, False
+    stored = {(r.from_lat, r.from_lon, r.to_lat, r.to_lon): r for r in conn.orm.scalars(select(DrivingRoute).where(DrivingRoute.trip_id == trip_id))}
     total, estimated = 0.0, False
-    for first, second, found in tripmap.drives(stops, located):
-        if found is not None:
-            total += (found.miles + found.start_link_miles + found.end_link_miles) * KM_PER_MILE
+    for drive in route_warming.drives_of(trip, places):
+        row = stored.get(route_warming.key_of(drive))
+        path = json.loads(row.path) if row is not None else None
+        if path:
+            total += _path_km(path)
         else:
-            total += stats.distance_km(located[first], located[second])
+            total += stats.distance_km((drive[0], drive[1]), (drive[2], drive[3]))
             estimated = True
     return total, estimated
 
@@ -185,7 +194,7 @@ def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | 
     booked = visibility.visible_segments(conn, viewer, [trip_id])
     live = [s for s in booked if s.status != "cancelled"]
     flight_km, airport_countries = _flight_km(conn, live)
-    road_km, estimated = _road_km(live)
+    road_km, estimated = _road_km(conn, viewer, trip_id)
     photos = _photos(conn, viewer, trip_id)
     states, countries = _places(conn, live, airport_countries, photos)
     return {"days": _days(trip.start_date, trip.end_date) if live or not booked else 0, "nights": _nights(live),

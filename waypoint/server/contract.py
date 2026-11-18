@@ -538,27 +538,6 @@ class TripStayPoint(TypedDict):
     precision: Literal["airport", "zip", "city"]
 
 
-class TripRoadLeg(TypedDict):
-    from_segment_id: int
-    to_segment_id: int
-    refs: list[str]
-    points: list[list[float]]
-
-
-class TripRoadLine(TypedDict):
-    ref: str
-    points: list[list[float]]
-
-
-class TripRoads(TypedDict):
-    legs: list[TripRoadLeg]
-    interstates: list[TripRoadLine]
-
-
-class TripStateLine(TypedDict):
-    points: list[list[float]]
-
-
 class TripHome(TypedDict):
     city: str
     latitude: float
@@ -570,8 +549,6 @@ class TripPlaces(TypedDict):
     airports: list[TripAirportPoint]
     cities: list[TripCityPoint]
     stays: list[TripStayPoint]
-    roads: TripRoads
-    boundaries: list[TripStateLine]
 
 
 class DrivingPlace(TypedDict):

@@ -20,7 +20,7 @@ const road = [[39.74, -104.99], [40.2, -105.0], [41.9, -107.5], [41.5, -110.0], 
 
 const places = (more: Partial<TripPlaces> = {}): TripPlaces => ({
   home: null, airports: [], cities: [], stays: [{ segment_id: 1, ...DENVER, precision: "city" }, { segment_id: 2, ...SALT_LAKE, precision: "city" }],
-  roads: { legs: [], interstates: [] }, boundaries: [], ...more,
+  ...more,
 });
 const stay = (id: number, tripId: number, name: string, start: string, end: string) => segment({ id, trip_id: tripId, kind: "hotel", origin: name, destination: name, start_local: start, end_local: end });
 const driven = (id = 9) => trip([stay(id * 10 + 1, id, "Denver", "2026-09-03T15:00", "2026-09-05T10:00"), stay(id * 10 + 2, id, "Salt Lake City", "2026-09-05T15:00", "2026-09-08T10:00")], { id, name: `Road trip ${id}`, start_date: "2026-09-03", end_date: "2026-09-08" });

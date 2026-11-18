@@ -1421,29 +1421,6 @@ export interface TripPlaces {
   airports: TripAirportPoint[];
   cities: TripCityPoint[];
   stays: TripStayPoint[];
-  roads: TripRoads;
-  boundaries: TripStateLine[];
-}
-
-export interface TripRoadLeg {
-  from_segment_id: number;
-  to_segment_id: number;
-  refs: string[];
-  points: number[][];
-}
-
-export interface TripRoadLine {
-  ref: string;
-  points: number[][];
-}
-
-export interface TripRoads {
-  legs: TripRoadLeg[];
-  interstates: TripRoadLine[];
-}
-
-export interface TripStateLine {
-  points: number[][];
 }
 
 export interface TripStayPoint {

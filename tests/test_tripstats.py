@@ -1,3 +1,4 @@
+import itertools
 import time
 import unittest
 from unittest import mock
@@ -5,7 +6,7 @@ from unittest import mock
 from sqlalchemy import insert, select
 
 from tests.test_trips import Household
-from waypoint.domain import stats, trips, tripstats
+from waypoint.domain import driving_routes, route_warming, stats, tripmap, trips, tripstats
 from waypoint.storage.models import Airport, Photo, PhotoExclusion, PhotoGrant, PhotoSource
 
 MOUNTAIN = {"start_zone": "America/Denver", "end_zone": "America/Denver"}
@@ -144,17 +145,30 @@ class TripSummaryTests(TripSummaryCase):
         self.assertAlmostEqual(got["flight_km"], self.great_circle(("SFO", "DEN")), delta=0.1)
         self.assertEqual(got["kinds"]["flight"], 2)
 
-    def test_a_highway_drive_is_measured_along_the_road(self):
+    def stored_road(self, trip, *middle):
+        places, booked = tripmap.places(self.c, self.jane, trip), trips.get(self.c, self.jane, trip)
+        drive = route_warming.drives_of(booked, places)[0]
+        lat1, lon1, lat2, lon2 = drive
+        path = [[lat1, lon1], *[list(p) for p in middle], [lat2, lon2]]
+        self.assertTrue(driving_routes.store(self.c, self.jane, trip, {"latitude": round(lat1, 4), "longitude": round(lon1, 4)},
+                                             {"latitude": round(lat2, 4), "longitude": round(lon2, 4)}, path, time.time()))
+        return drive, path
+
+    def test_a_drive_with_a_stored_road_is_measured_along_that_road(self):
         trip = self.mine(DENVER)["trip_id"]
         self.mine(SALT_LAKE_DRIVE, trip)
-        got = self.summary(trip)
         straight = stats.distance_km((39.75, -104.99), (40.76, -111.89))
+        before = self.summary(trip)
+        self.assertTrue(before["road_estimated"])
+        self.assertAlmostEqual(before["road_km"], straight, delta=25)
+        _, path = self.stored_road(trip, (40.2, -108.0), (40.9, -110.0))
+        got = self.summary(trip)
         self.assertFalse(got["road_estimated"])
-        self.assertGreater(got["road_km"], straight)
-        self.assertLess(got["road_km"], 2.5 * straight)
+        self.assertEqual(got["road_km"], round(sum(stats.distance_km(tuple(a), tuple(b)) for a, b in itertools.pairwise(path)), 1))
+        self.assertGreater(got["road_km"], before["road_km"])
         self.assertEqual(got["distance_km"], got["road_km"])
 
-    def test_a_short_hop_with_no_highway_is_a_straight_line_and_estimated(self):
+    def test_a_drive_with_no_stored_road_is_a_straight_line_and_estimated(self):
         trip = self.mine(DENVER)["trip_id"]
         self.mine(BOULDER, trip)
         segs = {s["destination"]: s for s in trips.get(self.c, self.jane, trip)["segments"]}
@@ -166,12 +180,34 @@ class TripSummaryTests(TripSummaryCase):
         self.assertEqual(got["states"], ["Colorado"])
         self.assertEqual(got["countries"], ["United States"])
 
+    def test_one_stored_road_leaves_the_trips_other_drive_straight_and_the_trip_estimated(self):
+        trip = self.mine(DENVER)["trip_id"]
+        self.mine(SALT_LAKE_DRIVE, trip)
+        self.mine({**BOULDER, "start_local": "2026-06-06T15:00", "end_local": "2026-06-07T10:00"}, trip)
+        alone = self.summary(trip)["road_km"]
+        _, path = self.stored_road(trip, (40.2, -108.0))
+        got = self.summary(trip)
+        self.assertTrue(got["road_estimated"])
+        self.assertGreater(got["road_km"], sum(stats.distance_km(tuple(a), tuple(b)) for a, b in itertools.pairwise(path)))
+        self.assertNotEqual(got["road_km"], alone)
+
+    def test_a_stored_road_for_a_drive_the_trip_no_longer_makes_counts_for_nothing(self):
+        trip = self.mine(DENVER)["trip_id"]
+        stay = self.mine(SALT_LAKE_DRIVE, trip)
+        self.stored_road(trip, (40.2, -108.0), (40.9, -110.0))
+        self.assertTrue(trips.delete_segment(self.c, self.jane, stay["id"]))
+        self.mine({**BOULDER, "start_local": "2026-06-06T15:00", "end_local": "2026-06-07T10:00"}, trip)
+        got = self.summary(trip)
+        self.assertTrue(got["road_estimated"])
+        self.assertLess(got["road_km"], 60)
+
     def test_a_flight_between_stays_breaks_the_drive(self):
         trip = self.mine(DENVER)["trip_id"]
         self.mine({**SFO_DEN, "start_local": "2026-06-03T12:00", "end_local": "2026-06-03T15:00", "origin": "DEN", "destination": "SLC"}, trip)
         self.mine(SALT_LAKE_DRIVE, trip)
         got = self.summary(trip)
-        self.assertEqual((got["road_km"], got["road_estimated"]), (0.0, False))
+        self.assertTrue(got["road_estimated"])
+        self.assertLess(got["road_km"], 0.25 * stats.distance_km((39.75, -104.99), (40.76, -111.89)))
         self.assertAlmostEqual(got["flight_km"], self.great_circle(("DEN", "SLC")), delta=0.1)
 
     def test_visits_add_their_country_and_state(self):

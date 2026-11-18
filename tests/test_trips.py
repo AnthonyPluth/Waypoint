@@ -26,6 +26,10 @@ BACK = {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": 
         "end_local": "2026-06-08T14:05"}
 HOTEL = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-06-02T15:00",
          "end_local": "2026-06-08T10:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
+DENVER = {**HOTEL, "origin": "Mile High Inn", "destination": "Denver", "start_local": "2026-06-02T15:00", "end_local": "2026-06-04T10:00",
+          "start_zone": "America/Denver", "end_zone": "America/Denver"}
+SALT_LAKE = {**DENVER, "origin": "Salt Flat Inn", "destination": "Salt Lake City", "start_local": "2026-06-04T15:00", "end_local": "2026-06-08T10:00"}
+BOULDER = {**DENVER, "origin": "Flatiron Inn", "destination": "Boulder", "start_local": "2026-06-04T15:00", "end_local": "2026-06-08T10:00"}
 
 
 def guest(name):
@@ -1329,6 +1333,19 @@ class TripPlacesRouteTests(RouteCase):
             self.assertAlmostEqual(by[stay["id"]]["latitude"], 40.0, delta=0.15)
             self.assertNotIn(canary_name, repr(got))
             self.assertNotIn(canary_code, repr(got))
+
+    def test_a_trip_of_112_stays_answers_in_under_a_second_with_the_stops_alone_and_a_stranger_gets_404(self):
+        address = {"address": "100 Pearl Street, Boulder, CO 80302"}
+        first = self.book("ana", {**DENVER, "destination": "Boulder", "details": address})
+        trip = first["trip_id"]
+        for n in range(111):
+            self.book("ana", {**SALT_LAKE, "origin": f"Inn {n}", "destination": "Boulder", "details": address}, trip_id=trip)
+        started = time.perf_counter()
+        got = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+        self.assertLess(time.perf_counter() - started, 1.0)
+        self.assertEqual(sorted(got), ["airports", "cities", "home", "stays"])
+        self.assertEqual(len(got["stays"]), 112)
+        self.assertEqual(self.call("ben", "GET", f"/api/trips/{trip}/places")[0], 404)
 
     def test_a_trip_you_cannot_see_gives_no_stored_points(self):
         stay = self.book("ana", {**HOTEL, "destination": "Boulder"})

@@ -447,10 +447,16 @@ def _keep_a_road(conn: db.Connection, viewer: Viewer) -> None:
     found = tripmap.places(conn, viewer, trip_id)
     assert found is not None
     start, end = sorted(found["stays"], key=lambda stay: stay["segment_id"])[:2]
-    middle = [point for leg in found["roads"]["legs"] if leg["from_segment_id"] == start["segment_id"] for point in leg["points"]]
-    path = [[start["latitude"], start["longitude"]], *middle, [end["latitude"], end["longitude"]]]
+    path = _made_up_road((start["latitude"], start["longitude"]), (end["latitude"], end["longitude"]))
     driving_routes.store(conn, viewer, trip_id, {"latitude": start["latitude"], "longitude": start["longitude"]},
                          {"latitude": end["latitude"], "longitude": end["longitude"]}, path, time.time())
+
+
+def _made_up_road(start: tuple[float, float], end: tuple[float, float]) -> list[list[float]]:
+    (lat1, lon1), (lat2, lon2) = start, end
+    bend = {0.25: 0.02, 0.5: -0.015, 0.75: 0.01}
+    middle = [[round(lat1 + (lat2 - lat1) * t - (lon2 - lon1) * k, 5), round(lon1 + (lon2 - lon1) * t + (lat2 - lat1) * k, 5)] for t, k in bend.items()]
+    return [[lat1, lon1], *middle, [lat2, lon2]]
 
 
 def _trip_of(conn: db.Connection, origin: str) -> int:

@@ -610,7 +610,7 @@ class JobTests(SyncCase):
         self.assertEqual((jobs.PHOTO_SYNC_EVERY, jobs.PHOTO_SYNC_FIRST, photosync.TIME_BUDGET, photosync.FULL_RELIST_DAYS), (6 * 3600, 600, 600.0, 7))
         stop = threading.Event()
         stop.set()
-        with mock.patch.object(jobs, "warm_map_data"), mock.patch.object(jobs.flightstatus, "forget_key_pause"):
+        with mock.patch.object(jobs.flightstatus, "forget_key_pause"):
             started = jobs.start(stop)
         self.addCleanup(photoqueue.disable)
         self.assertIn("photo-sync", [t.name for t in started])

@@ -17,8 +17,6 @@ const places: TripPlaces = {
     { segment_id: 3, latitude: 39.78, longitude: -89.64, precision: "city" },
     { segment_id: 5, latitude: 39.79, longitude: -89.66, precision: "city" },
   ],
-  roads: { legs: [], interstates: [] },
-  boundaries: [],
 };
 const zone = "America/Chicago";
 const first = segment({ id: 1, kind: "hotel", origin: "Arch Inn", destination: "St. Louis", start_local: "2025-12-05T15:00", start_zone: zone, end_local: "2025-12-06T11:00", end_zone: zone });
