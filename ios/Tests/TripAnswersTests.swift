@@ -176,6 +176,32 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertFalse(try read("YES"))
     }
 
+    func testABookingThatIsNotAFlightAtMidnightHasNoTimeEvenWithoutTheFlag() throws {
+        let midnight = AnswerFixtures.hotel(5, "Hotel Example", "2026-11-17T00:00", "2026-11-20T00:00")
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [midnight])])
+        let booking = try XCTUnwrap(copy.trips.first?.bookings.first)
+        XCTAssertFalse(booking.timeUnknown)
+        XCTAssertTrue(booking.datedOnly)
+        let subject = answers(at: AnswerFixtures.date("2026-11-18T20:00"))
+        XCTAssertEqual(subject.tonight(copy).spoken, "Tonight you're staying at Hotel Example in Grand Junction. You check out Friday.")
+        XCTAssertNil(subject.tonight(copy).card?.checkOut?.time)
+        XCTAssertEqual(answers(at: AnswerFixtures.date("2026-11-20T15:00")).checkOut(copy).spoken, "You check out of Hotel Example today.")
+    }
+
+    func testOnlyOneEndAtMidnightKeepsAStayTimedAndAFlightAtMidnightStaysTimed() throws {
+        let oneEnd = AnswerFixtures.hotel(5, "Hotel Example", "2026-11-17T00:00", "2026-11-20T11:00")
+        let flight = AnswerFixtures.flight(13, "2026-11-20T00:00", "2026-11-20T01:30")
+        let copy = try saved([AnswerFixtures.trip(1, "Trip", [oneEnd, flight])])
+        let bookings = try XCTUnwrap(copy.trips.first?.bookings)
+        XCTAssertEqual(bookings.map(\.datedOnly), [false, false])
+        let both = AnswerFixtures.flight(14, "2026-11-21T00:00", "2026-11-21T00:00")
+        let flightsCopy = try saved([AnswerFixtures.trip(1, "Trip", [both])])
+        XCTAssertEqual(flightsCopy.trips.first?.bookings.first?.datedOnly, false)
+        XCTAssertEqual(answers(at: wednesday5am).nextFlight(flightsCopy).page, "#trip/1/flight/14")
+        XCTAssertEqual(answers(at: AnswerFixtures.date("2026-11-18T20:00")).tonight(copy).spoken,
+                       "Tonight you're staying at Hotel Example in Grand Junction. You check out Friday at 11 am.")
+    }
+
     func testAFlightMarkedNoForUnknownTimeIsStillTheNextFlightAndAHotelKeepsItsCheckOutTime() throws {
         var flight = AnswerFixtures.flight(13, "2026-11-20T07:40", "2026-11-20T08:45")
         var flightDetails = flight["details"] as! [String: Any]

@@ -74,6 +74,16 @@ struct SavedBooking: Decodable, Equatable {
         }
     }
 
+    /// No time to speak or compare: the flag is exactly "yes", or a booking that isn't a flight starts and ends at midnight.
+    /// Mirrors `dated_only` (waypoint/domain/trips.py) and `untimed` (frontend/src/lib/trips.ts), which keeps only the flag.
+    var datedOnly: Bool {
+        func midnight(_ text: String) -> Bool {
+            let characters = Array(text)
+            return characters.count >= 16 && String(characters[10..<16]) == "T00:00"
+        }
+        return timeUnknown || (kind != "flight" && midnight(startLocal) && midnight(endLocal))
+    }
+
     var isCancelled: Bool { status == "cancelled" }
 }
 

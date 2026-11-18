@@ -206,7 +206,7 @@ struct TripAnswers {
     func nextFlight(_ copy: SavedCopy) -> Answer {
         var flights: [Flight] = []
         for trip in copy.trips {
-            for booking in trip.bookings where booking.kind == "flight" && !booking.isCancelled && !booking.timeUnknown {
+            for booking in trip.bookings where booking.kind == "flight" && !booking.isCancelled && !booking.datedOnly {
                 guard let start = WallClock(booking.startLocal) else { continue }
                 let startZone = zone(booking.startZone)
                 guard let departs = instant(start, in: startZone), departs > now else { continue }
@@ -295,7 +295,7 @@ struct TripAnswers {
                 let place = zone(booking.startZone)
                 guard let checkIn = instant(start, in: place), let checkOut = instant(end, in: zone(booking.endZone)) else { continue }
                 found.append(Stay(trip: trip, booking: booking, start: start, end: end, zone: place,
-                                  checkIn: checkIn, checkOut: checkOut, timed: !booking.timeUnknown))
+                                  checkIn: checkIn, checkOut: checkOut, timed: !booking.datedOnly))
             }
         }
         return found
