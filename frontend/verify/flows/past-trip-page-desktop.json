@@ -10,7 +10,7 @@
     {"expect_text": {"selector": "h1", "text": "Trip to Denver"}},
     {"wait_for": "[data-testid=trip-column] [data-testid=trip-summary]"},
     {"expect_text": {"selector": "[data-testid=trip-column]", "text": "13 photos"}},
-    {"expect_text": {"selector": "h2", "text": "Photos by day"}},
+    {"expect_text": {"selector": "h2:has-text('Photos by day')", "text": "Photos by day"}},
     {"wait_for": "[data-testid=photo-days] [data-day]"},
     {"screenshot": "columns"},
     {"wait_for": "[data-testid=trip-column] [role=group][aria-label='Trip map']"},
