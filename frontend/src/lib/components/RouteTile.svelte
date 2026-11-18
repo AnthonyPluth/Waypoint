@@ -38,6 +38,7 @@
   const pending = $derived(wanted && (!looked || (stops.length >= 2 && snapshot === undefined) || (snapshot != null && image === "loading")));
   const frame = $derived(snapshot ? { center: snapshot.center, zoom: snapshot.zoom, width: snapshot.width, height: snapshot.height } : null);
   const spots = $derived(frame ? cardSpots(stops, frame) : []);
+  const ratio = $derived(snapshot && clientWidth > 0 ? snapshot.width / clientWidth : 1);
   const legs = $derived(frame ? cardLegs(stops, spots, roads, frame) : []);
 
   let latest = 0;
@@ -64,8 +65,9 @@
     const id = tripId;
     if (!wanted || stops.length < 2 || !size) return;
     const { width, height } = size;
+    const revision = stops.map((s) => `${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`).join(";");
     let live = true;
-    untrack(() => void snapshotFor(id, width, height).then((found) => {
+    untrack(() => void snapshotFor(id, width, height, revision).then((found) => {
       if (!live) return;
       if (found?.url !== snapshot?.url) image = "loading";
       snapshot = found;
@@ -91,11 +93,11 @@
       <img class="absolute inset-0 size-full" src={snapshot.url} alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" draggable="false" onload={() => (image = "loaded")} onerror={() => (image = "failed")} />
       {#if loaded && frame}
         <svg viewBox="0 0 {frame.width} {frame.height}" preserveAspectRatio="none" class="absolute inset-0 size-full" aria-hidden="true" data-testid="route-overlay">
-          <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width={2.2 * ratio}>
             {#each legs as leg, i (i)}<path d={leg.d} class={leg.flight ? "stroke-map-route" : "stroke-map-stay"} />{/each}
           </g>
           {#each stops as s, i (i)}
-            <circle cx={spots[i].x} cy={spots[i].y} r="4" class={s.kind === "airport" ? "fill-map-airport stroke-map-sea" : "fill-map-stay stroke-map-sea"} stroke-width="2" />
+            <circle cx={spots[i].x} cy={spots[i].y} r={4 * ratio} class={s.kind === "airport" ? "fill-map-airport stroke-map-sea" : "fill-map-stay stroke-map-sea"} stroke-width={2 * ratio} />
           {/each}
         </svg>
       {/if}

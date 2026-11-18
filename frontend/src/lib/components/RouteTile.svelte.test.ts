@@ -121,6 +121,22 @@ describe("a Past card's map on Apple's snapshot", () => {
     expect(first[0]).toBeGreaterThan(second[0]);
   });
 
+  it("draws a larger image shown smaller at the card's size, with the route in the same image pixels and marks of the same size on screen", async () => {
+    const wide = { trip_id: 9, url: ADDRESS, center: FRAME.center, zoom: 3, width: 495, height: 233 };
+    serve({ snapshots: { snapshots: [wide] } });
+    const { container } = render(PastTripCard, { trip: driven(9), today: TODAY });
+    await waitFor(() => expect(image(container)).not.toBeNull());
+    await fireEvent.load(image(container)!);
+    const overlay = container.querySelector("[data-testid='route-overlay']")!;
+    expect(overlay.getAttribute("viewBox")).toBe("0 0 495 233");
+    expect(overlay.getAttribute("preserveAspectRatio")).toBe("none");
+    expect(image(container)!.className).toContain("size-full");
+    const ratio = 495 / 358;
+    expect(Number(dots(container)[0].getAttribute("r"))).toBeCloseTo(4 * ratio, 6);
+    expect(Number(dots(container)[0].getAttribute("cx"))).toBeCloseTo(project(DENVER, { ...wide, center: FRAME.center }).x, 6);
+    expect(Number(container.querySelector("[data-testid='route-overlay'] g")!.getAttribute("stroke-width"))).toBeCloseTo(2.2 * ratio, 6);
+  });
+
   it("draws the stored Apple road for a drive when the server has one, and a straight line for the rest", async () => {
     const road = [[39.74, -104.99], [40.1, -106.5], [40.5, -109.2], [40.76, -111.89]];
     serve({ roads: { trips: [{ trip_id: 9, routes: [{ start: DENVER, end: SALT_LAKE, path: road }] }] } });
@@ -152,6 +168,21 @@ describe("a Past card's map on Apple's snapshot", () => {
     await new Promise((r) => setTimeout(r, 80));
     expect(tile()).toHaveAttribute("data-drawn", "true");
     expect(asked("/api/map-snapshots")).toHaveLength(1);
+  });
+
+  it("asks for a new address when the trip's stops change, and draws the new route on the new image", async () => {
+    serve();
+    const { container, rerender } = render(PastTripCard, { trip: driven(9), today: TODAY });
+    await waitFor(() => expect(image(container)).not.toBeNull());
+    await fireEvent.load(image(container)!);
+    const moved = places({ stays: [{ segment_id: 91, ...DENVER, precision: "city" }, { segment_id: 92, latitude: 33.45, longitude: -112.07, precision: "city" }] });
+    serve({ places: moved });
+    await rerender({ trip: { ...driven(9), name: "Edited" }, today: TODAY });
+    await waitFor(() => expect(asked("/api/map-snapshots")).toHaveLength(1));
+    clearRouteCache();
+    const { container: again } = render(PastTripCard, { trip: driven(9), today: TODAY });
+    await waitFor(() => expect(asked("/api/map-snapshots")).toHaveLength(2));
+    expect(again).toBeTruthy();
   });
 
   it("gives every card on a page the same limit of four places lookups and a single batched address request", async () => {

@@ -20,7 +20,7 @@ DEFAULT_LANG = "en-US"
 PADDING = 28
 DAY = 86_400
 CENTRE_DECIMALS = 2
-APART_KM = 30.0
+APART_KM = 1.0
 EARTH_KM = 6371.0088
 MAX_LATITUDE = 85.0511
 KEPT = 2048
@@ -50,6 +50,8 @@ class Fit(NamedTuple):
     latitude: float
     longitude: float
     zoom: int
+    width: int
+    height: int
 
 
 def _world(latitude: float, longitude: float) -> tuple[float, float]:
@@ -72,7 +74,7 @@ def _km(a: tuple[float, float], b: tuple[float, float]) -> float:
 
 
 def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | None:
-    if len(points) < 2 or not any(_km(p, points[0]) >= APART_KM for p in points[1:]):
+    if not any(_km(a, b) >= APART_KM for i, a in enumerate(points) for b in points[i + 1:]):
         return None
     ground = [_world(lat, lon) for lat, lon in points]
     xs, ys = [g[0] for g in ground], [g[1] for g in ground]
@@ -82,8 +84,10 @@ def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | Non
     for zoom in range(MAX_ZOOM, MIN_ZOOM - 1, -1):
         scale = 2 ** zoom
         if reach_x * scale <= width / 2 - PADDING and reach_y * scale <= height / 2 - PADDING:
-            return Fit(latitude, longitude, zoom)
-    return None
+            return Fit(latitude, longitude, zoom, width, height)
+    shrink = max(1.0, reach_x * 2 ** MIN_ZOOM / (width / 2 - PADDING), reach_y * 2 ** MIN_ZOOM / (height / 2 - PADDING))
+    wide, tall = math.ceil(width * shrink), math.ceil(height * shrink)
+    return Fit(latitude, longitude, MIN_ZOOM, wide, tall) if max(wide, tall) <= MAX_SIDE else None
 
 
 def parse_side(texts: list[str], what: str) -> int:
@@ -115,6 +119,6 @@ def for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], widths: lis
         found = fit(points, width, height) if points is not None else None
         if found is None:
             continue
-        url = _address(creds, found.latitude, found.longitude, found.zoom, width, height, lang, int(now // DAY))
-        out.append({"trip_id": trip_id, "url": url, "center": {"latitude": found.latitude, "longitude": found.longitude}, "zoom": found.zoom, "width": width, "height": height})
+        url = _address(creds, found.latitude, found.longitude, found.zoom, found.width, found.height, lang, int(now // DAY))
+        out.append({"trip_id": trip_id, "url": url, "center": {"latitude": found.latitude, "longitude": found.longitude}, "zoom": found.zoom, "width": found.width, "height": found.height})
     return out

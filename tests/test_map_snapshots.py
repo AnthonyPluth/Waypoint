@@ -79,6 +79,15 @@ class FitTests(unittest.TestCase):
         self.assertTrue(5 <= found.zoom <= 7, found)
         self.assertAlmostEqual(found.longitude, -108.44, delta=0.1)
 
+    def test_places_within_30_km_of_each_other_get_a_map_at_a_close_zoom(self):
+        found = map_snapshots.fit([(39.74, -104.99), (39.80, -104.90)], 358, 168)
+        self.assertIsNotNone(found)
+        self.assertTrue(10 <= found.zoom <= map_snapshots.MAX_ZOOM)
+        self.assertEqual((found.width, found.height), (358, 168))
+
+    def test_places_spread_wide_but_all_near_the_first_are_judged_by_the_widest_pair(self):
+        self.assertIsNotNone(map_snapshots.fit([(39.74, -104.99), (39.80, -104.90), (39.76, -104.95), (39.9, -105.1)], 358, 168))
+
     def test_the_zoom_never_passes_city_level(self):
         found = map_snapshots.fit([(39.74, -104.99), (40.10, -104.9)], 358, 168)
         self.assertTrue(7 <= found.zoom <= map_snapshots.MAX_ZOOM)
@@ -95,10 +104,26 @@ class FitTests(unittest.TestCase):
     def test_fewer_than_two_places_or_one_place_twice_is_no_map(self):
         self.assertIsNone(map_snapshots.fit([], 358, 168))
         self.assertIsNone(map_snapshots.fit([(39.74, -104.99)], 358, 168))
-        self.assertIsNone(map_snapshots.fit([(39.74, -104.99), (39.80, -104.90)], 358, 168))
 
-    def test_a_trip_wider_than_the_lowest_zoom_shows_is_no_map(self):
-        self.assertIsNone(map_snapshots.fit([(40.64, -73.78), (51.47, -0.45)], 358, 168))
+    def test_a_trip_wider_than_zoom_3_shows_gets_a_larger_image_at_zoom_3_to_show_scaled_down(self):
+        found = map_snapshots.fit([(40.64, -73.78), (51.47, -0.45)], 358, 168)
+        self.assertEqual(found.zoom, 3)
+        self.assertGreater(found.width, 358)
+        self.assertLessEqual(max(found.width, found.height), 640)
+        self.assertAlmostEqual(found.width / found.height, 358 / 168, delta=0.02)
+        shown = 358 / found.width
+        cx, cy = map_snapshots._world(found.latitude, found.longitude)
+        for lat, lon in [(40.64, -73.78), (51.47, -0.45)]:
+            x, y = map_snapshots._world(lat, lon)
+            self.assertLessEqual(abs(x - cx) * 8 * shown, 358 / 2 - 28 + 1)
+            self.assertLessEqual(abs(y - cy) * 8 * shown, 168 / 2 - 28 + 1)
+
+    def test_a_trip_that_fits_at_a_normal_zoom_keeps_the_card_size(self):
+        found = map_snapshots.fit([(39.74, -104.99), (40.76, -111.89)], 358, 168)
+        self.assertEqual((found.width, found.height), (358, 168))
+
+    def test_a_trip_too_wide_even_for_a_640_pixel_image_at_zoom_3_is_no_map(self):
+        self.assertIsNone(map_snapshots.fit([(51.47, -0.45), (-33.94, 151.18)], 358, 168))
         self.assertIsNone(map_snapshots.fit([(33.94, -118.4), (-33.94, 151.18)], 358, 168))
 
 
@@ -159,9 +184,34 @@ class RouteTests(SnapshotCase):
         lonely = self.book("ana", DENVER)["trip_id"]
         self.assertEqual(self.snapshots("ana", lonely), (200, {"snapshots": []}))
 
-    def test_a_trip_a_card_could_not_show_is_left_out(self):
+    def test_a_transatlantic_trip_gets_a_larger_image_at_zoom_3_and_one_too_wide_for_that_is_left_out(self):
         flown = self.book("ana", {**HOTEL, "kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10"})["trip_id"]
-        self.assertEqual(self.snapshots("ana", flown), (200, {"snapshots": []}))
+        [snap] = self.snapshots("ana", flown)[1]["snapshots"]
+        self.assertEqual((snap["zoom"], snap["width"] > 358, max(snap["width"], snap["height"]) <= 640), (3, True, True))
+        self.assertEqual(dict(query_of(snap["url"]))["size"], f"{snap['width']}x{snap['height']}")
+        far = self.book("ana", {**HOTEL, "kind": "flight", "origin": "LHR", "destination": "SYD", "start_local": "2026-07-01T19:00", "end_local": "2026-07-02T07:10"})["trip_id"]
+        self.assertEqual(self.snapshots("ana", far), (200, {"snapshots": []}))
+
+    def test_two_stays_in_one_metro_still_get_a_map(self):
+        near = {**DENVER, "origin": "Boulder Inn", "destination": "Boulder", "start_local": "2026-06-04T15:00", "end_local": "2026-06-06T10:00"}
+        trip = self.road_trip("ana", near)
+        [snap] = self.snapshots("ana", trip)[1]["snapshots"]
+        self.assertGreaterEqual(snap["zoom"], 8)
+        self.assertEqual((snap["width"], snap["height"]), (358, 168))
+
+    def test_a_past_country_visit_in_a_mixed_trip_does_not_widen_the_map(self):
+        trip = self.road_trip("ana", BOULDER)
+        before = self.snapshots("ana", trip)[1]["snapshots"][0]
+        self.book("ana", {"kind": "visit", "destination": "JP", "start_local": "2026-06-09T00:00", "end_local": "2026-06-10T00:00"}, trip_id=trip)
+        places = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+        self.assertTrue(any(s["longitude"] > 100 for s in places["stays"]))
+        after = self.snapshots("ana", trip)[1]["snapshots"][0]
+        self.assertEqual((after["center"], after["zoom"]), (before["center"], before["zoom"]))
+
+    def test_a_cruise_gets_a_map_from_its_ports(self):
+        cruise = self.book("ana", {"kind": "cruise", "origin": "Miami", "destination": "Miami", "start_local": "2026-06-01T16:00", "end_local": "2026-06-08T07:00", "start_zone": "America/New_York", "end_zone": "America/New_York",
+                                   "itinerary": [{"name": "Nassau", "arrive_local": "2026-06-03T08:00", "depart_local": "2026-06-03T17:00", "zone": "America/New_York"}]})["trip_id"]
+        self.assertEqual(len(self.snapshots("ana", cruise)[1]["snapshots"]), 1)
 
     def test_at_most_twelve_trips_and_sizes_inside_what_apple_draws(self):
         trip = self.road_trip()

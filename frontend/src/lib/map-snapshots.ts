@@ -7,7 +7,9 @@ export type Snapshot = Omit<MapSnapshot, "trip_id">;
 export const CARD_TRIPS = 12;
 export const CARD_WAIT_MS = 40;
 
-const asked = new Map<string, Promise<Snapshot | null>>();
+export const KEEP_MS = 12 * 60 * 60 * 1000;
+
+const asked = new Map<string, { job: Promise<Snapshot | null>; at: number }>();
 const queued: { trip: number; width: number; height: number; resolve: (snapshot: Snapshot | null) => void }[] = [];
 let timer: ReturnType<typeof setTimeout> | undefined;
 let generation = 0;
@@ -53,16 +55,16 @@ async function flush(batch: typeof queued, born: number): Promise<void> {
   }
 }
 
-export function snapshotFor(trip: number, width: number, height: number): Promise<Snapshot | null> {
-  const key = `${trip}:${width}x${height}`;
+export function snapshotFor(trip: number, width: number, height: number, revision = ""): Promise<Snapshot | null> {
+  const key = `${trip}:${width}x${height}:${revision}`;
   const have = asked.get(key);
-  if (have) return have;
+  if (have && Date.now() - have.at < KEEP_MS) return have.job;
   const born = generation;
   const job = new Promise<Snapshot | null>((resolve) => {
     queued.push({ trip, width, height, resolve });
     clearTimeout(timer);
     timer = setTimeout(() => void flush(queued.splice(0), born), CARD_WAIT_MS);
   });
-  asked.set(key, job);
+  asked.set(key, { job, at: Date.now() });
   return job;
 }

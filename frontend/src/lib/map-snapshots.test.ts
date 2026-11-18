@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiCall } from "./contract";
-import { CARD_TRIPS, CARD_WAIT_MS, clearSnapshots, snapshotFor } from "./map-snapshots";
+import { CARD_TRIPS, CARD_WAIT_MS, KEEP_MS, clearSnapshots, snapshotFor } from "./map-snapshots";
 
 vi.mock("./contract", () => ({ apiCall: vi.fn() }));
 const server = vi.mocked(apiCall);
@@ -49,6 +49,31 @@ describe("asking for the addresses of the cards on screen", () => {
     await snapshotFor(1, 352, 168);
     await settle();
     expect(server).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks again for a trip whose route changed, so an edited trip never keeps the old image", async () => {
+    const old = snapshotFor(1, 352, 168, "39.7400,-104.9900;40.7600,-111.8900");
+    await settle();
+    await old;
+    expect(snapshotFor(1, 352, 168, "39.7400,-104.9900;40.7600,-111.8900")).toBe(old);
+    const edited = snapshotFor(1, 352, 168, "39.7400,-104.9900;40.7600,-111.8900;33.4500,-112.0700");
+    expect(edited).not.toBe(old);
+    await settle();
+    expect(server).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks again once a kept address is old enough that Apple may have stopped accepting it", async () => {
+    const first = snapshotFor(1, 352, 168);
+    await settle();
+    await first;
+    await vi.advanceTimersByTimeAsync(KEEP_MS - 1000);
+    expect(snapshotFor(1, 352, 168)).toBe(first);
+    await vi.advanceTimersByTimeAsync(2000);
+    const again = snapshotFor(1, 352, 168);
+    expect(again).not.toBe(first);
+    await settle();
+    expect((await again)?.url).toBe(snap(1).url);
+    expect(server).toHaveBeenCalledTimes(2);
   });
 
   it("answers null for a trip the reply leaves out, and doesn't ask for it again until the page reloads", async () => {
