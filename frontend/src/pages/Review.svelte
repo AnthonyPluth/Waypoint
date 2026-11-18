@@ -320,6 +320,7 @@
         }
         const leg = legs[n];
         if (leg?.pick) addedPicks.push(leg.pick);
+        if (leg?.other?.pick) addedPicks.push(leg.other.pick);
         if (n < bodies.length - 1) drafts = drafts.filter((d) => d !== leg);
       }
       listed = true;

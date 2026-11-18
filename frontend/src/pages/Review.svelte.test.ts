@@ -943,6 +943,24 @@ describe("Review: a stay read two ways", () => {
     expect(calls).toContainEqual(["/api/segments", "POST", expect.objectContaining({ confirmation: "555000111", start_zone: "America/Chicago" })]);
   });
 
+  it("takes both readings of the pair off the item once either is added, and keeps the booking that failed", async () => {
+    secondSegmentFails = "The flight was refused.";
+    const flight = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15",
+      end_local: "2026-12-02T10:05" } as unknown as ReviewItem["suggestions"][number];
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said, flight] })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
+    await userEvent.click(screen.getByRole("button", { name: "AI suggestion" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add 2 bookings" }));
+    await screen.findByRole("alert");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Discard changes" }));
+    await waitFor(() => expect(calls).toContainEqual(["/api/review/1?suggestion=1&suggestion=2", "DELETE", undefined]));
+    secondSegmentFails = "";
+    await settled();
+    expect(held.items[0]?.suggestions).toEqual([flight]);
+  });
+
   it("keeps edits to a reading when going back to the other one and back", async () => {
     held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
     render(ReviewPage);
