@@ -118,15 +118,6 @@ def _near(point: list[float], latitude: float, longitude: float, reach: float) -
     return abs(point[0] - latitude) <= reach and abs(point[1] - longitude) <= reach
 
 
-def _stops(places: tripmap.Places) -> list[tuple[float, float]]:
-    found: list[tuple[float, float]] = [(a["latitude"], a["longitude"]) for a in places["airports"]]
-    found += [(c["latitude"], c["longitude"]) for c in places["cities"]]
-    found += [(s["latitude"], s["longitude"]) for s in places["stays"]]
-    if places["home"] is not None:
-        found.append((places["home"]["latitude"], places["home"]["longitude"]))
-    return found
-
-
 def _on_trip(stops: list[tuple[float, float]], drive: Drive) -> bool:
     lat1, lon1, lat2, lon2 = drive
     return (any(_near([lat, lon], lat1, lon1, STOP_REACH_DEGREES) for lat, lon in stops)
@@ -134,11 +125,10 @@ def _on_trip(stops: list[tuple[float, float]], drive: Drive) -> bool:
 
 
 def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], now: float) -> list[CachedRoute] | None:
-    places = tripmap.places(conn, viewer, trip_id)
-    if places is None:
+    stops = tripmap.stop_points(conn, viewer, trip_id)
+    if stops is None:
         return None
     drives = parse_drives(texts)
-    stops = _stops(places)
     wanted = {_key(d): d for d in drives if _on_trip(stops, d)}
     if not wanted:
         return []
@@ -151,11 +141,11 @@ def cached(conn: db.Connection, viewer: Viewer, trip_id: int, texts: list[str], 
 
 
 def store(conn: db.Connection, viewer: Viewer, trip_id: int, start: Any, end: Any, raw_path: Any, now: float) -> bool | None:
-    places = tripmap.places(conn, viewer, trip_id)
-    if places is None:
+    stops = tripmap.stop_points(conn, viewer, trip_id)
+    if stops is None:
         return None
     drive = drive_of(start, end)
-    if not _on_trip(_stops(places), drive):
+    if not _on_trip(stops, drive):
         raise Invalid("That isn't a drive of this trip")
     path = clean_path(raw_path, drive)
     from_lat, from_lon, to_lat, to_lon = _key(drive)
@@ -195,8 +185,7 @@ def cached_for_trips(conn: db.Connection, viewer: Viewer, texts: list[str], now:
                             .order_by(DrivingRoute.trip_id, DrivingRoute.from_lat, DrivingRoute.from_lon, DrivingRoute.to_lat, DrivingRoute.to_lon)).all()
     stops: dict[int, list[tuple[float, float]]] = {}
     for trip_id in sorted({row.trip_id for row in rows}):
-        places = tripmap.places(conn, viewer, trip_id)
-        stops[trip_id] = _stops(places) if places is not None else []
+        stops[trip_id] = tripmap.stop_points(conn, viewer, trip_id) or []
     out: dict[int, TripRoutes] = {}
     for row in rows:
         start: Place = {"latitude": row.from_lat / SCALE, "longitude": row.from_lon / SCALE}
