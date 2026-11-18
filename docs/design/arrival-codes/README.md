@@ -138,9 +138,17 @@ Turning location back on in iOS Settings resumes watching at the next save or ac
 
 ## Build
 
-The issues, in the order they land (Sonnet each; created from [build-plan.md](build-plan.md)):
+The issues, in the order they land (Sonnet each; created on 2026-11-18 from [build-plan.md](build-plan.md)):
 
-Created after this design merges; the list is also posted on #819.
+| Order | Issue | What | Depends on |
+| --- | --- | --- | --- |
+| 1 | [#846](https://github.com/AnthonyPluth/Waypoint/issues/846) | The iPhone app keeps the parking QR picture with the saved trips (the promise change) | This design merged |
+| 2 | [#847](https://github.com/AnthonyPluth/Waypoint/issues/847) | Airport coordinates in the saved trips | #846 |
+| 3 | [#848](https://github.com/AnthonyPluth/Waypoint/issues/848) | Find each watched booking's place on the phone | #846, #847 |
+| 4 | [#849](https://github.com/AnthonyPluth/Waypoint/issues/849) | Ask for location in context, watch the places and post the notification (holds the no-location-to-the-server test) | #848 |
+| 5 | [#850](https://github.com/AnthonyPluth/Waypoint/issues/850) | Open a booking's code from the notification or the Upcoming card | #849, #846 |
+
+The same list is posted on [#819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981941089).
 
 ## Not confirmed
 

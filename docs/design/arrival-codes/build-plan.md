@@ -1,6 +1,6 @@
 # Arrival codes: build plan
 
-Draft agent-task issue bodies for building [the arrival codes design](README.md) ([#819](https://github.com/AnthonyPluth/Waypoint/issues/819)), in the sections the `fleet-agent-task` skill names. The design is signed off ([comment on #819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981807369), 2026-11-18): parking, rental pickup and hotel; the parking QR picture kept by the iPhone app; Apple's geocoder on the phone; a card on Upcoming, never auto-open; no Settings switch or card, iOS's own asks being the opt-in; the lock-screen wording by kind only and the windows and radii as recommended. The issues were created from these bodies; the README's "Build" section lists their numbers. Here they refer to each other by key in `{{…}}`; the created issues use the real numbers.
+Draft agent-task issue bodies for building [the arrival codes design](README.md) ([#819](https://github.com/AnthonyPluth/Waypoint/issues/819)), in the sections the `fleet-agent-task` skill names. The design is signed off ([comment on #819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981807369), 2026-11-18): parking, rental pickup and hotel; the parking QR picture kept by the iPhone app; Apple's geocoder on the phone; a card on Upcoming, never auto-open; no Settings switch or card, iOS's own asks being the opt-in; the lock-screen wording by kind only and the windows and radii as recommended. The issues were created from these bodies; the README's "Build" section lists their numbers. Here they refer to each other by key in `{{…}}`; the created issues (#846 to #850, numbers in each heading) use the real numbers.
 
 Order: `{{ARRIVAL-QR}}` first, on its own, because it changes a promise (owner decision 2). Then `{{ARRIVAL-AIRPORTS}}` and `{{ARRIVAL-PLACES}}` (they can run at once; `{{ARRIVAL-AIRPORTS}}` touches the same reply as `{{ARRIVAL-QR}}`), then `{{ARRIVAL-WATCH}}`, then `{{ARRIVAL-OPEN}}`. There is no Settings card issue: the owner decided on no switch or card (2026-11-18).
 
@@ -8,7 +8,7 @@ Model: the issue for #819 names Sonnet for the build once the design is decided,
 
 ---
 
-## {{ARRIVAL-QR}} feat: the iPhone app keeps the parking QR picture with the saved trips
+## {{ARRIVAL-QR}} (#846) feat: the iPhone app keeps the parking QR picture with the saved trips
 
 **Context**
 Owner decision on #819 (PR #832, 2026-11-18): the iPhone app may keep a parking booking's gate QR picture with its saved trips so it shows with no connection, and the server's offline reply carries it for the person's own parking bookings only. Today `waypoint/domain/offline.py` blanks `gate_code`, and the "Email stays on the server" promise in `AGENTS.md` says the picture is "absent from the offline copy". The picture is sealed in `segment_codes` and read through `waypoint/storage/gate_codes.py`; `GET /api/segments/{id}/code` serves it today. `docs/design/arrival-codes/README.md`, "The parking QR picture on the phone", is the specification, including every wording change.
@@ -42,7 +42,7 @@ Sonnet (Waypoint's routing puts privacy-sensitive work on Sonnet, held by the ch
 
 ---
 
-## {{ARRIVAL-AIRPORTS}} feat: airport coordinates in the saved trips
+## {{ARRIVAL-AIRPORTS}} (#847) feat: airport coordinates in the saved trips
 
 **Context**
 The arrival codes design (#819, `docs/design/arrival-codes/`) watches a rental pickup that has only an airport code (`origin`) around that airport. The phone's saved copy (`GET /api/offline`, `waypoint/domain/offline.py`, `waypoint/server/api/offline.py`) carries airport codes but no coordinates; the bundled `airports` table (`waypoint/storage/schema.py`, loaded by `waypoint/storage/reference.py`) has them. They are public reference data, not anyone's location.
@@ -70,10 +70,10 @@ Sonnet: a small, typed change to one reply.
 
 ---
 
-## {{ARRIVAL-PLACES}} feat(ios): find each watched booking's place on the phone
+## {{ARRIVAL-PLACES}} (#848) feat(ios): find each watched booking's place on the phone
 
 **Context**
-The design (#819, `docs/design/arrival-codes/README.md`, decision 4) needs a street-level point for each parking lot and rental pickup on the saved trips. The server's `segments.latitude`/`longitude` are postcode or city precision (`waypoint/storage/geocode.py`) and are not in the saved copy. The saved trips are in `ios/Waypoint/OfflineStore.swift`, filled by `OfflineSync.swift`.
+The design (#819, `docs/design/arrival-codes/README.md`, owner decision 3) needs a street-level point for each parking lot, rental pickup and hotel on the saved trips. The server's `segments.latitude`/`longitude` are postcode or city precision (`waypoint/storage/geocode.py`) and are not in the saved copy. The saved trips are in `ios/Waypoint/OfflineStore.swift`, filled by `OfflineSync.swift`.
 
 **Scope**
 - New `ios/Waypoint/ArrivalPlaces.swift`: from the saved trips, the qualifying bookings (parking; car pickups; hotels), not cancelled, whose window (README, point 5) hasn't ended.
@@ -100,7 +100,7 @@ Sonnet.
 
 ---
 
-## {{ARRIVAL-WATCH}} feat(ios): watch the places and post the arrival notification
+## {{ARRIVAL-WATCH}} (#849) feat(ios): watch the places and post the arrival notification
 
 **Context**
 The design (#819, `docs/design/arrival-codes/`, frames A1, A2, C and D and README points 2 to 6). There is no switch or card in Waypoint (owner decision, 2026-11-18): iOS's own permission asks are the opt-in, and iOS Settings or signing out is how to stop it. `{{ARRIVAL-PLACES}}` gives the places. The iPhone app has no CoreLocation or UserNotifications code today (`ios/README.md`). The saved copy is `.complete`, unreadable while the phone is locked.
@@ -135,7 +135,7 @@ Sonnet.
 
 ---
 
-## {{ARRIVAL-OPEN}} feat: open a booking's code from the notification or the Upcoming card
+## {{ARRIVAL-OPEN}} (#850) feat: open a booking's code from the notification or the Upcoming card
 
 **Context**
 The design (#819, frames A3 and B). The QR code dialog is `frontend/src/lib/components/GateCode.svelte`. The shell loads the person's server or the cached page (`ios/Waypoint/ShellViewController.swift`, `OfflinePageHandler.swift`).
