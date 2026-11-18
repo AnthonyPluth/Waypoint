@@ -1124,6 +1124,48 @@ describe("past trip cards", () => {
     expect(screen.getByRole("heading", { level: 2, name: "2026" }).parentElement).toHaveTextContent(/^2026\s*2 trips$/);
   });
 
+  it("asks for no more map images than there are cards without photos on a 60-card list", async () => {
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get: () => 358 });
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 168 });
+    app.state = state({ mapkit: true });
+    const stays = [{ segment_id: 1, latitude: 39.74, longitude: -104.99, precision: "city" }, { segment_id: 2, latitude: 40.76, longitude: -111.89, precision: "city" }];
+    const many = Array.from({ length: 60 }, (_, i) => trip([
+      segment({ id: 1000 + i * 2, trip_id: 100 + i, kind: "hotel", origin: "Denver", destination: "Denver", start_local: "2026-03-02T15:00", end_local: "2026-03-04T11:00" }),
+      segment({ id: 1001 + i * 2, trip_id: 100 + i, kind: "hotel", origin: "Salt Lake City", destination: "Salt Lake City", start_local: "2026-03-04T15:00", end_local: "2026-03-06T11:00" }),
+    ], { id: 100 + i, name: `Card ${i}`, start_date: "2026-03-02", end_date: "2026-03-06" }));
+    serve(many);
+    const base = vi.mocked(api).getMockImplementation()!;
+    const mapped: number[] = [];
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      const text = String(path);
+      if (text.endsWith("/places")) return { home: null, airports: [], cities: [], stays: stays.map((s, k) => ({ ...s, segment_id: Number(text.split("/")[3]) * 2 - 200 + 1000 + k })) } as never;
+      if (text.startsWith("/api/map-snapshots")) {
+        const q = new URLSearchParams(text.split("?")[1]);
+        mapped.push(...q.getAll("trip").map(Number));
+        return { snapshots: q.getAll("trip").map((t) => ({ trip_id: Number(t), url: `https://maps.example/snapshot?trip=${t}`, center: { latitude: 40.27, longitude: -108.43 }, zoom: 5, width: 352, height: 168 })) } as never;
+      }
+      if (text.startsWith("/api/driving-routes")) return { trips: [] } as never;
+      return base(path, opts);
+    });
+    let release: (v: unknown) => void = () => {};
+    const served = vi.mocked(api).getMockImplementation()!;
+    vi.mocked(api).mockImplementation((path, opts) => (path === "/api/photos/trip-covers" ? new Promise((r) => { release = r; }) : served(path, opts)) as never);
+    const { container } = render(Trips);
+    await screen.findByText("Card 0");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots"))).toHaveLength(0);
+    release({ trips: many.filter((t) => t.id % 2 === 0).map((t) => ({ trip_id: t.id, count: 4, covers: [t.id] })) });
+    await waitFor(() => expect(container.querySelectorAll("img[src^='https://maps.example/snapshot']").length).toBeGreaterThan(0));
+    await new Promise((r) => setTimeout(r, 400));
+    const withoutPhotos = many.filter((t) => t.id % 2 === 1).map((t) => t.id);
+    expect(container.querySelectorAll("img[src^='/api/photos/']").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll("img[src^='https://maps.example/snapshot']").length).toBeLessThanOrEqual(withoutPhotos.length);
+    expect([...new Set(mapped)].sort()).toEqual([...mapped].sort());
+    expect(mapped.every((id) => withoutPhotos.includes(id))).toBe(true);
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientWidth;
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
+  });
+
   it.each([[null], [{ name: null, email: null, local: true }]])("doesn't ask for covers at all in local mode, where there are no photos (%j)", async (user) => {
     app.state = state({ user });
     serveCards({ trips: [{ trip_id: 31, count: 5, covers: [1] }] });

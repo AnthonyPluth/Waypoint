@@ -19,6 +19,7 @@ from sqlalchemy import insert, select
 
 from waypoint import oidc
 from waypoint.providers import gmail
+from waypoint.domain import map_snapshots
 from waypoint.domain import people as people_domain
 from waypoint.domain import trips
 from waypoint.domain.mail import review, scan
@@ -27,6 +28,7 @@ from waypoint.server import jobs
 from waypoint.server.api import ai as ai_api
 from waypoint.server.api import backups, flight_import as flight_import_api, flightstatus as flightstatus_api, mailboxes, people, state, stats as stats_api
 from waypoint.server.api import driving_routes as driving_routes_api
+from waypoint.server.api import map_snapshots as map_snapshots_api
 from waypoint.server.api import home as home_api
 from waypoint.server.api import mcp as mcp_api
 from waypoint.server.api import review as review_api
@@ -146,6 +148,9 @@ class Replies(DbCase):
                                                       "start_local": f"{today:%Y-%m-%d}T22:15", "end_local": f"{today:%Y-%m-%d}T23:50",
                                                       "travelers": [{"name": "DOE/JANE MS"}]})
         self.check("GET /api/driving-routes", driving_routes_api.api_driving_routes_for_trips(self.c, {"trip": [str(seg["trip_id"])]}, {}))
+        sample = {"trip_id": seg["trip_id"], "url": "https://snapshot.example/x", "center": {"latitude": 39.74, "longitude": -104.99}, "zoom": 9, "width": 358, "height": 168}
+        with mock.patch.object(map_snapshots, "for_trips", return_value=[sample]):
+            self.check("GET /api/map-snapshots", map_snapshots_api.api_map_snapshots(self.c, {"trip": [str(seg["trip_id"])], "w": ["358"], "h": ["168"]}, {}))
         box = self.c.execute(insert(Mailbox).values(owner_sub="u8", address="joan@gmail.example", token=secretbox.encrypt("t"), status="connected",
                                                     created=1.0)).lastrowid
         stored_mail.put(self.c, box, "m8", {"subject": "Your itinerary", "sender_domain": "air.example", "received": "2026-02-20", "text": "Hello.",
@@ -606,7 +611,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes", "GET /api/trips/{id}/summary", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes", "GET /api/map-snapshots", "GET /api/trips/{id}/summary", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

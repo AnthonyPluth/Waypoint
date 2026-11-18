@@ -13,6 +13,7 @@
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
   import { clearRouteCache } from "$lib/driving-routes";
+  import { clearSnapshots } from "$lib/map-snapshots";
   import { clearSaved } from "$lib/offline";
   import OfflineSection from "$lib/components/settings/OfflineSection.svelte";
   import PhotoSharingSettings from "$lib/components/settings/PhotoSharingSettings.svelte";
@@ -62,6 +63,7 @@
 
   const signOut = () => act(async () => {
     clearRouteCache();
+    clearSnapshots();
     await clearSaved();
     const r = await api<{ redirect: string }>("/auth/logout", { method: "POST" });
     location.href = r.redirect;

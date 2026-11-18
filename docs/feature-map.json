@@ -312,6 +312,7 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_home.py",
+        "tests/test_map_snapshots.py",
         "tests/test_route_cache.py",
         "tests/test_route_warming.py",
         "tests/test_trip_summary.py",
@@ -1632,6 +1633,22 @@
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mapkit.py"
+      ],
+      "docs": [
+        "start/trips"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/map-snapshots",
+      "handler": "waypoint/server/api/map_snapshots.py:api_map_snapshots",
+      "web": [
+        "frontend/src/lib/map-snapshots.ts"
+      ],
+      "tests": [
+        "tests/test_api_contract.py",
+        "tests/test_map_snapshots.py",
+        "tests/test_mcp_routes.py"
       ],
       "docs": [
         "start/trips"

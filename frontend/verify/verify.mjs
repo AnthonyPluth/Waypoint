@@ -126,10 +126,23 @@ const REPO = join(HERE, "..", "..");
 const fakeSource = (mode) => ["fake-mapkit.js", ...(mode === "error" ? ["fake-mapkit-error.js"] : [])].map((f) => readFileSync(join(HERE, f), "utf8")).join("\n");
 const CROSS_ORIGIN = { "Access-Control-Allow-Origin": "*" };
 
+export const SNAPSHOT_PATH = "/api/v1/snapshot";
+const SNAPSHOT_SIZE = /^(\d{2,3})x(\d{2,3})$/;
+
+export function snapshotStandIn(size) {
+  const [w, h] = (SNAPSHOT_SIZE.exec(size ?? "") ?? ["", "400", "200"]).slice(1);
+  const roads = "M-10,70 Q120,10 260,60 T420,20 M-10,150 Q90,110 210,140 T420,110 M80,-10 Q120,90 90,210 M300,-10 Q330,70 290,210";
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 400 200" preserveAspectRatio="none"><rect width="400" height="200" fill="#1d222b"/><ellipse cx="130" cy="110" rx="90" ry="44" fill="#1f2a26"/><ellipse cx="230" cy="130" rx="46" ry="42" fill="#1f2a26"/><path d="M280,-5 L300,30 L292,62 L250,92 L310,126 L308,160 L288,205 L405,205 L405,-5 Z" fill="#13202f"/><path d="${roads}" fill="none" stroke="#3a4150" stroke-width="2.2"/><path d="M-10,100 Q140,60 420,90 M180,-10 Q210,100 150,210" fill="none" stroke="#2a303c" stroke-width="1"/><text x="8" y="194" font-family="sans-serif" font-size="10" font-weight="600" fill="#ffffff" fill-opacity=".72">Maps</text><text x="364" y="194" font-family="sans-serif" font-size="9" fill="#ffffff" fill-opacity=".55">Legal</text></svg>`;
+}
+
 export async function standInForApple(ctx, mode, onRequest = () => {}) {
   const refused = mode === "none" || mode === "blocked";
   await ctx.route(APPLE_MAPS_URLS, (route) => {
     onRequest(route.request().url());
+    const asked = new URL(route.request().url());
+    if (!refused && asked.pathname === SNAPSHOT_PATH) {
+      return route.fulfill({ status: 200, contentType: "image/svg+xml", headers: CROSS_ORIGIN, body: snapshotStandIn(asked.searchParams.get("size")) });
+    }
     if (!refused && /\/mapkit\.js$/.test(new URL(route.request().url()).pathname)) {
       return route.fulfill({ status: 200, contentType: "application/javascript", headers: CROSS_ORIGIN, body: fakeSource(mode) });
     }

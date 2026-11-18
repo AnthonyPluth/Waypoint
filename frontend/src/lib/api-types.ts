@@ -519,6 +519,24 @@ export interface MailboxList {
   mailboxes: Mailbox[];
 }
 
+export interface MapSnapshot {
+  trip_id: number;
+  url: string;
+  center: MapSnapshotCentre;
+  zoom: number;
+  width: number;
+  height: number;
+}
+
+export interface MapSnapshotCentre {
+  latitude: number;
+  longitude: number;
+}
+
+export interface MapSnapshots {
+  snapshots: MapSnapshot[];
+}
+
 export interface MapkitToken {
   enabled: boolean;
   token?: string;
@@ -1567,6 +1585,7 @@ export interface Endpoints {
   "POST /api/reminders/devices": { body: DeviceBody; reply: ReminderDevice };
   "DELETE /api/reminders/devices/{id}": { body: never; reply: Ok };
   "GET /api/mapkit/token": { body: never; reply: MapkitToken };
+  "GET /api/map-snapshots": { body: never; reply: MapSnapshots };
   "GET /api/reminders/app": { body: never; reply: AppPush };
   "POST /api/reminders/app/devices": { body: AppDeviceBody; reply: ReminderDevice };
   "DELETE /api/reminders/app/devices/{id}": { body: never; reply: Ok };

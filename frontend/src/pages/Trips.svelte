@@ -52,10 +52,11 @@
   $effect(() => { void load(); });
 
   let covers = $state<ReadonlyMap<number, TripCover>>(new Map());
+  let coversKnown = $state(false);
   let coversTicket = 0;
   async function loadCovers() {
     const mine = ++coversTicket;
-    if (app.state && (!app.state.user || app.state.user.local)) { covers = new Map(); return; }
+    if (app.state && (!app.state.user || app.state.user.local)) { covers = new Map(); coversKnown = true; return; }
     try {
       const found = await apiCall<"GET /api/photos/trip-covers">("/api/photos/trip-covers", { keep: true, background: true });
       if (mine !== coversTicket) return;
@@ -63,6 +64,7 @@
     } catch {
       if (mine === coversTicket) covers = new Map();
     }
+    if (mine === coversTicket) coversKnown = true;
   }
 
   const lookup = limited(4);
@@ -286,7 +288,7 @@
             {#each g.trips as t (t.id)}
               {@const cover = covers.get(t.id)}
               {@const km = distances.get(t.id)}
-              <li class="min-w-0"><PastTripCard trip={t} today={day} photos={cover?.count ?? 0} covers={cover?.covers ?? []} distance={km && unit ? distanceText(km, unit) : ""} {roomy} /></li>
+              <li class="min-w-0"><PastTripCard trip={t} today={day} photos={cover?.count ?? 0} covers={cover?.covers ?? []} {coversKnown} distance={km && unit ? distanceText(km, unit) : ""} {roomy} /></li>
             {/each}
           </ul>
         </div>

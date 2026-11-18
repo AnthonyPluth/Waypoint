@@ -72,16 +72,25 @@ def _locate(conn: db.Connection, viewer: Viewer, trip_id: int) -> _Located | Non
     return _Located(live, found, stored, points, home.point(conn))
 
 
-def stop_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Point] | None:
-    at = _locate(conn, viewer, trip_id)
-    if at is None:
-        return None
+def _points(at: _Located, with_home: bool) -> list[Point]:
     found: list[Point] = [(a.latitude, a.longitude) for a in sorted(at.airports, key=lambda a: a.code)]
     found += [at.cities[c] for c in sorted(at.cities)]
     found += [(g.latitude, g.longitude) for g in at.stays if g.latitude is not None and g.longitude is not None]
-    if at.home is not None:
+    if with_home and at.home is not None:
         found.append((at.home["latitude"], at.home["longitude"]))
     return found
+
+
+def stop_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Point] | None:
+    at = _locate(conn, viewer, trip_id)
+    return None if at is None else _points(at, True)
+
+
+def route_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[Point] | None:
+    at = _locate(conn, viewer, trip_id)
+    if at is None:
+        return None
+    return _points(at, all(s["kind"] not in ("flight", "train", "cruise") for s in at.live))
 
 
 def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:

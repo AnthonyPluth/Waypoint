@@ -1,4 +1,5 @@
 import { clearRouteCache } from "./driving-routes";
+import { clearSnapshots } from "./map-snapshots";
 import { onDenied } from "./api";
 import { clearSaved, dropExpired, resumeSaving, saveCurrentTrip, savedInfos, stopSaving, watchExpiry, whenExpired } from "./offline";
 import { inOldShell, inShell, shellRemove, shellSetSaving, shellStatus, type ShellStatus } from "./offline-shell";
@@ -98,7 +99,7 @@ function forgetCopy(): void {
 whenExpired(() => { void refreshOffline(); });
 
 export function clearOnDenied(): void {
-  onDenied(async () => { clearRouteCache(); await clearSaved(); forgetCopy(); });
+  onDenied(async () => { clearRouteCache(); clearSnapshots(); await clearSaved(); forgetCopy(); });
 }
 
 export async function turnOnOffline(): Promise<VaultError | null> {

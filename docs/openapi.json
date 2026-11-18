@@ -3131,6 +3131,27 @@
         }
       }
     },
+    "/api/map-snapshots": {
+      "get": {
+        "operationId": "api_map_snapshots",
+        "x-handler": "waypoint/server/api/map_snapshots.py:api_map_snapshots",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapSnapshots"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/reminders/app": {
       "get": {
         "operationId": "api_app_push",
@@ -6444,6 +6465,69 @@
         "required": [
           "configured",
           "mailboxes"
+        ],
+        "additionalProperties": false
+      },
+      "MapSnapshot": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string"
+          },
+          "center": {
+            "$ref": "#/components/schemas/MapSnapshotCentre"
+          },
+          "zoom": {
+            "type": "integer"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "trip_id",
+          "url",
+          "center",
+          "zoom",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false
+      },
+      "MapSnapshotCentre": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
+      "MapSnapshots": {
+        "type": "object",
+        "properties": {
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MapSnapshot"
+            }
+          }
+        },
+        "required": [
+          "snapshots"
         ],
         "additionalProperties": false
       },

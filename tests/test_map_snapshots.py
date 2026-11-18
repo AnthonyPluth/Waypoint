@@ -1,0 +1,269 @@
+import json
+import unittest
+import urllib.parse
+from unittest import mock
+
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric.utils import encode_dss_signature
+
+from tests.privacy import no_leaks
+from tests.test_mapkit import KEY_ID, PEM, PRIVATE, TEAM_ID, Keys, key_line, unb64
+from tests.test_trips import BOULDER, DENVER, HOTEL, SALT_LAKE, RouteCase
+
+PHOENIX = {**DENVER, "origin": "Desert Inn", "destination": "Phoenix", "start_local": "2026-06-08T15:00", "end_local": "2026-06-10T10:00"}
+from waypoint.domain import map_snapshots, maps
+from waypoint.providers import mapkit
+from waypoint.server import mcp_access, mcp_http
+
+CREDS = mapkit.Credentials(PEM, KEY_ID, TEAM_ID)
+NOON = 1_700_000_000.0
+START = (int(NOON) // 86400) * 86400
+ALLOWED = ["center", "z", "size", "scale", "colorScheme", "poi", "lang", "expires", "teamId", "keyId", "signature"]
+
+
+def query_of(url: str) -> list[tuple[str, str]]:
+    return urllib.parse.parse_qsl(urllib.parse.urlsplit(url).query, keep_blank_values=True)
+
+
+def verifies(url: str, public) -> bool:
+    signed, signature = url.removeprefix(mapkit.SNAPSHOT_URL).rsplit("&signature=", 1)
+    raw = unb64(signature)
+    try:
+        public.verify(encode_dss_signature(int.from_bytes(raw[:32], "big"), int.from_bytes(raw[32:], "big")), signed.encode(), ec.ECDSA(hashes.SHA256()))
+    except Exception:
+        return False
+    return True
+
+
+class SnapshotUrlTests(unittest.TestCase):
+    def url(self, **changes):
+        args = {"creds": CREDS, "center": (39.74, -104.99), "zoom": 9, "size": (358, 168), "scale": 2, "scheme": "dark", "lang": "en-US", "now": NOON, **changes}
+        return mapkit.snapshot_url(**args)
+
+    def test_it_is_the_snapshot_address_with_the_signature_last_and_valid(self):
+        url = self.url()
+        self.assertTrue(url.startswith("https://snapshot.apple-mapkit.com/api/v1/snapshot?"))
+        self.assertEqual([k for k, _ in query_of(url)], ALLOWED)
+        self.assertEqual(dict(query_of(url)) | {"signature": "", "expires": ""}, {"center": "39.74,-104.99", "z": "9", "size": "358x168", "scale": "2", "colorScheme": "dark", "poi": "0",
+                                                                                        "lang": "en-US", "expires": "", "teamId": TEAM_ID, "keyId": KEY_ID, "signature": ""})
+        self.assertTrue(verifies(url, PRIVATE.public_key()))
+        self.assertFalse(verifies(url, ec.generate_private_key(ec.SECP256R1()).public_key()))
+
+    def test_expires_is_inside_the_signed_string_and_two_days_on(self):
+        url = self.url()
+        self.assertEqual(dict(query_of(url))["expires"], str(int(NOON) + 2 * 86400))
+        self.assertTrue(verifies(url.replace("expires=", "expires=9"), PRIVATE.public_key()) is False)
+
+    def test_the_centre_is_never_sent_closer_than_a_hundredth_of_a_degree(self):
+        self.assertEqual(dict(query_of(self.url(center=(39.7392123, -104.9903456))))["center"], "39.74,-104.99")
+
+    def test_what_apple_wouldnt_draw_is_refused(self):
+        for changes in ({"size": (49, 168)}, {"size": (358, 641)}, {"zoom": 2}, {"zoom": 21}, {"scale": 4}, {"scheme": "sepia"}, {"center": (91.0, 0.0)}, {"center": (0.0, 181.0)}):
+            with self.subTest(changes):
+                with self.assertRaises(ValueError):
+                    self.url(**changes)
+
+    def test_a_key_that_isnt_elliptic_is_refused(self):
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        pem = rsa.generate_private_key(65537, 2048).private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        with self.assertRaises(ValueError):
+            self.url(creds=mapkit.Credentials(pem, KEY_ID, TEAM_ID))
+
+
+class FitTests(unittest.TestCase):
+    def test_two_cities_a_day_apart_fit_a_card_at_a_regional_zoom(self):
+        found = map_snapshots.fit([(39.74, -104.99), (40.76, -111.89)], 358, 168)
+        self.assertIsNotNone(found)
+        self.assertTrue(5 <= found.zoom <= 7, found)
+        self.assertAlmostEqual(found.longitude, -108.44, delta=0.1)
+
+    def test_the_zoom_never_passes_city_level(self):
+        found = map_snapshots.fit([(39.74, -104.99), (40.10, -104.9)], 358, 168)
+        self.assertTrue(7 <= found.zoom <= map_snapshots.MAX_ZOOM)
+
+    def test_every_stop_lands_inside_the_card_with_room_round_it(self):
+        points = [(39.74, -104.99), (40.76, -111.89), (36.17, -115.14)]
+        found = map_snapshots.fit(points, 358, 168)
+        cx, cy = map_snapshots._world(found.latitude, found.longitude)
+        for lat, lon in points:
+            x, y = map_snapshots._world(lat, lon)
+            self.assertLessEqual(abs(x - cx) * 2 ** found.zoom, 358 / 2 - 20)
+            self.assertLessEqual(abs(y - cy) * 2 ** found.zoom, 168 / 2 - 20)
+
+    def test_fewer_than_two_places_or_one_place_twice_is_no_map(self):
+        self.assertIsNone(map_snapshots.fit([], 358, 168))
+        self.assertIsNone(map_snapshots.fit([(39.74, -104.99)], 358, 168))
+        self.assertIsNone(map_snapshots.fit([(39.74, -104.99), (39.80, -104.90)], 358, 168))
+
+    def test_a_trip_wider_than_the_lowest_zoom_shows_is_no_map(self):
+        self.assertIsNone(map_snapshots.fit([(40.64, -73.78), (51.47, -0.45)], 358, 168))
+        self.assertIsNone(map_snapshots.fit([(33.94, -118.4), (-33.94, 151.18)], 358, 168))
+
+
+class SnapshotCase(RouteCase, Keys):
+    def setUp(self):
+        RouteCase.setUp(self)
+        Keys.setUp(self)
+        self.configure()
+        map_snapshots._address.cache_clear()
+
+    def road_trip(self, who="ana", second=SALT_LAKE):
+        first = self.book(who, DENVER)
+        self.book(who, second, trip_id=first["trip_id"])
+        return first["trip_id"]
+
+    def snapshots(self, who, *trips, w=358, h=168, extra=""):
+        query = "&".join([*(f"trip={t}" for t in trips), f"w={w}", f"h={h}"]) + extra
+        return self.call(who, "GET", f"/api/map-snapshots?{query}")
+
+
+class RouteTests(SnapshotCase):
+    def test_a_trip_you_are_on_gets_an_address_for_its_area(self):
+        trip = self.road_trip()
+        status, body = self.snapshots("ana", trip)
+        self.assertEqual(status, 200, body)
+        [snap] = body["snapshots"]
+        self.assertEqual((snap["trip_id"], snap["width"], snap["height"]), (trip, 358, 168))
+        self.assertTrue(5 <= snap["zoom"] <= 7)
+        asked = dict(query_of(snap["url"]))
+        self.assertEqual(asked["center"], f"{snap['center']['latitude']:.2f},{snap['center']['longitude']:.2f}")
+        self.assertEqual((asked["z"], asked["size"], asked["scale"], asked["colorScheme"], asked["poi"], asked["lang"]), (str(snap["zoom"]), "358x168", "2", "dark", "0", "en-US"))
+        self.assertTrue(verifies(snap["url"], PRIVATE.public_key()))
+
+    def test_the_signed_query_holds_only_the_allowed_parameters_and_no_stop(self):
+        trip = self.road_trip()
+        places = self.ok("ana", "GET", f"/api/trips/{trip}/places")
+        _, body = self.snapshots("ana", trip)
+        url = body["snapshots"][0]["url"]
+        self.assertEqual([k for k, _ in query_of(url)], ALLOWED)
+        for stop in places["stays"]:
+            for number in (stop["latitude"], stop["longitude"]):
+                self.assertNotIn(f"{number:.3f}", urllib.parse.unquote(url))
+        self.assertNotIn("trip", urllib.parse.urlsplit(url).query)
+        for name in ("Denver", "Salt", "Inn"):
+            self.assertNotIn(name, url)
+        self.assertEqual(sorted(body["snapshots"][0]), ["center", "height", "trip_id", "url", "width", "zoom"])
+
+    def test_a_trip_you_are_not_on_is_left_out_like_one_with_no_route(self):
+        mine = self.road_trip("ana")
+        theirs = self.road_trip("cy", BOULDER)
+        status, body = self.snapshots("ana", mine, theirs, 987654)
+        self.assertEqual(status, 200)
+        self.assertEqual([s["trip_id"] for s in body["snapshots"]], [mine])
+        self.assertEqual(self.snapshots("ana", theirs), (200, {"snapshots": []}))
+        self.assertEqual(self.snapshots("ben", mine), (200, {"snapshots": []}))
+
+    def test_a_trip_with_fewer_than_two_places_is_left_out(self):
+        lonely = self.book("ana", DENVER)["trip_id"]
+        self.assertEqual(self.snapshots("ana", lonely), (200, {"snapshots": []}))
+
+    def test_a_trip_a_card_could_not_show_is_left_out(self):
+        flown = self.book("ana", {**HOTEL, "kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10"})["trip_id"]
+        self.assertEqual(self.snapshots("ana", flown), (200, {"snapshots": []}))
+
+    def test_at_most_twelve_trips_and_sizes_inside_what_apple_draws(self):
+        trip = self.road_trip()
+        self.assertEqual(self.snapshots("ana", *range(1, 13))[0], 200)
+        for bad in (self.snapshots("ana", *range(1, 14)), self.snapshots("ana"), self.snapshots("ana", "x"), self.snapshots("ana", trip, w=49), self.snapshots("ana", trip, w=641),
+                    self.snapshots("ana", trip, h="tall"), self.snapshots("ana", trip, h=-168), self.call("ana", "GET", f"/api/map-snapshots?trip={trip}&h=168")):
+            self.assertEqual(bad[0], 400, bad)
+
+    def test_a_card_is_asked_in_the_viewers_language(self):
+        trip = self.road_trip()
+        for lang, shown in (("es-MX", "es-MX"), ("fr", "fr"), ("en-GB", "en-GB"), ("not a language", "en-US"), ("x&signature=1", "en-US")):
+            with self.subTest(lang):
+                _, body = self.snapshots("ana", trip, extra=f"&lang={urllib.parse.quote(lang)}")
+                self.assertEqual(dict(query_of(body["snapshots"][0]["url"]))["lang"], shown)
+
+    def test_with_no_key_or_the_flag_off_it_signs_nothing(self):
+        trip = self.road_trip()
+        for changes in ({maps.FLAG_ENV: "off"}, {maps.KEY_FILE_ENV: None}, {maps.PUBLIC_URL_ENV: None}):
+            with self.subTest(changes):
+                self.configure(**changes)
+                with mock.patch.object(mapkit, "snapshot_url", side_effect=AssertionError("signed without MapKit")):
+                    self.assertEqual(self.snapshots("ana", trip), (200, {"snapshots": []}))
+
+    def test_an_assistant_cant_reach_it(self):
+        self.assertTrue(mcp_access.blocked("/api/map-snapshots"))
+        self.assertIsNone(mcp_http.needs("GET", "/api/map-snapshots"))
+
+    def test_signed_out_it_is_refused(self):
+        status, _ = self.req("GET", "/api/map-snapshots?trip=1&w=358&h=168")
+        self.assertIn(status, (401, 403))
+
+    def test_nothing_is_cached_by_the_browser_for_the_signing_route(self):
+        trip = self.road_trip()
+        from tests.shared import fetch
+        _, headers, _ = fetch(self.base, "GET", f"/api/map-snapshots?trip={trip}&w=358&h=168", None, {"X-Waypoint": "1", **self.who["ana"]})
+        self.assertEqual(headers["Cache-Control"], "no-store")
+
+
+class KeptAddressTests(SnapshotCase):
+    def test_the_same_card_gets_the_same_address_all_day_so_apple_counts_one_snapshot(self):
+        trip = self.road_trip()
+        morning = self.at(START + 3600)
+        with morning:
+            first = self.snapshots("ana", trip)[1]["snapshots"][0]["url"]
+        evening = self.at(START + 3600 * 10)
+        with evening, mock.patch.object(mapkit, "snapshot_url", side_effect=AssertionError("signed again within the day")):
+            self.assertEqual(self.snapshots("ana", trip)[1]["snapshots"][0]["url"], first)
+
+    def test_an_address_outlives_the_day_it_is_kept_for(self):
+        trip = self.road_trip()
+        with self.at(START + 86399):
+            url = self.snapshots("ana", trip)[1]["snapshots"][0]["url"]
+        self.assertGreaterEqual(int(dict(query_of(url))["expires"]) - (START + 86399), 86400)
+
+    def test_the_next_day_signs_again(self):
+        trip = self.road_trip()
+        with self.at(START):
+            first = self.snapshots("ana", trip)[1]["snapshots"][0]["url"]
+        with self.at(START + 86400):
+            second = self.snapshots("ana", trip)[1]["snapshots"][0]["url"]
+        self.assertNotEqual(first, second)
+        self.assertGreater(int(dict(query_of(second))["expires"]), int(dict(query_of(first))["expires"]))
+
+    def test_a_trip_that_moved_gets_the_new_area_not_the_kept_one(self):
+        trip = self.road_trip()
+        before = self.snapshots("ana", trip)[1]["snapshots"][0]
+        self.book("ana", PHOENIX, trip_id=trip)
+        after = self.snapshots("ana", trip)[1]["snapshots"][0]
+        self.assertNotEqual((before["center"], before["zoom"]), (after["center"], after["zoom"]))
+        self.assertEqual(dict(query_of(after["url"]))["center"], f"{after['center']['latitude']:.2f},{after['center']['longitude']:.2f}")
+
+    def at(self, now):
+        return mock.patch("waypoint.server.api.map_snapshots.time", mock.Mock(time=lambda: now))
+
+
+class PrivacyTests(SnapshotCase):
+    def test_the_key_and_its_ids_are_never_logged_or_sent_on(self):
+        trip = self.road_trip()
+        with no_leaks(self, key_line(), KEY_ID, TEAM_ID, self.path):
+            status, body = self.snapshots("ana", trip)
+            self.snapshots("cy", trip)
+            self.snapshots("ana", 999)
+            self.snapshots("ana", trip, w=1)
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["snapshots"]), 1)
+
+    def test_the_server_never_fetches_the_image(self):
+        trip = self.road_trip()
+        with mock.patch("waypoint.tls.urlopen", side_effect=AssertionError("the server reached out")), mock.patch("waypoint.tls.post_http2", side_effect=AssertionError("the server reached out")):
+            self.assertEqual(self.snapshots("ana", trip)[0], 200)
+
+    def test_the_reply_names_the_key_id_and_team_id_apple_needs_but_never_the_key(self):
+        trip = self.road_trip()
+        text = json.dumps(self.snapshots("ana", trip)[1])
+        self.assertIn(KEY_ID, text)
+        for secret in (key_line(), "PRIVATE KEY", self.path):
+            self.assertNotIn(secret, text)
+
+    def test_the_route_is_registered_once_and_only_for_get(self):
+        from waypoint import server
+        self.assertEqual([(m, p) for m, p, *_ in server.ROUTES if "map-snapshots" in p], [("GET", "/api/map-snapshots")])
+
+
+if __name__ == "__main__":
+    unittest.main()
