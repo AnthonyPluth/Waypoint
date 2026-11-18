@@ -3,7 +3,8 @@ import Foundation
 
 /// What a read of the saved trips gives an intent: the trips, or the fixed answer that says why there are none to read.
 enum TripsRead: Equatable {
-    case trips([SavedTrip])
+    /// `scope` names the server the copy is for (`OfflineStore.folderName`), so a trip id is never read against another server.
+    case trips([SavedTrip], scope: String)
     case fixed(Answer)
 }
 
@@ -17,7 +18,7 @@ extension TripAnswerService {
         switch SavedTripsReader.read(store, server: server) {
         case .nothingSaved: return .fixed(.nothingSaved)
         case .unreadable: return .fixed(.unreadable)
-        case .copy(let copy): return .trips(copy.trips)
+        case .copy(let copy): return .trips(copy.trips, scope: OfflineStore.folderName(for: server))
         }
     }
 }
@@ -27,18 +28,21 @@ struct TripEntity: AppEntity, Equatable {
     static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Trip")
     static var defaultQuery = TripEntityQuery()
 
-    let id: Int
+    /// The server and the trip: a saved Shortcut never resolves against another server's trip with the same number.
+    let id: String
+    let tripId: Int
     let place: String
     let dates: String?
 
-    init(id: Int, place: String, dates: String?) {
-        self.id = id
+    init(tripId: Int, scope: String, place: String, dates: String?) {
+        self.id = "\(scope):\(tripId)"
+        self.tripId = tripId
         self.place = place
         self.dates = dates
     }
 
-    init(_ trip: SavedTrip) {
-        self.init(id: trip.id, place: TripPlaces.place(of: trip), dates: TripPlaces.dates(of: trip))
+    init(_ trip: SavedTrip, scope: String) {
+        self.init(tripId: trip.id, scope: scope, place: TripPlaces.place(of: trip), dates: TripPlaces.dates(of: trip))
     }
 
     var displayRepresentation: DisplayRepresentation {
@@ -50,19 +54,19 @@ struct TripEntity: AppEntity, Equatable {
 /// Answers only from the saved copy, so after a purge it is empty. `suggestedEntities()` is what
 /// `updateAppShortcutParameters()` gives the system as the places a phrase can name.
 struct TripEntityQuery: EntityStringQuery {
-    func entities(for identifiers: [Int]) async throws -> [TripEntity] {
-        guard case .trips(let trips) = await IntentRuntime.service.readTrips() else { return [] }
-        return TripPlaces.entities(in: trips).filter { identifiers.contains($0.id) }
+    func entities(for identifiers: [String]) async throws -> [TripEntity] {
+        guard case .trips(let trips, let scope) = await IntentRuntime.service.readTrips() else { return [] }
+        return TripPlaces.entities(in: trips, scope: scope).filter { identifiers.contains($0.id) }
     }
 
     func entities(matching string: String) async throws -> [TripEntity] {
-        guard case .trips(let trips) = await IntentRuntime.service.readTrips() else { return [] }
-        return TripPlaces.matching(string, in: trips).map(TripEntity.init)
+        guard case .trips(let trips, let scope) = await IntentRuntime.service.readTrips() else { return [] }
+        return TripPlaces.matching(string, in: trips).map { TripEntity($0, scope: scope) }
     }
 
     func suggestedEntities() async throws -> [TripEntity] {
-        guard case .trips(let trips) = await IntentRuntime.service.readTrips() else { return [] }
-        return TripPlaces.entities(in: trips)
+        guard case .trips(let trips, let scope) = await IntentRuntime.service.readTrips() else { return [] }
+        return TripPlaces.entities(in: trips, scope: scope)
     }
 }
 
@@ -101,8 +105,8 @@ enum TripPlaces {
     }
 
     /// Every saved trip, soonest first, as the places a phrase can name. Two trips to one place are two entities, told apart by dates.
-    static func entities(in trips: [SavedTrip]) -> [TripEntity] {
-        trips.sorted { ($0.startDate ?? "", $0.id) < ($1.startDate ?? "", $1.id) }.map(TripEntity.init)
+    static func entities(in trips: [SavedTrip], scope: String) -> [TripEntity] {
+        trips.sorted { ($0.startDate ?? "", $0.id) < ($1.startDate ?? "", $1.id) }.map { TripEntity($0, scope: scope) }
     }
 
     private static func normalized(_ text: String) -> String {
@@ -124,11 +128,11 @@ enum TripPlaces {
     }
 
     /// "Opening your trip to Grand Junction." with `#trip/{id}`, or, when the trip is no longer saved, "There's no trip to
-    /// Lisbon saved on this iPhone. Opening Waypoint." with no page, so the app opens on Upcoming.
+    /// Lisbon saved on this iPhone. Opening Waypoint." with `#upcoming`, so the app opens on Upcoming.
     static func open(_ picked: TripEntity, in read: TripsRead) -> OpenTripAnswer {
         switch read {
-        case .trips(let trips):
-            if let trip = trips.first(where: { $0.id == picked.id }) {
+        case .trips(let trips, let scope):
+            if picked.id.hasPrefix(scope + ":"), let trip = trips.first(where: { $0.id == picked.tripId }) {
                 return OpenTripAnswer(spoken: "Opening your trip to \(place(of: trip)).", page: "#trip/\(trip.id)")
             }
             return noTrip(picked.place)
@@ -139,6 +143,6 @@ enum TripPlaces {
     }
 
     static func noTrip(_ place: String) -> OpenTripAnswer {
-        OpenTripAnswer(spoken: "There's no trip to \(place) saved on this iPhone. Opening Waypoint.", page: nil)
+        OpenTripAnswer(spoken: "There's no trip to \(place) saved on this iPhone. Opening Waypoint.", page: "#upcoming")
     }
 }

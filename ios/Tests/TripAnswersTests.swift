@@ -704,9 +704,9 @@ final class PendingPageTests: XCTestCase {
         XCTAssertNil(pages.take(now: start.addingTimeInterval(PendingPage.lifetime + 1)), "it expires")
     }
 
-    func testOnlyTheTwoTripRoutesAreAccepted() {
-        for good in ["#trip/3", "#trip/3/flight/12"] { XCTAssertTrue(PendingPage.isValid(good), good) }
-        for bad in ["", "#trip/", "#trip/x", "#trip/3/", "#trip/3/flight/", "#trip/3'; alert(1)//", "javascript:alert(1)", "#settings", "https://example.com/#trip/3", "#trip/3\n"] {
+    func testOnlyTheAllowedRoutesAreAccepted() {
+        for good in ["#trip/3", "#trip/3/flight/12", "#upcoming"] { XCTAssertTrue(PendingPage.isValid(good), good) }
+        for bad in ["", "#trip/", "#trip/x", "#trip/3/", "#trip/3/flight/", "#trip/3'; alert(1)//", "javascript:alert(1)", "#settings", "https://example.com/#trip/3", "#trip/3\n", "#upcoming/x", "#upcoming\n", "#Upcoming"] {
             XCTAssertFalse(PendingPage.isValid(bad), bad)
         }
         let pages = PendingPage()
@@ -783,9 +783,15 @@ final class OpenTripTests: XCTestCase {
         try TripFixtures.store(at: root, now: savedAt).save(AnswerFixtures.reply(trips), version: 1, for: home)
     }
 
+    private let scope = "scope-a"
+
     private func trips(_ read: TripsRead) -> [SavedTrip] {
-        if case .trips(let found) = read { return found }
+        if case .trips(let found, _) = read { return found }
         return []
+    }
+
+    private func entity(_ id: Int, _ place: String, _ dates: String? = nil, scope: String? = nil) -> TripEntity {
+        TripEntity(tripId: id, scope: scope ?? self.scope, place: place, dates: dates)
     }
 
     // MARK: Places and dates
@@ -804,16 +810,22 @@ final class OpenTripTests: XCTestCase {
         XCTAssertNil(TripPlaces.dates(of: trip(1, "T", destination: nil, start: "soon")))
     }
 
+    func testATripOfAnotherServerIsNotOpened() {
+        let saved = trip(3, "Colorado", destination: "Grand Junction")
+        let foreign = entity(3, "Oslo", scope: "scope-b")
+        XCTAssertEqual(TripPlaces.open(foreign, in: .trips([saved], scope: scope)), TripPlaces.noTrip("Oslo"))
+    }
+
     func testTheEntityHoldsOnlyAnIdAPlaceAndDates() {
-        let entity = TripEntity(trip(4, "Colorado", destination: "Grand Junction"))
-        XCTAssertEqual(entity, TripEntity(id: 4, place: "Grand Junction", dates: "Dec 1 to Dec 8"))
+        let made = TripEntity(trip(4, "Colorado", destination: "Grand Junction"), scope: scope)
+        XCTAssertEqual(entity, entity(4, "Grand Junction", "Dec 1 to Dec 8"))
     }
 
     func testEntitiesAreSoonestFirstAndTwoTripsToOnePlaceStayTwo() {
         let later = trip(1, "B", destination: "Grand Junction", start: "2026-12-20", end: "2026-12-27")
         let sooner = trip(2, "A", destination: "Grand Junction")
-        let entities = TripPlaces.entities(in: [later, sooner])
-        XCTAssertEqual(entities.map(\.id), [2, 1])
+        let entities = TripPlaces.entities(in: [later, sooner], scope: scope)
+        XCTAssertEqual(entities.map(\.tripId), [2, 1])
         XCTAssertEqual(entities.map(\.place), ["Grand Junction", "Grand Junction"])
         XCTAssertEqual(entities.map(\.dates), ["Dec 1 to Dec 8", "Dec 20 to Dec 27"], "Siri tells them apart by their dates")
     }
@@ -844,21 +856,21 @@ final class OpenTripTests: XCTestCase {
 
     func testOpeningASavedTrip() {
         let saved = trip(3, "Colorado", destination: "Grand Junction")
-        let answer = TripPlaces.open(TripEntity(saved), in: .trips([saved]))
+        let answer = TripPlaces.open(TripEntity(saved, scope: scope), in: .trips([saved], scope: scope))
         XCTAssertEqual(answer, OpenTripAnswer(spoken: "Opening your trip to Grand Junction.", page: "#trip/3"))
         XCTAssertTrue(PendingPage.isValid(answer.page ?? ""))
     }
 
     func testATripThatIsNoLongerSavedSaysSoAndOpensUpcoming() {
-        let gone = TripEntity(id: 9, place: "Lisbon", dates: nil)
+        let gone = entity(9, "Lisbon")
         let other = trip(3, "Colorado", destination: "Grand Junction")
-        let expected = OpenTripAnswer(spoken: "There's no trip to Lisbon saved on this iPhone. Opening Waypoint.", page: nil)
-        XCTAssertEqual(TripPlaces.open(gone, in: .trips([other])), expected)
+        let expected = OpenTripAnswer(spoken: "There's no trip to Lisbon saved on this iPhone. Opening Waypoint.", page: "#upcoming")
+        XCTAssertEqual(TripPlaces.open(gone, in: .trips([other], scope: scope)), expected)
         XCTAssertEqual(TripPlaces.open(gone, in: .fixed(.nothingSaved)), expected)
     }
 
     func testOtherReasonsForNoTripsAreSaidAsTheyAre() {
-        let picked = TripEntity(id: 1, place: "Lisbon", dates: nil)
+        let picked = entity(1, "Lisbon")
         for answer in [Answer.locked, .notSignedIn, .savingOff, .unreadable] {
             XCTAssertEqual(TripPlaces.open(picked, in: .fixed(answer)), OpenTripAnswer(spoken: answer.spoken, page: nil))
         }
@@ -875,9 +887,10 @@ final class OpenTripTests: XCTestCase {
         let suggested = try await query.suggestedEntities()
         XCTAssertEqual(Set(suggested.map(\.place)), ["Grand Junction", "Oslo"])
         let matched = try await query.entities(matching: "oslo")
-        XCTAssertEqual(matched.map(\.id), [2])
-        let byId = try await query.entities(for: [1, 99])
-        XCTAssertEqual(byId.map(\.id), [1], "an id that isn't saved is not made up")
+        XCTAssertEqual(matched.map(\.tripId), [2])
+        let scope = OfflineStore.folderName(for: home)
+        let byId = try await query.entities(for: ["\(scope):1", "\(scope):99", "other-server:2"])
+        XCTAssertEqual(byId.map(\.tripId), [1], "an id that isn't saved, or is another server's, is not made up")
         let none = try await query.entities(matching: "Lisbon")
         XCTAssertEqual(none, [])
     }
@@ -934,10 +947,10 @@ final class OpenTripTests: XCTestCase {
         IntentRuntime.pages = held
         OpenTripFailingProtocol.reset()
         URLProtocol.registerClass(OpenTripFailingProtocol.self)
-        _ = try await OpenTripIntent(trip: TripEntity(id: 1, place: "Grand Junction", dates: nil)).perform()
+        _ = try await OpenTripIntent(trip: entity(1, "Grand Junction", scope: OfflineStore.folderName(for: home))).perform()
         XCTAssertEqual(held.take(), "#trip/1")
-        _ = try await OpenTripIntent(trip: TripEntity(id: 7, place: "Lisbon", dates: nil)).perform()
-        XCTAssertNil(held.take(), "a trip that isn't saved opens Upcoming, not a page")
+        _ = try await OpenTripIntent(trip: entity(7, "Lisbon", scope: OfflineStore.folderName(for: home))).perform()
+        XCTAssertEqual(held.take(), "#upcoming", "a trip that isn't saved opens Upcoming")
         XCTAssertEqual(OpenTripFailingProtocol.requests, 0)
     }
 
@@ -945,7 +958,7 @@ final class OpenTripTests: XCTestCase {
         try save([AnswerFixtures.trip(1, "Colorado", [AnswerFixtures.hotel(5, "Hotel Example", "2026-11-18T15:00", "2026-11-20T11:00")],
                                       destination: "Grand Junction")])
         let read = await service(server: home).readTrips()
-        let entities = TripPlaces.entities(in: trips(read))
+        let entities = TripPlaces.entities(in: trips(read), scope: scope)
         let said = TripPlaces.open(entities[0], in: read)
         let texts = entities.flatMap { [$0.place, $0.dates ?? ""] } + [said.spoken, said.page ?? ""]
         for text in texts {
