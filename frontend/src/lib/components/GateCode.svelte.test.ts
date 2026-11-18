@@ -67,6 +67,28 @@ describe("GateCode button", () => {
   });
 });
 
+describe("opened by the app on arrival", () => {
+  it("opens the dialog without a button when it is told to, and closes it for its owner", async () => {
+    render(GateCode, { segment: lot, now: NOW, buttons: false, showing: true });
+    expect(screen.queryByRole("button", { name: /Show QR code/ })).toBeNull();
+    const dialog = await screen.findByRole("dialog", { name: "QR code" });
+    expect(await within(dialog).findByRole("img", { name: "QR code for Example Airport Long-Term Lot" })).toHaveAttribute("src", QR);
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("shows only Show QR code, no way to choose a picture, when it is read only", () => {
+    render(GateCode, { segment: lot, now: NOW, readOnly: true });
+    expect(screen.getByRole("button", { name: /Show QR code/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Choose/ })).toBeNull();
+  });
+
+  it("shows nothing when read only and no code is chosen yet", () => {
+    render(GateCode, { segment: { ...lot, gate_code: { state: "choose", day: null } }, now: NOW, readOnly: true });
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
 describe("the full-screen code", () => {
   it("shows the picture centred on white with sharp pixels, the lot and the times, and the brightness reminder", async () => {
     render(GateCode, { segment: lot, now: NOW });

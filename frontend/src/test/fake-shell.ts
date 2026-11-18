@@ -12,6 +12,7 @@ export function installShell(initial: { saving?: boolean; syncing?: boolean; las
     shell.posts.push(message);
     if (shell.replies.has(message.type)) return shell.replies.get(message.type);
     if (message.type === "load") return { version: 1, trips: shell.trips };
+    if (message.type === "pendingArrival" || message.type === "arrivalHere") return { version: 1, segmentId: null, tripId: null };
     if (message.type === "setSaving") { shell.saving = message.on; if (!message.on) shell.trips = []; }
     if (message.type === "remove") shell.trips = [];
     return status();

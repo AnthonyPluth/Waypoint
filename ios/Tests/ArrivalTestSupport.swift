@@ -82,6 +82,32 @@ final class FakeArrivalGeocoder: AddressGeocoding, @unchecked Sendable {
     }
 }
 
+final class FakeArrivalFix: ArrivalFixing, @unchecked Sendable {
+    var isAllowed = true
+    var point: PlacePoint?
+    private(set) var requests = 0
+
+    func current() async -> PlacePoint? {
+        requests += 1
+        return point
+    }
+}
+
+final class FakeArrivalHere: ArrivalHereAnswering, @unchecked Sendable {
+    var found: ArrivalHereAnswer?
+    private(set) var asked: [URL] = []
+    private(set) var backgrounds = 0
+
+    func answer(server: URL) async -> ArrivalHereAnswer? {
+        asked.append(server)
+        return found
+    }
+
+    func backgrounded() async {
+        backgrounds += 1
+    }
+}
+
 final class ArrivalGate: @unchecked Sendable {
     private let lock = NSLock()
     private var isOpen = false
@@ -206,6 +232,8 @@ final class ArrivalRig {
     let home: URL
     let places: ArrivalPlaces
     let watch: ArrivalWatch
+    let fix: FakeArrivalFix
+    let here: ArrivalHere
 
     init(authorization: ArrivalAuthorization = .always, at start: Date = ArrivalFixtures.moment(2026, 11, 30, 12)) {
         let rootFolder = FileManager.default.temporaryDirectory.appendingPathComponent("arrival-watch-\(UUID().uuidString)", isDirectory: true)
@@ -221,6 +249,10 @@ final class ArrivalRig {
         let server = URL(string: "https://waypoint.example.com")!
         let found = ArrivalPlaces(store: offlineStore, geocoder: lookups, permission: manager, calendar: ArrivalFixtures.utc,
                                   now: { time.date })
+        let looking = FakeArrivalFix()
+        fix = looking
+        here = ArrivalHere(places: found, fix: looking, settings: OfflineSettings(defaults: suiteDefaults),
+                           protectedDataAvailable: { flag.value }, now: { time.date })
         root = rootFolder
         suite = suiteName
         defaults = suiteDefaults

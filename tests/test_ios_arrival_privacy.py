@@ -6,11 +6,14 @@ from pathlib import Path
 IOS = Path(__file__).resolve().parent.parent / "ios"
 GEOCODING_FILE = IOS / "Waypoint" / "ArrivalPlaces.swift"
 WATCH_FILE = IOS / "Waypoint" / "ArrivalWatch.swift"
+HERE_FILE = IOS / "Waypoint" / "ArrivalHere.swift"
 DESIGN = IOS.parent / "docs" / "design" / "arrival-codes" / "README.md"
 LOCATION_FIXES = re.compile(
-    r"\b(startUpdatingLocation|startMonitoringSignificantLocationChanges|requestLocation|didUpdateLocations|allowsBackgroundLocationUpdates"
+    r"\b(startUpdatingLocation|startMonitoringSignificantLocationChanges|allowsBackgroundLocationUpdates"
     r"|startRangingBeacons|CLLocationUpdate|CLServiceSession|CLMonitor)\b"
 )
+ONE_LOCATION_REQUEST = re.compile(r"\b(requestLocation|didUpdateLocations)\b")
+KEPT_ANYWHERE = re.compile(r"\b(OfflineStore|UserDefaults|FileManager|saveArrival|savePlaces)\b|\.write\(")
 LOCATION_PROPERTY = re.compile(r"\.location\b")
 ARRIVAL_RECORD_DENIALS = re.compile(
     r"(where (you|the person|they) (was|were)|when (you|they) arrived|arrivals?)[^.;:]{0,40}\b(not|never)\b[^.;:]{0,20}\b(recorded|kept)\b"
@@ -42,14 +45,24 @@ class ArrivalPrivacyTests(unittest.TestCase):
             if path.name.startswith("Arrival"):
                 self.assertIsNone(LOGGING.search(path.read_text()), f"{path.name} writes a log line")
 
-    def test_the_arrival_files_never_ask_for_a_location_fix(self):
+    def test_the_arrival_files_never_follow_the_phone(self):
         self.assertTrue(WATCH_FILE.is_file())
         for path in swift_files(IOS / "Waypoint"):
             if path.name.startswith("Arrival"):
                 text = path.read_text()
-                self.assertIsNone(LOCATION_FIXES.search(text), f"{path.name} asks for a location fix")
+                self.assertIsNone(LOCATION_FIXES.search(text), f"{path.name} follows the phone's location")
                 if path != GEOCODING_FILE:
                     self.assertIsNone(LOCATION_PROPERTY.search(text), f"{path.name} reads the phone's location")
+
+    def test_one_file_makes_the_single_location_request_for_the_card_and_keeps_nothing(self):
+        asking = [p.name for p in swift_files(IOS) if ONE_LOCATION_REQUEST.search(p.read_text())]
+        self.assertEqual(asking, ["ArrivalHere.swift"])
+        text = HERE_FILE.read_text()
+        self.assertEqual(len(re.findall(r"\.requestLocation\(\)", text)), 1)
+        self.assertIsNone(KEPT_ANYWHERE.search(text), "ArrivalHere.swift stores something")
+        self.assertIsNone(re.search(r"\b(requestWhenInUseAuthorization|requestAlwaysAuthorization)\b", text))
+        self.assertIn("ArrivalHere", (IOS / "Waypoint" / "WaypointApp.swift").read_text())
+        self.assertEqual(ONE_LOCATION_REQUEST.findall("manager.requestLocation()"), ["requestLocation"])
 
     def test_the_regions_are_named_arrival_and_the_segment_id_only(self):
         text = WATCH_FILE.read_text()
@@ -110,6 +123,7 @@ class ArrivalPrivacyTests(unittest.TestCase):
         self.assertIsNotNone(LOCATION_FIXES.search("manager.startUpdatingLocation()"))
         self.assertIsNotNone(LOCATION_PROPERTY.search("let here = manager.location"))
         self.assertIsNone(LOCATION_FIXES.search("let place = ArrivalPlace(kind: .parking)"))
+        self.assertIsNone(LOCATION_FIXES.search("manager.requestLocation()"))
 
 
 if __name__ == "__main__":

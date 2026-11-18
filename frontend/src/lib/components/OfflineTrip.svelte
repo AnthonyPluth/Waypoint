@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Segment } from "$lib/api-types";
   import { app } from "$lib/app.svelte";
+  import ArrivalOpen from "$lib/components/ArrivalOpen.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
+  import GateCode from "$lib/components/GateCode.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -37,6 +39,8 @@
     <p class="text-muted-foreground">This is the copy saved on this device. Editing and adding need a connection.</p>
   </div>
 </div>
+
+<ArrivalOpen tripId={trip.id} segments={trip.segments} {now} />
 
 <div class="mb-6 space-y-1">
   <h1 class="break-words text-display">{trip.name}</h1>
@@ -82,6 +86,7 @@
             <div class="flex flex-col gap-2" data-booking>
               {#if card.segments.length > 1 && b.confirmation}<p class="text-lg"><CopyCode code={b.confirmation} /></p>{/if}
               {#if costsShown && card.segments.length > 1 && b.price}<p class="text-sm" data-cost><span class="eyebrow">Cost</span> <span class="font-medium" class:line-through={b.status === "cancelled"}>{formatMoney(b.price.amount_minor, b.price.currency)}</span></p>{/if}
+              {#if b.kind === "parking"}<div class="flex flex-wrap gap-2"><GateCode segment={b} {now} readOnly /></div>{/if}
               {#if b.details.phone}<p class="text-sm"><span class="eyebrow">Phone</span> <a class="underline underline-offset-2" href={b.links.call ?? `tel:${b.details.phone}`}>{b.details.phone}</a></p>{/if}
               {#if b.travelers.length && showBookingTravellers(b, everyone)}
                 <h3 class="eyebrow">Travellers</h3>

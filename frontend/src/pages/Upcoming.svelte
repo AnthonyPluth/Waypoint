@@ -14,6 +14,7 @@
   import FlightRow from "$lib/components/FlightRow.svelte";
   import FlightStatus from "$lib/components/FlightStatus.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
+  import ArrivalCard from "$lib/components/ArrivalCard.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
   import AvatarStack from "$lib/components/AvatarStack.svelte";
@@ -218,6 +219,8 @@
     </div>
   {/if}
 </div>
+
+{#if trips}<ArrivalCard segments={trips.flatMap((t) => t.segments)} {now} />{/if}
 
 {#if loadError}
   <Alert><AlertDescription class="flex flex-wrap items-center justify-between gap-3">

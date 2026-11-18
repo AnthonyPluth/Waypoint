@@ -1,0 +1,27 @@
+{
+  "name": "arrival-tap",
+  "page": "upcoming",
+  "steps": [
+    { "fake_shell": "tap-parking" },
+    { "reload": true },
+    { "wait_for": "[data-testid='code-square'] img" },
+    { "expect_text": { "selector": "[data-testid='code-lot']", "text": "Example Airport Long-Term Lot" } },
+    { "screenshot": "parking" },
+    { "press": { "selector": "[role='dialog']", "key": "Escape" } },
+    { "expect_text": { "selector": "main", "text": "Example Airport Long-Term Lot" } },
+    { "screenshot": "parking-trip" },
+    { "goto": "#upcoming" },
+    { "fake_shell": "tap-car" },
+    { "reload": true },
+    { "wait_for": "[data-testid='confirmation-dialog']" },
+    { "expect_text": { "selector": "[data-testid='confirmation-dialog']", "text": "Pickup" } },
+    { "screenshot": "rental" },
+    { "press": { "selector": "[role='dialog']", "key": "Escape" } },
+    { "goto": "#upcoming" },
+    { "fake_shell": "tap-hotel" },
+    { "reload": true },
+    { "wait_for": "[data-testid='confirmation-dialog']" },
+    { "expect_text": { "selector": "[data-testid='confirmation-dialog']", "text": "Check-in" } },
+    { "screenshot": "hotel" }
+  ]
+}

@@ -14,6 +14,7 @@
   import PastBookings from "$lib/components/PastBookings.svelte";
   import PastBookingsSheet from "$lib/components/PastBookingsSheet.svelte";
   import AddressLink from "$lib/components/AddressLink.svelte";
+  import ArrivalOpen from "$lib/components/ArrivalOpen.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightCard from "$lib/components/FlightCard.svelte";
   import DayTime from "$lib/components/DayTime.svelte";
@@ -333,6 +334,7 @@
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {@const t = trip}
+  <ArrivalOpen tripId={t.id} segments={t.segments} {now} />
   {#if completedPage}
     <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
       onbookings={() => (bookingsOpen = true)} bookings={pastBookings} />
