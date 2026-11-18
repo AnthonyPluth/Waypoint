@@ -165,5 +165,10 @@ describe("an arrival with no connection, on the cached page", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
     await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: "Show pickup" }));
     expect(await screen.findByRole("dialog", { name: "Pickup" })).toBeInTheDocument();
+    expect(location.hash).toBe("#trip/1");
+    expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
   });
 });

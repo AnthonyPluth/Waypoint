@@ -63,7 +63,12 @@ export async function checkArrivalHere(): Promise<void> {
   }
   if (mine !== checks) return;
   arrival.here = found;
-  if (found === null) arrival.dismissed = null;
+  if (found === null || (arrival.dismissed !== null && arrival.dismissed !== found.segmentId)) arrival.dismissed = null;
+}
+
+export function openBooking(segmentId: number, tripId: number): void {
+  arrival.target = { segmentId, tripId, at: Date.now() };
+  showTrip(tripId);
 }
 
 export function dismissArrival(segmentId: number): void {

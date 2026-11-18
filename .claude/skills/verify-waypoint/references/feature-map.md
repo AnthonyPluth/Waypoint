@@ -31,7 +31,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#upcoming`.
 - **Widths:** phone, desktop.
 - **Touches:** `Show QR code`, `Dismiss`, `Show pickup`, `Show check-in`.
-- **Expects to see:** `You’re at Example Airport Long-Term Lot`, `Your code is one tap away.`, `Show this at the counter.`, `Show this at the front desk.`.
+- **Expects to see:** `You’re at Example Airport Long-Term Lot`, `Your code is one tap away.`, `Example Airport Long-Term Lot`, `Show this at the counter.`, `Show this at the front desk.`.
 - **Fakes (the demo server can't):** `fake_shell`.
 - **Drive it:** `tools/control flow arrival-card`; or `poetry run python run.py verify --flow arrival-card`.
 

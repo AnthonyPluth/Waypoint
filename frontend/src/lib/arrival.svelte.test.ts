@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ARRIVAL_EVENT, TARGET_LIFETIME, arrival, checkArrivalHere, dismissArrival, listenForArrival, openable, pendingFor, resetArrival, settleTarget, takePendingArrival } from "./arrival.svelte";
+import { ARRIVAL_EVENT, TARGET_LIFETIME, arrival, checkArrivalHere, dismissArrival, listenForArrival, openBooking, openable, pendingFor, resetArrival, settleTarget, takePendingArrival } from "./arrival.svelte";
 import { installShell, type FakeShell } from "../test/fake-shell";
 import { segment } from "../test/fixtures";
 
@@ -88,6 +88,19 @@ describe("the check for the booking you are at", () => {
     expect(arrival.dismissed).toBeNull();
   });
 
+  it("lets a dismissed booking show again once the app has named a different one", async () => {
+    reply("arrivalHere", 5, 7);
+    await checkArrivalHere();
+    dismissArrival(5);
+    reply("arrivalHere", 8, 7);
+    await checkArrivalHere();
+    expect(arrival.dismissed).toBeNull();
+    reply("arrivalHere", 5, 7);
+    await checkArrivalHere();
+    expect(arrival.dismissed).toBeNull();
+    expect(arrival.here).toEqual({ segmentId: 5, tripId: 7 });
+  });
+
   it("shows no card when the check fails, and keeps a dismissal through it", async () => {
     reply("arrivalHere", 5, 7);
     await checkArrivalHere();
@@ -132,5 +145,14 @@ describe("which bookings have a code to open", () => {
     expect(openable(segment({ kind: "hotel", confirmation: " " }), NOW)).toBe(false);
     expect(openable(segment({ kind: "car", confirmation: null }), NOW)).toBe(false);
     expect(openable(segment({ kind: "flight", confirmation: "AB12" }), NOW)).toBe(false);
+  });
+});
+
+describe("opening a booking from the card", () => {
+  it("goes to its trip and hands the booking to the trip page", () => {
+    location.hash = "#upcoming";
+    openBooking(5, 7);
+    expect(location.hash).toBe("#trip/7");
+    expect(pendingFor(7)).toBe(5);
   });
 });

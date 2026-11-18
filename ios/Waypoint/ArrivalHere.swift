@@ -142,7 +142,11 @@ actor ArrivalHere: ArrivalHereAnswering {
 
     func answer(server: URL) async -> ArrivalHereAnswer? {
         if let running = check, running.server == server {
-            return await running.task.value
+            let cached = await running.task.value
+            guard let cached else { return nil }
+            if await stillHolds(cached, server: server) { return cached }
+            check = nil
+            return nil
         }
         check?.task.cancel()
         let task = Task { await look(server: server) }
@@ -154,6 +158,14 @@ actor ArrivalHere: ArrivalHereAnswering {
     func backgrounded() {
         check?.task.cancel()
         check = nil
+    }
+
+    /// A cached answer is given again only while saving is on, the phone can be asked and the booking is still among the saved places:
+    /// switching saving off or any purge ends it at once, in the same foreground session.
+    private func stillHolds(_ answer: ArrivalHereAnswer, server: URL) async -> Bool {
+        guard settings.isOn, fix.isAllowed, await protectedDataAvailable() else { return false }
+        let found = await places.places(server: server)
+        return found.contains { $0.segmentId == answer.segmentId && $0.tripId == answer.tripId }
     }
 
     private func look(server: URL) async -> ArrivalHereAnswer? {

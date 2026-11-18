@@ -135,6 +135,36 @@ final class ArrivalHereTests: XCTestCase {
         XCTAssertEqual(phone.fix.requests, 2)
     }
 
+    func testACachedAnswerEndsWhenSavingIsSwitchedOffInTheSameForegroundSession() async {
+        let phone = await saved()
+        phone.fix.point = ArrivalFixtures.lot
+        let first = await phone.here.answer(server: phone.home)
+        XCTAssertEqual(first?.segmentId, 1)
+        OfflineSettings(defaults: phone.defaults).set(false)
+        let second = await phone.here.answer(server: phone.home)
+        XCTAssertNil(second)
+        XCTAssertEqual(phone.fix.requests, 1)
+    }
+
+    func testACachedAnswerEndsWhenTheSavedTripsArePurged() async throws {
+        let phone = await saved()
+        phone.fix.point = ArrivalFixtures.lot
+        let first = await phone.here.answer(server: phone.home)
+        XCTAssertEqual(first?.segmentId, 1)
+        try phone.store.purge(server: phone.home)
+        let second = await phone.here.answer(server: phone.home)
+        XCTAssertNil(second)
+    }
+
+    func testACachedAnswerEndsWhenThePhoneCanNoLongerBeAsked() async {
+        let phone = await saved()
+        phone.fix.point = ArrivalFixtures.lot
+        _ = await phone.here.answer(server: phone.home)
+        phone.fix.isAllowed = false
+        let second = await phone.here.answer(server: phone.home)
+        XCTAssertNil(second)
+    }
+
     func testAnswersAgainForAnotherServer() async {
         let phone = await saved()
         phone.fix.point = ArrivalFixtures.lot

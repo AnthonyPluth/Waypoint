@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Segment } from "$lib/api-types";
-  import { arrival, checkArrivalHere, dismissArrival, openable } from "$lib/arrival.svelte";
-  import ArrivalCode from "$lib/components/ArrivalCode.svelte";
+  import { arrival, checkArrivalHere, dismissArrival, openable, openBooking } from "$lib/arrival.svelte";
   import KindTile from "$lib/components/KindTile.svelte";
   import { Button } from "$lib/components/ui/button";
   import { headline } from "$lib/trips";
@@ -9,8 +8,6 @@
 
   type Props = { segments: Segment[]; now: number };
   let { segments, now }: Props = $props();
-
-  let open = $state(false);
 
   const here = $derived(arrival.here);
   const segment = $derived(here ? segments.find((s) => s.id === here.segmentId && s.trip_id === here.tripId) : undefined);
@@ -34,9 +31,8 @@
     <div class="min-w-0 flex-1">
       <p class="break-words text-[15px] font-semibold">You’re at {place}</p>
       <p class="text-caption text-muted-foreground">Your code is one tap away.</p>
-      <div class="mt-2"><Button size="sm" onclick={() => (open = true)}>{label}</Button></div>
+      <div class="mt-2"><Button size="sm" onclick={() => openBooking(shown.id, shown.trip_id)}>{label}</Button></div>
     </div>
     <Button variant="ghost" size="icon" class="-mr-1.5 -mt-1.5" aria-label="Dismiss" onclick={() => dismissArrival(shown.id)}><X /></Button>
   </section>
-  <ArrivalCode segment={shown} {now} bind:open />
 {/if}

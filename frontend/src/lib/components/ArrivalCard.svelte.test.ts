@@ -7,7 +7,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), apiImage: vi.fn(), newPage: vi.fn(), 
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { apiImage } from "$lib/api";
-import { arrival, resetArrival } from "$lib/arrival.svelte";
+import { arrival, pendingFor, resetArrival } from "$lib/arrival.svelte";
 import { installShell, type FakeShell } from "../../test/fake-shell";
 import { segment } from "../../test/fixtures";
 import ArrivalCard from "./ArrivalCard.svelte";
@@ -40,31 +40,42 @@ describe("the card on Upcoming when the app says you are at a booking (frame A3)
     expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
 
-  it("never opens the code by itself: the dialog waits for the tap, then shows the picture", async () => {
+  it("never opens the code by itself: the tap takes the person to the booking’s trip page and hands the booking over", async () => {
     here(5);
+    location.hash = "#upcoming";
     render(ArrivalCard, { segments: all, now: NOW });
     await screen.findByTestId("arrival-card");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(apiImage).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Show QR code" }));
-    expect(await screen.findByRole("dialog", { name: "QR code" })).toBeInTheDocument();
-    expect(await screen.findByRole("img", { name: "QR code for Harbour Parking, Lot B" })).toHaveAttribute("src", "data:image/png;base64,QUJD");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(location.hash).toBe("#trip/7");
+    expect(pendingFor(7)).toBe(5);
   });
 
-  it("offers the pickup and opens its confirmation for a rental", async () => {
-    here(6);
+  it("does the same for a rental pickup and a hotel", async () => {
+    for (const [id, label] of [[6, "Show pickup"], [8, "Show check-in"]] as const) {
+      resetArrival();
+      location.hash = "#upcoming";
+      here(id);
+      const { unmount } = render(ArrivalCard, { segments: all, now: NOW });
+      await user.click(await screen.findByRole("button", { name: label }));
+      expect(location.hash).toBe("#trip/7");
+      expect(pendingFor(7)).toBe(id);
+      unmount();
+    }
+  });
+
+  it("hides the card again for the same arrival after a dismissal is cleared by a different booking", async () => {
+    here(5);
     render(ArrivalCard, { segments: all, now: NOW });
-    expect(await screen.findByRole("status", { name: "You’re at Sol Rent a Car · Lisbon Airport" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show pickup" }));
-    expect(await screen.findByRole("dialog", { name: "Pickup" })).toHaveTextContent("SR-7Q2K9");
-  });
-
-  it("offers the check-in and opens its confirmation for a hotel", async () => {
+    await user.click(await screen.findByRole("button", { name: "Dismiss" }));
     here(8);
-    render(ArrivalCard, { segments: all, now: NOW });
-    expect(await screen.findByRole("status", { name: "You’re at Casa do Rio" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Show check-in" }));
-    expect(await screen.findByRole("dialog", { name: "Check-in" })).toHaveTextContent("8841 2207");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await screen.findByRole("status", { name: "You’re at Casa do Rio" });
+    here(5);
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(await screen.findByRole("status", { name: "You’re at Harbour Parking, Lot B" })).toBeInTheDocument();
   });
 
   it("hides until you leave and arrive again when it is dismissed, and comes back for the next arrival", async () => {
