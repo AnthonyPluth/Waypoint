@@ -396,7 +396,7 @@ struct TripAnswers {
     }
 
     /// The parking booking that is current (its entry passed and its exit not yet, as wall-clock times in the lot's zone; one with no
-    /// times from its first day to the end of its last), the one that ends first if two are; else the next one. Not cancelled. The
+    /// times from its first day to the end of its last, so it ends at the midnight after), the one that ends first if two are; else the next one. Not cancelled. The
     /// answer is only the lot's name and the trip to open: the code comes from the server once the app is open, never from here.
     func parking(_ copy: SavedCopy) -> Answer {
         var found: [Parking] = []
@@ -404,9 +404,12 @@ struct TripAnswers {
             for booking in trip.bookings where booking.kind == "parking" && !booking.isCancelled {
                 guard let start = WallClock(booking.startLocal), let end = WallClock(booking.endLocal) else { continue }
                 let place = zone(booking.startZone)
-                guard let entry = instant(start, in: place), let exit = instant(end, in: zone(booking.endZone)) else { continue }
+                let endPlace = zone(booking.endZone)
+                guard let entry = instant(start, in: place), let ends = instant(end, in: endPlace) else { continue }
+                let timed = !booking.datedOnly
+                let exit = timed ? ends : (gregorian(endPlace).date(byAdding: .day, value: 1, to: ends) ?? ends)
                 found.append(Parking(trip: trip, booking: booking, start: start, end: end, zone: place,
-                                     entry: entry, exit: exit, timed: !booking.datedOnly))
+                                     entry: entry, exit: exit, timed: timed))
             }
         }
         let current = found.filter { booking in

@@ -630,6 +630,15 @@ final class TripAnswersTests: XCTestCase {
         XCTAssertEqual(answer.page, "#trip/2")
     }
 
+    func testABookingWithNoTimesEndsAtTheEndOfItsLastDayWhenTwoAreCurrent() throws {
+        let allDay = AnswerFixtures.parking(53, "Lot All Day", "2026-11-18T00:00", "2026-11-18T00:00")
+        let noon = AnswerFixtures.parking(54, "Lot Noon", "2026-11-17T09:00", "2026-11-18T12:00")
+        let copy = try saved([AnswerFixtures.trip(1, "All day", [allDay]), AnswerFixtures.trip(2, "Noon", [noon])])
+        let answer = answers(at: AnswerFixtures.date("2026-11-18T09:00")).parking(copy)
+        XCTAssertEqual(answer.spoken, "Opening your parking at Lot Noon.")
+        XCTAssertEqual(answer.page, "#trip/2")
+    }
+
     func testEntryIsFromTheMomentItStartsAndExitIsUntilTheMomentItEnds() throws {
         let copy = try saved([AnswerFixtures.trip(1, "Trip", [lotExample])])
         let atEntry = answers(at: AnswerFixtures.date("2026-11-17T09:00")).parking(copy)
