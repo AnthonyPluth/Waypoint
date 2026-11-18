@@ -6663,6 +6663,26 @@
         ],
         "additionalProperties": false
       },
+      "OfflineAirport": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "latitude": {
+            "type": "number"
+          },
+          "longitude": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "code",
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "OfflineMessages": {
         "type": "object",
         "properties": {
@@ -6718,6 +6738,12 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
+            }
+          },
+          "airports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfflineAirport"
             }
           },
           "codes": {

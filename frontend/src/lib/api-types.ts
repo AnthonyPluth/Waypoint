@@ -576,6 +576,12 @@ export interface Offline {
   trips: OfflineTrip[];
 }
 
+export interface OfflineAirport {
+  code: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface OfflineMessages {
   segment_id: number;
   emails: StoredEmail[];
@@ -591,6 +597,7 @@ export interface OfflineTrip {
   trip: Trip;
   messages: OfflineMessages[];
   cities: Record<string, string>;
+  airports?: OfflineAirport[];
   codes?: OfflinePicture[];
 }
 

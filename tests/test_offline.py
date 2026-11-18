@@ -14,7 +14,7 @@ from waypoint.server import ROUTES
 from waypoint.server.api.offline import api_offline
 from waypoint.server.common import _current
 from waypoint.storage import db, gate_codes, secretbox, stored_mail
-from waypoint.storage.models import AuthSession, Mailbox, Person, Segment, Trip, User
+from waypoint.storage.models import Airport, AuthSession, Mailbox, Person, Segment, Trip, User
 from tests.privacy import no_leaks
 from tests.shared import DbCase, ServerCase, fetch
 from tests.test_gate_codes import png
@@ -389,6 +389,45 @@ class OfflineRouteTests(ServerCase):
         self.assertEqual(got["trips"][0]["cities"], {"SEA": "Seattle", "PDX": "Portland"})
         for others in ("Denver", "Grand Junction", "DEN", "GJT"):
             self.assertNotIn(others, json.dumps(got))
+
+    def car(self, start: date, end: date, **more) -> dict:
+        return {"kind": "car", "origin": "DEN", "provider": "Example Rentals", "confirmation": "CAR001", "start_local": f"{start.isoformat()}T10:00",
+                "end_local": f"{end.isoformat()}T10:00", "start_zone": "America/Denver", "end_zone": "America/Denver", **more}
+
+    def test_a_trip_with_an_airport_only_car_pickup_lists_that_airports_coordinates(self):
+        ana = [{"person_id": self.person["ana"]}]
+        mine = self.trip_with("ana", days(1), days(3), self.car(days(1), days(3)), ana)
+        [trip] = self.ok("ana")["trips"]
+        self.assertEqual(trip["trip"]["id"], mine["trip_id"])
+        with db.session() as conn:
+            den = conn.orm.get(Airport, "DEN")
+            self.assertEqual(trip["airports"], [{"code": "DEN", "latitude": den.latitude, "longitude": den.longitude}])
+        self.assertEqual(sorted(trip["airports"][0]), ["code", "latitude", "longitude"])
+
+    def test_a_trip_without_an_airport_car_pickup_has_an_empty_airports_list(self):
+        ana = [{"person_id": self.person["ana"]}]
+        self.trip_with("ana", days(1), days(3), flight(days(1), days(3), origin="DEN", destination="GJT"), ana)
+        self.trip_with("ana", days(2), days(4), self.car(days(2), days(4), origin="123 Example Street, Denver", confirmation="CAR002"), ana)
+        got = self.ok("ana")
+        self.assertEqual([t["airports"] for t in got["trips"]], [[], []])
+
+    def test_only_a_car_bookings_origin_adds_an_airport_and_each_code_is_listed_once(self):
+        ana = [{"person_id": self.person["ana"]}]
+        mine = self.trip_with("ana", days(1), days(3), flight(days(1), days(3), origin="SEA", destination="PDX"), ana)
+        for confirmation in ("CAR003", "CAR004"):
+            self.book("ana", {**self.car(days(1), days(3), confirmation=confirmation), "trip_id": mine["trip_id"]}, ana)
+        self.book("ana", {**self.car(days(1), days(3), confirmation="CAR005", origin="Example Depot", destination="JFK"), "trip_id": mine["trip_id"]}, ana)
+        [trip] = self.ok("ana")["trips"]
+        self.assertEqual([a["code"] for a in trip["airports"]], ["DEN"])
+
+    def test_the_airports_list_holds_only_the_viewers_own_trips_and_the_rest_of_the_reply_is_unchanged(self):
+        self.trip_with("cy", days(1), days(3), self.car(days(1), days(3)), [{"person_id": self.person["cy"]}])
+        self.assertEqual(self.ok("ana"), {"version": 1, "trips": []})
+        ana = [{"person_id": self.person["ana"]}]
+        self.trip_with("ana", days(1), days(3), flight(days(1), days(3)), ana)
+        [trip] = self.ok("ana")["trips"]
+        self.assertEqual(sorted(trip), ["airports", "cities", "messages", "trip"])
+        self.assertEqual(trip["airports"], [])
 
     def test_the_route_is_a_get_and_the_only_one(self):
         self.assertEqual([m for m, p, *_ in ROUTES if p == "/api/offline"], ["GET"])
