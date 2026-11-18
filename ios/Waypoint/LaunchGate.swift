@@ -22,3 +22,21 @@ final class LaunchGate {
         lock.unlock()
     }
 }
+
+enum LaunchDecision: Equatable {
+    case launch
+    case purgeAndConnect
+    case failed(String)
+
+    static let unreadable = "Waypoint can’t read your saved sign-in right now. Try again, or unlock your phone and reopen the app."
+
+    /// What a launch does for what the Keychain says. Only a Keychain that was read and holds no sign-in purges the saved trips; one that
+    /// cannot be read shows the failure screen, whose Try again reads it again, and deletes nothing.
+    static func of(_ standing: ServerSession.Standing) -> LaunchDecision {
+        switch standing {
+        case .connected: return .launch
+        case .notConnected: return .purgeAndConnect
+        case .unknown: return .failed(unreadable)
+        }
+    }
+}

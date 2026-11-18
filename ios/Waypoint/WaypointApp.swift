@@ -78,12 +78,16 @@ struct WaypointApp: App {
     @MainActor
     private func open() async {
         Task { await ServerSession.shared.retryPendingRevocations() }
-        let standing = await ServerSession.shared.standing()
-        if standing == .unknown { return }
-        guard standing == .connected else {
+        switch LaunchDecision.of(await ServerSession.shared.standing()) {
+        case .failed(let why):
+            phase = .failed(why)
+            return
+        case .purgeAndConnect:
             await OfflineSync.shared.purge()
             phase = .connect
             return
+        case .launch:
+            break
         }
         switch await ServerSession.shared.launchWebView() {
         case .server(let url):

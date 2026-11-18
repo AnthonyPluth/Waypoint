@@ -132,22 +132,29 @@ final class LockedLaunchTests: XCTestCase {
         XCTAssertEqual(readable, .notConnected)
     }
 
-    func testTheWatchKeepsItsRegionsWhileTheCredentialsCannotBeReadAndClearsThemOnceKnownWithNoServer() async {
+    func testTheWatchKeepsItsRegionsUnlessTheFinalStandingIsNotConnected() async {
         let phone = ArrivalRig()
         phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot]
         phone.save([ArrivalFixtures.parking()])
         await phone.watch.saved(server: phone.home)
         XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1"])
-        let known = ArrivalFlag(false)
+        let signedOut = ArrivalFlag(false)
         let blind = ArrivalWatch(store: phone.store, places: phone.places, locations: phone.locations, notifications: phone.notifications,
                                  asks: ArrivalAsks(defaults: phone.defaults), settings: OfflineSettings(defaults: phone.defaults),
-                                 server: { nil }, credentialsKnown: { known.value })
+                                 server: { nil }, signedOut: { signedOut.value })
         await blind.handle(.authorizationChanged)
         await blind.activated()
         XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1"])
-        known.value = true
+        signedOut.value = true
         await blind.handle(.authorizationChanged)
         XCTAssertEqual(phone.locations.monitoredIds, [])
         phone.cleanUp()
+    }
+
+    func testTheLaunchDecisionPurgesOnlyForAKeychainThatWasReadAndIsEmpty() {
+        XCTAssertEqual(LaunchDecision.of(.connected), .launch)
+        XCTAssertEqual(LaunchDecision.of(.notConnected), .purgeAndConnect)
+        XCTAssertEqual(LaunchDecision.of(.unknown), .failed(LaunchDecision.unreadable))
+        XCTAssertFalse(LaunchDecision.unreadable.isEmpty)
     }
 }
