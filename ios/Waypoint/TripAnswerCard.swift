@@ -19,7 +19,7 @@ private extension Color {
     }
 }
 
-private enum Tokens {
+private enum CardColors {
     static let foreground = Color(hex: 0xf3f5f9)
     static let card = Color(hex: 0x12151d)
     static let border = Color(hex: 0x232837)
@@ -41,7 +41,7 @@ private struct CardContent: View {
             header
             if let from = card.from, let to = card.to { route(from, to) }
             if let address = card.address {
-                Text(address).font(.system(size: 14)).foregroundColor(Tokens.muted)
+                Text(address).font(.system(size: 14)).foregroundColor(CardColors.muted)
             }
             if let checkIn = card.checkIn, let checkOut = card.checkOut {
                 HStack(alignment: .top, spacing: 16) {
@@ -49,25 +49,25 @@ private struct CardContent: View {
                     fact("Check-out", checkOut)
                 }
             }
-            Divider().overlay(Tokens.border)
+            Divider().overlay(CardColors.border)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(card.footer)
                 Spacer(minLength: 8)
                 Text(card.saved).multilineTextAlignment(.trailing)
             }
             .font(.system(size: 12.5))
-            .foregroundColor(Tokens.muted)
+            .foregroundColor(CardColors.muted)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background(Tokens.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Tokens.border, lineWidth: 1))
-        .foregroundColor(Tokens.foreground)
+        .background(CardColors.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(CardColors.border, lineWidth: 1))
+        .foregroundColor(CardColors.foreground)
         .environment(\.colorScheme, .dark)
         .accessibilityElement(children: .combine)
     }
 
-    private var tint: Color { card.kind == .flight ? Tokens.flight : Tokens.stay }
+    private var tint: Color { card.kind == .flight ? CardColors.flight : CardColors.stay }
 
     private var header: some View {
         HStack(spacing: 10) {
@@ -80,7 +80,7 @@ private struct CardContent: View {
                 Text(card.eyebrow.uppercased())
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(1.3)
-                    .foregroundColor(Tokens.muted)
+                    .foregroundColor(CardColors.muted)
                 Text(card.title).font(.system(size: 15, weight: .semibold))
             }
             Spacer(minLength: 8)
@@ -91,9 +91,9 @@ private struct CardContent: View {
     private func chip(_ chip: AnswerCard.Chip) -> some View {
         let (soft, ink): (Color, Color) = {
             switch chip.tone {
-            case .info: return (Tokens.infoSoft, Tokens.infoInk)
-            case .warn: return (Tokens.warnSoft, Tokens.warnInk)
-            case .quiet: return (Tokens.quietSoft, Tokens.muted)
+            case .info: return (CardColors.infoSoft, CardColors.infoInk)
+            case .warn: return (CardColors.warnSoft, CardColors.warnInk)
+            case .quiet: return (CardColors.quietSoft, CardColors.muted)
             }
         }()
         return HStack(spacing: 6) {
@@ -111,9 +111,9 @@ private struct CardContent: View {
             stop(from, alignment: .leading)
             ZStack {
                 Rectangle()
-                    .stroke(Tokens.muted.opacity(0.6), style: StrokeStyle(lineWidth: 2, dash: [4, 5]))
+                    .stroke(CardColors.muted.opacity(0.6), style: StrokeStyle(lineWidth: 2, dash: [4, 5]))
                     .frame(height: 2)
-                Image(systemName: "airplane").font(.system(size: 14)).foregroundColor(Tokens.infoInk)
+                Image(systemName: "airplane").font(.system(size: 14)).foregroundColor(CardColors.infoInk)
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 13)
@@ -125,9 +125,9 @@ private struct CardContent: View {
         VStack(alignment: alignment, spacing: 0) {
             Text(stop.code).font(.system(size: 28, weight: .semibold, design: .monospaced))
             if let city = stop.city {
-                Text(city).font(.system(size: 13)).foregroundColor(Tokens.muted).padding(.top, 4)
+                Text(city).font(.system(size: 13)).foregroundColor(CardColors.muted).padding(.top, 4)
             }
-            (Text(stop.time).font(.system(size: 13, design: .monospaced)) + Text(" \(stop.zone)").font(.system(size: 12)).foregroundColor(Tokens.muted))
+            (Text(stop.time).font(.system(size: 13, design: .monospaced)) + Text(" \(stop.zone)").font(.system(size: 12)).foregroundColor(CardColors.muted))
                 .padding(.top, 6)
         }
     }
@@ -137,7 +137,7 @@ private struct CardContent: View {
             Text(title.uppercased())
                 .font(.system(size: 11, weight: .semibold))
                 .tracking(1.1)
-                .foregroundColor(Tokens.muted)
+                .foregroundColor(CardColors.muted)
             Text(fact.day).font(.system(size: 13.5, design: .monospaced))
             if let time = fact.time { Text(time).font(.system(size: 13.5, design: .monospaced)) }
         }
