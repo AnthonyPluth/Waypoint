@@ -318,3 +318,69 @@ class ConfigTests(unittest.TestCase):
             self.assertIn("OIDC_ALLOWED_EMAILS", str(cm.exception))
         finally:
             os.environ.pop("OIDC_ISSUER", None)
+
+
+class ClientLeavesBeforeTheReply(unittest.TestCase):
+
+    def serve(self, route):
+        class Leaving(server.Handler):
+            def _route(self, method):
+                route(self)
+
+        httpd = server.Server(("127.0.0.1", 0), Leaving)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        self.addCleanup(httpd.server_close)
+        self.addCleanup(httpd.shutdown)
+        return httpd.server_port
+
+    def hang_up_then(self, reply):
+        import socket
+        import struct
+        gone, done = threading.Event(), threading.Event()
+
+        def route(handler):
+            gone.wait(5)
+            time.sleep(0.2)
+            try:
+                reply(handler)
+            finally:
+                done.set()
+
+        port = self.serve(route)
+        with mock.patch.object(monitoring, "report") as report, mock.patch.object(monitoring, "log") as log:
+            s = socket.create_connection(("127.0.0.1", port))
+            s.sendall(b"GET /x HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            s.close()
+            gone.set()
+            self.assertTrue(done.wait(5))
+            time.sleep(0.2)
+        return report, log
+
+    def test_a_plain_reply_is_dropped_quietly(self):
+        report, log = self.hang_up_then(lambda h: h._send(200, b"x" * 4_000_000))
+        report.assert_not_called()
+        self.assertEqual([c.args[0].split()[1:3] for c in log.call_args_list], [["GET", "/x"]])
+
+    def test_a_json_reply_is_dropped_quietly(self):
+        report, log = self.hang_up_then(lambda h: h._json(200, {"data": "x" * 4_000_000}))
+        report.assert_not_called()
+        self.assertEqual([c.args[0].split()[1:3] for c in log.call_args_list], [["GET", "/x"]])
+
+    def test_a_routed_response_is_dropped_quietly(self):
+        report, log = self.hang_up_then(lambda h: h._respond(server.handler.Response(b"x" * 4_000_000, "text/plain")))
+        report.assert_not_called()
+        self.assertEqual([c.args[0].split()[1:3] for c in log.call_args_list], [["GET", "/x"]])
+
+    def test_the_connection_is_closed(self):
+        seen = []
+        self.hang_up_then(lambda h: (h._send(200, b"x" * 4_000_000), seen.append(h.close_connection)))
+        self.assertEqual(seen, [True])
+
+    def test_other_errors_still_surface(self):
+        def broken(h):
+            with mock.patch.object(h, "end_headers", side_effect=RuntimeError("boom")):
+                h._send(200, b"ok")
+
+        report, _ = self.hang_up_then(broken)
+        report.assert_called_once()

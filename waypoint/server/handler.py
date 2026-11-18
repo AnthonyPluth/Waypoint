@@ -118,6 +118,13 @@ class Handler(BaseHTTPRequestHandler):
         if oidc.config()["secure_cookie"]:
             self.send_header("Strict-Transport-Security", "max-age=31536000")
 
+    @contextlib.contextmanager
+    def _client_may_leave(self) -> Generator[None]:
+        try:
+            yield
+        except (BrokenPipeError, ConnectionResetError, TimeoutError):
+            self.close_connection = True
+
     def _send(self, status: int, body: bytes, ctype: str = "application/json", cache: str = "no-store",
               nonce: str | None = None, extra: dict[str, str] | None = None, csp: str | None = None) -> None:
         self.send_response(status)
@@ -127,9 +134,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", cache)
         self._security_headers(nonce, csp)
-        self.end_headers()
-        if self.command != "HEAD":
-            self.wfile.write(body)
+        with self._client_may_leave():
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
 
     def _error(self, e: BaseException) -> None:
         err = server_error(e, self.command, route_name(urllib.parse.urlsplit(self.path).path))
@@ -171,7 +179,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(304)
             self.send_header("ETag", etag)
             self._security_headers()
-            self.end_headers()
+            with self._client_may_leave():
+                self.end_headers()
             return
         self.send_response(r.status)
         self.send_header("Content-Type", ctype)
@@ -187,24 +196,29 @@ class Handler(BaseHTTPRequestHandler):
         self._security_headers()
         if csp:
             self.send_header("Content-Security-Policy", csp)
-        self.end_headers()
+        sent = False
+        with self._client_may_leave():
+            self.end_headers()
+            if r.stream is None and self.command != "HEAD":
+                self.wfile.write(r.body)
+            sent = True
         if r.stream is not None:
-            return self._stream(r.stream)
-        if self.command != "HEAD":
-            self.wfile.write(r.body)
-            if r.sent:
-                r.sent()
+            if sent:
+                return self._stream(r.stream)
+            self.close_connection = True
+            r.stream.close()
+        elif sent and self.command != "HEAD" and r.sent:
+            r.sent()
 
     def _stream(self, events: Generator[bytes]) -> None:
         self.close_connection = True
         try:
             if self.command == "HEAD":
                 return
-            for piece in events:
-                self.wfile.write(piece)
-                self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError, TimeoutError):
-            pass
+            with self._client_may_leave():
+                for piece in events:
+                    self.wfile.write(piece)
+                    self.wfile.flush()
         finally:
             events.close()
 
@@ -375,8 +389,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("Set-Cookie", self._cookie_header("waypoint_session", "", 0))
         self._security_headers()
-        self.end_headers()
-        self.wfile.write(body)
+        with self._client_may_leave():
+            self.end_headers()
+            self.wfile.write(body)
 
     def _feed(self, method: str, path: str) -> None:
         if method != "GET":
