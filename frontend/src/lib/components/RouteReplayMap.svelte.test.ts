@@ -52,6 +52,15 @@ describe("RouteReplayMap", () => {
     expect(list()).toEqual(["Minneapolis (MSP), Dec 5", "San Francisco (SFO), Dec 5 – 11", "Minneapolis (MSP), Dec 11"]);
   });
 
+  it("leaves the stops list out when asked, keeping the map, its name and the controls", () => {
+    render(RouteReplayMap, { stops, year: 2025, still: false, stopList: false });
+    expect(screen.queryByRole("list", { name: "Stops in order" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Stops list" })).toBeNull();
+    expect(screen.getByRole("img", { name: "Map of the route, stop by stop" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+    expect(screen.getByRole("slider", { name: "Position along the route", hidden: true }).getAttribute("aria-valuetext")).toBe("Minneapolis (MSP), Dec 5");
+  });
+
   it("does not play until asked, and shows only the first stop", () => {
     const { container } = render(RouteReplayMap, { stops, year: 2025, still: false });
     expect(frames).toHaveLength(0);

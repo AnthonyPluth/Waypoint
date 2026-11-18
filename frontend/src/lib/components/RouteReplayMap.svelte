@@ -1,27 +1,20 @@
 <script lang="ts">
-  import { tick, untrack } from "svelte";
+  import { untrack } from "svelte";
   import { geoEqualEarth, geoPath } from "d3-geo";
   import RouteReplayMapKit from "$lib/components/RouteReplayMapKit.svelte";
   import { Button } from "$lib/components/ui/button";
   import { landFor } from "$lib/land.svelte";
   import type { Maps } from "$lib/mapkit";
-  import { clusterCaption, clusterCount, clusterName, clusterTitle, thumbnailUrl, type ClusterInfo } from "$lib/photos";
-  import { mercatorFor } from "$lib/replay-mapkit";
   import { viewport } from "$lib/phone.svelte";
-  import { clock } from "$lib/trips";
-  import { activeStop, boundariesShown, datesOf, PIN_TARGET, pinFraction, pinLit, pinsOf, spreadPins, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, SCRUB_STEPS, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Box, type Roads, type Stop } from "$lib/route-replay";
+  import { activeStop, boundariesShown, boundaryShapes, cameraAt, inView, labelLit, LABEL_HOLD_MS, moverAt, NO_BOUNDARIES, NO_ROADS, SCRUB_STEPS, legProgress, legsOf, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopTitle, type Boundaries, type Roads, type Stop } from "$lib/route-replay";
   import Pause from "@lucide/svelte/icons/pause";
   import Play from "@lucide/svelte/icons/play";
-  import X from "@lucide/svelte/icons/x";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
-  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, infos = [], unlocated = 0, onshow, tripId, compact = false, onreplay = null, onended = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; infos?: ClusterInfo[]; unlocated?: number; onshow?: (cluster: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
+  let { stops, year, roads = NO_ROADS, boundaries = NO_BOUNDARIES, still = null, autoplay = false, maps = null, stopList = true, tripId, compact = false, onreplay = null, onended = null }: { stops: Stop[]; year: number; tripId?: number; roads?: Roads; boundaries?: Boundaries; still?: boolean | null; autoplay?: boolean; maps?: Maps | null; stopList?: boolean; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null } = $props();
   const replayable = $derived(stops.length >= 2);
-  const clusters = $derived(infos.map((i) => i.cluster));
-  const away = $derived(new Set(infos.filter((i) => i.far > 0).map((i) => i.index)));
-  const photoPlaces = $derived(infos.length > 0);
-  const COMPACT_LABEL = "Trip map, photo pins show how many photos are there";
-  const mapLabel = $derived(compact ? COMPACT_LABEL : !replayable ? "Map of where this trip’s photos were taken" : photoPlaces ? "Map of the route, stop by stop, with photo places; the stops are listed below" : "Map of the route, stop by stop; the stops are listed below");
+  const COMPACT_LABEL = "Trip map";
+  const mapLabel = $derived(stopList ? "Map of the route, stop by stop; the stops are listed below" : "Map of the route, stop by stop");
   let fellBack = $state(false);
   const onMapkit = $derived(maps !== null && !fellBack && replayable);
 
@@ -37,7 +30,7 @@
 
   const width = $derived(compact ? 600 : viewport.phone ? 600 : 960);
   const height = $derived(compact ? 405 : viewport.phone ? 640 : 520);
-  const projection = $derived(routeProjection(stops, width, height, undefined, roads, geoEqualEarth, clusters));
+  const projection = $derived(routeProjection(stops, width, height, undefined, roads, geoEqualEarth));
   const path = $derived(geoPath(projection));
   const legs = $derived(legsOf(stops, projection, roads));
   const lines = $derived(boundaryShapes(boundaries, projection));
@@ -99,58 +92,6 @@
   const zoom = $derived(box.w / width);
   const stateLines = $derived(boundariesShown(projection, zoom) ? lines.filter((l) => inView(l, box)) : []);
   const zoomed = $derived(box.w < width - 0.5);
-  let mapkitView = $state.raw<Box | null>(null);
-  const showView = (view: Box) => { mapkitView = view; };
-  const pinProjection = $derived(onMapkit ? mercatorFor(stops, width, height, roads, clusters) : projection);
-  const pinBox = $derived(onMapkit ? (calm ? { x: 0, y: 0, w: width, h: height } : (mapkitView ?? { x: 0, y: 0, w: width, h: height })) : box);
-  let mapWidth = $state(0);
-  let mapHeight = $state(0);
-  const pins = $derived.by(() => {
-    const placed = pinsOf(clusters, pinProjection, away).map((pin) => ({ ...pin, ...pinFraction(pin, pinBox) }));
-    if (mapWidth === 0 || mapHeight === 0) return placed;
-    const marks = positions(stops, pinProjection).map((spot) => pinFraction(spot, pinBox)).map((f) => ({ x: (f.left * mapWidth) / 100, y: (f.top * mapHeight) / 100 }));
-    const spread = spreadPins(placed.map((p) => ({ index: p.index, x: (p.left * mapWidth) / 100, y: (p.top * mapHeight) / 100, reach: Math.max(p.size, PIN_TARGET) / 2, clear: p.size / 2 })), undefined, marks);
-    const at = new Map(spread.map((p) => [p.index, p]));
-    return placed.map((p) => ({ ...p, left: (at.get(p.index)!.x / mapWidth) * 100, top: (at.get(p.index)!.y / mapHeight) * 100 }));
-  });
-  const infoOf = (index: number) => infos.find((i) => i.index === index);
-  const litPin = (index: number) => calm || !replayable || pinLit(clusters[index], stops, progress);
-  const lastLit = new Set<number>();
-  let pinging = $state<number[]>([]);
-  let named = $state<number | null>(null);
-  const timers = new Set<ReturnType<typeof setTimeout>>();
-  const later = (run: () => void, ms: number) => {
-    const timer = setTimeout(() => { timers.delete(timer); run(); }, ms);
-    timers.add(timer);
-  };
-  $effect(() => () => timers.forEach(clearTimeout));
-  $effect(() => {
-    const lit = new Set(pins.filter((p) => litPin(p.index)).map((p) => p.index));
-    const fresh = [...lit].filter((i) => !lastLit.has(i));
-    lastLit.clear();
-    lit.forEach((i) => lastLit.add(i));
-    if (!playing || calm || !replayable || fresh.length === 0) return;
-    untrack(() => {
-      pinging = [...pinging, ...fresh];
-      later(() => { pinging = pinging.filter((i) => !fresh.includes(i)); }, 1000);
-      const latest = fresh[fresh.length - 1];
-      named = latest;
-      later(() => { if (named === latest) named = null; }, LABEL_HOLD_MS);
-    });
-  });
-  $effect(() => { if (!playing) named = null; });
-  let selected = $state<number | null>(null);
-  const chosen = $derived(selected === null ? null : (infoOf(selected) ?? null));
-  let cardBroken = $state(false);
-  $effect(() => { void selected; cardBroken = false; });
-  let mapBox = $state<HTMLElement | null>(null);
-  function choose(index: number) { selected = selected === index ? null : index; }
-  function release(back = true) {
-    const was = selected;
-    selected = null;
-    if (back && was !== null) void tick().then(() => mapBox?.parentElement?.querySelector<HTMLElement>(`[data-pin="${was}"]`)?.focus());
-  }
-  const dismiss = (e: KeyboardEvent) => { if (e.key === "Escape" && selected !== null) { e.stopPropagation(); release(); } };
   const movers = $derived(legs.flatMap((leg, i) => {
     const done = calm ? 1 : legProgress(i, stops.length, progress);
     if (done <= 0 || done >= 1) return [];
@@ -183,10 +124,10 @@
   const buttonLabel = $derived(progress >= 1 ? "Replay" : playing ? "Pause" : progress > 0 ? "Resume" : "Play");
 </script>
 
-<div class="space-y-3" role="presentation" onkeydown={dismiss}>
-  <div role={compact ? "group" : undefined} aria-label={compact ? COMPACT_LABEL : undefined} bind:this={mapBox} bind:clientWidth={mapWidth} bind:clientHeight={mapHeight} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
+<div class="space-y-3">
+  <div role={compact ? "group" : undefined} aria-label={compact ? COMPACT_LABEL : undefined} class="relative overflow-hidden rounded-2xl border border-border bg-map-sea" style="aspect-ratio: {width} / {height}" data-testid="replay-map">
     {#if onMapkit && maps}
-      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {width} {height} {progress} {playing} {calm} more={clusters} onview={showView} label={mapLabel} onfailure={() => { fellBack = true; }} />
+      <RouteReplayMapKit {maps} {tripId} {stops} {roads} {width} {height} {progress} {playing} {calm} label={mapLabel} onfailure={() => { fellBack = true; }} />
     {:else}
     <svg viewBox="{box.x} {box.y} {box.w} {box.h}" data-zoomed={zoomed} role={compact ? undefined : "img"} aria-label={compact ? undefined : mapLabel} aria-hidden={compact ? "true" : undefined} class="block h-full w-full">
       <path d={sphere} class="fill-map-sea" />
@@ -242,31 +183,6 @@
       </g>
     </svg>
     {/if}
-    {#if pins.length}
-      <div class="pointer-events-none absolute inset-0" data-testid="photo-pins">
-        {#each pins as p (p.index)}
-          {@const info = infoOf(p.index)}
-          {@const lit = litPin(p.index)}
-          <button type="button" aria-label={info ? (compact ? clusterTitle(info) : clusterName(info, year)) : undefined} aria-pressed={selected === p.index} onclick={() => choose(p.index)}
-            data-pin={p.index} data-count={p.count} data-size={p.size} data-hollow={p.inferred} data-far={p.far} data-lit={lit} style="left: {p.left}%; top: {p.top}%; --s: {Math.max(p.size, PIN_TARGET)}px; width: {Math.max(p.size, PIN_TARGET)}px; height: {Math.max(p.size, PIN_TARGET)}px"
-            class={`pointer-events-auto absolute grid -translate-x-1/2 -translate-y-1/2 cursor-pointer place-items-center rounded-full p-0 outline-none transition-opacity duration-500 before:absolute before:inset-[min(0px,calc((var(--s)-44px)/2))] before:rounded-full before:content-[''] focus-visible:ring-[3px] focus-visible:ring-ring motion-reduce:transition-none ${lit ? "" : "opacity-45"}`}>
-            <span class={`relative grid place-items-center rounded-full font-mono text-[11px] font-semibold shadow-[0_2px_8px_rgb(0_0_0/50%)] ${p.inferred ? "border-2 border-map-photo bg-map-sea text-map-photo shadow-[0_0_0_2px_var(--map-sea),0_2px_8px_rgb(0_0_0/50%)]" : "border-2 border-map-sea bg-map-photo text-map-sea"} ${selected === p.index ? "outline outline-[3px] outline-offset-[3px] outline-ring" : ""}`} style="width: {p.size}px; height: {p.size}px" data-disc>
-              <span aria-hidden="true">{p.count}</span>
-              {#if p.far}<span class="absolute -right-[3px] -top-[3px] size-[11px] rounded-full border-2 border-map-sea bg-signal" aria-hidden="true" data-far-dot></span>{/if}
-              {#if pinging.includes(p.index)}<span class="pointer-events-none absolute -inset-[9px] animate-ping rounded-full border-2 border-map-photo opacity-60" aria-hidden="true" data-ping></span>{/if}
-            </span>
-          </button>
-        {/each}
-      </div>
-    {/if}
-    {#if named !== null && infoOf(named)}
-      {@const info = infoOf(named)!}
-      <div aria-hidden="true" class="pointer-events-none absolute bottom-2 left-2 flex max-w-[11rem] items-center gap-2 rounded-lg border border-border bg-card px-2 py-1 text-xs leading-tight shadow-elevation-1" data-testid="photo-label">
-        <span class="size-2 shrink-0 rounded-full bg-map-photo"></span>
-        <span><b class="block font-semibold text-foreground">{clusterCount(info)}</b><span class="text-muted-foreground">{datesOf(info.cluster.first, info.cluster.first, year, true)}, from {clock(info.cluster.first)}</span></span>
-      </div>
-    {/if}
-    {#if chosen && !viewport.phone && !compact}{@render card(chosen, "absolute bottom-3 right-3 w-[300px] max-w-[calc(100%-1.5rem)]")}{/if}
     {#if compact && onreplay && replayable && !observed}
       <Button class="absolute bottom-3 left-3" variant="secondary" size="sm" aria-label="Replay trip" aria-expanded="false" onclick={onreplay}><Play class="size-3.5" aria-hidden="true" /> Replay trip</Button>
     {/if}
@@ -282,7 +198,6 @@
     </div>
     {/if}
   </div>
-  {#if chosen && (viewport.phone || compact)}{@render card(chosen, "w-full")}{/if}
   {#if !compact}
   <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key">
     {#if replayable}
@@ -294,15 +209,7 @@
     {#if stateLines.length && !onMapkit}<li class="flex items-center gap-2"><span class="w-4 border-t border-dashed border-map-border" aria-hidden="true"></span>State line</li>{/if}
     {#if legs.some((l) => !l.flight)}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
     {/if}
-    {#if pins.length}
-      <li class="flex items-center gap-2"><span class="size-3 rounded-full bg-map-photo" aria-hidden="true"></span>Photos</li>
-      {#if pins.some((p) => p.inferred)}<li class="flex items-center gap-2"><span class="size-3 rounded-full border-2 border-map-photo" aria-hidden="true"></span>Photos placed from the itinerary</li>{/if}
-      {#if pins.some((p) => p.far)}<li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-signal" aria-hidden="true"></span>Far from every booking</li>{/if}
-    {/if}
   </ul>
-  {/if}
-  {#if !replayable && unlocated > 0}
-    <p class="text-caption text-muted-foreground" data-testid="unlocated">{unlocated === 1 ? "1 photo has no location and isn’t on the map." : `${unlocated} photos have no location and aren’t on the map.`}</p>
   {/if}
   {#if !calm && replayable && !compact}
     <div class="flex items-center gap-3">
@@ -314,7 +221,7 @@
         aria-valuetext={stopLine(stops[now], year)} class="h-11 min-w-0 flex-1 accent-primary" />
     </div>
   {/if}
-  {#if replayable && !compact}
+  {#if stopList && replayable && !compact}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div bind:this={listBox} use:quiet class="relative max-h-[24rem] overflow-y-auto overscroll-contain rounded-xl" tabindex="0" role="region" aria-label="Stops list">
     <ol class="text-sm" aria-label="Stops in order" data-testid="stop-list">
@@ -333,19 +240,3 @@
   </div>
   {/if}
 </div>
-
-{#snippet card(info: ClusterInfo, place: string)}
-  <div role="group" aria-label={clusterTitle(info)} data-testid="pin-card" class={`flex flex-wrap items-center gap-3 rounded-[14px] border border-border bg-popover p-2.5 shadow-elevation-3 ${place}`}>
-    <div class="size-14 shrink-0 overflow-hidden rounded-[10px] bg-surface-3" aria-hidden="true">
-      {#if !cardBroken}<img class="size-full object-cover" src={thumbnailUrl(info.cluster.cover)} alt="" decoding="async" draggable="false" onerror={() => { cardBroken = true; }} />{/if}
-    </div>
-    <div class="flex min-w-0 flex-1 basis-40 flex-col gap-0.5">
-      <p class="text-heading">{clusterCount(info)}</p>
-      <p class="text-caption text-muted-foreground">{clusterCaption(info, year)}</p>
-    </div>
-    <div class="flex basis-full items-center justify-between gap-1">
-      <Button size="sm" onclick={() => onshow?.(info.index)}>Show these photos</Button>
-      <Button variant="ghost" size="icon" class="size-8" aria-label="Close" onclick={() => release()}><X /></Button>
-    </div>
-  </div>
-{/snippet}

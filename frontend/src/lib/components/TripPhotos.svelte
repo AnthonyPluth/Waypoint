@@ -8,7 +8,7 @@
   import TripPhotoSharing from "$lib/components/TripPhotoSharing.svelte";
   import TripPhotoSharingMenu from "$lib/components/TripPhotoSharingMenu.svelte";
   import { actingPersons, PersonSharing } from "$lib/trip-sharing.svelte";
-  import { byDay, dayCaption, DAY_PHOTOS, DAY_PHOTOS_WIDE, dayPhotoCount, daysFor, dayTileName, firstOfCluster, FIRST_DAYS, isFar, isInferred, localDay, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
+  import { byDay, dayCaption, DAY_PHOTOS, DAY_PHOTOS_WIDE, dayPhotoCount, daysFor, dayTileName, FIRST_DAYS, isFar, isInferred, pastDays, personName, STRIP_SIZE, thumbnailUrl, tileLabel } from "$lib/photos";
   import { MAX_REMOVED, REMOVE, removeText, toggled } from "$lib/photo-sharing";
   import { clock, dayIn, dayLabel, viewerZone } from "$lib/trips";
   import Check from "@lucide/svelte/icons/check";
@@ -17,7 +17,6 @@
   import Play from "@lucide/svelte/icons/play";
 
   const NONE: ReadonlySet<number> = new Set();
-  const GLYPHS = ["M6 22 C 14 18 20 12 26 14 S 38 16 42 8", "M8 14 C 14 8 22 8 26 14 S 36 22 42 16", "M6 10 C 14 14 20 22 28 20 S 38 12 42 20", "M6 20 C 14 20 18 12 26 12 S 38 8 42 6"];
 
   let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), headerEnd = null, belowHeader = null }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
@@ -241,28 +240,6 @@
     if (fromStrip) { await tick(); focusTile(days[0]?.photos[0]?.id); }
   }
 
-  async function showClusterInDays(target: TripPhoto) {
-    const at = pastDaysList.findIndex((d) => d.photos.some((p) => p.id === target.id));
-    if (at < 0) {
-      announce = `Showing the photo from the map, from ${clock(target.taken_local)}`;
-      openViewer(target, null);
-      return;
-    }
-    if (at >= FIRST_DAYS) allDays = true;
-    const day = pastDaysList[at];
-    const near = photos.filter((p) => p.cluster === target.cluster).length;
-    announce = `Showing ${near} ${near === 1 ? "photo" : "photos"} from the map, from ${clock(target.taken_local)}`;
-    await tick();
-    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`);
-    if (!tile) {
-      announce = `Showing the photo from the map, from ${clock(target.taken_local)}`;
-      openViewer(target, gallery?.querySelector<HTMLElement>(`#photo-day-${day.day}`) ?? null);
-      return;
-    }
-    tile.scrollIntoView?.({ block: "center", behavior: "auto" });
-    tile.focus({ preventScroll: true });
-  }
-
   export function headingElement(): HTMLElement | null {
     return heading;
   }
@@ -270,22 +247,6 @@
   export function viewFirst() {
     const first = photos[0];
     if (first) openViewer(first, null);
-  }
-
-  export async function showCluster(index: number) {
-    const target = firstOfCluster(photos, index);
-    if (!target) return;
-    if (timeline) { await showClusterInDays(target); return; }
-    const needed = days.findIndex((d) => d.day === localDay(target)) + 1;
-    expanded = true;
-    shownDays = Math.max(shownDays, daysFor(days, 0), needed);
-    const near = photos.filter((p) => p.cluster === index).length;
-    announce = `Showing ${near} ${near === 1 ? "photo" : "photos"} from the map, from ${clock(target.taken_local)}`;
-    await tick();
-    const tile = gallery?.querySelector<HTMLElement>(`[data-photo="${target.id}"]`);
-    if (!tile) return;
-    tile.scrollIntoView?.({ block: "center", behavior: "auto" });
-    tile.focus({ preventScroll: true });
   }
 
   function close() {
@@ -564,7 +525,7 @@
 
 {#snippet daysView()}
   <div class={`flex flex-col ${wide ? "gap-3.5" : "gap-[22px]"}`} data-testid="photo-days">
-    {#each shownPast as d, n (d.day)}
+    {#each shownPast as d (d.day)}
       {#if wide}
         <section class="flex flex-col gap-1.5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
           <div class="flex items-baseline justify-between gap-3 px-0.5">
@@ -578,12 +539,9 @@
       {:else}
       <section class="relative ml-1.5 flex flex-col gap-2.5 border-l-2 border-border pl-5" aria-labelledby={`photo-day-${d.day}`} data-day={d.day}>
         <span class="absolute -left-2 top-[3px] size-3.5 rounded-full border-[3px] border-background bg-primary" aria-hidden="true"></span>
-        <div class="flex items-center justify-between gap-3">
-          <div class="min-w-0">
-            <h3 id={`photo-day-${d.day}`} class="text-[16px] leading-snug font-semibold outline-none" tabindex="-1">{d.label}</h3>
-            <span class="block text-caption text-muted-foreground">{[d.place, dayPhotoCount(d)].filter(Boolean).join(" · ")}</span>
-          </div>
-          <svg class="h-[30px] w-12 shrink-0 rounded-[9px] border border-border bg-card p-[3px]" viewBox="0 0 48 30" aria-hidden="true" data-testid="day-glyph"><path d={GLYPHS[n % GLYPHS.length]} fill="none" stroke="var(--map-route)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <div class="min-w-0">
+          <h3 id={`photo-day-${d.day}`} class="text-[16px] leading-snug font-semibold outline-none" tabindex="-1">{d.label}</h3>
+          <span class="block text-caption text-muted-foreground">{[d.place, dayPhotoCount(d)].filter(Boolean).join(" · ")}</span>
         </div>
         <div class="grid grid-cols-3 gap-[3px] overflow-hidden rounded-[14px]">
           {#each d.shown as p, i (p.id)}{@render tile(p, "", dayTileName(d, i + 1, i === DAY_PHOTOS - 1, p), i === DAY_PHOTOS - 1 ? d.more : 0)}{/each}

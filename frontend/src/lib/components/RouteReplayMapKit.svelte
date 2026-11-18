@@ -1,21 +1,17 @@
 <script lang="ts">
-  import { untrack } from "svelte";
   import type { Maps } from "$lib/mapkit";
   import { createReplayMap, DEFAULT_PALETTE, type ReplayMap } from "$lib/replay-mapkit";
-  import type { Box, Roads, Stop } from "$lib/route-replay";
+  import type { Roads, Stop } from "$lib/route-replay";
 
-  let { maps, tripId, stops, roads, width, height, progress, playing, calm, onfailure, more = [], onview, label = "Map of the route, stop by stop; the stops are listed below" }: {
-    maps: Maps; tripId?: number; stops: Stop[]; roads: Roads; width: number; height: number; progress: number; playing: boolean; calm: boolean; onfailure: () => void;
-    more?: Pick<Stop, "latitude" | "longitude">[]; onview?: (box: Box) => void; label?: string;
+  let { maps, tripId, stops, roads, width, height, progress, playing, calm, onfailure, label = "Map of the route, stop by stop; the stops are listed below" }: {
+    maps: Maps; tripId?: number; stops: Stop[]; roads: Roads; width: number; height: number; progress: number; playing: boolean; calm: boolean; onfailure: () => void; label?: string;
   } = $props();
 
-  const moreKey = $derived(more.map((m) => `${m.latitude},${m.longitude}`).join(";"));
   let host = $state<HTMLElement | null>(null);
   let replay = $state.raw<ReplayMap | null>(null);
 
   $effect(() => {
     const element = host;
-    void moreKey;
     if (!element) return;
     if (maps.failed()) {
       onfailure();
@@ -26,7 +22,7 @@
     const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay) };
     let made: ReplayMap;
     try {
-      made = createReplayMap(maps.mk, element, { stops, roads, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId, more: untrack(() => more), onView: untrack(() => onview) });
+      made = createReplayMap(maps.mk, element, { stops, roads, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId });
     } catch {
       onfailure();
       return;
