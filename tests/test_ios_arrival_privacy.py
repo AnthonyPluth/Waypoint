@@ -53,10 +53,29 @@ class ArrivalPrivacyTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r"CLCircularRegion\(", text)), 1)
         self.assertIn("identifier: id)", text)
 
+    def test_the_arrival_file_keeps_exactly_the_fields_the_docs_say(self):
+        def fields(source: str, struct: str) -> list[str]:
+            body = re.search(rf"struct {struct}\b[^{{]*\{{(.*?)\n\}}", source, re.S).group(1)
+            return re.findall(r"^\s+(?:let|var) (\w+):", body, re.M)
+
+        places = (IOS / "Waypoint" / "ArrivalPlaces.swift").read_text()
+        watch = WATCH_FILE.read_text()
+        self.assertEqual(fields(places, "ArrivalPlace"), ["segmentId", "tripId", "kind", "latitude", "longitude", "radius", "opens", "closes"])
+        self.assertEqual(fields(watch, "ArrivalWatched"), ["place", "notifiedAt"])
+        self.assertEqual(fields(watch, "ArrivalFileContent"), ["version", "watched"])
+        root = IOS.parent
+        for name in ("AGENTS.md", "SECURITY.md", ".github/agent-review/invariants.md", "docs/src/content/docs/start/ios.md"):
+            text = (root / name).read_text()
+            self.assertIn("when its alert last fired", text, name)
+            self.assertIn("issue #849 comment", text, name)
+            for denied in ("sent or kept", "never kept", "kept or logged", "is not recorded", "never recorded", "when they arrived is not"):
+                self.assertNotIn(denied, text, f"{name} says {denied!r}, which the arrival file's alert time contradicts")
+
     def test_the_launch_opens_only_through_the_launch_guard(self):
         app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
         self.assertNotIn("task { await open() }", app)
-        self.assertIn("LaunchGuard.mayOpen(", app)
+        self.assertNotIn("task(id:", app)
+        self.assertIn("launch.begin(", app)
 
     def test_the_usage_strings_are_the_signed_off_ones_and_no_background_mode_is_declared(self):
         plist = plistlib.loads((IOS / "Waypoint" / "Info.plist").read_bytes())

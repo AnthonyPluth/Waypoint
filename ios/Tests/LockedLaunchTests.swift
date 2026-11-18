@@ -65,10 +65,35 @@ final class LockedLaunchTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: tripsFile.path))
     }
 
-    func testALaunchOpensOnlyWhileActiveAndUnlocked() {
-        XCTAssertTrue(LaunchGuard.mayOpen(active: true, protectedDataAvailable: true))
-        XCTAssertFalse(LaunchGuard.mayOpen(active: false, protectedDataAvailable: true))
-        XCTAssertFalse(LaunchGuard.mayOpen(active: true, protectedDataAvailable: false))
-        XCTAssertFalse(LaunchGuard.mayOpen(active: false, protectedDataAvailable: false))
+    func testALaunchStartsOnlyWhileActiveAndUnlockedAndOnlyOnce() {
+        let gate = LaunchGate()
+        XCTAssertFalse(gate.begin(active: false, protectedDataAvailable: true))
+        XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: false))
+        XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
+        XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: true))
+        gate.end()
+        XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
+    }
+
+    func testALaunchInProgressIsNeitherRestartedNorCancelledByTheAppGoingInactiveAndBack() async {
+        let gate = LaunchGate()
+        let opened = expectation(description: "opened")
+        var starts = 0
+        var cancelled = false
+        let launch = Task {
+            guard gate.begin(active: true, protectedDataAvailable: true) else { return }
+            starts += 1
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            cancelled = Task.isCancelled
+            gate.end()
+            opened.fulfill()
+        }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertFalse(gate.begin(active: false, protectedDataAvailable: true))
+        XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: true))
+        await fulfillment(of: [opened], timeout: 10)
+        _ = await launch.value
+        XCTAssertEqual(starts, 1)
+        XCTAssertFalse(cancelled)
     }
 }

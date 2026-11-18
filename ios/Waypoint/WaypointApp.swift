@@ -4,6 +4,7 @@ import UIKit
 @main
 struct WaypointApp: App {
     @State private var phase: Phase = .starting
+    @State private var launch = LaunchGate()
     @Environment(\.scenePhase) private var scenePhase
 
     enum Phase: Equatable {
@@ -25,6 +26,7 @@ struct WaypointApp: App {
             }
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active {
+                    Task { await openIfAllowed() }
                     Task {
                         await ArrivalWatch.shared.foregrounded()
                         await returnToForeground()
@@ -43,7 +45,7 @@ struct WaypointApp: App {
     private var content: some View {
         switch phase {
         case .starting:
-            ProgressView().task(id: scenePhase) { await openIfAllowed() }
+            ProgressView().task { await openIfAllowed() }
         case .connect:
             ConnectView { await open() }
         case .signedOut:
@@ -67,8 +69,10 @@ struct WaypointApp: App {
 
     @MainActor
     private func openIfAllowed() async {
-        guard LaunchGuard.mayOpen(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
+        guard phase == .starting,
+              launch.begin(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
         await open()
+        launch.end()
     }
 
     @MainActor

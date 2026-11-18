@@ -582,11 +582,9 @@ final class ArrivalWatchTests: XCTestCase {
         XCTAssertTrue(phone.locations.monitoredIds.contains("arrival-1"))
     }
 
-    func testTheArrivalFileHoldsNoInstantButTheWindowAndWhenAnAlertLastFired() async throws {
-        let phone = await watching()
-        await enter(phone, 1, at: ArrivalFixtures.moment(2026, 12, 1, 8))
-        let text = try XCTUnwrap(phone.arrivalText)
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)))
+    private func assertTheFileHoldsOnlyTheWindowAndTheAlertTime(_ phone: ArrivalRig, alertAt: Date, file: StaticString = #filePath, line: UInt = #line) throws {
+        let text = try XCTUnwrap(phone.arrivalText, file: file, line: line)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(text.utf8)), file: file, line: line)
         var found: [(String, String)] = []
         func collect(_ value: Any, key: String?) {
             if let dictionary = value as? [String: Any] {
@@ -598,9 +596,90 @@ final class ArrivalWatchTests: XCTestCase {
             }
         }
         collect(object, key: nil)
-        XCTAssertEqual(Set(found.map { $0.0 }), ["kind", "opens", "closes", "notifiedAt"])
+        XCTAssertEqual(Set(found.map { $0.0 }), ["kind", "opens", "closes", "notifiedAt"], file: file, line: line)
         let alerts = found.filter { $0.0 == "notifiedAt" }.map { $0.1 }
-        XCTAssertEqual(alerts, [ISO8601DateFormatter().string(from: ArrivalFixtures.moment(2026, 12, 1, 8))])
+        XCTAssertEqual(alerts, [ISO8601DateFormatter().string(from: alertAt)], file: file, line: line)
+    }
+
+    func testAfterAParkingEntryTheArrivalFileHoldsNoInstantButTheWindowAndWhenTheAlertLastFired() async throws {
+        let phone = await watching()
+        let at = ArrivalFixtures.moment(2026, 12, 1, 8)
+        await enter(phone, 1, at: at)
+        try assertTheFileHoldsOnlyTheWindowAndTheAlertTime(phone, alertAt: at)
+    }
+
+    func testAfterARentalPickupEntryTheArrivalFileHoldsNoInstantButTheWindowAndWhenTheAlertLastFired() async throws {
+        let phone = await watching()
+        let at = ArrivalFixtures.moment(2026, 12, 1, 9)
+        await enter(phone, 2, at: at)
+        try assertTheFileHoldsOnlyTheWindowAndTheAlertTime(phone, alertAt: at)
+    }
+
+    func testAfterAHotelEntryTheArrivalFileHoldsNoInstantButTheWindowAndWhenTheAlertLastFired() async throws {
+        let phone = await watching()
+        let at = ArrivalFixtures.moment(2026, 12, 1, 13)
+        await enter(phone, 3, at: at)
+        try assertTheFileHoldsOnlyTheWindowAndTheAlertTime(phone, alertAt: at)
+    }
+
+    func testAReportThatChangesNothingAsksTheGeocoderNothing() async {
+        let phone = makeRig()
+        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.hotel()])
+        phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot]
+        await phone.watch.saved(server: phone.home)
+        let asked = phone.geocoder.asked.count
+        XCTAssertEqual(asked, 2)
+        await phone.watch.handle(.authorizationChanged)
+        await phone.watch.handle(.authorizationChanged)
+        XCTAssertEqual(phone.geocoder.asked.count, asked)
+        XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1"])
+    }
+
+    func testAReportThatChangesTheStandingLooksTheMissedAddressUpAgain() async {
+        let phone = makeRig()
+        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.hotel()])
+        phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot]
+        await phone.watch.saved(server: phone.home)
+        phone.locations.hasPreciseLocation = false
+        await phone.watch.handle(.authorizationChanged)
+        XCTAssertEqual(phone.geocoder.asked.count, 3)
+    }
+
+    func testAPurgeDuringALookupStopsTheRefreshAndLeavesNothingWatched() async throws {
+        let phone = makeRig()
+        answers(phone.geocoder)
+        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.hotel()])
+        let gate = ArrivalGate()
+        phone.geocoder.duringAsk = { await gate.wait() }
+        let refresh = Task { await phone.watch.saved(server: phone.home) }
+        for _ in 0..<200 where phone.geocoder.asked.isEmpty {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        await phone.watch.cleared()
+        gate.open()
+        await refresh.value
+        XCTAssertEqual(phone.geocoder.asked.count, 1)
+        XCTAssertEqual(phone.locations.monitoredIds, [])
+    }
+
+    func testASaveForANewServerDuringARefreshForTheOldOneEndsWithTheNewServersRegions() async throws {
+        let phone = makeRig()
+        answers(phone.geocoder)
+        let other = URL(string: "https://other.example.com")!
+        phone.save([ArrivalFixtures.parking()])
+        try phone.store.save(ArrivalFixtures.tripsJSON([ArrivalFixtures.hotel()]), version: 1, for: other)
+        let gate = ArrivalGate()
+        phone.geocoder.duringAsk = { await gate.wait() }
+        let old = Task { await phone.watch.saved(server: phone.home) }
+        for _ in 0..<200 where phone.geocoder.asked.isEmpty {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let new = Task { await phone.watch.saved(server: other) }
+        try await Task.sleep(nanoseconds: 100_000_000)
+        gate.open()
+        await old.value
+        await new.value
+        XCTAssertEqual(phone.locations.monitoredIds, ["arrival-3"])
     }
 
     func testRegionStartsAndStopsAreSeenByTheNextReadBeforeTheSystemHasRunThem() {
@@ -619,5 +698,36 @@ final class ArrivalWatchTests: XCTestCase {
         async let second: Void = phone.watch.activated()
         _ = await (first, second)
         XCTAssertEqual(phone.geocoder.asked.filter { $0 == "1 Main St" }.count, 1)
+    }
+
+    func testASecondSaveWhileTheFirstLookupIsSuspendedEndsWithTheLatestSavesRegions() async throws {
+        let phone = makeRig()
+        answers(phone.geocoder)
+        let gate = ArrivalGate()
+        phone.geocoder.duringAsk = { await gate.wait() }
+        let saves = ArrivalFakeSaves()
+        let sync = phone.makeSync(data: ArrivalFixtures.tripsJSON([ArrivalFixtures.parking()]), using: saves)
+        let first = await sync.sync()
+        XCTAssertEqual(first, .saved)
+        for _ in 0..<200 where phone.geocoder.asked.isEmpty {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(phone.geocoder.asked.isEmpty)
+        saves.data = ArrivalFixtures.tripsJSON([ArrivalFixtures.parking(), ArrivalFixtures.hotel()])
+        let second = await sync.sync()
+        XCTAssertEqual(second, .saved)
+        gate.open()
+        await sync.arrivalSettled()
+        XCTAssertEqual(phone.locations.monitoredIds, ["arrival-1", "arrival-3"])
+    }
+
+    func testTheArrivalFileIsLeftOutOfBackupsEvenAfterASave() async throws {
+        let phone = await watching()
+        func excluded() throws -> Bool? {
+            try phone.arrivalFile.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup
+        }
+        XCTAssertEqual(try excluded(), true)
+        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.rental(), ArrivalFixtures.hotel()])
+        XCTAssertEqual(try excluded(), true)
     }
 }

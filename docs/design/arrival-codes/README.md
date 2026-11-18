@@ -150,6 +150,10 @@ The issues, in the order they land (Sonnet each; created on 2026-11-18 from [bui
 
 The same list is posted on [#819](https://github.com/AnthonyPluth/Waypoint/issues/819#issuecomment-6981941089).
 
+## Accepted departures
+
+**2026-11-18, build of #849 (owner decision, [issue #849 comment](https://github.com/AnthonyPluth/Waypoint/issues/849#issuecomment-6991020882)).** The arrival file also holds, for each watched booking, when its alert last fired (`notifiedAt`), so the "how often" rules of point 5 can be decided from the file alone on a wake-up. This is the one instant kept besides the window. It records no place the person was at and no arrival beyond that alert time. It is dropped when the window ends, deleted by every purge and left out of iCloud and computer backups. The notification ask comes only after Always is granted; a notification is removed at the next rebuild after its window ends, not by a timer; a person already inside a circle when its window opens gets no notification until they leave and re-enter; the per-phone ask flags are not cleared on sign-out; a rental pickup or hotel that has notified no longer holds one of the 15 regions, and its delivered notification stays until its window ends. Point 4's "Nothing is recorded" is read with this exception.
+
 ## Not confirmed
 
 None of this has run on a device. Region monitoring's wake-up with Always, its behaviour with Precise Location off, how late it fires, and whether a wake-up while locked can read the arrival file are from Apple's documentation. The build issues say what each can check in CI and what needs a phone.

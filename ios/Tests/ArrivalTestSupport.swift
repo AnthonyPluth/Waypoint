@@ -72,11 +72,41 @@ final class FakeArrivalNotifications: ArrivalNotifying, @unchecked Sendable {
 
 final class FakeArrivalGeocoder: AddressGeocoding, @unchecked Sendable {
     var answers: [String: PlacePoint] = [:]
+    var duringAsk: (() async -> Void)?
     private(set) var asked: [String] = []
 
     func point(for address: String) async -> PlacePoint? {
         asked.append(address)
+        await duringAsk?()
         return answers[address]
+    }
+}
+
+final class ArrivalGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if isOpen {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                waiting.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    func open() {
+        lock.lock()
+        isOpen = true
+        let released = waiting
+        waiting = []
+        lock.unlock()
+        for continuation in released { continuation.resume() }
     }
 }
 
@@ -216,8 +246,8 @@ final class ArrivalRig {
         try! store.save(ArrivalFixtures.tripsJSON(segments), version: 1, for: home)
     }
 
-    func makeSync(data: Data = Data(), status: Int = 200, hasServer: Bool = true) -> OfflineSync {
-        let fetching = ArrivalFakeSaves()
+    func makeSync(data: Data = Data(), status: Int = 200, hasServer: Bool = true, using saves: ArrivalFakeSaves? = nil) -> OfflineSync {
+        let fetching = saves ?? ArrivalFakeSaves()
         fetching.data = data
         fetching.status = status
         let address = home

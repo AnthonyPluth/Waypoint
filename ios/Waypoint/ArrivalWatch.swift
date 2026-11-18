@@ -240,6 +240,11 @@ enum ArrivalRules {
     }
 }
 
+struct ArrivalStanding: Equatable {
+    let authorization: ArrivalAuthorization
+    let precise: Bool
+}
+
 protocol ArrivalWatching: Sendable {
     func saved(server: URL) async
     func cleared() async
@@ -296,8 +301,10 @@ actor ArrivalWatch: ArrivalWatching {
     private var foreground = false
     private var chain: Chain = .idle
     private var epoch = 0
-    private var refreshing = false
-    private var refreshQueued = false
+    private var refreshTail: Task<Void, Never>?
+    private var refreshTasks: [Int: Task<Void, Never>] = [:]
+    private var refreshCounter = 0
+    private var lastSeen: ArrivalStanding
 
     init(store: OfflineStore = .shared,
          places: ArrivalPlaces,
@@ -317,6 +324,7 @@ actor ArrivalWatch: ArrivalWatching {
         self.currentServer = server
         self.protectedDataAvailable = protectedDataAvailable
         self.now = now
+        self.lastSeen = ArrivalStanding(authorization: locations.authorization, precise: locations.hasPreciseLocation)
     }
 
     // MARK: When the app is used
@@ -352,6 +360,7 @@ actor ArrivalWatch: ArrivalWatching {
     /// delete; this stops the regions and takes back every arrival notification.
     func cleared() async {
         epoch += 1
+        for task in refreshTasks.values { task.cancel() }
         stopRegions()
         await removeNotifications { _ in true }
     }
@@ -398,28 +407,43 @@ actor ArrivalWatch: ArrivalWatching {
         }
     }
 
+    /// iOS reports the authorization to a new manager at every launch, a background region relaunch included, so a report that changes
+    /// nothing only rebuilds from what is known: the places are looked up again (and an address Apple could not find sent again) only after
+    /// a change, a save or an active launch.
     private func authorizationChanged() async {
         await continueAsks()
+        let standing = ArrivalStanding(authorization: locations.authorization, precise: locations.hasPreciseLocation)
+        let changed = standing != lastSeen
+        lastSeen = standing
         guard let server = await currentServer() else {
             await cleared()
             return
         }
-        await refresh(server: server)
+        if changed {
+            await refresh(server: server)
+        } else {
+            await rebuild(server: server)
+        }
     }
 
     // MARK: What is watched
 
     private func refresh(server: URL) async {
-        if refreshing {
-            refreshQueued = true
-            return
-        }
-        refreshing = true
-        repeat {
-            refreshQueued = false
+        refreshCounter += 1
+        let id = refreshCounter
+        let previous = refreshTail
+        let mine = Task {
+            await previous?.value
             await refreshOnce(server: server)
-        } while refreshQueued
-        refreshing = false
+            refreshTasks[id] = nil
+        }
+        refreshTasks[id] = mine
+        refreshTail = mine
+        await withTaskCancellationHandler {
+            await mine.value
+        } onCancel: {
+            mine.cancel()
+        }
     }
 
     private func refreshOnce(server: URL) async {
