@@ -29,7 +29,7 @@
         {/each}
       </span>
     {:else}
-      <RouteTile {trip} locate={coversKnown && worthLocating(trip, today)} />
+      <RouteTile {trip} locate={coversKnown && covers.length === 0 && worthLocating(trip, today)} />
     {/if}
     <span class={`pointer-events-none absolute inset-y-0 left-0 bg-linear-to-b from-transparent from-[38%] to-background/84 ${whole ? "right-0" : "w-2/3"}`}></span>
     <span class={`absolute bottom-3 left-3.5 flex flex-col gap-0.5 text-white ${whole ? "right-3.5" : "right-[36%]"}`}>

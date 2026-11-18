@@ -127,6 +127,17 @@ describe("PastTripCard", () => {
     expect(within(within(card()).getByTestId("route-tile")).getByTestId("trip-kinds")).toBeInTheDocument();
   });
 
+  it("asks Apple for nothing for a card with photo coverage even when every thumbnail fails to load", async () => {
+    app.state = state({ mapkit: true });
+    render(PastTripCard, { trip: lisbon, today: TODAY, photos: 3, covers: [11, 12, 13] });
+    for (const img of [...card().querySelectorAll("img")]) await fireEvent.error(img);
+    expect(card().querySelectorAll("img")).toHaveLength(0);
+    await new Promise((r) => setTimeout(r, 120));
+    expect(api).not.toHaveBeenCalled();
+    expect(within(card()).getByTestId("route-tile")).toHaveAttribute("data-drawn", "false");
+    expect(within(card()).getByTestId("trip-kinds")).toBeInTheDocument();
+  });
+
   it("waits to look up a route until the list knows which cards have photos", async () => {
     app.state = state({ mapkit: true });
     const { rerender } = render(PastTripCard, { trip: lisbon, today: TODAY, coversKnown: false });
