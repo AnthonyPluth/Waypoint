@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { TripPlaces } from "./api-types";
+import type { Trip, TripPlaces } from "./api-types";
 import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
 import { segment, trip } from "../test/fixtures";
+import { isDrive } from "./driving-routes";
 
 const places: TripPlaces = {
   home: null,
@@ -398,4 +400,25 @@ describe("a past trip made of countries", () => {
     expect(names(stopsOf(trip([out, stay, ecuador]), located))).toEqual(["Minneapolis", "San Francisco", "Bayview Inn"]);
     expect(maxStops(trip([out, ecuador]))).toBe(2);
   });
+});
+
+type SharedCase = { name: string; trip: Trip; places: TripPlaces; today: string; stops: [string, string, string | null, number, number][]; drives: number[][]; max_stops: number; worth_locating: boolean; names: boolean };
+
+const shared: SharedCase[] = JSON.parse(readFileSync(new URL("../../../tests/fixtures/route_stops.json", import.meta.url), "utf8"));
+
+describe("the stops and drives the server warms (tests/fixtures/route_stops.json, the same cases tests/test_route_warming.py asserts)", () => {
+  it("has cases", () => {
+    expect(shared.length).toBeGreaterThan(10);
+  });
+
+  for (const c of shared) {
+    it(c.name, () => {
+      const stops = stopsOf(c.trip, c.places);
+      expect(stops.map((s) => [s.kind, c.names ? s.name : null, s.via, s.latitude, s.longitude])).toEqual(c.stops.map(([kind, name, ...rest]) => [kind, c.names ? name : null, ...rest]));
+      const drives = stops.flatMap((s, i) => (i > 0 && isDrive(stops[i - 1], s) ? [[stops[i - 1].latitude, stops[i - 1].longitude, s.latitude, s.longitude]] : []));
+      expect(drives).toEqual(c.drives);
+      expect(maxStops(c.trip)).toBe(c.max_stops);
+      expect(worthLocating(c.trip, c.today)).toBe(c.worth_locating);
+    });
+  }
 });

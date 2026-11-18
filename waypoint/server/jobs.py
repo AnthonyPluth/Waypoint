@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 
 from .. import monitoring, oidc
@@ -18,10 +19,6 @@ SCAN_EVERY = 4 * 3600
 SCAN_FIRST = 300
 PHOTO_SYNC_EVERY = 6 * 3600
 PHOTO_SYNC_FIRST = 600
-ROUTES_FIRST = 120
-ROUTES_EVERY = 6 * 3600
-ROUTES_MORE_EVERY = 600
-ROUTES_RETRY_EVERY = 3600
 
 
 def warm_map_data() -> None:
@@ -32,29 +29,27 @@ def warm_map_data() -> None:
         monitoring.report(e, values=False)
 
 
-def warm_driving_routes(stop: threading.Event, given: route_warming.Memory) -> int | None:
+def warm_driving_routes(stop: threading.Event, given: route_warming.Memory) -> bool:
     try:
-        fetch = route_warming.client()
+        fetch = route_warming.client(given)
         if fetch is None:
-            return None
+            return False
         outcome = route_warming.run(date.today(), fetch, stop.wait, given, time.time)
         if outcome.refused:
             monitoring.log("Driving routes: Apple's Maps Server API didn't accept the MapKit key, so routes aren't being prepared ahead; check that the Maps Server API is enabled for the key.", "warning")
-            return None
+            return False
         monitoring.log(f"Driving routes: {outcome.fetched} prepared" + (", more to come." if outcome.left else "."))
-        return ROUTES_MORE_EVERY if outcome.left else ROUTES_RETRY_EVERY if outcome.stop else ROUTES_EVERY
     except Exception as e:
         monitoring.report(e, values=False)
-        return ROUTES_RETRY_EVERY
+    return True
 
 
-def keep_routes_warm(stop: threading.Event) -> None:
+def keep_routes_warm(stop: threading.Event, clock: Callable[[], datetime] = datetime.now) -> None:
     given = route_warming.Memory()
-    if stop.wait(ROUTES_FIRST):
-        return
     while True:
-        wait = warm_driving_routes(stop, given)
-        if wait is None or stop.wait(wait):
+        if stop.wait(route_warming.seconds_until(clock(), route_warming.hour())):
+            return
+        if not warm_driving_routes(stop, given):
             return
 
 

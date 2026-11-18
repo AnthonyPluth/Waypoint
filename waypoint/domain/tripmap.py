@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from datetime import datetime
-from typing import TypedDict, cast
+from typing import NamedTuple, TypedDict, cast
 
 from sqlalchemy import select
 
@@ -230,7 +231,15 @@ def state_lines(waypoints: list[roads.Point], legs: list[RoadLeg], flights: list
     return [{"points": _round(line)} for line in states.state_lines().within(extent)]
 
 
-def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
+class _Located(NamedTuple):
+    live: list[trips.SegmentOut]
+    airports: Sequence[Airport]
+    stays: Sequence[Segment]
+    cities: dict[str, roads.Point]
+    home: home.HomePoint | None
+
+
+def _locate(conn: db.Connection, viewer: Viewer, trip_id: int) -> _Located | None:
     trip = trips.get(conn, viewer, trip_id)
     if trip is None:
         return None
@@ -243,13 +252,47 @@ def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
     found = conn.orm.scalars(select(Airport).where(Airport.code.in_(sorted(codes)))).all()
     stored = conn.orm.scalars(select(Segment).where(Segment.id.in_([s["id"] for s in live if s["kind"] != "flight"]),
                                                     Segment.latitude.is_not(None), Segment.longitude.is_not(None)).order_by(Segment.id)).all()
-    located = {g.id: (g.latitude, g.longitude) for g in stored if g.latitude is not None and g.longitude is not None}
     points = stats.points_of(conn, stats.countries_of(conn, cities))
+    return _Located(live, found, stored, points, home.point(conn))
+
+
+def stop_points(conn: db.Connection, viewer: Viewer, trip_id: int) -> list[roads.Point] | None:
+    at = _locate(conn, viewer, trip_id)
+    if at is None:
+        return None
+    found: list[roads.Point] = [(a.latitude, a.longitude) for a in sorted(at.airports, key=lambda a: a.code)]
+    found += [at.cities[c] for c in sorted(at.cities)]
+    found += [(g.latitude, g.longitude) for g in at.stays if g.latitude is not None and g.longitude is not None]
+    if at.home is not None:
+        found.append((at.home["latitude"], at.home["longitude"]))
+    return found
+
+
+def stop_places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
+    at = _locate(conn, viewer, trip_id)
+    if at is None:
+        return None
+    return {
+        "home": at.home,
+        "airports": [{"code": a.code, "city": a.city, "latitude": a.latitude, "longitude": a.longitude} for a in sorted(at.airports, key=lambda a: a.code)],
+        "cities": [{"city": c, "latitude": at.cities[c][0], "longitude": at.cities[c][1]} for c in sorted(at.cities)],
+        "stays": [{"segment_id": g.id, "latitude": g.latitude, "longitude": g.longitude, "precision": cast(Precision, g.geo_precision or "city")}
+                  for g in at.stays if g.latitude is not None and g.longitude is not None],
+        "roads": {"legs": [], "interstates": []},
+        "boundaries": [],
+    }
+
+
+def places(conn: db.Connection, viewer: Viewer, trip_id: int) -> Places | None:
+    at = _locate(conn, viewer, trip_id)
+    if at is None:
+        return None
+    live, found, stored, points, at_home = at
+    located = {g.id: (g.latitude, g.longitude) for g in stored if g.latitude is not None and g.longitude is not None}
     drives = road_legs(live, located)
     airport_at = {a.code: (a.latitude, a.longitude) for a in found}
     flights = [(airport_at[o], airport_at[d]) for s in live if s["kind"] == "flight"
                for o, d in [((s["origin"] or "").strip().upper(), (s["destination"] or "").strip().upper())] if o in airport_at and d in airport_at]
-    at_home = home.point(conn)
     road_trip = not any(s["kind"] in BREAKING_KINDS for s in live)
     waypoints = [(a.latitude, a.longitude) for a in found] + list(points.values()) + list(located.values())
     if at_home and road_trip:

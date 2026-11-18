@@ -7,7 +7,8 @@ import time
 import unittest
 import urllib.error
 import urllib.request
-from datetime import date
+from datetime import date, datetime
+from pathlib import Path
 from unittest import mock
 
 from cryptography.hazmat.primitives import serialization
@@ -83,6 +84,14 @@ class WarmingCase(RouteCacheCase):
 
 
 class FillingTests(WarmingCase):
+    def test_the_stops_without_the_road_work_are_the_ones_the_map_shows(self):
+        trip = self.road_trip(DENVER, SALT_LAKE)
+        with db.session() as conn:
+            full = tripmap.places(conn, route_warming.HOUSEHOLD, trip)
+            bare = tripmap.stop_places(conn, route_warming.HOUSEHOLD, trip)
+            self.assertEqual({k: v for k, v in full.items() if k not in ("roads", "boundaries")}, {k: v for k, v in bare.items() if k not in ("roads", "boundaries")})
+            self.assertIsNone(tripmap.stop_places(conn, driving_routes.Viewer(None), trip))
+
     def test_a_missing_drive_is_fetched_and_stored_for_its_trip_and_a_cached_one_is_not_asked_again(self):
         trip = self.road_trip(DENVER, SALT_LAKE)
         fetch = Fetcher()
@@ -114,7 +123,7 @@ class FillingTests(WarmingCase):
         self.road_trip(SALT_LAKE)
         with db.session() as conn:
             out = trip_domain.get(conn, route_warming.HOUSEHOLD, trip_domain.listing(conn, route_warming.HOUSEHOLD)[0]["id"])
-            places = tripmap.places(conn, route_warming.HOUSEHOLD, out["id"])
+            places = tripmap.stop_places(conn, route_warming.HOUSEHOLD, out["id"])
             self.assertEqual(len(route_warming.drives_of(out, places)), 2)
         fetch = Fetcher()
         self.assertEqual(run(fetch).fetched, 0)
@@ -131,7 +140,7 @@ class FillingTests(WarmingCase):
         trip = self.road_trip(DENVER, flight, SALT_LAKE)
         with db.session() as conn:
             out = trip_domain.get(conn, route_warming.HOUSEHOLD, trip)
-            places = tripmap.places(conn, route_warming.HOUSEHOLD, trip)
+            places = tripmap.stop_places(conn, route_warming.HOUSEHOLD, trip)
             stays = [(s["latitude"], s["longitude"]) for s in places["stays"]]
             drives = route_warming.drives_of(out, places)
         self.assertEqual(len(drives), 2)
@@ -222,7 +231,7 @@ class PacingAndFailureTests(WarmingCase):
         self.assertEqual((got.refused, got.stop, got.fetched), (True, True, 0))
         stop = threading.Event()
         with mock.patch.object(route_warming, "client", return_value=refuse(403)), mock.patch.object(monitoring, "log") as logged:
-            self.assertIsNone(jobs.warm_driving_routes(stop, route_warming.Memory()))
+            self.assertFalse(jobs.warm_driving_routes(stop, route_warming.Memory()))
         self.assertIn("Maps Server API", logged.call_args.args[0])
         self.assertEqual(self.rows(), [])
 
@@ -235,7 +244,7 @@ class JobTests(WarmingCase):
                 os.environ.pop(name, None)
             self.assertIsNone(route_warming.client())
             with mock.patch.object(tls, "urlopen") as opened:
-                self.assertIsNone(jobs.warm_driving_routes(threading.Event(), route_warming.Memory()))
+                self.assertFalse(jobs.warm_driving_routes(threading.Event(), route_warming.Memory()))
             opened.assert_not_called()
         with mock.patch.object(maps, "enabled", return_value=False), mock.patch.object(maps, "credentials", return_value=CREDS):
             self.assertIsNone(route_warming.client())
@@ -246,7 +255,7 @@ class JobTests(WarmingCase):
         stop = threading.Event()
         with mock.patch.object(monitoring, "log") as logged, mock.patch.object(route_warming, "client", return_value=Fetcher()), \
                 mock.patch.object(route_warming, "PAUSE_SECONDS", 0.0), mock.patch.object(route_warming, "MAX_PER_RUN", 1):
-            self.assertEqual(jobs.warm_driving_routes(stop, route_warming.Memory()), jobs.ROUTES_MORE_EVERY)
+            self.assertTrue(jobs.warm_driving_routes(stop, route_warming.Memory()))
         self.assertEqual(logged.call_args.args[0], "Driving routes: 1 prepared, more to come.")
         self.assertEqual(len(self.rows()), 1)
 
@@ -255,7 +264,7 @@ class JobTests(WarmingCase):
         with mock.patch.object(route_warming, "client", side_effect=RuntimeError(secret)):
             out = io.StringIO()
             with mock.patch("sys.stderr", out):
-                self.assertEqual(jobs.warm_driving_routes(threading.Event(), route_warming.Memory()), jobs.ROUTES_RETRY_EVERY)
+                self.assertTrue(jobs.warm_driving_routes(threading.Event(), route_warming.Memory()))
         self.assertNotIn(secret, out.getvalue())
         self.assertIn("RuntimeError", out.getvalue())
 
@@ -271,7 +280,7 @@ class JobTests(WarmingCase):
             with mock.patch.object(route_warming, "client", return_value=Fetcher(None)):
                 jobs.warm_driving_routes(threading.Event(), route_warming.Memory())
 
-    def test_the_thread_starts_with_the_others_waits_first_and_ends_when_told_to_stop(self):
+    def test_the_thread_starts_with_the_others_and_waits_for_the_night_instead_of_running_at_startup(self):
         stop = threading.Event()
         stop.set()
         with mock.patch.object(jobs, "warm_map_data"), mock.patch.object(jobs.flightstatus, "forget_key_pause"), \
@@ -282,13 +291,41 @@ class JobTests(WarmingCase):
         self.addCleanup(jobs.photoqueue.disable)
         self.assertIn("driving-routes", [t.name for t in started])
         ran.assert_not_called()
-        self.assertGreater(jobs.ROUTES_FIRST, 0)
 
-    def test_the_loop_runs_a_round_after_the_first_wait_and_ends_when_a_round_says_stop(self):
+    def test_the_loop_sleeps_until_midnight_runs_one_pass_and_sleeps_until_the_next_night(self):
+        waits = []
+
+        class Stop:
+            def wait(self, seconds):
+                waits.append(seconds)
+                return len(waits) >= 3
+
+        clock = iter([datetime(2026, 11, 18, 14, 30), datetime(2026, 11, 19, 0, 4), datetime(2026, 11, 19, 0, 9)])
+        with mock.patch.object(jobs, "warm_driving_routes", return_value=True) as ran:
+            jobs.keep_routes_warm(Stop(), lambda: next(clock))
+        self.assertEqual(waits, [9.5 * 3600, 23 * 3600 + 56 * 60, 24 * 3600 - 9 * 60])
+        self.assertEqual(ran.call_count, 2)
+
+    def test_the_loop_ends_when_a_pass_says_to_stop_for_good(self):
         stop = threading.Event()
-        with mock.patch.object(jobs, "ROUTES_FIRST", 0), mock.patch.object(jobs, "warm_driving_routes", return_value=None) as ran:
-            jobs.keep_routes_warm(stop)
+        stop.wait = lambda seconds: False
+        with mock.patch.object(jobs, "warm_driving_routes", return_value=False) as ran:
+            jobs.keep_routes_warm(stop, lambda: datetime(2026, 11, 18, 23, 0))
         ran.assert_called_once()
+
+    def test_the_quiet_hour_is_midnight_unless_configured_and_a_bad_value_means_midnight(self):
+        self.assertEqual(route_warming.seconds_until(datetime(2026, 11, 18, 0, 0), 0), 24 * 3600)
+        self.assertEqual(route_warming.seconds_until(datetime(2026, 11, 18, 2, 0), 3), 3600)
+        for value, want in (("", 0), ("3", 3), ("23", 23), ("24", 0), ("-1", 0), ("x", 0), ("٣", 0)):
+            with mock.patch.dict(os.environ, {route_warming.HOUR_ENV: value}):
+                self.assertEqual(route_warming.hour(), want)
+
+    def test_a_pass_never_works_out_a_trips_roads_or_state_lines(self):
+        self.two_drives()
+        with mock.patch.object(tripmap, "places", side_effect=AssertionError("roads worked out")), \
+                mock.patch.object(tripmap, "road_legs", side_effect=AssertionError("roads worked out")), \
+                mock.patch.object(tripmap, "state_lines", side_effect=AssertionError("lines worked out")):
+            self.assertEqual(run(Fetcher(), delay=0.0).fetched, 2)
 
 
 def seg(id, kind, origin=None, destination=None, start="2026-06-01T10:00", end="2026-06-01T11:00", itinerary=(), status="confirmed"):
@@ -304,6 +341,24 @@ def places_of(airports=(), cities=(), stays=(), home=None):
 
 def stops(segments, places):
     return [(v.kind, v.name, v.via) for v in route_warming.stops_of({"segments": segments}, places)]
+
+
+SHARED = json.loads((Path(__file__).parent / "fixtures" / "route_stops.json").read_text())
+
+
+class SharedCasesTests(unittest.TestCase):
+    def test_the_stops_and_drives_are_those_the_web_app_works_out_for_the_same_trips(self):
+        self.assertGreater(len(SHARED), 10)
+        for case in SHARED:
+            with self.subTest(case["name"]):
+                trip = case["trip"]
+                places = case["places"]
+                got = route_warming.stops_of(trip, places)
+                self.assertEqual([[v.kind, v.name if case["names"] else None, v.via, v.latitude, v.longitude] for v in got],
+                                 [[kind, name if case["names"] else None, *rest] for kind, name, *rest in case["stops"]])
+                self.assertEqual([list(d) for d in route_warming.drives_in(got)], case["drives"])
+                self.assertEqual(route_warming.max_stops(trip), case["max_stops"])
+                self.assertEqual(route_warming.worth_locating(trip, date.fromisoformat(case["today"])), case["worth_locating"])
 
 
 class StopTests(unittest.TestCase):
@@ -406,6 +461,24 @@ class ServerApiTests(unittest.TestCase):
         self.assertEqual(parts(mapkit.sign_server(CREDS, 1.0, True))[1]["scope"], "server_api")
         with self.fake(401, 401), self.assertRaises(mapkit.Refused):
             mapkit.Directions(CREDS).route((1.0, 2.0), (3.0, 4.0), 5000.0)
+
+    def test_the_scope_that_worked_is_remembered_for_the_next_round(self):
+        memory = route_warming.Memory()
+        env = {maps.FLAG_ENV: "on", maps.KEY_FILE_ENV: self.key_file(), maps.KEY_ID_ENV: KEY_ID, maps.TEAM_ID_ENV: TEAM_ID, maps.PUBLIC_URL_ENV: "https://waypoint.example.test"}
+        with mock.patch.dict(os.environ, env), self.fake(401, self.TOKEN, self.ROUTE):
+            route_warming.client(memory)((1.0, 2.0), (3.0, 4.0))
+        self.assertTrue(memory.scoped)
+        with mock.patch.dict(os.environ, env), self.fake(self.TOKEN, self.ROUTE):
+            route_warming.client(memory)((1.0, 2.0), (3.0, 4.0))
+        self.assertEqual(parts(self.sent[-2].get_header("Authorization").split()[1])[1]["scope"], "server_api")
+
+    def key_file(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        path = os.path.join(folder.name, "k.p8")
+        with open(path, "wb") as f:
+            f.write(PEM)
+        return path
 
     def test_a_route_is_asked_for_with_an_access_token_and_comes_back_as_one_line(self):
         with self.fake(self.TOKEN, self.ROUTE):

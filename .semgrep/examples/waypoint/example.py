@@ -98,6 +98,8 @@ MAP_CONNECT = "connect-src 'self' https://*.apple-mapkit.com"
 policy = maps.POLICY
 # ruleid: waypoint-apple-maps-server-host
 DIRECTIONS = "https://maps-api.apple.com/v1/directions"
+# ruleid: waypoint-apple-directions-caller
+asking = mapkit.Directions(creds)
 
 # ruleid: waypoint-flightstatus-hosts
 STATUS_URL = "https://aerodatabox.p.rapidapi.com/flights/number/EX101/2026-11-20"

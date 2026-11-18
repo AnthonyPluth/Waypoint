@@ -4,10 +4,11 @@ import hashlib
 import itertools
 import json
 import math
+import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
@@ -22,7 +23,9 @@ from .visibility import Viewer
 HOUSEHOLD = Viewer(None, household=True)
 SAME_PLACE_KM = 30.0
 EARTH_KM = 6371.0
-MAX_PER_RUN = 60
+MAX_PER_RUN = 200
+HOUR_ENV = "WAYPOINT_ROUTE_WARMING_HOUR"
+DEFAULT_HOUR = 0
 PAUSE_SECONDS = 3.0
 Drive = tuple[float, float, float, float]
 Key = tuple[int, int, int, int]
@@ -255,6 +258,7 @@ class Missing:
 class Memory:
     gave_up: set[Key] = field(default_factory=set)
     settled: dict[int, str] = field(default_factory=dict)
+    scoped: bool = False
 
 
 @dataclass
@@ -281,7 +285,7 @@ def missing(conn: db.Connection, today: date, memory: Memory) -> list[Missing]:
         if memory.settled.get(trip["id"]) == mark:
             continue
         try:
-            places = tripmap.places(conn, HOUSEHOLD, trip["id"])
+            places = tripmap.stop_places(conn, HOUSEHOLD, trip["id"])
             stops = stops_of(trip, places) if places is not None else []
         except Exception as e:
             monitoring.report(e, values=False)
@@ -345,9 +349,29 @@ def run(today: date, fetch: Fetch, pause: Callable[[float], bool], memory: Memor
     return outcome
 
 
-def client() -> Fetch | None:
+def hour() -> int:
+    text = os.environ.get(HOUR_ENV, "").strip()
+    return int(text) if text.isascii() and text.isdigit() and int(text) < 24 else DEFAULT_HOUR
+
+
+def seconds_until(now: datetime, at: int) -> float:
+    target = now.replace(hour=at, minute=0, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return (target - now).total_seconds()
+
+
+def client(memory: Memory | None = None) -> Fetch | None:
     creds = maps.credentials() if maps.enabled() else None
     if creds is None:
         return None
     directions = mapkit.Directions(creds)
-    return lambda start, end: directions.route(start, end, time.time())
+    directions.scoped = memory.scoped if memory is not None else False
+
+    def fetch(start: tuple[float, float], end: tuple[float, float]) -> list[list[float]] | None:
+        try:
+            return directions.route(start, end, time.time())
+        finally:
+            if memory is not None:
+                memory.scoped = directions.scoped
+    return fetch
