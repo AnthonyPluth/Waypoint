@@ -92,7 +92,7 @@ A booking’s times are the wall-clock times at its places, stored with each pla
 
 ## Where a booking is on the map
 
-When a stay, car, train, cruise or parking booking is saved, Waypoint works out roughly where it is and stores that point with the booking, so the [Stats map](/Waypoint/start/stats/#the-map) can show it. The point is never a street address: it is the centre of the ZIP or postal code in the address, else the airport a car or train names, else the city, when it is clear which city is meant. Everything is read on your server against lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)); no map or geocoding service is contacted. A booking whose place can’t be read isn’t drawn. The point is in a backup and not shown on the booking’s card.
+When a stay, car, train, cruise or parking booking is saved, Waypoint works out roughly where it is and stores that point with the booking, so the [Stats map](/Waypoint/start/stats/#the-map) can show it. The point is never a street address: it is the centre of the ZIP or postal code in the address, else the airport a car or train names, else the city, when it is clear which city is meant. Everything is read on your server against lists that ship with Waypoint ([Data sources](/Waypoint/reference/data-sources/)); the server contacts no map or geocoding service (the iPhone app can look an address up with Apple’s geocoder on the phone, see [Finding the places of your bookings](/Waypoint/start/ios/#finding-the-places-of-your-bookings)). A booking whose place can’t be read isn’t drawn. The point is in a backup and not shown on the booking’s card.
 
 ## How segments are grouped
 
