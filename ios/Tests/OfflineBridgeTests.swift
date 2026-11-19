@@ -47,6 +47,8 @@ final class OfflineBridgeTests: XCTestCase {
     private var settings: OfflineSettings!
     private var sync: OfflineSync!
     private var bridge: OfflineBridge!
+    private var pending: PendingArrival!
+    private var here: FakeArrivalHere!
     private let home = URL(string: "https://waypoint.example.com")!
 
     override func setUp() {
@@ -58,7 +60,9 @@ final class OfflineBridgeTests: XCTestCase {
         pages = OfflinePages(root: root.appendingPathComponent("pages"))
         settings = OfflineSettings(defaults: defaults)
         sync = OfflineSync(store: store, settings: settings, pages: pages, server: { [home] in home }, bearer: { nil })
-        bridge = OfflineBridge(store: store, sync: sync, settings: settings)
+        pending = PendingArrival()
+        here = FakeArrivalHere()
+        bridge = OfflineBridge(store: store, sync: sync, settings: settings, pending: pending, here: here)
     }
 
     override func tearDown() {
@@ -182,7 +186,9 @@ final class OfflineBridgeTests: XCTestCase {
 
     func testRepliesAreWhatWebKitCanPassToThePage() async throws {
         try store.save(TripFixtures.reply(["Lisbon"]), version: 1, for: home)
-        for body in [["type": "status"], ["type": "load"]] {
+        pending.hold(segmentId: 5, tripId: 7)
+        here.found = ArrivalHereAnswer(segmentId: 5, tripId: 7)
+        for body in [["type": "status"], ["type": "load"], ["type": "arrivalHere"], ["type": "pendingArrival"], ["type": "pendingArrival"]] {
             let reply = try await ask(body)
             XCTAssertTrue(JSONSerialization.isValidJSONObject(reply), "\(body)")
         }
@@ -241,6 +247,49 @@ final class OfflineBridgeTests: XCTestCase {
         XCTAssertTrue(trips(reply).isEmpty)
         XCTAssertNil(store.load(server: home))
         XCTAssertFalse(pages.hasPage(for: home))
+    }
+
+    func testAPendingArrivalIsAnsweredOnceAndOnlyWithIds() async throws {
+        pending.hold(segmentId: 5, tripId: 7)
+        let first = try await ask(["type": "pendingArrival"])
+        XCTAssertEqual(Set(first.keys), ["version", "segmentId", "tripId"])
+        XCTAssertEqual(first["version"] as? Int, 1)
+        XCTAssertEqual(first["segmentId"] as? Int, 5)
+        XCTAssertEqual(first["tripId"] as? Int, 7)
+        let second = try await ask(["type": "pendingArrival"])
+        XCTAssertEqual(Set(second.keys), ["version", "segmentId", "tripId"])
+        XCTAssertTrue(second["segmentId"] is NSNull)
+        XCTAssertTrue(second["tripId"] is NSNull)
+    }
+
+    func testAnExpiredPendingArrivalIsNotAnswered() async throws {
+        pending.hold(segmentId: 5, tripId: 7, now: Date().addingTimeInterval(-PendingArrival.lifetime - 5))
+        let reply = try await ask(["type": "pendingArrival"])
+        XCTAssertTrue(reply["segmentId"] is NSNull)
+    }
+
+    func testAPendingArrivalNeedsNothingSavedAndTouchesNothing() async throws {
+        pending.hold(segmentId: 5, tripId: 7)
+        let reply = try await ask(["type": "pendingArrival"])
+        XCTAssertEqual(reply["tripId"] as? Int, 7)
+        XCTAssertNil(store.load(server: home))
+        XCTAssertTrue(here.asked.isEmpty)
+    }
+
+    func testArrivalHereIsAnsweredWithTheTwoIdsOfTheBookingTheAppFound() async throws {
+        here.found = ArrivalHereAnswer(segmentId: 5, tripId: 7)
+        let reply = try await ask(["type": "arrivalHere"])
+        XCTAssertEqual(Set(reply.keys), ["version", "segmentId", "tripId"])
+        XCTAssertEqual(reply["segmentId"] as? Int, 5)
+        XCTAssertEqual(reply["tripId"] as? Int, 7)
+        XCTAssertEqual(here.asked, [home])
+    }
+
+    func testArrivalHereWithNoBookingIsNull() async throws {
+        let reply = try await ask(["type": "arrivalHere"])
+        XCTAssertEqual(Set(reply.keys), ["version", "segmentId", "tripId"])
+        XCTAssertTrue(reply["segmentId"] is NSNull)
+        XCTAssertTrue(reply["tripId"] is NSNull)
     }
 
     func testARequestTheHandlerDoesNotKnowFails() async {

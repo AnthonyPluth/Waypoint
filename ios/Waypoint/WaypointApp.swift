@@ -17,6 +17,7 @@ struct WaypointApp: App {
 
     init() {
         ArrivalWatch.listen()
+        ArrivalTapHandler.install()
     }
 
     var body: some Scene {
@@ -32,7 +33,10 @@ struct WaypointApp: App {
                         await returnToForeground()
                     }
                 } else if newPhase == .background {
-                    Task { await ArrivalWatch.shared.backgrounded() }
+                    Task {
+                        await ArrivalWatch.shared.backgrounded()
+                        await ArrivalHere.shared.backgrounded()
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .webViewUnauthorized)) { _ in

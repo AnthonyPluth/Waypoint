@@ -29,6 +29,8 @@ struct OfflineBridge {
     let store: OfflineStore
     let sync: OfflineSync
     let settings: OfflineSettings
+    var pending: PendingArrival = .shared
+    var here: ArrivalHereAnswering = ArrivalHere.shared
 
     func answer(_ body: Any, server: URL) async throws -> [String: Any] {
         guard let request = body as? [String: Any], let type = request["type"] as? String else { throw Failure.unknownRequest }
@@ -44,9 +46,21 @@ struct OfflineBridge {
         case "remove":
             await sync.remove()
             return status(server)
+        case "pendingArrival":
+            let target = pending.take()
+            return arrival(segmentId: target?.segmentId, tripId: target?.tripId)
+        case "arrivalHere":
+            let found = await here.answer(server: server)
+            return arrival(segmentId: found?.segmentId, tripId: found?.tripId)
         default:
             throw Failure.unknownRequest
         }
+    }
+
+    /// An arrival is two ids or nothing: never a place, a name, a code or a coordinate.
+    func arrival(segmentId: Int?, tripId: Int?) -> [String: Any] {
+        guard let segmentId, let tripId else { return ["version": Self.version, "segmentId": NSNull(), "tripId": NSNull()] }
+        return ["version": Self.version, "segmentId": segmentId, "tripId": tripId]
     }
 
     func status(_ server: URL) -> [String: Any] {

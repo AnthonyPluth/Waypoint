@@ -2,6 +2,7 @@
   import { boot, route } from "$lib/app.svelte";
   import * as Card from "$lib/components/ui/card";
   import { Button } from "$lib/components/ui/button";
+  import ArrivalCard from "$lib/components/ArrivalCard.svelte";
   import OfflineTrip from "$lib/components/OfflineTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import { ignoreFailure } from "$lib/act";
@@ -12,6 +13,11 @@
   import { onMount } from "svelte";
 
   let copies = $state<SavedCopy[]>([]);
+  let now = $state(Date.now());
+  $effect(() => {
+    const tick = setInterval(() => (now = Date.now()), 30_000);
+    return () => clearInterval(tick);
+  });
   let chosen = $state<number | null>(null);
   const shell = inShell();
   let loading = $state(shell);
@@ -78,6 +84,10 @@
     };
   });
 </script>
+
+{#if shell && route.page === "upcoming" && !loading && copies.length}
+  <ArrivalCard segments={copies.flatMap((c) => (c.trip ? c.trip.segments : []))} {now} />
+{/if}
 
 {#if !offline.checked || loading}
   <div class="h-56 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>

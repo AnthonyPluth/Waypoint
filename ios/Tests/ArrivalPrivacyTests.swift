@@ -93,6 +93,40 @@ final class ArrivalPrivacyTests: XCTestCase {
         XCTAssertEqual(ArrivalRecordingProtocol.seen.filter(carriesACoordinate).count, 0)
     }
 
+    func testTheInAppCheckAndTheTapSendNothingToTheServerAndNoCoordinateAnywhere() async throws {
+        let phone = ArrivalRig(authorization: .whenInUse, at: ArrivalFixtures.moment(2026, 12, 1, 13))
+        rig = phone
+        phone.geocoder.answers = ["1 Main St": ArrivalFixtures.lot, "2 Rental Rd": ArrivalFixtures.counter, "3 Inn Ave": ArrivalFixtures.inn]
+        phone.save([ArrivalFixtures.parking(), ArrivalFixtures.rental(), ArrivalFixtures.hotel()])
+        await phone.watch.saved(server: phone.home)
+        let pending = PendingArrival()
+        let bridge = OfflineBridge(store: phone.store, sync: phone.makeSync(), settings: OfflineSettings(defaults: phone.defaults), pending: pending, here: phone.here)
+        ArrivalRecordingProtocol.reset()
+
+        phone.fix.point = ArrivalFixtures.lot
+        let made = ArrivalNotice(ArrivalPlace(segmentId: 1, tripId: 7, kind: .parking, latitude: ArrivalFixtures.lot.latitude,
+                                              longitude: ArrivalFixtures.lot.longitude, radius: 250,
+                                              opens: ArrivalFixtures.moment(2026, 12, 1, 7), closes: ArrivalFixtures.moment(2026, 12, 5, 18)))
+        let center = NotificationCenter()
+        ArrivalTap.respond(identifier: made.id, userInfo: made.content().userInfo, pending: pending, center: center)
+        let atTheBooking = try await bridge.answer(["type": "arrivalHere"], server: phone.home)
+        let tapped = try await bridge.answer(["type": "pendingArrival"], server: phone.home)
+        await phone.here.backgrounded()
+
+        for reply in [atTheBooking, tapped] {
+            XCTAssertEqual(Set(reply.keys), ["version", "segmentId", "tripId"])
+            let text = String(decoding: try JSONSerialization.data(withJSONObject: reply), as: UTF8.self)
+            for number in [ArrivalFixtures.lot, ArrivalFixtures.inn, ArrivalFixtures.counter].flatMap({ [String($0.latitude), String($0.longitude)] }) {
+                XCTAssertFalse(text.contains(number), number)
+            }
+        }
+        XCTAssertEqual(atTheBooking["segmentId"] as? Int, 1)
+        XCTAssertEqual(tapped["tripId"] as? Int, 7)
+        let host = try XCTUnwrap(phone.home.host)
+        XCTAssertEqual(ArrivalRecordingProtocol.seen.filter { $0.url?.host == host }.count, 0)
+        XCTAssertEqual(ArrivalRecordingProtocol.seen.filter(carriesACoordinate).count, 0)
+    }
+
     func testTheNotificationAndTheArrivalFileCarryNoCoordinateOutsideTheFile() async throws {
         let phone = ArrivalRig()
         rig = phone

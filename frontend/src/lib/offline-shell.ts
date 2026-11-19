@@ -2,7 +2,7 @@ export const BRIDGE_HANDLER = "waypointOffline";
 export const BRIDGE_VERSION = 1;
 const UNAUTHORIZED_HANDLER = "waypointUnauthorized";
 
-export type ShellRequest = { type: "status" } | { type: "load" } | { type: "setSaving"; on: boolean } | { type: "remove" };
+export type ShellRequest = { type: "status" } | { type: "load" } | { type: "setSaving"; on: boolean } | { type: "remove" } | { type: "pendingArrival" } | { type: "arrivalHere" };
 export type ShellTrip = { id: number; name: string };
 export type ShellStatus = { version: typeof BRIDGE_VERSION; saving: boolean; syncing: boolean; lastSaveFailed: boolean; savedAt: number | null; trips: ShellTrip[] };
 export type ShellLoad = { version: typeof BRIDGE_VERSION; trips: unknown[] };
@@ -40,6 +40,21 @@ function readStatus(reply: unknown): ShellStatus {
   }
   return { version: BRIDGE_VERSION, saving: r.saving, syncing: r.syncing === true, lastSaveFailed: r.lastSaveFailed === true, savedAt: r.savedAt, trips: trips.map((t) => ({ id: t.id, name: t.name })) };
 }
+
+export type ShellArrival = { segmentId: number; tripId: number };
+
+const isId = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+
+function readArrival(reply: unknown): ShellArrival | null {
+  const r = reply as { version?: unknown; segmentId?: unknown; tripId?: unknown } | null;
+  if (!r || typeof r !== "object" || r.version !== BRIDGE_VERSION) throw new Error("The app sent an unreadable arrival.");
+  if (r.segmentId === null && r.tripId === null) return null;
+  if (!isId(r.segmentId) || !isId(r.tripId)) throw new Error("The app sent an unreadable arrival.");
+  return { segmentId: r.segmentId, tripId: r.tripId };
+}
+
+export const shellPendingArrival = async (): Promise<ShellArrival | null> => readArrival(await ask({ type: "pendingArrival" }));
+export const shellArrivalHere = async (): Promise<ShellArrival | null> => readArrival(await ask({ type: "arrivalHere" }));
 
 export const shellStatus = async (): Promise<ShellStatus> => readStatus(await ask({ type: "status" }));
 export const shellSetSaving = async (on: boolean): Promise<ShellStatus> => readStatus(await ask({ type: "setSaving", on }));
