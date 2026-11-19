@@ -536,8 +536,13 @@ class Server(ThreadingHTTPServer):
         self._deadlines: dict = {}
         self._deadlines_lock = threading.Lock()
         self._closed = threading.Event()
-        super().__init__(*a, **k)
         self._wake_read, self._wake_write = socket.socketpair()
+        try:
+            super().__init__(*a, **k)
+        except BaseException:
+            self._wake_read.close()
+            self._wake_write.close()
+            raise
         threading.Thread(target=self._hang_up_late, daemon=True, name="hang-up-late").start()
 
     def set_deadline(self, sock, seconds: float | None) -> None:
