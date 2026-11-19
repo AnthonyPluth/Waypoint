@@ -206,15 +206,8 @@
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
-  const asking_ai = new SvelteSet<number>();
-  const askAi = (item: ReviewItem) => act(async () => {
-    await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
-    await settle();
-  }, { busy: (on) => (on ? asking_ai.add(item.id) : asking_ai.delete(item.id)) });
-
   let asking_all = $state(false);
-  const askWord = (item: ReviewItem) => asking_ai.has(item.id) ? "Asking…" : item.suggestions.length ? "Ask again" : "Ask AI";
-  const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length && !asking_ai.has(i.id)) : [];
+  const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length) : [];
   const suggested = $derived(shown.filter((i) => i.suggestions.length > 0));
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
   const unasked = $derived(askable(shown));
@@ -569,7 +562,6 @@
           <div class="flex flex-col items-stretch gap-1" role="group" aria-label="This email">
             <p class="eyebrow px-1">This email</p>
             {#if item.suggestions.length}<Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); startAdd(item); }} aria-label={`Add by hand instead: “${subject(item)}”`}>Add by hand instead</Button>{/if}
-            {#if review?.ai && item.reason !== "generic"}<Button variant="ghost" size="sm" class="justify-start" disabled={asking_all || asking_ai.has(item.id)} onclick={() => { close(); void askAi(item); }} aria-label={`${askWord(item)}: “${subject(item)}”`}>{askWord(item)}</Button>{/if}
             <Button variant="ghost" size="sm" class="justify-start" onclick={() => { close(); void dismiss(item); }} aria-label={item.count > 1 ? `Dismiss all: ${item.count} emails about “${subject(item)}”` : `Dismiss: “${subject(item)}”`}>{item.count > 1 ? "Dismiss all" : "Dismiss"}</Button>
           </div>
           {#if item.sender_domain && item.mine}

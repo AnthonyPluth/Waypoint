@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail & review → AI** is off until you save an Ollama address. That is the whole choice: there is no mode to pick, no hosted provider and no second setting for reading mail automatically. Leave the address empty and nothing is ever sent. Once an address is saved, Waypoint sends the text of booking emails it couldn’t read fully to that [Ollama](https://ollama.com) server to fill the gaps, and you can choose **Ask AI** on an item in [Review](/Waypoint/start/review/) (under Check suggestions or Add missing details) to ask about one message yourself. A booking Waypoint read completely is never sent.
+**Settings → Mail & review → AI** is off until you save an Ollama address. That is the whole choice: there is no mode to pick, no hosted provider and no second setting for reading mail automatically. Leave the address empty and nothing is ever sent. Once an address is saved, Waypoint sends the text of booking emails it couldn’t read fully to that [Ollama](https://ollama.com) server to fill the gaps, and you can choose **Ask AI about all** in [Review](/Waypoint/start/review/) to ask about the messages still waiting without a suggestion yourself. A booking Waypoint read completely is never sent.
 
 ## Your Ollama server
 
@@ -80,7 +80,7 @@ Only the message’s plain text goes out, for an item in Check suggestions or Ad
 
 ### Who can ask
 
-Anyone who can see an unread item in Review can choose **Ask AI** on it, or **Ask AI about all**: the mailbox’s owner, and every other member for a mailbox its owner [shared with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Someone who can’t see the item gets “No such item”, and an AI assistant connected over MCP can’t ask. The text goes through the same setting whoever asks, and the suggestion is saved on the item for everyone who sees it.
+Anyone who can see an unread item in Review can choose **Ask AI about all** (or **Ask AI about these N emails** when the list is narrowed): the mailbox’s owner, and every other member for a mailbox its owner [shared with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Someone who can’t see the item gets “No such item”, and an AI assistant connected over MCP can’t ask. The text goes through the same setting whoever asks, and the suggestion is saved on the item for everyone who sees it.
 
 ### The destination button on a trip
 

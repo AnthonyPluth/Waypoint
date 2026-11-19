@@ -107,7 +107,7 @@ describe("Review", () => {
     expect(screen.getAllByRole("button", { name: /ignore/i })).toHaveLength(1);
   });
 
-  it("shows an item shared by another member with whose mailbox it is, and View email, Add by hand, Ask AI and Dismiss", async () => {
+  it("shows an item shared by another member with whose mailbox it is, and View email, Add by hand and Dismiss, with no per-item Ask AI", async () => {
     held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [], ai: true };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
@@ -116,7 +116,7 @@ describe("Review", () => {
     expect(within(row).getByRole("button", { name: /View email: .Mail from example-air.example.* on 2026-10-17/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Add by hand: .Mail from example-air.example.*/ })).toBeInTheDocument();
     expect(within(row).getByRole("button", { name: /Dismiss/ })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: /^(Ask AI|Ask again): / })).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
     expect(within(row).queryByRole("button", { name: /ignore example-air.example/i })).toBeNull();
     expect(within(row).queryByRole("link")).toBeNull();
   });
@@ -126,6 +126,7 @@ describe("Review", () => {
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
     expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
   });
 
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
@@ -1134,47 +1135,57 @@ describe("Review: Ask AI", () => {
     expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
   });
 
-  it("asks the AI, then offers its suggestion to check", async () => {
-    held = { matches: [], items: [item()], who: [], ai: true };
+  it("has no per-email Ask AI or Ask again in an email’s More menu, whether or not it has a suggestion", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3, suggestions: [SUGGESTION] })], who: [], ai: true };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
+    const rows = await screen.findAllByTestId("review-item");
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      expect(within(row).getByLabelText(/^More actions for /)).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: /^Dismiss: / })).toBeInTheDocument();
+      expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again)/ })).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
+    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeInTheDocument();
+  });
+
+  it("asks the AI, then offers its suggestion to check", async () => {
+    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
+    render(ReviewPage);
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
-    expect(await screen.findByRole("button", { name: /Check suggestion: / })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^(Ask AI|Ask again): / })).toHaveTextContent("Ask again");
+    expect(await screen.findAllByRole("button", { name: /Check suggestion: / })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
   });
 
   it("says nothing of a dismissal when the AI left the item in Review", async () => {
-    held = { matches: [], items: [item()], who: [], ai: true };
+    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
-    await screen.findByRole("button", { name: /Check suggestion: / });
-    expect(toast.success).not.toHaveBeenCalled();
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await screen.findAllByRole("button", { name: /Check suggestion: / });
+    expect(toast.success).not.toHaveBeenCalledWith(expect.stringMatching(/dismiss/i));
   });
 
-  it("asks about several messages at once, each showing its own progress", async () => {
+  it("asks about several messages in one go, the bulk button showing its progress", async () => {
     let open: () => void = () => {};
     suggestGate = new Promise((r) => { open = r; });
     held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
     render(ReviewPage);
-    const asks = await screen.findAllByRole("button", { name: /^Ask AI: “/ });
-    await userEvent.click(asks[0]);
-    await userEvent.click(asks[1]);
-    await waitFor(() => expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest"]));
-    expect(asks[0]).toHaveTextContent("Asking…");
-    expect(asks[1]).toHaveTextContent("Asking…");
-    expect(asks[0]).toBeDisabled();
-    expect(asks[2]).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeEnabled();
+    const all = await screen.findByRole("button", { name: "Ask AI about all 4" });
+    await userEvent.click(all);
+    await waitFor(() => expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest"]));
+    expect(all).toHaveTextContent("Asking…");
+    expect(all).toBeDisabled();
     open();
     await waitFor(() => expect(screen.getAllByRole("button", { name: /Check suggestion: / })).toHaveLength(4));
   });
 
   it("says when the AI couldn’t be asked", async () => {
-    held = { matches: [], items: [item()], who: [], ai: true };
+    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
     suggestFails = "Turn on AI suggestions in Settings first.";
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: /^(Ask AI|Ask again): / }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Turn on AI suggestions in Settings first."));
+    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
   });
 
   it("asks about every message without a suggestion at once", async () => {
@@ -2058,7 +2069,7 @@ describe("Review as a queue of decisions", () => {
     expect(within(menu).getByText("More")).toBeInTheDocument();
     expect(within(row).getByLabelText("More actions for “Your itinerary”")).toBeInTheDocument();
     const mine = within(menu).getByRole("group", { name: "This email" });
-    expect(within(mine).getByRole("button", { name: "Ask AI: “Your itinerary”" })).toBeInTheDocument();
+    expect(within(mine).queryByRole("button", { name: /Ask AI|Ask again/ })).toBeNull();
     expect(within(mine).getByRole("button", { name: "Dismiss: “Your itinerary”" })).toBeInTheDocument();
     expect(within(mine).queryByRole("button", { name: /ignore/ })).toBeNull();
     const future = within(menu).getByRole("group", { name: "All future mail from example-air.example" });
