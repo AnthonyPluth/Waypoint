@@ -530,20 +530,21 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     return asked
 
 
-def _would_send(token: Callable[[], str], message_id: str, reason: str) -> bool | None:
+def _would_send(token: Callable[[], str], message_id: str, reason: str, sure: bool = False) -> bool | None:
     try:
         if reason != "no_markup":
             message = extract.read(gmail.fetch(token(), message_id))
             if message.markup or message.bookings:
                 return True
-        return triage.strong(extract.head(gmail.fetch_head(token(), message_id)))
+        head = extract.head(gmail.fetch_head(token(), message_id))
+        return sure or triage.strong(head)
     except gmail.MessageGone:
         return False
     except gmail.GmailError:
         return None
 
 
-def _requeue(mailbox_id: int, token: Callable[[], str], started: float) -> None:
+def _requeue(mailbox_id: int, token: Callable[[], str], started: float, forced: set[str], again: bool) -> None:
     with db.session() as conn:
         if not autoask.active(conn):
             return
@@ -551,7 +552,7 @@ def _requeue(mailbox_id: int, token: Callable[[], str], started: float) -> None:
     for message_id, reason in held:
         if BUDGET - (_clock() - started) <= 0:
             return
-        eligible = _would_send(token, message_id, reason)
+        eligible = _would_send(token, message_id, reason, again or message_id in forced)
         if eligible is None:
             continue
         with db.session() as conn:
@@ -760,7 +761,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
-            _requeue(mailbox_id, current, started)
+            _requeue(mailbox_id, current, started, forced, again)
             asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current, started, known)
             asked_by_ai += _fill_gaps(current, started, viewer, gaps)
             made, queued = made + ai_made, max(0, queued - ai_cleared)
