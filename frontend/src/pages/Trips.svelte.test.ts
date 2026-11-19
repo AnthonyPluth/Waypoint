@@ -1139,7 +1139,7 @@ describe("past trip cards", () => {
     it("asks in groups of at most twelve trips, and each card shows its own trip's distance", async () => {
       serveMany(30, (path) => summariesFor(path, kmFor));
       render(Trips);
-      await waitFor(() => expect(card(129)).toHaveAccessibleName(/1,?868 mi|1\.?868 mi|\d+ mi/));
+      await waitFor(() => expect(card(129)).toHaveAccessibleName(/, 802 mi,/));
       expect(summaryPaths().map((p) => askedIds(p).length).sort((a, b) => a - b)).toEqual([6, 12, 12]);
       expect(new Set(summaryPaths().flatMap(askedIds)).size).toBe(30);
       expect(card(100)).toHaveAccessibleName(/621 mi/);
@@ -1158,10 +1158,10 @@ describe("past trip cards", () => {
     it("keeps the distances of the other groups when one group's request fails, and shows every card", async () => {
       serveMany(14, (path) => (askedIds(path).includes(100) ? Promise.reject(Object.assign(new Error("down"), { status: 500 })) : summariesFor(path, kmFor)));
       render(Trips);
-      await waitFor(() => expect(card(112)).toHaveAccessibleName(/\d+ mi/));
+      await waitFor(() => expect(card(112)).toHaveAccessibleName(/, 696 mi,/));
       expect(summaryPaths()).toHaveLength(2);
       expect(card(100)).not.toHaveAccessibleName(/ mi,/);
-      expect(card(113)).toHaveAccessibleName(/\d+ mi/);
+      expect(card(113)).toHaveAccessibleName(/, 702 mi,/);
       expect(screen.getAllByRole("link", { name: /^Short \d+,/ })).toHaveLength(14);
     });
 
@@ -1226,7 +1226,7 @@ describe("past trip cards", () => {
     await u.click(within(pane).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(vi.mocked(api).mock.calls.some(([path]) => path === "/api/photos/trip-covers")).toBe(true));
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/31/places" || (String(path).startsWith("/api/map-snapshots") && String(path).includes("trip=31")))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/31/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(31)))).toHaveLength(0);
     expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168");
   });
 
@@ -1238,7 +1238,7 @@ describe("past trip cards", () => {
     render(Trips);
     await screen.findByRole("link", { name: /^Omitted,/ });
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/70/places" || (String(path).startsWith("/api/map-snapshots") && String(path).includes("trip=70")))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/70/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(70)))).toHaveLength(0);
   });
 
   it("asks Apple nothing about a trip that becomes past while the page is open and isn't in the covers reply", async () => {
@@ -1256,7 +1256,7 @@ describe("past trip cards", () => {
     ticks.forEach((tick) => tick());
     await screen.findByRole("link", { name: /^Just ended,/ });
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/61/places" || (String(path).startsWith("/api/map-snapshots") && String(path).includes("trip=61")))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/61/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(61)))).toHaveLength(0);
     vi.restoreAllMocks();
   });
 
