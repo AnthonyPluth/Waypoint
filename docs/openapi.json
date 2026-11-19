@@ -713,6 +713,27 @@
         }
       }
     },
+    "/api/trip-summaries": {
+      "get": {
+        "operationId": "api_trip_summaries",
+        "x-handler": "waypoint/server/api/trips.py:api_trip_summaries",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSummaries"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
     "/api/trips/{id}/emails/clear": {
       "post": {
         "operationId": "api_trip_emails_clear",
@@ -10626,6 +10647,21 @@
         ],
         "additionalProperties": false
       },
+      "TripSummaries": {
+        "type": "object",
+        "properties": {
+          "summaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TripSummaryOf"
+            }
+          }
+        },
+        "required": [
+          "summaries"
+        ],
+        "additionalProperties": false
+      },
       "TripSummary": {
         "type": "object",
         "properties": {
@@ -10677,6 +10713,22 @@
           "countries",
           "photos",
           "kinds"
+        ],
+        "additionalProperties": false
+      },
+      "TripSummaryOf": {
+        "type": "object",
+        "properties": {
+          "trip_id": {
+            "type": "integer"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/TripSummary"
+          }
+        },
+        "required": [
+          "trip_id",
+          "summary"
         ],
         "additionalProperties": false
       },

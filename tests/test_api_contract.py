@@ -440,6 +440,7 @@ class Replies(DbCase):
         self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(seg["id"])))
         self.check("GET /api/trips/{id}/places", trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"])))
         self.check("GET /api/trips/{id}/summary", trips_api.api_trip_summary(self.c, {}, {}, str(seg["trip_id"])))
+        self.check("GET /api/trip-summaries", trips_api.api_trip_summaries(self.c, {"trip": [str(seg["trip_id"])]}, {}))
         first, second = trips_api.api_trip_places(self.c, {}, {}, str(seg["trip_id"]))["airports"][:2]
         start, end = ({"latitude": p["latitude"], "longitude": p["longitude"]} for p in (first, second))
         self.check("PUT /api/trips/{id}/driving-routes", driving_routes_api.api_driving_route_store(
@@ -611,7 +612,7 @@ class Generated(unittest.TestCase):
                                      "GET /api/trips", "POST /api/trips", "GET /api/trips/{id}", "POST /api/trips/{id}",
                                      "DELETE /api/trips/{id}", "POST /api/trips/{id}/emails/clear", "POST /api/trips/{id}/merge", "POST /api/trips/{id}/split", "POST /api/trips/{id}/destination/suggest",
                                      "POST /api/segments", "GET /api/segments/{id}", "POST /api/segments/{id}", "POST /api/segments/{id}/code",
-                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes", "GET /api/map-snapshots", "GET /api/trips/{id}/summary", "GET /api/offline",
+                                     "DELETE /api/segments/{id}", "POST /api/segments/{id}/move", "GET /api/segments/{id}/emails", "GET /api/airports", "GET /api/airports/{id}", "GET /api/trips/{id}/places", "GET /api/trips/{id}/driving-routes", "PUT /api/trips/{id}/driving-routes", "GET /api/driving-routes", "GET /api/map-snapshots", "GET /api/trips/{id}/summary", "GET /api/trip-summaries", "GET /api/offline",
                                      "POST /api/import/preview", "POST /api/import",
                                      "GET /api/stats", "GET /api/distance-unit", "POST /api/distance-unit", "GET /api/home", "POST /api/home", "DELETE /api/home", "GET /api/flight-status", "POST /api/flight-status/{id}",
                                      "GET /api/loyalty", "POST /api/loyalty", "POST /api/loyalty/{id}", "DELETE /api/loyalty/{id}",

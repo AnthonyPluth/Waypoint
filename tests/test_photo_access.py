@@ -138,6 +138,21 @@ class ScopeTests(AccessCase):
         self.assertEqual(self.call("cy", "GET", f"/api/trips/{self.trip}/summary"), (404, NO_TRIP))
         self.assertEqual(self.call("cy", "GET", f"/api/trips/{self.trip}/photo-sharing"), (404, NO_TRIP))
 
+    def test_the_batched_summaries_count_only_the_photos_the_viewer_may_see_as_the_trip_route_does(self):
+        def batched(who):
+            [got] = self.ok(who, "GET", f"/api/trip-summaries?trip={self.trip}")["summaries"]
+            return got["summary"]
+        self.share("ben", scope="only_me")
+        self.photo("ben")
+        self.assertEqual(batched("ben")["photos"], {"total": 1, "inferred": 0})
+        self.assertEqual(batched("ana")["photos"], {"total": 0, "inferred": 0})
+        self.assertNotIn(COUNTRY, batched("ana")["countries"])
+        self.share("ben", scope="trip")
+        for who in ("ana", "ben"):
+            self.assertEqual(batched(who), self.summary(who))
+        self.assertEqual(batched("ana")["photos"], {"total": 1, "inferred": 0})
+        self.assertEqual(self.ok("cy", "GET", f"/api/trip-summaries?trip={self.trip}"), {"summaries": []})
+
     def test_a_revoked_grant_shows_nothing_and_reads_as_declined_to_its_person_only(self):
         self.share("ben", revoked=5.0)
         self.photo("ben")
