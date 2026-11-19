@@ -74,6 +74,21 @@ describe("TripPhotos", () => {
     expect(screen.getByRole("button", { name: "See all 14 photos", expanded: false })).toBeTruthy();
   });
 
+  it("keeps the photos, and reports no new load, when the app state is refreshed with the same person", async () => {
+    photos = [photo(1)];
+    const statuses: string[] = [];
+    render(TripPhotos, { trip: roadTrip, people: [ada], now: after, onstatus: (next: string) => statuses.push(next) });
+    await section();
+    const reads = () => vi.mocked(api).mock.calls.filter((c) => String(c[0]).endsWith("/photos")).length;
+    const before = reads();
+    const reported = statuses.length;
+    app.state = state();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(reads()).toBe(before);
+    expect(statuses).toHaveLength(reported);
+    expect(statuses[statuses.length - 1]).toBe("ready");
+  });
+
   it("has no +N tile when every photo fits in the strip", async () => {
     photos = many(3);
     render(TripPhotos, { trip: roadTrip, people: [ada], now: after });
