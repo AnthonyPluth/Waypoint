@@ -93,4 +93,4 @@ The build is the one in #772: `TripPhotoSharingMenu.svelte` on the past trip pag
 
 The pages load Geist and Geist Mono from Google Fonts when you are online and fall back to system fonts otherwise. This is for viewing these design files only; the app bundles its own fonts and loads nothing from outside.
 
-The maps in these frames were drawn on Waypoint's bundled SVG map. That map is gone: every map is now Apple's, and none is shown without a MapKit key (the [MapKit-only design](../mapkit-only/README.md), 2026-11-18).
+The maps in these frames were drawn on Waypoint's bundled SVG map. That map is gone: every map is now Apple's, except the Year in Review card's picture, and no Apple map is shown without a MapKit key (the [MapKit-only design](../mapkit-only/README.md), 2026-11-18).

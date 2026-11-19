@@ -10,7 +10,7 @@ A person's photos are used on a trip only when that person has shared them on th
 
 Nothing is special-cased for one trip. The motivating case (a two-year road trip of stays and rentals) is just a long trip with many `hotel` and `car` segments; a weekend flight works the same way.
 
-Non-goals for the first version: editing, albums, faces, uploading, sharing links, photos in the offline copy, photos through `/mcp`, and map tiles of Waypoint's own (every map in Waypoint is Apple's, drawn only when the server has a MapKit key; see `docs/design/mapkit-only/README.md`).
+Non-goals for the first version: editing, albums, faces, uploading, sharing links, photos in the offline copy, photos through `/mcp`, and map tiles of Waypoint's own (every map in Waypoint but the Year in Review card's picture is Apple's, drawn only when the server has a MapKit key; see `docs/design/mapkit-only/README.md`).
 
 ## Terms
 

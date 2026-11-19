@@ -1,6 +1,6 @@
 # Spike: MapKit JS for the route replay and trip detail maps (#530)
 
-Status: history. Superseded on 2026-11-18 by [the MapKit-only design](mapkit-only/README.md) (#828, signed off on #833; built in #835 to #839): every map in Waypoint is now Apple's MapKit, the bundled SVG map and the server's road and state-line data are gone, and there is no fallback renderer, so the "SVG map kept as the fallback" and the bundled-data wording below are no longer true. What follows is the spike as it was written.
+Status: history. Superseded on 2026-11-18 by [the MapKit-only design](mapkit-only/README.md) (#828, signed off on #833; built in #835 to #839): every map in Waypoint except the Year in Review card's picture is now Apple's MapKit, the bundled SVG map and the server's road and state-line data are gone, and there is no fallback renderer, so the "SVG map kept as the fallback" and the bundled-data wording below are no longer true. What follows is the spike as it was written.
 
 Status when written: the owner asked for this (section 9) and the route replay on MapKit JS is built behind a flag, with the SVG map kept as the fallback. Sections 1 to 8 are the findings as first written; where the owner's decisions changed an answer, section 9 says so. Nothing could be tried against Apple: there is no key yet, so everything was tested against a fake `mapkit` (section 9, "Not verified").
 
