@@ -79,7 +79,7 @@ The d frames draw only Cancelled; the owner settled these when #807's second rev
 ## Open questions for the owner
 
 1. Six photos per day, or three on phone?
-2. The hero's fallback when a trip has few or no photos, or no Immich library: map and bookings only? Decided by the owner on 2026-11-16 for the Past list card (#708): a route map in place of the photo mosaic, the same size as the mosaic, with no photo-count pill, and a plain tile with the trip's kind icons when the route cannot be placed. The trip page hero keeps its own issue.
+2. The hero's fallback when a trip has few or no photos, or no Immich library: map and bookings only? Decided by the owner on 2026-11-16 for the Past list card (#708): a route map in place of the photo mosaic, the same size as the mosaic, with no photo-count pill, and a plain tile with the trip's kind icons when the route cannot be placed. The trip page hero keeps its own issue. (Superseded in part by the [MapKit-only design](../mapkit-only/README.md), 2026-11-18: that map is Apple's snapshot with Waypoint's route on top, and with no MapKit key the card shows its kinds tile.)
 3. How a day's cover and best photos are chosen (suggestion: the first with GPS), and who picks the hero's best photos.
 4. A group for undated bookings (parking, for example) at the end of the Bookings sheet (drawn as c2)?
 5. Does Edit stay in the detail sheet, or move to the Trip options menu?

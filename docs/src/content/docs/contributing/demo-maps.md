@@ -11,7 +11,7 @@ There is nothing to set up. Don’t create an Apple Maps token, a Maps ID or a k
 
 ## What the demo and the docs show
 
-The [MapKit-only design](https://github.com/AnthonyPluth/Waypoint/blob/main/docs/design/mapkit-only/README.md) (signed off on #833) removes the bundled map renderer, so every map in Waypoint is Apple’s. Without a key, the maps are hidden. Its renderer step, [#836](https://github.com/AnthonyPluth/Waypoint/issues/836), builds this behaviour into the demo and `make verify`:
+The [MapKit-only design](https://github.com/AnthonyPluth/Waypoint/blob/main/docs/design/mapkit-only/README.md) (signed off on #833) removes the bundled renderer, so every map in Waypoint is Apple’s. Without a key, the maps are hidden. Its renderer step, [#836](https://github.com/AnthonyPluth/Waypoint/issues/836), builds this behaviour into the demo and `make verify`:
 
 - **The static demo** ([anthonypluth.github.io/Waypoint/demo/](https://anthonypluth.github.io/Waypoint/demo/)) has no map and no route replay:
   - Past trip cards without photos show their kinds tile.

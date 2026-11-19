@@ -976,6 +976,20 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Settings`, `Offline & notifications`, `Account`, `Database`, `Mail & review`, `Travel preferences`, `Calendar feed`, `Connected assistants`, `Backup & import`, `IMPORT PAST FLIGHTS`.
 - **Drive it:** `tools/control flow settings-groups`; or `poetry run python run.py verify --flow settings-groups`.
 
+#### `settings-maps-no-key`
+
+- **Starts at:** `#settings`; goes to: `#settings/travel`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Travel preferences`, `Off: this server has no MapKit key, so Waypoint shows no maps or route replays.`, `How to turn on maps`.
+- **Drive it:** `tools/control flow settings-maps-no-key`; or `poetry run python run.py verify --flow settings-maps-no-key`.
+
+#### `settings-maps`
+
+- **Starts at:** `#settings`; goes to: `#settings/travel`.
+- **Widths:** phone, desktop.
+- **Expects to see:** `Travel preferences`, `Apple Maps.`, `On`, `What Apple learns`.
+- **Drive it:** `tools/control flow settings-maps`; or `poetry run python run.py verify --flow settings-maps`.
+
 #### `share-mailbox`
 
 - **Starts at:** `#settings`; goes to: `#settings/mail`.
