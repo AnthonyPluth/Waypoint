@@ -11,8 +11,6 @@
   let host = $state<HTMLElement | null>(null);
   let replay = $state.raw<ReplayMap | null>(null);
 
-  // Rebuild the map only when what it draws changes. The same route read again arrives as new objects,
-  // and Svelte counts a re-set object prop as changed, so the build below depends on these keys alone.
   const shape = $derived(JSON.stringify(stops));
   const tripKey = $derived(tripId);
   const wide = $derived(width);
