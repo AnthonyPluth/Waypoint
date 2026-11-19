@@ -5,6 +5,7 @@ import html
 from http.cookies import SimpleCookie
 import json
 import os
+import selectors
 import socket
 import sys
 import threading
@@ -535,8 +536,14 @@ class Server(ThreadingHTTPServer):
         self._deadlines: dict = {}
         self._deadlines_lock = threading.Lock()
         self._closed = threading.Event()
-        super().__init__(*a, **k)
-        threading.Thread(target=self._hang_up_late, daemon=True).start()
+        self._wake_read, self._wake_write = socket.socketpair()
+        try:
+            super().__init__(*a, **k)
+        except BaseException:
+            self._wake_read.close()
+            self._wake_write.close()
+            raise
+        threading.Thread(target=self._hang_up_late, daemon=True, name="hang-up-late").start()
 
     def set_deadline(self, sock, seconds: float | None) -> None:
         with self._deadlines_lock:
@@ -546,18 +553,25 @@ class Server(ThreadingHTTPServer):
                 self._deadlines[sock] = time.monotonic() + seconds
 
     def _hang_up_late(self) -> None:
-        while not self._closed.wait(0.5):
-            now = time.monotonic()
-            with self._deadlines_lock:
-                late = [sock for sock, t in self._deadlines.items() if t < now]
-                for sock in late:
-                    del self._deadlines[sock]
+        with selectors.DefaultSelector() as closing:
+            closing.register(self._wake_read, selectors.EVENT_READ)
+            while not closing.select(0.5):
+                self._hang_up_late_sockets()
+        self._wake_read.close()
+
+    def _hang_up_late_sockets(self) -> None:
+        now = time.monotonic()
+        with self._deadlines_lock:
+            late = [sock for sock, t in self._deadlines.items() if t < now]
             for sock in late:
-                with contextlib.suppress(OSError):
-                    sock.shutdown(socket.SHUT_RDWR)
+                del self._deadlines[sock]
+        for sock in late:
+            with contextlib.suppress(OSError):
+                sock.shutdown(socket.SHUT_RDWR)
 
     def server_close(self):
         self._closed.set()
+        self._wake_write.close()
         super().server_close()
 
     def handle_error(self, request, client_address):

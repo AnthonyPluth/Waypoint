@@ -287,6 +287,21 @@ class FrozenClockTests(unittest.TestCase):
         self.assertEqual(" ".join(clock), verify.FROZEN_NOW, "the threads ran under the frozen clock")
         self.assertLess(int(handoffs), 600, "with the switch interval working, 0.3 s of two busy threads hands the GIL over about 60 times")
 
+    @unittest.skipUnless(verify.find_faketime(), "libfaketime isn't installed")
+    def test_an_idle_server_under_the_frozen_clock_uses_almost_no_cpu(self):
+        idle_server = (
+            "import select, time\n"
+            "from waypoint.server import handler\n"
+            "httpd = handler.Server(('127.0.0.1', 0), handler.Handler)\n"
+            "start = time.process_time()\n"
+            "select.select([], [], [], 1.5)\n"
+            "print(time.process_time() - start)\n"
+            "httpd.server_close()\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = verify.frozen_env(verify.clean_env(tmp), verify.find_faketime())
+            done = subprocess.run([sys.executable, "-c", idle_server], env=env, cwd=verify.ROOT, capture_output=True, text=True, timeout=60, check=True)
+        self.assertLess(float(done.stdout.split()[-1]), 0.3, "idle for 1.5 s, the server's threads use about none of it; a spinning one uses all of it")
+
     def test_the_browser_gets_the_same_date_as_the_server(self):
         self.assertEqual(verify.FROZEN_NOW_ISO, verify.FROZEN_NOW.replace(" ", "T") + "Z")
 

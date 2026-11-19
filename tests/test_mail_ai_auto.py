@@ -349,6 +349,25 @@ class RequeueTests(AutoCase):
         [item] = self.items()
         self.assertEqual((item["suggestions"], item["auto_read"]), ([GOOD], True))
 
+    def test_an_item_holding_the_error_stored_before_the_limit_text_was_shortened_is_queued_and_read_once_the_service_answers(self):
+        self.turn_on()
+        self.stranded("m-old", error="The AI service is busy or over its limit. Try again later.")
+        with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=True):
+            self.scan()
+        [item] = self.items()
+        self.assertEqual((len(self.fake.requests), item["suggestions"], item["suggestion_error"], item["auto_read"]), (1, [GOOD], None, True))
+
+    def test_a_weak_message_in_a_picked_label_is_queued_and_read_not_exempted(self):
+        self.turn_on()
+        self.fake.content = json.dumps({"bookings": []})
+        self.stranded("m-picked", mail=plain_mail("Pat <pat@friend.example>", "Notes", f"Dinner on Friday. {BODY}"))
+        self.google.label_mail["Label_1"] = ["m-picked"]
+        self.google.mailbox_labels.append({"id": "Label_1", "name": "Trips", "type": "user"})
+        self.read(lambda conn: conn.execute(Mailbox.__table__.update().values(scan_labels=scan.encode_labels(["Label_1"]))))
+        self.scan()
+        self.assertEqual((len(self.fake.requests), self.waiting()), (1, []))
+        self.assertEqual(self.items()[0]["suggestion_error"], ai.NO_BOOKING)
+
     def test_an_item_the_ai_found_no_booking_in_is_not_queued_again(self):
         self.turn_on()
         self.fake.content = json.dumps({"bookings": []})

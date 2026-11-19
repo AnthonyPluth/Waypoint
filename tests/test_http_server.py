@@ -1,7 +1,12 @@
+import socket
+import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest import mock
 
+from waypoint.server import handler
 from tests.shared import ServerCase
 
 
@@ -29,6 +34,62 @@ class ServerTests(ServerCase):
     def test_an_address_no_route_answers_is_a_404(self):
         self.assertEqual(self.req("GET", "/api/transactions"), (404, {"error": "Not found"}))
         self.assertEqual(self.req("POST", "/api/state", {}), (404, {"error": "Not found"}))
+
+
+class HangUpLateTests(unittest.TestCase):
+    def serve(self):
+        httpd = handler.Server(("127.0.0.1", 0), handler.Handler)
+        self.addCleanup(httpd.server_close)
+        return httpd
+
+    def test_it_never_waits_on_an_event_with_a_timeout_which_returns_at_once_under_the_frozen_clock(self):
+        timed_waits = []
+        real_wait = threading.Event.wait
+
+        def fast_wait(event, timeout=None):
+            if threading.current_thread() is not threading.main_thread() and timeout is not None:
+                timed_waits.append(timeout)
+                return False
+            return real_wait(event, timeout)
+
+        with mock.patch.object(threading.Event, "wait", fast_wait):
+            httpd = self.serve()
+            cpu_before = time.process_time()
+            time.sleep(0.3)
+            httpd.server_close()
+        self.assertEqual(timed_waits, [])
+        self.assertLess(time.process_time() - cpu_before, 0.15)
+
+    def test_a_connection_past_its_deadline_is_hung_up_and_one_that_is_not_yet_late_is_left(self):
+        httpd = self.serve()
+        late_client, late = socket.socketpair()
+        fresh_client, fresh = socket.socketpair()
+        self.addCleanup(lambda: [s.close() for s in (late_client, late, fresh_client, fresh)])
+        httpd.set_deadline(late, -1)
+        httpd.set_deadline(fresh, 60)
+        late_client.settimeout(5)
+        self.assertEqual(late_client.recv(1), b"")
+        fresh_client.settimeout(0.1)
+        with self.assertRaises(TimeoutError):
+            fresh_client.recv(1)
+        httpd.set_deadline(late, None)
+
+    def test_a_failed_bind_raises_the_bind_error_and_leaves_no_thread_behind(self):
+        taken = self.serve()
+        hang_ups = lambda: sum(t.name == "hang-up-late" for t in threading.enumerate())
+        threads_before = hang_ups()
+        with self.assertRaises(OSError) as raised:
+            handler.Server(taken.server_address, handler.Handler)
+        self.assertNotIsInstance(raised.exception, AttributeError)
+        self.assertEqual(hang_ups(), threads_before)
+
+    def test_closing_the_server_stops_the_thread_at_once_and_closing_twice_is_fine(self):
+        httpd = self.serve()
+        thread = next(t for t in threading.enumerate() if t.name == "hang-up-late")
+        httpd.server_close()
+        thread.join(2)
+        self.assertFalse(thread.is_alive())
+        httpd.server_close()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,8 @@ TRIES = 3
 ROUNDS = 3
 CAP = TRIES * ROUNDS
 RETRYABLE = ("incomplete", "broken", "no_markup")
-UNANSWERED = (None, ai.BAD_REPLY, ai.TOO_LONG, ai.UNREACHABLE, ai.REFUSED, ai.LIMITED, ai.FAILED, ai.ASK_FAILED)
+LIMITED_STORED_BEFORE_SHORTENING = "The AI service is busy or over its limit. Try again later."
+UNANSWERED = (None, ai.BAD_REPLY, ai.TOO_LONG, ai.UNREACHABLE, ai.REFUSED, ai.LIMITED, LIMITED_STORED_BEFORE_SHORTENING, ai.FAILED, ai.ASK_FAILED)
 WAITING = "waiting"
 READ = "read"
 
