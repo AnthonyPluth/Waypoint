@@ -556,6 +556,31 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(got, {"ai_ollama_url": "http://ollama.example:11434", "ai_ollama_model": "llama3", "distance_unit": "mi"} if keeps
                                  else {"distance_unit": "mi"})
 
+    def test_0050_indexes_airports_by_lowercased_city_and_downgrading_drops_only_the_index(self):
+        from alembic import command
+
+        def airport_indexes():
+            sql = ("SELECT indexname FROM pg_indexes WHERE tablename = 'airports' AND schemaname = current_schema()" if db.using_postgres()
+                   else "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'airports'")
+            with db.engine(self.path).connect() as c:
+                return {r[0] for r in c.exec_driver_sql(sql) if not r[0].startswith(("sqlite_autoindex", "airports_pkey"))}
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "0049")
+        self.assertEqual(airport_indexes(), set())
+        before = rows_of(self.path, "airports")
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(drift(self.path), [])
+        self.assertEqual(airport_indexes(), {"ix_airports_city_lower"})
+        self.assertEqual(rows_of(self.path, "airports"), before)
+        with db.engine(self.path).begin() as c:
+            command.downgrade(db.alembic_config(c), "0049")
+        self.assertEqual(airport_indexes(), set())
+        self.assertEqual(rows_of(self.path, "airports"), before)
+        with db.engine(self.path).begin() as c:
+            command.upgrade(db.alembic_config(c), "head")
+        self.assertEqual(airport_indexes(), {"ix_airports_city_lower"})
+
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
         db.init(self.path)
         with db.session(self.path) as conn:
