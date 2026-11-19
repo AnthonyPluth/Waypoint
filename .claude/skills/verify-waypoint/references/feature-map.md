@@ -1004,7 +1004,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#settings`; goes to: `#settings/travel`.
 - **Widths:** phone, desktop.
-- **Expects to see:** `Travel preferences`, `Apple Maps.`, `On`, `What Apple learns`.
+- **Expects to see:** `Travel preferences`, `Apple Maps. The route replay, Past trips cards and Stats are drawn by Apple; Apple learns the areas shown.`, `On`, `What Apple learns`.
 - **Drive it:** `tools/control flow settings-maps`; or `poetry run python run.py verify --flow settings-maps`.
 
 #### `share-mailbox`
