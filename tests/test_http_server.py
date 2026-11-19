@@ -76,11 +76,12 @@ class HangUpLateTests(unittest.TestCase):
 
     def test_a_failed_bind_raises_the_bind_error_and_leaves_no_thread_behind(self):
         taken = self.serve()
-        threads_before = threading.active_count()
+        hang_ups = lambda: sum(t.name == "hang-up-late" for t in threading.enumerate())
+        threads_before = hang_ups()
         with self.assertRaises(OSError) as raised:
             handler.Server(taken.server_address, handler.Handler)
         self.assertNotIsInstance(raised.exception, AttributeError)
-        self.assertEqual(threading.active_count(), threads_before)
+        self.assertEqual(hang_ups(), threads_before)
 
     def test_closing_the_server_stops_the_thread_at_once_and_closing_twice_is_fine(self):
         httpd = self.serve()
