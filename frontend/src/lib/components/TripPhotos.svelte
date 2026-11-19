@@ -195,12 +195,13 @@
     }
   }
 
+  const person = $derived(app.state?.person_id ?? null);
   const changeKey = $derived(JSON.stringify([trip.id, trip.start_date, trip.end_date, [...trip.people].sort(), trip.segments.map((s) => [s.id, s.status, s.kind, s.start_local, s.start_zone, s.end_local, s.end_zone, s.origin, s.destination, s.details.address, s.details.state, s.itinerary]), people.map((p) => [p.id, p.member, p.first_name, p.display_name])]));
   let seen: { id: number; key: string } | null = null;
 
   $effect(() => {
     const id = tripId;
-    const me = app.state?.person_id ?? null;
+    const me = person;
     if (!signedIn) return;
     untrack(() => void load(id));
     untrack(() => void sync(id, me));
@@ -216,7 +217,7 @@
   $effect(() => {
     const key = changeKey;
     const id = tripId;
-    const me = app.state?.person_id ?? null;
+    const me = person;
     const before = seen;
     seen = { id, key };
     if (!signedIn || before === null || before.id !== id || before.key === key) return;
