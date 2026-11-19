@@ -128,7 +128,7 @@ def find_faketime(candidates: tuple[str, ...] = FAKETIME_LIBRARIES) -> str | Non
 
 
 def frozen_env(env: dict[str, str], library: str) -> dict[str, str]:
-    return {**env, "LD_PRELOAD": library, "FAKETIME": FROZEN_NOW, "FAKETIME_DONT_FAKE_MONOTONIC": "1", "TZ": "UTC"}
+    return {**env, "LD_PRELOAD": library, "FAKETIME": FROZEN_NOW, "FAKETIME_DONT_FAKE_MONOTONIC": "1", "FAKETIME_FORCE_MONOTONIC_FIX": "0", "TZ": "UTC"}
 
 
 def missing_faketime_message() -> str:

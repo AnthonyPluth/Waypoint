@@ -261,6 +261,29 @@ class FrozenClockTests(unittest.TestCase):
         self.assertEqual((env["LD_PRELOAD"], env["FAKETIME"], env["TZ"]), ("/lib/libfaketime.so.1", verify.FROZEN_NOW, "UTC"))
         self.assertEqual(env["PATH"], "/bin")
 
+    def test_the_real_monotonic_clock_is_left_alone_so_waits_and_the_gil_keep_real_time(self):
+        env = verify.frozen_env({}, "/lib/libfaketime.so.1")
+        self.assertEqual((env["FAKETIME_DONT_FAKE_MONOTONIC"], env["FAKETIME_FORCE_MONOTONIC_FIX"]), ("1", "0"))
+
+    @unittest.skipUnless(verify.find_faketime(), "libfaketime isn't installed")
+    def test_threads_under_the_frozen_clock_take_turns_at_the_normal_switch_interval(self):
+        two_busy_threads = (
+            "import threading, time\n"
+            "last, handoffs, end = [None], [0], time.monotonic() + 0.3\n"
+            "def spin(me):\n"
+            "    while time.monotonic() < end:\n"
+            "        if last[0] != me:\n"
+            "            last[0] = me\n"
+            "            handoffs[0] += 1\n"
+            "threads = [threading.Thread(target=spin, args=(n,)) for n in range(2)]\n"
+            "[t.start() for t in threads]\n"
+            "[t.join() for t in threads]\n"
+            "print(handoffs[0])\n")
+        with tempfile.TemporaryDirectory() as tmp:
+            env = verify.frozen_env(verify.clean_env(tmp), verify.find_faketime())
+            done = subprocess.run([sys.executable, "-c", two_busy_threads], env=env, capture_output=True, text=True, timeout=60, check=True)
+        self.assertLess(int(done.stdout), 600, "with the switch interval working, 0.3 s of two busy threads hands the GIL over about 60 times")
+
     def test_the_browser_gets_the_same_date_as_the_server(self):
         self.assertEqual(verify.FROZEN_NOW_ISO, verify.FROZEN_NOW.replace(" ", "T") + "Z")
 
