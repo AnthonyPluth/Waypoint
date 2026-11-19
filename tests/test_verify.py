@@ -278,11 +278,14 @@ class FrozenClockTests(unittest.TestCase):
             "threads = [threading.Thread(target=spin, args=(n,)) for n in range(2)]\n"
             "[t.start() for t in threads]\n"
             "[t.join() for t in threads]\n"
+            "print(time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime()))\n"
             "print(handoffs[0])\n")
         with tempfile.TemporaryDirectory() as tmp:
             env = verify.frozen_env(verify.clean_env(tmp), verify.find_faketime())
             done = subprocess.run([sys.executable, "-c", two_busy_threads], env=env, capture_output=True, text=True, timeout=60, check=True)
-        self.assertLess(int(done.stdout), 600, "with the switch interval working, 0.3 s of two busy threads hands the GIL over about 60 times")
+        clock, handoffs = done.stdout.split()[-3:-1], done.stdout.split()[-1]
+        self.assertEqual(" ".join(clock), verify.FROZEN_NOW, "the threads ran under the frozen clock")
+        self.assertLess(int(handoffs), 600, "with the switch interval working, 0.3 s of two busy threads hands the GIL over about 60 times")
 
     def test_the_browser_gets_the_same_date_as_the_server(self):
         self.assertEqual(verify.FROZEN_NOW_ISO, verify.FROZEN_NOW.replace(" ", "T") + "Z")
