@@ -26,7 +26,7 @@ A message lands here when it looks like a booking (from an airline, hotel, renta
 
 Most senders put no machine-readable booking in their emails; those are the ones to add by hand or ignore. Messages Gmail files under Purchases or Reservations can also land here, such as a restaurant or an appointment: dismiss them. How a scan chooses what to read is under [Scanning](/Waypoint/start/gmail/#scanning).
 
-Each email has a main button (**Check suggestion** or **Add by hand**), **View email**, and a **More** menu. **More** has two parts so that dismissing one email can’t be mistaken for ignoring a sender: **This email** (**Add by hand instead**, **Ask AI** or **Ask again**, **Dismiss**) and **All future mail from** the sender’s domain (**Not travel: ignore this sender**).
+Each email has a main button (**Check suggestion** or **Add by hand**), **View email**, and a **More** menu. **More** has two parts so that dismissing one email can’t be mistaken for ignoring a sender: **This email** (**Add by hand instead**, **Dismiss**) and **All future mail from** the sender’s domain (**Not travel: ignore this sender**).
 
 ### Add by hand
 
@@ -46,13 +46,11 @@ Saving adds the booking to your trips, takes the item off the list and keeps the
 - Nothing the sender wrote can run, and its styles can’t change Waypoint’s. Pictures are the copies Waypoint kept, so opening the message tells the sender nothing ([what the sender can learn](/Waypoint/privacy/email-scanning/#what-the-sender-can-learn)).
 - Links open in a new tab, and only `https` and `mailto` ones are kept. A link goes to the sender’s own address, which may identify you, so choosing one is visiting their site.
 
-### Ask AI
+### AI suggestions
 
-When the optional [AI suggestions](/Waypoint/start/ai/) have an Ollama address saved, **Ask AI** asks the model about this one message now. Complete results are added to trips automatically; partial ones stay here to complete. When Waypoint’s own reading and the AI’s of the only booking of its kind in an email can’t be matched up (they name different confirmation codes, say), Waypoint marks them as two readings of one booking and the row says **Read two ways** and **Check suggestion** opens one booking with a choice between **Read from the email** and **AI suggestion**; pick the one that matches the email, and only that one is added. A suggestion a scan asked for by itself arrives filled in, with a **read automatically** label ([What a scan sends by itself](/Waypoint/start/ai/#what-a-scan-sends-by-itself)).
+When the optional [AI suggestions](/Waypoint/start/ai/) have an Ollama address saved, a scan asks the model about the messages it couldn’t read fully, and about the ones left in Review from before the address was saved or after earlier tries failed ([Items already in Review](/Waypoint/start/ai/#items-already-in-review)); there is no button to ask by hand. Complete results are added to trips automatically; partial ones stay here to complete. When Waypoint’s own reading and the AI’s of the only booking of its kind in an email can’t be matched up (they name different confirmation codes, say), Waypoint marks them as two readings of one booking and the row says **Read two ways** and **Check suggestion** opens one booking with a choice between **Read from the email** and **AI suggestion**; pick the one that matches the email, and only that one is added. A suggestion a scan asked for by itself arrives filled in, with a **read automatically** label ([What a scan sends by itself](/Waypoint/start/ai/#what-a-scan-sends-by-itself)).
 
 When the model finds no booking in an email, the item stays here, with a note that no booking was found, whatever the email is (a promotion, a statement or a newsletter included): the AI never dismisses an item for you, and the stored copy of the email is kept until you dismiss the item yourself. During a scan only, when an Ollama address is saved, a flight reminder the AI couldn’t complete or an older copy that adds nothing to a booking you already have, and that carries the booking’s code or was itself sent (not forwarded) from the domain of an email already kept with it (when that domain is a travel sender Waypoint knows), is attached to that booking instead of waiting here ([Emails that add nothing new](/Waypoint/start/ai/#emails-that-add-nothing-new)).
-
-When two or more items have no suggestion yet, **Ask AI about all** asks about each in turn, stops at the first failure and says how many it got through. A line beside it says the text goes to your own Ollama server, unredacted. When the list is narrowed to one sender or mailbox, it becomes **Ask AI about these N emails** and asks only about those. Any member who can see an item can ask ([who can ask](/Waypoint/start/ai/#who-can-ask)).
 
 ### Not travel and Dismiss
 
@@ -69,7 +67,7 @@ Items are private to the member whose mailbox they came from: nobody else sees t
 
 In **Settings → Mail & review → Gmail**, each mailbox has a box, **Show this mailbox’s unread mail to the household**, off until its owner ticks it. Only the owner can, and unticking it hides the items again at once. While it’s on, every member sees that mailbox’s items in Review, marked with whose mailbox they’re in, and the Review tab counts them.
 
-Members see what the owner does (subject, sender, day, why it couldn’t be read, and what the AI read from it) and can **View email**, **Add by hand** or **Dismiss** an item, so anyone can clear the queue. **Ask AI** is open to every member who sees the item; **Not travel: ignore this sender** stays with the mailbox’s owner. A mailbox, and what it shares, ends with its owner’s access.
+Members see what the owner does (subject, sender, day, why it couldn’t be read, and what the AI read from it) and can **View email**, **Add by hand** or **Dismiss** an item, so anyone can clear the queue. **Not travel: ignore this sender** stays with the mailbox’s owner. A mailbox, and what it shares, ends with its owner’s access.
 
 ## Match bookings
 

@@ -30,7 +30,7 @@ BLOCKED = [
     "POST /api/import/preview", "POST /api/mailboxes/connect", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/scan", "POST /api/mailboxes/{id}/share",
     "POST /api/mcp-settings/writes", "POST /api/mcp-settings/connections/{id}/mail", "POST /api/reminders", "POST /api/reminders/devices",
     "GET /api/segments/{id}/logo", "GET /api/loyalty/{id}/logo", "GET /api/segments/{id}/emails",
-    "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "POST /api/review/{id}/suggest",
+    "POST /api/trips/{id}/emails/clear", "POST /api/restore", "POST /api/trips/{id}/destination/suggest", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match",
     "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
     "GET /api/home", "POST /api/home", "DELETE /api/home", "POST /api/show-costs",
     "GET /api/trips/{id}/photos", "GET /api/photos/review", "GET /api/photos/trip-covers", "POST /api/photos/{id}", "POST /api/photos/{id}/undo", "GET /api/photos/{id}/thumbnail", "GET /api/photos/{id}/preview", "GET /api/photos/{id}/original",

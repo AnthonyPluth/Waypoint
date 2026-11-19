@@ -341,20 +341,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 
 UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
-SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
-NO_AI = ai.NEEDS_AI
-
-
-class NoAi(Exception):
-    pass
-
-
-class NotAskable(Exception):
-    pass
-
-
-HOLDS_BOOKINGS = "This item holds bookings to settle, not a message to read."
-READ_ALREADY = "Waypoint already read this one: check what it found."
+SUGGESTION_FAILED = ai.ASK_FAILED
 
 
 def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
@@ -369,29 +356,6 @@ def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
 def preview(owner: str, item_id: int) -> Content:
     mailbox_id, message_id, raw = _again(owner, item_id)
     return keep_message(mailbox_id, message_id, raw, [], time.time())
-
-
-def suggest_now(owner: str, item_id: int, now: float) -> None:
-    with db.session() as conn:
-        found = review.seen_message(conn, owner, item_id)
-        if found is None:
-            raise KeyError(item_id)
-        mailbox_id, message_id, mine = found
-        if review.is_match(conn, mailbox_id, message_id):
-            raise NotAskable(HOLDS_BOOKINGS)
-        if review.is_generic(conn, mailbox_id, message_id):
-            raise NotAskable(READ_ALREADY)
-        if ai.mail_config(conn) is None:
-            raise NoAi(NO_AI)
-        kept = None if mine else stored_mail.get(conn, mailbox_id, message_id)
-        token = None if mine or kept is not None else gmail.access_token(conn, mailbox_id, time.time())
-    if kept is not None:
-        _ask(mailbox_id, message_id, kept["text"], now, kept["subject"] or "")
-        return
-    if token is not None:
-        _suggest(mailbox_id, message_id, gmail.fetch(token, message_id), now)
-        return
-    _suggest(mailbox_id, message_id, _again(owner, item_id)[2], now)
 
 
 class Read(NamedTuple):
@@ -412,24 +376,6 @@ def _read(cfg: ai.Config, text: str, timeout: float | None = None, subject: str 
     except Exception as e:
         monitoring.report(e, values=False)
         return Read([], SUGGESTION_FAILED, True)
-
-
-def _suggest(mailbox_id: int, message_id: str, raw: dict[str, Any], now: float) -> None:
-    content = keep_message(mailbox_id, message_id, raw, [], now)
-    subject, revises = extract.guard(raw)
-    _ask(mailbox_id, message_id, content["text"], now, subject, revises)
-
-
-def _ask(mailbox_id: int, message_id: str, text: str, now: float, subject: str = "", revises: bool = False) -> None:
-    with db.session() as conn:
-        cfg = ai.mail_config(conn)
-        asking = not review.is_match(conn, mailbox_id, message_id)
-    if cfg is None or not asking:
-        return
-    read = _read(cfg, text, None, subject, revises)
-    with db.session() as conn:
-        filed = _file_ai(conn, mailbox_id, message_id, read.suggestions, read.error, False, now, read.parking, signals=read.signals)
-    _settle_message(mailbox_id, message_id, filed.segments, now, parked=read.parking)
 
 
 def _time_left(started: float | None) -> float | None:
@@ -584,6 +530,34 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     return asked
 
 
+def _would_send(token: Callable[[], str], message_id: str, reason: str) -> bool | None:
+    try:
+        if reason != "no_markup":
+            message = extract.read(gmail.fetch(token(), message_id))
+            if message.markup or message.bookings:
+                return True
+        return triage.strong(extract.head(gmail.fetch_head(token(), message_id)))
+    except gmail.MessageGone:
+        return False
+    except gmail.GmailError:
+        return None
+
+
+def _requeue(mailbox_id: int, token: Callable[[], str], started: float) -> None:
+    with db.session() as conn:
+        if not autoask.active(conn):
+            return
+        held = autoask.stranded(conn, mailbox_id, UNREADABLE)
+    for message_id, reason in held:
+        if BUDGET - (_clock() - started) <= 0:
+            return
+        eligible = _would_send(token, message_id, reason)
+        if eligible is None:
+            continue
+        with db.session() as conn:
+            (autoask.queue if eligible else autoask.exempt)(conn, mailbox_id, message_id)
+
+
 def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, known: Counter[str] | None = None) -> tuple[int, int, int]:
     asked = made = cleared = 0
     known = Counter() if known is None else known
@@ -602,6 +576,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         except gmail.MessageGone:
             with db.session() as conn:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
+                autoask.exempt(conn, mailbox_id, message_id)
             continue
         except gmail.GmailError:
             continue
@@ -609,9 +584,14 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         if left <= 0:
             return asked, made, cleared
         asked += 1
+        with db.session() as conn:
+            kept = stored_mail.get(conn, mailbox_id, message_id)
+        if kept is None:
+            _keep_quietly(mailbox_id, message_id, raw, [], time.time(), started)
         subject, revises = extract.guard(raw)
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:
+            before = autoask.tries_of(conn, mailbox_id, message_id)
             fixed = review.fixed_suggestions(conn, mailbox_id, message_id)
             said, held = review.keeping_fixed(fixed, read.suggestions)
             answered = bool(read.suggestions)
@@ -624,6 +604,8 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
                 autoask.failed(conn, mailbox_id, message_id)
             else:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
+                if not read.suggestions and read.error not in (None, ai.NO_BOOKING):
+                    autoask.spent(conn, mailbox_id, message_id, before)
         _settle_message(mailbox_id, message_id, filed.segments, time.time(), started, read.parking)
 
 
@@ -778,6 +760,7 @@ def _scan(mailbox_id: int, now: float, today: date, again: bool = False, backfil
             attached += bool(joined) and not a
             read, made, queued, handled = read + 1, made + a, queued + b, handled + 1
         if not capped:
+            _requeue(mailbox_id, current, started)
             asked_by_ai, ai_made, ai_cleared = _ask_waiting(mailbox_id, current, started, known)
             asked_by_ai += _fill_gaps(current, started, viewer, gaps)
             made, queued = made + ai_made, max(0, queued - ai_cleared)

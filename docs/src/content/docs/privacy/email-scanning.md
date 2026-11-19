@@ -92,7 +92,7 @@ When a message is read for a booking, Waypoint also looks for the booking’s to
 
 ## Optional AI suggestions
 
-Off until you save an Ollama address (**Settings → Mail & review → AI**; see [AI suggestions](/Waypoint/start/ai/)); there is no other setting and no hosted provider. With an address saved, a scan sends the text of travel mail that no reader could read or that a reader left with a gap (a missing detail, or a hotel name that was really a price), and **Ask AI** on a Review item sends that one message. The Settings card says this in plain words. Leave the address empty and a scan sends no email text anywhere.
+Off until you save an Ollama address (**Settings → Mail & review → AI**; see [AI suggestions](/Waypoint/start/ai/)); there is no other setting and no hosted provider. With an address saved, a scan sends the text of travel mail that no reader could read or that a reader left with a gap (a missing detail, or a hotel name that was really a price), including Review items left behind from before the address was saved or after earlier tries failed, at most nine tries each; nothing else sends an email’s text to the AI, and there is no button that does. The Settings card says this in plain words. Leave the address empty and a scan sends no email text anywhere.
 
 The address is a server on your own network. The text goes unredacted and untrimmed and never leaves your network, so loyalty and Known Traveler numbers in it reach your own server.
 

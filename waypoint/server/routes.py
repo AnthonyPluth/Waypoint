@@ -30,7 +30,7 @@ from .api.mailboxes import api_mailbox_backfill, api_mailbox_callback, api_mailb
 from .api.reminders import (api_app_device_add, api_app_device_remove, api_app_push, api_device_add, api_device_remove, api_feed_make, api_feed_off, api_reminders,
                             api_reminders_set)
 from .api.review import (api_review, api_review_attach, api_review_dismiss, api_review_ignore, api_review_image, api_review_match, api_review_preview,
-                         api_review_same, api_review_suggest, api_review_who)
+                         api_review_same, api_review_who)
 from .api.offline import api_offline
 from .api.state import api_show_costs_save, api_state
 from .api.driving_routes import api_driving_route_store, api_driving_routes, api_driving_routes_for_trips
@@ -152,7 +152,6 @@ ROUTES: list[tuple[str, str, Callable[..., Any]]] = [
     ("POST", "/api/review/{id}/attach", api_review_attach),
     ("GET", "/api/review/{id}/preview", api_review_preview),
     ("GET", "/api/review/{id}/images/{id}", api_review_image),
-    ("POST", "/api/review/{id}/suggest", api_review_suggest),
     ("DELETE", "/api/review/{id}", api_review_dismiss),
     ("GET", "/api/mcp-settings", api_mcp_settings),
     ("POST", "/api/mcp-settings/writes", api_mcp_writes),

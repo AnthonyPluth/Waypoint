@@ -3630,46 +3630,6 @@
         }
       }
     },
-    "/api/review/{id}/suggest": {
-      "post": {
-        "operationId": "api_review_suggest",
-        "x-handler": "waypoint/server/api/review.py:api_review_suggest",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Waypoint",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "const": "1"
-            },
-            "description": "Sent with every request that isn't a GET; Waypoint refuses one without it (CSRF)."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Asked"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/Error"
-          }
-        }
-      }
-    },
     "/api/review/{id}": {
       "delete": {
         "operationId": "api_review_dismiss",
@@ -4428,18 +4388,6 @@
         "required": [
           "enabled",
           "devices"
-        ],
-        "additionalProperties": false
-      },
-      "Asked": {
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
         ],
         "additionalProperties": false
       },
@@ -7992,16 +7940,12 @@
             "items": {
               "$ref": "#/components/schemas/WhoIsThis"
             }
-          },
-          "ai": {
-            "type": "boolean"
           }
         },
         "required": [
           "items",
           "matches",
-          "who",
-          "ai"
+          "who"
         ],
         "additionalProperties": false
       },

@@ -311,16 +311,6 @@ class MustStayInReviewTests(NothingNewCase):
             result = self.scan(now=NOW + 60)
         self.assertEqual((result.review, len(self.kept()), self.fake.requests, self.counted()), (1, 1, [], (0, 0)))
 
-    def test_asking_by_hand_does_not_dismiss_a_known_booking(self):
-        self.turn_on()
-        self.add_mail("hand", mail(REMINDER, ident="hand"))
-        self.scan(now=NOW + 60)
-        [item] = self.kept()
-        self.fake.content = json.dumps(SAME)
-        with no_leaks(self, *CANARIES, database=self.path, sent_ok=True):
-            self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW + 90))
-        self.assertEqual(len(self.kept()), 1)
-
     def test_a_review_item_that_holds_matches_to_settle_is_left_alone(self):
         with db.session() as conn:
             conn.execute(ReviewItem.__table__.delete())

@@ -18,7 +18,7 @@ from sqlalchemy import delete, func, insert, select, update
 from tests.privacy import no_leaks
 from tests.shared import ServerCase, fetch
 from tests.test_mail_ai import ScanAiCase
-from tests.test_mail_scan import NOW, ScanCase, b64
+from tests.test_mail_scan import NOW, ScanCase, b64, eml
 from waypoint import oidc
 from waypoint.domain import calendar, offline, people, trips, visibility
 from waypoint.domain.visibility import Viewer
@@ -788,11 +788,12 @@ class AiFiledTests(ScanAiCase, Kept):
         self.assertEqual(len(self.fake.requests), 2)
         self.assertNotIn("images", self.fake.requests[0][2]["messages"][1])
 
-    def test_a_booking_filed_by_ask_ai_is_settled_after_it_commits(self):
+    def test_a_booking_filed_by_a_later_read_is_settled_after_it_commits(self):
         self.waiting_item()
         self.turn_on()
         self.answers('{"picture": 1}')
-        scan._ask(self.mailbox, "m-ai", "Reservation PK30417 is confirmed.", NOW)
+        [item] = self.items()
+        self.ask_about(item["id"])
         [segment] = self.parking()
         self.assertEqual(self.code(segment), (("ready", "2026-10-16"), {"type": "image/png", "data": QR}))
 
@@ -1305,7 +1306,8 @@ class ReviewPathTests(ScanAiCase, Kept):
         self.fresh()
         reading = json.dumps({"bookings": [{"kind": "parking", "origin": f"Lot {n}", "start_local": "2026-12-01T05:15", "end_local": "2026-12-04T03:00"} for n in "AB"]})
         self.fake.content = reading
-        scan._ask(self.mailbox, "m-r", "Reservation PK30417", NOW)
+        self.google.mail["m-r"] = eml("no_markup_ids")
+        self.ask_about(int(self.read(lambda conn: conn.execute(select(ReviewItem.id)).scalar())))
         count = lambda: self.read(lambda conn: conn.execute(select(ReviewItem.parking)).scalar())
         self.assertEqual(count(), 2)
         self.read(lambda conn: review.raise_parking(conn, self.mailbox, "m-r", 1))

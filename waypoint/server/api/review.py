@@ -7,11 +7,11 @@ from ... import validate
 from ...domain import people, trips
 import time
 
-from ...domain.mail import ai, gatecode, review, scan
+from ...domain.mail import gatecode, review, scan
 from ...providers import gmail
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, image_response, own_session, position, row_id
-from ..contract import Asked, Attached, Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewCandidate, ReviewItem, ReviewMatch, SameBooking, SegmentBody, WhoBody
+from ..contract import Attached, Ignoring, Matched, MatchBody, Ok, Preview, Review, ReviewCandidate, ReviewItem, ReviewMatch, SameBooking, SegmentBody, WhoBody
 from .mailboxes import owner
 from .trips import segment_fields, viewer
 
@@ -26,8 +26,8 @@ def api_review(conn, _q, _b) -> Review:
             "who": [{"id": t.id, "name": t.name or "", "segment_id": s["id"], "trip_id": s["trip_id"], "kind": s["kind"],
                      "provider": s["provider"], "origin": s["origin"], "destination": s["destination"],
                      "start_local": s["start_local"], "start_zone": s["start_zone"]}
-                    for t, s in trips.unmatched(conn, viewer(conn))],
-            "ai": ai.mail_config(conn) is not None}
+                    for t, s in trips.unmatched(conn, viewer(conn))]}
+
 
 
 def _pick(linked: gatecode.Linked | None) -> None:
@@ -172,18 +172,3 @@ def api_review_image(conn, _q, _b, item_id: str, index: str) -> Response:
     if found is None:
         raise ApiError(NO_IMAGE, 404)
     return image_response(found)
-
-
-@own_session
-def api_review_suggest(_conn, _q, _b, item_id: str) -> Asked:
-    try:
-        scan.suggest_now(owner(), row_id(item_id, NO_ITEM), time.time())
-    except KeyError:
-        raise ApiError(NO_ITEM, 404) from None
-    except (scan.NoAi, scan.NotAskable) as e:
-        raise ApiError(str(e)) from e
-    except gmail.MessageGone:
-        raise ApiError(GONE, 404) from None
-    except gmail.GmailError as e:
-        raise ApiError(str(e), 502) from e
-    return {"ok": True}

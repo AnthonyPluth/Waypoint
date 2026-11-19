@@ -263,8 +263,6 @@ class Replies(DbCase):
         with mock.patch.object(scan, "preview", return_value={"subject": None, "sender_domain": None, "received": None, "text": "Hello.",
                                                                   "html": "<p>Hello.</p>", "truncated": False, "original": True, "images": 0}):
             self.check("GET /api/review/{id}/preview", review_api.api_review_preview(None, {}, {}, str(listed["items"][2]["id"])))
-        with mock.patch.object(scan, "suggest_now", return_value=None):
-            self.check("POST /api/review/{id}/suggest", review_api.api_review_suggest(None, {}, {}, str(listed["items"][1]["id"])))
         self.c.commit()
         self.check("DELETE /api/review/{id}", review_api.api_review_dismiss(self.c, {}, {}, str(listed["items"][1]["id"])))
         stay = {"kind": "hotel", "origin": "Harbour Hotel", "destination": None, "start_local": "2026-11-21T15:00", "end_local": "2026-11-27T10:00",
@@ -605,7 +603,7 @@ class Generated(unittest.TestCase):
                                      "POST /api/mailboxes/{id}/reread", "POST /api/mailboxes/{id}/backfill", "POST /api/mailboxes/{id}/share",
                                      "GET /api/ai", "POST /api/ai",
                                      "GET /api/review", "POST /api/review/who/{id}", "POST /api/review/{id}/ignore", "POST /api/review/{id}/match", "DELETE /api/review/{id}",
-                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/suggest", "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
+                                     "GET /api/review/{id}/preview", "POST /api/review/{id}/same", "POST /api/review/{id}/attach",
                                      "GET /api/people", "POST /api/people",
                                      "POST /api/people/{id}", "DELETE /api/people/{id}", "POST /api/people/{id}/claim",
                                      "GET /api/people/claim-suggestions", "POST /api/people/claim-suggestions/dismiss",
