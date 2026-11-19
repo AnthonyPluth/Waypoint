@@ -16,6 +16,7 @@
   import ImageOff from "@lucide/svelte/icons/image-off";
   import Play from "@lucide/svelte/icons/play";
 
+<<<<<<< Updated upstream
   const NONE: ReadonlySet<number> = new Set();
 
   let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), headerEnd = null, belowHeader = null }: {
@@ -23,6 +24,9 @@
     timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
     onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; headerEnd?: Snippet | null; belowHeader?: Snippet | null;
   } = $props();
+=======
+  let { trip, people, now, onloaded, onsettled, onchanged }: { trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onsettled?: () => void; onchanged?: () => void } = $props();
+>>>>>>> Stashed changes
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
   let loaded = $state<Loaded>({ state: "loading" });
@@ -145,7 +149,7 @@
         if (mapStale) onloaded?.(null);
       } else loaded = { state: "error" };
     } finally {
-      if (mine === latest) refreshing = false;
+      if (mine === latest) { refreshing = false; onsettled?.(); }
     }
   }
 
@@ -201,7 +205,7 @@
   $effect(() => {
     const id = tripId;
     const me = app.state?.person_id ?? null;
-    if (!signedIn) return;
+    if (!signedIn) { untrack(() => onsettled?.()); return; }
     untrack(() => void load(id));
     untrack(() => void sync(id, me));
     return () => untrack(() => {

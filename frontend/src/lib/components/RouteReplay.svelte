@@ -8,7 +8,11 @@
   import { stopsOf, worthLocating } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
+<<<<<<< Updated upstream
   let { trip, now, shown = true, stopList = true, onstops, compact = false, onreplay = null, onended = null, wrapClass = "", wrapId = undefined, fallbackFocus = null, onmap }: { trip: Trip; now: number; shown?: boolean; stopList?: boolean; onstops?: (count: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null; wrapClass?: string; wrapId?: string; fallbackFocus?: (() => HTMLElement | null) | null; onmap?: (showing: boolean) => void } = $props();
+=======
+  let { trip, now, photos = null, photosSettled = true, onshow }: { trip: Trip; now: number; photos?: TripPhotos | null; photosSettled?: boolean; onshow?: (cluster: number) => void } = $props();
+>>>>>>> Stashed changes
 
   let places = $state<TripPlaces | null>(null);
 
@@ -106,6 +110,7 @@
   });
 </script>
 
+<<<<<<< Updated upstream
 {#if shown && wanted && (maps || lost)}
   <div id={wrapId} class={wrapClass || undefined}>
     {#if available && maps}
@@ -115,4 +120,10 @@
     {/if}
     <p role="status" aria-live="polite" class={lost ? "rounded-[14px] border border-dashed border-border px-3.5 py-3 text-sm text-muted-foreground" : "sr-only"}>{lost ? "The map couldn’t load" : ""}</p>
   </div>
+=======
+{#if stops.length >= 2 || photoOnly}
+  <section class="mb-6" aria-label={stops.length >= 2 ? "Route replay" : "Trip photo map"}>
+    {#key trip.id}<RouteReplayMap {stops} {year} roads={places?.roads ?? NO_ROADS} boundaries={places?.boundaries ?? NO_BOUNDARIES} autoplay={maps !== undefined && photosSettled} maps={stops.length >= 2 ? (maps ?? null) : null} {infos} unlocated={photos ? unlocated(photos.photos) : 0} {onshow} />{/key}
+  </section>
+>>>>>>> Stashed changes
 {/if}

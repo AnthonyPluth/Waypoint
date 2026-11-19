@@ -55,6 +55,12 @@
   import { toast } from "svelte-sonner";
 
   const staticDemo = import.meta.env.MODE === "demo";
+<<<<<<< Updated upstream
+=======
+  let tripPhotos = $state<PhotoReply | null>(null);
+  let photosSettled = $state(false);
+  let gallery = $state<{ showCluster: (cluster: number) => Promise<void> } | null>(null);
+>>>>>>> Stashed changes
 
   let { tripId = null, onchanged = null, revision = 0 }: { tripId?: number | null; onchanged?: ((movedTo?: number) => void) | null; revision?: number } = $props();
 
@@ -198,7 +204,11 @@
   }
   let seenRevision = untrack(() => revision);
   $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
+<<<<<<< Updated upstream
   $effect(() => { void id; form = null; editingTrip = false; detailId = null; bookingsOpen = false; savedCopy = null; savedTrips = []; void load(); });
+=======
+  $effect(() => { void id; photosSettled = false; form = null; editingTrip = false; savedCopy = null; savedTrips = []; void load(); });
+>>>>>>> Stashed changes
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   let openedWanted = "";
@@ -416,8 +426,13 @@
     {/if}
   </div>
 
+<<<<<<< Updated upstream
   <RouteReplay trip={t} {now} />
   <TripPhotos onchanged={() => photoChanges++} trip={t} {people} {now} />
+=======
+  <RouteReplay trip={t} {now} photos={tripPhotos} {photosSettled} onshow={(cluster) => void gallery?.showCluster(cluster)} />
+  <TripPhotos bind:this={gallery} onloaded={(found) => (tripPhotos = found)} onsettled={() => (photosSettled = true)} onchanged={() => photoChanges++} trip={t} {people} {now} />
+>>>>>>> Stashed changes
 
   {#if form && form.id === null}
     <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />

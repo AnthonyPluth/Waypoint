@@ -314,6 +314,38 @@ describe("a route replay and Apple's map", () => {
     expect(fake.maps).toHaveLength(1);
   });
 
+<<<<<<< Updated upstream
+=======
+  it("does not rebuild Apple's map when the clusters are read again at the same places, and rebuilds it when they move", async () => {
+    render(MapKitClusters, { maps: fakeMaps(), stops, roads: places.roads, boundaries: places.boundaries });
+    await waitFor(() => expect(fake.maps).toHaveLength(1));
+    await fireEvent.click(screen.getByRole("button", { name: "same" }));
+    expect(fake.maps).toHaveLength(1);
+    expect(fake.maps[0].destroyed).toBe(false);
+    await fireEvent.click(screen.getByRole("button", { name: "moved" }));
+    await waitFor(() => expect(fake.maps).toHaveLength(2));
+    expect(fake.maps[0].destroyed).toBe(true);
+  });
+
+  it("does not rebuild Apple's map when the route is read again as new but identical objects", async () => {
+    render(MapKitClusters, { maps: fakeMaps(), stops, roads: places.roads, boundaries: places.boundaries });
+    await waitFor(() => expect(fake.maps).toHaveLength(1));
+    await fireEvent.click(screen.getByRole("button", { name: "again" }));
+    expect(fake.maps[0].destroyed).toBe(false);
+    expect(fake.maps).toHaveLength(1);
+  });
+
+  it("holds the replay until the photos have settled, so the map is rebuilt for their pins before it plays", async () => {
+    const t = trip(flights);
+    const view = render(RouteReplay, { trip: t, now: after, photos: null, photosSettled: false });
+    await loadScript();
+    await waitFor(() => expect(view.container.querySelector("[data-mapkit]")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Play" })).toBeTruthy();
+    await view.rerender({ trip: t, now: after, photos, photosSettled: true });
+    expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+  });
+
+>>>>>>> Stashed changes
   it("never draws a map with no route on Apple's, even with a handle left from the previous trip", async () => {
     const view = render(RouteReplay, { trip: trip(flights), now: after });
     await loadScript();
