@@ -141,7 +141,7 @@ async function main() {
     await standInForApple(fresh, mapkit ?? (opt.noKey ? "none" : undefined));
     const tab = await fresh.newPage();
     tab.setDefaultTimeout(30000);
-    tab.setDefaultNavigationTimeout(90000);
+    tab.setDefaultNavigationTimeout(30000);
     tab.on("console", (m) => keep(consoleBuffer, { type: m.type(), text: scrubText(firstLine(m.text())).slice(0, 300), route: route() }));
     tab.on("pageerror", (e) => keep(consoleBuffer, { type: "pageerror", text: scrubText(firstLine(e)).slice(0, 300), route: route() }));
     tab.on("response", (r) => { const path = scrubUrl(r.url(), base); if (path) keep(requests, { method: r.request().method(), path, status: r.status(), type: r.request().resourceType() }); });
