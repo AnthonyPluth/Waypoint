@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, CheckConstraint, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, text, true
+from sqlalchemy import Boolean, CheckConstraint, Column, Float, ForeignKey, Index, Integer, LargeBinary, MetaData, Table, Text, UniqueConstraint, false, func, text, true
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.expression import FunctionElement
 
@@ -85,6 +85,8 @@ airports = Table(
     Column('longitude', Float, nullable=False),
     info={'doc': 'airports by IATA code, with their IANA time zone (seeded from waypoint/storage/airports.tsv.gz; reference data, not part of a backup)'},
 )
+
+Index('ix_airports_city_lower', func.lower(airports.c.city))
 
 airlines = Table(
     'airlines', metadata,
