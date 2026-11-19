@@ -23,6 +23,16 @@ final class LaunchGate {
     }
 }
 
+extension LaunchGate {
+    /// The scene-phase callback that runs `ArrivalWatch.activated()` on becoming active finds the shell not open yet on a cold launch (the launch
+    /// is still running), and a launch that opens the cached page offline makes no save that would run it either. So a launch that has opened the
+    /// shell and is still active runs it itself, once, after `begin` allowed it: never from a background relaunch or a locked phone, which
+    /// `begin` refuses.
+    static func activatesArrival(shellOpen: Bool, active: Bool) -> Bool {
+        shellOpen && active
+    }
+}
+
 enum LaunchDecision: Equatable {
     case launch
     case purgeAndConnect

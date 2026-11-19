@@ -77,6 +77,9 @@ struct WaypointApp: App {
               launch.begin(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
         await open()
         launch.end()
+        if LaunchGate.activatesArrival(shellOpen: phase == .shell, active: scenePhase == .active) {
+            await ArrivalWatch.shared.activated()
+        }
     }
 
     @MainActor

@@ -151,6 +151,20 @@ final class LockedLaunchTests: XCTestCase {
         phone.cleanUp()
     }
 
+    func testALaunchThatOpenedTheShellWhileActiveActivatesTheArrivalWatchItself() {
+        XCTAssertTrue(LaunchGate.activatesArrival(shellOpen: true, active: true))
+        XCTAssertFalse(LaunchGate.activatesArrival(shellOpen: false, active: true))
+        XCTAssertFalse(LaunchGate.activatesArrival(shellOpen: true, active: false))
+    }
+
+    func testTheLaunchGateRefusesALockedOrBackgroundLaunchSoNothingActivates() {
+        let gate = LaunchGate()
+        XCTAssertFalse(gate.begin(active: false, protectedDataAvailable: true))
+        XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: false))
+        XCTAssertTrue(gate.begin(active: true, protectedDataAvailable: true))
+        XCTAssertFalse(gate.begin(active: true, protectedDataAvailable: true))
+    }
+
     func testTheLaunchDecisionPurgesOnlyForAKeychainThatWasReadAndIsEmpty() {
         XCTAssertEqual(LaunchDecision.of(.connected), .launch)
         XCTAssertEqual(LaunchDecision.of(.notConnected), .purgeAndConnect)

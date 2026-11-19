@@ -299,6 +299,14 @@ final class ArrivalWatchTests: XCTestCase {
         XCTAssertEqual(phone.locations.requests, ["whenInUse"])
     }
 
+    func testACachedPageLaunchThatMakesNoSaveStillAsksOnceWhenItActivatesTheWatch() async {
+        let phone = qualifyingPhone()
+        await phone.watch.activated()
+        XCTAssertEqual(phone.locations.requests, ["whenInUse"])
+        await phone.watch.activated()
+        XCTAssertEqual(phone.locations.requests, ["whenInUse"])
+    }
+
     func testNothingIsAskedWhileSavingIsOff() async {
         let phone = qualifyingPhone()
         OfflineSettings(defaults: phone.defaults).set(false)
