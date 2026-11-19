@@ -36,7 +36,7 @@
 <section aria-labelledby="ai-title" class="space-y-2">
   <h2 id="ai-title" class="eyebrow px-1">AI</h2>
   <p class="px-1 text-sm text-muted-foreground">Use AI to fill in what Waypoint couldn’t read in booking emails, and to suggest a trip’s destination.</p>
-  <details class="px-1 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">How email is shared</summary><p class="mt-2">Applies to all household mailboxes. AI is used exactly when an Ollama address is saved here; leave it empty to not use AI. Once one is saved, Waypoint sends the text of booking emails it couldn’t read fully to that Ollama server to fill the gaps. It goes to your own server and nowhere else. Complete bookings are added automatically; missing details stay in Review.</p></details>
+  <details class="px-1 text-sm text-muted-foreground"><summary class="cursor-pointer py-1">How email is shared</summary><p class="mt-2">Applies to all household mailboxes. AI is used exactly when an Ollama address is saved here; leave it empty to not use AI. Once one is saved, Waypoint sends the text of booking emails it couldn’t read fully to that Ollama server to fill the gaps, including ones already waiting in Review, a few times at most. It goes to your own server and nowhere else. Complete bookings are added automatically; missing details stay in Review.</p></details>
   <div class="rows">
     {#if problem}
       <div class="row"><p class="text-sm text-signal-ink" role="status">{problem}</p><Button variant="outline" onclick={load}>Try again</Button></div>

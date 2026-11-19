@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, select, update
 
 from ...storage import db
-from ...storage.models import ReviewItem
+from ...storage.models import ReviewItem, ScannedMessage
 from . import ai, review
 
 TRIES = 3
+ROUNDS = 3
+CAP = TRIES * ROUNDS
+RETRYABLE = ("incomplete", "broken", "no_markup")
 WAITING = "waiting"
 READ = "read"
 
@@ -40,4 +43,34 @@ def failed(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
         return
     left = int(tries) + 1
     conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
-                 .values(auto_tries=left, **({"auto_state": None} if left >= TRIES else {})))
+                 .values(auto_tries=left, **({"auto_state": None} if left % TRIES == 0 else {})))
+
+
+def tries_of(conn: db.Connection, mailbox_id: int, message_id: str) -> int:
+    return int(conn.execute(select(ReviewItem.auto_tries).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)).scalar() or 0)
+
+
+def spent(conn: db.Connection, mailbox_id: int, message_id: str, before: int) -> None:
+    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id)
+                 .values(auto_tries=(before // TRIES + 1) * TRIES, auto_state=None))
+
+
+def stranded(conn: db.Connection, mailbox_id: int, unreadable: str) -> list[tuple[str, str]]:
+    rows = list(conn.execute(
+        select(ReviewItem.message_id, ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error)
+        .join(ScannedMessage, and_(ScannedMessage.mailbox_id == ReviewItem.mailbox_id, ScannedMessage.message_id == ReviewItem.message_id))
+        .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.auto_state.is_(None), ReviewItem.reason.in_(RETRYABLE),
+               ReviewItem.auto_tries < CAP, ScannedMessage.outcome == unreadable)
+        .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())))
+    return [(r["message_id"], r["reason"]) for r in rows
+            if r["suggestion_error"] != ai.NO_BOOKING and all(x.get("parsed") for x in review.suggestions_of(r["suggestion"]))]
+
+
+def queue(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
+    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id,
+                                          ReviewItem.auto_state.is_(None)).values(auto_state=WAITING))
+
+
+def exempt(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
+    conn.execute(update(ReviewItem).where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.message_id == message_id,
+                                          ReviewItem.auto_state.is_(None)).values(auto_tries=CAP))

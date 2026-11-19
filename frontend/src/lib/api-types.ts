@@ -61,10 +61,6 @@ export interface AppPush {
   devices: ReminderDevice[];
 }
 
-export interface Asked {
-  ok: boolean;
-}
-
 export interface AssistantCandidate {
   segment_id: number;
   trip_id: number;
@@ -898,7 +894,6 @@ export interface Review {
   items: ReviewItem[];
   matches: ReviewMatch[];
   who: WhoIsThis[];
-  ai: boolean;
 }
 
 export interface ReviewBooking {
@@ -1609,7 +1604,6 @@ export interface Endpoints {
   "POST /api/review/{id}/same": { body: SegmentBody; reply: SameBooking };
   "POST /api/review/{id}/attach": { body: SegmentBody; reply: Attached };
   "GET /api/review/{id}/preview": { body: never; reply: Preview };
-  "POST /api/review/{id}/suggest": { body: never; reply: Asked };
   "DELETE /api/review/{id}": { body: never; reply: Ok };
   "GET /api/mcp-settings": { body: never; reply: McpSettings };
   "POST /api/mcp-settings/writes": { body: McpWritesBody; reply: McpWritesBody };

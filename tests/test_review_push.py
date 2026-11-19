@@ -13,7 +13,7 @@ from sqlalchemy import insert, select, update
 
 from tests.privacy import no_leaks
 from tests.test_mail_ai import GOOD, ScanAiCase
-from tests.test_mail_scan import NOW, eml
+from tests.test_mail_scan import eml
 from tests.test_reminders import ENDPOINT, subscription
 from tests.test_webpush import PushService, decrypt, receiver
 from waypoint.domain import app_push, reminders
@@ -223,14 +223,14 @@ class WhenItDoesNotTests(PushCase):
         self.scan_job()
         self.assertEqual((self.sent, self.remembered()), ([], []))
 
-    def test_ask_ai_does_not_notify(self):
+    def test_reading_a_waiting_item_later_does_not_notify(self):
         self.device()
-        self.turn_on()
         self.put("no_markup_ids")
+        self.scan()
+        self.turn_on()
         with mock.patch.object(reminders, "review_due") as due:
-            self.scan()
             [item] = self.items()
-            scan.suggest_now("u-jane", item["id"], NOW)
+            self.ask_about(item["id"])
         due.assert_not_called()
         self.assertEqual(self.sent, [])
 

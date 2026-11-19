@@ -16,7 +16,7 @@ from waypoint.domain.mail import ai, autoask, extract, review, scan
 from waypoint.providers import gmail
 from waypoint.storage import db
 from waypoint.storage import settings_keys as sk
-from waypoint.storage.models import ReviewItem, StoredMessage
+from waypoint.storage.models import ReviewItem
 
 BODY = "CANARY-BODY-AI-5J2K"
 IDS = ("TT87654321", "4111 1111 1111 1111", "2207781905", "FXLOY-4400123")
@@ -645,6 +645,16 @@ class ScanAiCase(ScanCase):
         with db.session() as conn:
             db.set_setting(conn, sk.AI_OLLAMA_URL, None)
 
+    def token(self):
+        token = self.read(lambda conn: gmail.access_token(conn, self.mailbox, NOW))
+        return lambda: token
+
+    def ask_about(self, item_id):
+        with db.session() as conn:
+            row = conn.execute(select(ReviewItem.mailbox_id, ReviewItem.message_id).where(ReviewItem.id == item_id)).fetchone()
+            autoask.queue(conn, row["mailbox_id"], row["message_id"])
+        return scan._ask_waiting(self.mailbox, self.token(), scan._clock())
+
 
 class ScanTests(ScanAiCase):
     def test_it_does_nothing_unless_turned_on(self):
@@ -736,10 +746,6 @@ class ScanTests(ScanAiCase):
 
 
 class ConfiguredAddressTests(ScanAiCase):
-    def token(self):
-        token = self.read(lambda conn: gmail.access_token(conn, self.mailbox, NOW))
-        return lambda: token
-
     def unread(self):
         return self.read(lambda conn: conn.execute(select(ReviewItem.message_id, ReviewItem.suggestion, ReviewItem.suggestion_error,
                                                           ReviewItem.auto_state)).fetchall())
@@ -783,17 +789,15 @@ class ConfiguredAddressTests(ScanAiCase):
         self.assertEqual((result.state, result.bookings, result.review), ("done", 1, 1))
         self.assertEqual(self.items()[0]["suggestion_error"], ai.FAILED)
 
-    def test_with_no_address_saved_a_scan_ask_ai_and_gap_filling_send_nothing(self):
+    def test_with_no_address_saved_a_scan_a_queued_item_and_gap_filling_send_nothing(self):
         self.turn_off()
         self.put("no_markup_ids", "flight_jsonld")
         asked: list[str] = []
         with refusing_ai_hosts(self, asked), no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path):
             result = self.scan()
             [item] = self.items()
-            with self.assertRaises(scan.NoAi) as caught:
-                scan.suggest_now("u-jane", item["id"], NOW)
+            self.assertEqual(self.ask_about(item["id"]), (0, 0, 0))
             self.assertEqual(scan._fill_gaps(self.token(), scan._clock(), self.jane, ["msg-flight_jsonld"]), 0)
-        self.assertEqual(str(caught.exception), ai.NEEDS_AI)
         self.assertEqual((result.state, result.review), ("done", 1))
         self.assertEqual((asked, self.fake.requests), ([], []))
         self.assertEqual(scan.summary(self.mailbox).ai_asked, 0)
@@ -854,44 +858,29 @@ class RoundTripScanTests(ScanAiCase):
         self.assertEqual(self.items()[0]["suggestions"], [partial])
         self.assertEqual(self.segments(), [])
 
-    def test_asking_ai_manually_adds_a_complete_booking_and_keeps_its_email(self):
+    def test_an_item_waiting_when_the_address_is_saved_is_read_on_a_later_scan_and_its_email_kept(self):
+        self.add_mail("later-ai", self.unreadable())
+        self.assertEqual(self.scan().review, 1)
+        self.assertEqual(self.fake.requests, [])
         self.turn_on()
-        self.add_mail("manual-ai", self.unreadable())
-        self.scan()
-        [item] = self.items()
         self.fake.content = json.dumps({"bookings": [OUTBOUND]})
         with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
-            scan.suggest_now("u-jane", item["id"], 1000000000)
+            self.scan()
         self.assertEqual(self.items(), [])
         [booking] = self.segments()
         self.assertEqual(booking["details"]["flight_number"], "DL 1204")
         self.assertEqual(len(self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))), 1)
 
-    def test_manual_ai_keeps_fetched_legacy_mail_before_filing(self):
-        self.turn_on()
-        self.add_mail("legacy-ai", self.unreadable())
-        self.scan()
-        [item] = self.items()
-        self.read(lambda conn: conn.execute(StoredMessage.__table__.delete()))
-        self.fake.content = json.dumps({"bookings": [OUTBOUND]})
-        with no_leaks(self, self.CANARY, database=self.path, sent_ok=True):
-            scan.suggest_now("u-jane", item["id"], 1000000000)
-        self.assertEqual(self.items(), [])
-        [booking] = self.segments()
-        emails = self.read(lambda conn: trips.emails_of(conn, self.jane, booking["id"]))
-        self.assertEqual(len(emails), 1)
-        self.assertIn(self.CANARY, emails[0]["text"])
-
     def test_dismissing_an_item_while_ai_reads_it_does_not_create_a_booking(self):
-        self.turn_on()
         self.add_mail("dismissed-ai", self.unreadable())
         self.scan()
+        self.turn_on()
         [item] = self.items()
         def dismissed(*_args):
             self.read(lambda conn: review.dismiss(conn, "u-jane", item["id"]))
             return ai.Reading([OUTBOUND])
         with mock.patch.object(ai, "suggest", side_effect=dismissed):
-            scan.suggest_now("u-jane", item["id"], 1000000000)
+            self.ask_about(item["id"])
         self.assertEqual(self.items(), [])
         self.assertEqual(self.segments(), [])
 

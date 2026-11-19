@@ -173,7 +173,7 @@ TOO_LONG = f"The AI suggested a flight longer than {MAX_HOURS} hours, so it was 
 BAD_REPLY = "The AI’s answer wasn’t a booking Waypoint could use, so it was left out."
 UNREACHABLE = "Waypoint couldn’t reach the AI service."
 REFUSED = "The AI server refused the request."
-LIMITED = "The AI service is busy or over its limit. Try again later."
+LIMITED = "The AI service is busy or over its limit."
 FAILED = "The AI service couldn’t answer."
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?")

@@ -8,9 +8,10 @@ from sqlalchemy import select
 from tests.privacy import no_leaks
 from tests.test_mail_ai import BODY, FOOTER, GOOD, IDS, QUOTED, REPLY_CANARY, ScanAiCase
 from tests.test_mail_followup import CODE, STAYS, follow
-from tests.test_mail_scan import NOW, eml, plain_mail
+from tests.test_mail_scan import NOW, eml, plain_mail, refusing_ai_hosts
 from waypoint import tls
-from waypoint.domain.mail import ai, autoask, ingest, scan
+from waypoint.domain.mail import ai, autoask, ingest, review, scan
+from waypoint.server import routes
 from waypoint.storage import db
 from waypoint.storage.models import Mailbox, ReviewItem, ScannedMessage
 
@@ -70,6 +71,11 @@ class SavedAddressTests(AutoCase):
         self.assertEqual(len(self.fake.requests), 1)
         self.assertEqual(self.suggested(), ["msg-new"])
 
+    def test_only_a_scan_can_ask_the_ai(self):
+        self.assertFalse([path for _, path, _ in routes.ROUTES if path.startswith("/api/review") and path.endswith("/suggest")])
+        self.assertFalse(hasattr(scan, "suggest_now"))
+        self.assertEqual([n for n in ("NoAi", "NotAskable") if hasattr(scan, n)], [])
+
     def test_turning_the_ai_off_stops_automatic_reading(self):
         self.turn_on()
         self.assertTrue(self.read(lambda conn: autoask.active(conn)))
@@ -107,18 +113,6 @@ class SavedAddressTests(AutoCase):
         with mock.patch.object(tls, "urlopen", recording):
             self.scan()
         self.assertEqual(callers, ["waypoint.domain.mail.ai"])
-
-    def test_the_automatic_request_is_the_same_request_ask_ai_makes(self):
-        self.turn_on()
-        self.put("no_markup_ids")
-        self.scan()
-        [item] = self.items()
-        scan.suggest_now("u-jane", item["id"], NOW)
-        first, second = self.fake.requests
-        self.assertEqual((first[0], first[2]), (second[0], second[2]))
-        self.assertEqual(first[1].get("Authorization"), second[1].get("Authorization"))
-        self.assertFalse(self.items()[0]["auto_read"])
-
 
 class WhoIsAskedTests(AutoCase):
     def test_shopping_codes_newsletters_replies_and_weak_mail_are_never_sent(self):
@@ -295,26 +289,131 @@ class EveryMessageTests(AutoCase):
     def test_the_most_a_failing_item_is_asked_is_three_times(self):
         self.assertEqual(autoask.TRIES, 3)
 
-    def test_an_item_that_was_already_waiting_when_the_switch_was_off_is_not_asked(self):
+    def test_an_item_that_was_in_review_when_the_address_was_saved_is_asked_by_the_next_scan(self):
         self.turn_off()
         self.put("no_markup_ids")
         self.scan()
+        self.assertEqual((self.fake.requests, self.waiting()), ([], []))
         self.turn_on()
-        self.scan(now=NOW + 60)
-        self.assertEqual(self.fake.requests, [])
+        with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=True):
+            self.scan(now=NOW + 60)
+        self.assertEqual(len(self.fake.requests), 1)
+        [item] = self.items()
+        self.assertEqual((item["suggestions"], item["suggestion_error"], item["auto_read"]), ([GOOD], None, True))
+        self.assertEqual(self.waiting(), [])
 
 
-class FailureTests(AutoCase):
-    def test_a_reply_that_stays_unusable_after_thinking_is_not_asked_for_again_by_later_scans(self):
+class RequeueTests(AutoCase):
+    def stranded(self, name="m-x", reason="no_markup", outcome=None, mail=None, error=None, suggestions=None):
+        self.google.mail[name] = mail or eml("no_markup_ids")
+
+        def hold(conn):
+            review.add(conn, self.mailbox, name, "example-air.example", "2026-10-17", reason, NOW)
+            scan._record(conn, self.mailbox, name, outcome or scan.UNREADABLE, NOW)
+            if suggestions or error:
+                review.set_suggestions(conn, self.mailbox, name, suggestions or [], error)
+        self.read(hold)
+
+    def test_items_waiting_when_the_address_is_saved_are_queued_and_read_by_the_next_scan(self):
+        self.stranded("m-a")
+        self.stranded("m-b", reason="incomplete")
+        self.turn_off()
+        self.scan()
+        self.assertEqual((self.fake.requests, self.waiting()), ([], []))
+        self.turn_on()
+        with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=True):
+            self.scan(now=NOW + 60)
+        self.assertEqual((len(self.fake.requests), self.waiting(), self.suggested()), (2, [], ["m-a", "m-b"]))
+
+    def test_an_item_whose_tries_ran_out_is_queued_again_by_a_later_scan_and_read_once_the_service_answers(self):
+        self.turn_on()
+        self.fake.status = 500
+        self.put("no_markup_ids")
+        for later in range(3):
+            self.scan(now=NOW + 60 * later)
+        self.assertEqual((len(self.fake.requests), self.tries(), self.waiting()), (3, autoask.TRIES, []))
+        self.fake.status = 200
+        self.scan(now=NOW + 300)
+        [item] = self.items()
+        self.assertEqual((len(self.fake.requests), item["suggestions"], item["suggestion_error"], item["auto_read"]), (4, [GOOD], None, True))
+
+    def test_an_item_the_ai_could_not_answer_after_its_own_retry_is_queued_again_by_a_later_scan(self):
         self.turn_on()
         self.fake.content = "not json"
         self.put("no_markup_ids")
         self.scan()
-        self.assertEqual((len(self.fake.requests), self.waiting()), (2, []))
+        self.assertEqual(self.waiting(), [])
+        self.fake.content = json.dumps(GOOD)
         self.scan(now=NOW + 60)
-        self.assertEqual(len(self.fake.requests), 2)
+        [item] = self.items()
+        self.assertEqual((item["suggestions"], item["auto_read"]), ([GOOD], True))
 
-    def test_a_failed_request_leaves_the_item_with_the_note_and_is_retried_at_most_twice(self):
+    def test_an_item_the_ai_found_no_booking_in_is_not_queued_again(self):
+        self.turn_on()
+        self.fake.content = json.dumps({"bookings": []})
+        self.put("no_markup_ids")
+        self.scan()
+        self.assertEqual(len(self.fake.requests), 1)
+        for later in range(1, 4):
+            self.scan(now=NOW + 60 * later)
+        self.assertEqual((len(self.fake.requests), self.items()[0]["suggestion_error"]), (1, ai.NO_BOOKING))
+
+    def test_an_item_that_already_holds_an_ai_suggestion_is_not_queued_again(self):
+        self.turn_on()
+        self.put("no_markup_ids")
+        self.scan()
+        self.assertEqual(len(self.fake.requests), 1)
+        self.scan(now=NOW + 60)
+        self.assertEqual(len(self.fake.requests), 1)
+
+    def test_what_the_scan_would_not_send_is_never_queued(self):
+        self.turn_on()
+        self.stranded("m-weak", mail=plain_mail("Pat <pat@somewhere.example>", "Your hotel booking", f"Thanks for choosing us. {BODY}"))
+        self.stranded("m-match", reason="match")
+        self.stranded("m-booked", reason="incomplete", outcome=scan.BOOKING)
+        self.stranded("m-hold", error=ai.NO_BOOKING)
+        self.stranded("m-said", suggestions=[GOOD])
+        with no_leaks(self, BODY, database=self.path):
+            self.scan()
+            self.scan(now=NOW + 60)
+        self.assertEqual((self.fake.requests, self.waiting(), self.suggested()), ([], [], ["m-said"]))
+        self.assertEqual(self.read(lambda conn: conn.execute(select(ReviewItem.auto_tries).where(ReviewItem.message_id == "m-weak")).scalar()), autoask.CAP)
+
+    def test_a_message_the_scan_would_send_from_its_head_is_queued_though_its_item_is_old(self):
+        self.turn_on()
+        self.stranded("m-strong", mail=plain_mail("Example Air <hi@example-air.example>", "Your flight itinerary", f"Flight QW 410. {BODY}"))
+        self.scan()
+        self.assertGreaterEqual(len(self.fake.requests), 1)
+        self.assertEqual(self.waiting(), [])
+
+    def test_nothing_is_queued_while_no_address_is_saved(self):
+        self.turn_off()
+        self.stranded()
+        with refusing_ai_hosts(self, []):
+            self.scan()
+        self.assertEqual(self.waiting(), [])
+
+    def test_a_message_gone_from_the_mailbox_is_left_as_it_is(self):
+        self.turn_on()
+        self.stranded()
+        del self.google.mail["m-x"]
+        self.assertEqual(self.scan().state, "done")
+        self.assertEqual((self.fake.requests, len(self.items())), ([], 1))
+
+
+class FailureTests(AutoCase):
+    def test_a_reply_that_stays_unusable_after_thinking_is_asked_for_again_by_later_scans_for_three_rounds_only(self):
+        self.turn_on()
+        self.fake.content = "not json"
+        self.put("no_markup_ids")
+        self.scan()
+        self.assertEqual((len(self.fake.requests), self.waiting(), self.tries()), (2, [], autoask.TRIES))
+        for later in range(1, 8):
+            self.scan(now=NOW + 60 * later)
+        self.assertEqual((len(self.fake.requests), self.waiting(), self.tries()), (2 * autoask.ROUNDS, [], autoask.CAP))
+        self.assertEqual(self.items()[0]["suggestion_error"], ai.BAD_REPLY)
+
+    def test_a_failed_request_leaves_the_item_with_the_note_and_is_asked_for_nine_tries_in_all(self):
         self.turn_on()
         self.fake.status = 500
         self.put("no_markup_ids")
@@ -325,8 +424,9 @@ class FailureTests(AutoCase):
         self.scan(now=NOW + 60)
         self.scan(now=NOW + 120)
         self.assertEqual((len(self.fake.requests), self.tries(), self.waiting()), (3, 3, []))
-        self.scan(now=NOW + 180)
-        self.assertEqual(len(self.fake.requests), 3)
+        for later in range(3, 12):
+            self.scan(now=NOW + 60 * later)
+        self.assertEqual((len(self.fake.requests), self.tries(), self.waiting()), (autoask.CAP, autoask.CAP, []))
         self.assertEqual(self.items()[0]["suggestion_error"], ai.FAILED)
 
     def test_one_scan_asks_about_an_item_once_even_when_it_fails(self):
@@ -373,19 +473,6 @@ class FailureTests(AutoCase):
         del self.google.mail["msg-no_markup_ids"]
         self.scan(now=NOW + 60)
         self.assertEqual((len(self.fake.requests), self.waiting()), (1, []))
-
-    def test_a_person_asking_by_hand_takes_the_item_out_of_the_automatic_queue(self):
-        self.turn_on()
-        self.fake.status = 500
-        self.put("no_markup_ids")
-        self.scan()
-        self.fake.status = 200
-        [item] = self.items()
-        scan.suggest_now("u-jane", item["id"], NOW)
-        self.assertEqual(self.waiting(), [])
-        [item] = self.items()
-        self.assertEqual((item["suggestions"], item["auto_read"]), ([GOOD], False))
-
 
 class PrivacyTests(AutoCase):
     SUBJECT = "CANARY-SUBJECT-AUTO-9K4M"

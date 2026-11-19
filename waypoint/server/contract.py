@@ -288,15 +288,10 @@ class Attached(TypedDict):
     segment_id: int
 
 
-class Asked(TypedDict):
-    ok: bool
-
-
 class Review(TypedDict):
     items: list[ReviewItem]
     matches: list[ReviewMatch]
     who: list[WhoIsThis]
-    ai: bool
 
 
 class Preview(TypedDict):

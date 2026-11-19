@@ -56,7 +56,7 @@ class VerdictParseTests(unittest.TestCase):
 
 
 class VerdictCase(ScanAiCase):
-    def asked_by_hand(self, name="promo_ids"):
+    def saved_later(self, name="promo_ids"):
         self.turn_off()
         self.put(name)
         self.assertEqual(self.scan().review, 1)
@@ -81,15 +81,15 @@ class VerdictCase(ScanAiCase):
         return self.scanned()
 
 
-class AskAiVerdictTests(VerdictCase):
-    def test_ask_ai_leaves_the_item_in_review_and_the_email_stored_for_every_category(self):
+class LaterAddressVerdictTests(VerdictCase):
+    def test_an_item_asked_about_after_the_address_is_saved_stays_in_review_and_the_email_stored_for_every_category(self):
         for category in CATEGORIES:
             with self.subTest(category=category):
                 self.setUp()
-                item = self.asked_by_hand()
+                item = self.saved_later()
                 self.fake.content = json.dumps({"bookings": [], "not_a_booking": category})
                 with no_leaks(self, BODY, QUOTED, FOOTER, *IDS, database=self.path, sent_ok=True):
-                    self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
+                    self.ask_about(item["id"])
                 [kept] = self.items()
                 self.assertEqual((kept["id"], kept["suggestions"], kept["suggestion_error"]), (item["id"], [], ai.NO_BOOKING))
                 self.assertEqual(self.read(lambda conn: review.count(conn, "u-jane")), 1)
@@ -97,14 +97,14 @@ class AskAiVerdictTests(VerdictCase):
                 self.assertEqual(self.outcomes(), {"msg-promo_ids": "unreadable"})
 
     def test_the_item_can_still_be_dismissed_by_a_person_which_is_what_deletes_the_email(self):
-        item = self.asked_by_hand()
-        scan.suggest_now("u-jane", item["id"], NOW)
+        item = self.saved_later()
+        self.ask_about(item["id"])
         self.assertEqual(len(self.stored()), 1)
         with db.session() as conn:
             review.dismiss(conn, "u-jane", item["id"])
         self.assertEqual((self.items(), self.stored()), ([], []))
 
-    def test_the_grouped_items_all_stay_when_one_of_them_is_asked_about(self):
+    def test_the_grouped_items_all_stay_when_one_of_them_is_asked_about_later(self):
         self.turn_on()
         for message_id in ("m-a", "m-b", "m-c"):
             self.google.mail[message_id] = eml("promo_ids")
@@ -113,39 +113,39 @@ class AskAiVerdictTests(VerdictCase):
                 review.add(conn, self.mailbox, message_id, "example-air.example", "2026-10-17", "no_markup", NOW, reference="QW4R7T")
         self.fake.content = VERDICT
         middle = self.read(lambda conn: conn.execute(select(ReviewItem.id).where(ReviewItem.message_id == "m-b")).scalar())
-        self.assertIsNone(scan.suggest_now("u-jane", middle, NOW))
+        self.ask_about(middle)
         self.assertEqual(self.read(lambda conn: sorted(conn.execute(select(ReviewItem.message_id)).scalars())), ["m-a", "m-b", "m-c"])
 
     def test_an_answer_with_a_booking_is_filed_as_before_with_or_without_the_verdict(self):
         for extra in ({}, {"not_a_booking": "promotion"}):
             with self.subTest(extra=extra):
                 self.setUp()
-                item = self.asked_by_hand("no_markup_ids")
+                item = self.saved_later("no_markup_ids")
                 self.fake.content = json.dumps({"bookings": [GOOD], **extra})
-                self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
+                self.ask_about(item["id"])
                 [kept] = self.items()
                 self.assertEqual(kept["suggestions"], [GOOD])
 
     def test_a_failing_service_a_bad_answer_and_a_bug_leave_the_item_with_its_error(self):
-        item = self.asked_by_hand()
+        item = self.saved_later()
         cases = ((500, "{}", ai.FAILED), (200, "not json at all " + REPLY_CANARY, ai.BAD_REPLY),
                  (200, '{"bookings": [], "not_a_booking": "promotion"', ai.BAD_REPLY), (401, "{}", ai.REFUSED), (429, "{}", ai.LIMITED))
         for status, content, expected in cases:
             with self.subTest(status=status, content=content[:20]):
                 self.fake.status, self.fake.content = status, content
                 with no_leaks(self, REPLY_CANARY, database=self.path):
-                    self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
+                    self.ask_about(item["id"])
                 [kept] = self.items()
                 self.assertEqual((kept["id"], kept["suggestion_error"]), (item["id"], expected))
         with mock.patch.object(ai, "suggest", side_effect=RuntimeError("boom")):
-            self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
+            self.ask_about(item["id"])
         [kept] = self.items()
         self.assertEqual(kept["suggestion_error"], scan.SUGGESTION_FAILED)
 
     def test_an_unreachable_service_leaves_the_item_with_its_error(self):
-        item = self.asked_by_hand()
+        item = self.saved_later()
         with self.ai_fails_with(OSError("down")):
-            self.assertIsNone(scan.suggest_now("u-jane", item["id"], NOW))
+            self.ask_about(item["id"])
         [kept] = self.items()
         self.assertEqual(kept["suggestion_error"], ai.UNREACHABLE)
 

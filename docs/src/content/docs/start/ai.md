@@ -31,7 +31,16 @@ A message a reader did turn into a booking is also sent when that booking lacks 
 
 When the AI’s reading of a booking a reader already found can’t be matched to it (it picked a different confirmation code, or two bookings of that kind can’t be told apart), Waypoint adds nothing by itself: both readings wait in Review for you to choose.
 
-There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about and how many emails it attached to their bookings as nothing new, counts only.
+There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note saying what went wrong, and is tried again on the next scans, at most twice more (three tries make a round). last-scan line in Settings says how many messages the AI was asked about and how many emails it attached to their bookings as nothing new, counts only.
+
+### Items already in Review
+
+Review has no button to ask the AI by hand: the scan is the only thing that asks. So a scan also asks about the items that were left behind, by the same rules as above and nothing it wouldn’t send itself:
+
+- **Mail already in Review when you save an Ollama address** is asked about by the next scan.
+- **An item whose three tries ran out, or whose answer the AI couldn’t make sense of even after its own second attempt,** gets another round on a later scan, at most one round per scan.
+- **Each item gets three rounds**, nine tries in all. After that the scan leaves it alone and the note from the last try stays on the item; add it by hand, or dismiss it.
+- **Never asked again:** an item the AI answered (with a suggestion, or with “no booking”), one a match or Waypoint’s own reading already holds, one that was partly booked, and mail with no booking data that doesn’t pass the travel check above.
 
 What is sent and where it goes are the same for every AI reading. The item in Review shows the suggestion with a **read automatically** label, and a complete result is added to your trips by itself.
 

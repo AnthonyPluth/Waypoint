@@ -8,4 +8,4 @@ def _read(cfg, text):
 
 
 # ok: waypoint-ai-suggest-caller
-scan.suggest_now(owner, item_id, now)
+scan.run(mailbox_id, today)

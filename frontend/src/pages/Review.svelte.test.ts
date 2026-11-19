@@ -72,7 +72,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { vi.useRealTimers(); setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset();  calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = ""; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset();  calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = ""; truncated = false; held = { matches: [], items: [item()], who: [who()] }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -86,7 +86,7 @@ describe("Review", () => {
   });
 
   it("names an item by its message's subject, and says who it came from beside it", async () => {
-    held = { matches: [], items: [item({ subject: "Your itinerary: EX 410" })], who: [], ai: false };
+    held = { matches: [], items: [item({ subject: "Your itinerary: EX 410" })], who: [] };
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Add missing details" });
     expect(within(list).getByText("Your itinerary: EX 410")).toBeInTheDocument();
@@ -95,7 +95,7 @@ describe("Review", () => {
   });
 
   it("says what it can when the sender or the day isn’t there", async () => {
-    held = { matches: [], items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1, reason: "broken", sender_domain: "", received: null }), item({ id: 2 })], who: [] };
     render(ReviewPage);
     expect(await screen.findByText("Mail from an unknown sender")).toBeInTheDocument();
     expect(screen.getByText("to ana@gmail.example")).toBeInTheDocument();
@@ -104,7 +104,7 @@ describe("Review", () => {
   });
 
   it("shows an item shared by another member with whose mailbox it is, and View email, Add by hand and Dismiss, with no per-item Ask AI", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [], ai: true };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe", address: "sam@gmail.example" })], who: [] };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
     expect(row).toHaveTextContent("in Sam Doe’s mailbox, shared with the household");
@@ -117,16 +117,8 @@ describe("Review", () => {
     expect(within(row).queryByRole("link")).toBeNull();
   });
 
-  it("offers no Ask AI on a shared item while the AI is off", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
-    render(ReviewPage);
-    const row = await screen.findByTestId("review-item");
-    expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
-  });
-
   it("opens a shared item's message beside the form like any other, and dismisses it", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [] };
     render(ReviewPage);
     const row = (await screen.findAllByTestId("review-item"))[0];
     await userEvent.click(within(row).getByRole("button", { name: /by hand/ }));
@@ -175,7 +167,7 @@ describe("Review", () => {
   });
 
   it("keeps a dismissed item off the list when an older reload answers after a newer one", async () => {
-    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [] };
     const stale = structuredClone(held);
     render(ReviewPage);
     await screen.findAllByTestId("review-item");
@@ -198,7 +190,7 @@ describe("Review", () => {
   });
 
   it("keeps a dismissed item off the list when its own reload is thrown away for a newer one", async () => {
-    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3 })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3 })], who: [] };
     render(ReviewPage);
     await screen.findAllByTestId("review-item");
     const base = vi.mocked(api).getMockImplementation()!;
@@ -238,7 +230,7 @@ describe("Review", () => {
   });
 
   it("moves focus to the next item after a dismissal", async () => {
-    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 })], who: [] };
     render(ReviewPage);
     const menus = await screen.findAllByTestId("action-menu");
     const next = within(menus[1]!).getByText("More").closest("summary") as HTMLElement;
@@ -286,7 +278,7 @@ describe("Review", () => {
 
   it("adds a legacy generic suggestion without a sender-trust prompt", async () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
-    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -295,7 +287,7 @@ describe("Review", () => {
 
   it("does not offer sender trust or send a trust flag", async () => {
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London", sources: {} };
-    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: false };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByRole("checkbox", { name: /Also trust/ })).toBeNull();
@@ -471,7 +463,7 @@ describe("Review", () => {
   it("preselects Cruise for a cruise suggestion", async () => {
     const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
       start_zone: "America/New_York", end_zone: "America/Nassau" };
-    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("What is it?")).toHaveValue("cruise");
@@ -521,7 +513,7 @@ describe("Review", () => {
   it("opens a parking suggestion with its lot name and dates and asks for a zone or an address without either", async () => {
     const lot = { kind: "parking" as const, provider: "Example Parking", confirmation: "PK1234", origin: "Example Long-Term Lot",
       start_local: "2026-12-02T08:00", end_local: "2026-12-09T21:00" };
-    held = { matches: [], items: [item({ suggestions: [lot] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [lot] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Lot")).toHaveValue("Example Long-Term Lot");
@@ -589,7 +581,7 @@ describe("Review", () => {
 
   it("describes each kind of booking a name is on", async () => {
     held = { matches: [], items: [], who: [who({ id: 1, kind: "hotel", origin: "Harbour Hotel", destination: null, provider: null }), who({ id: 2, kind: "car", origin: "SFO", destination: "SFO" }),
-      who({ id: 3, kind: "train", origin: null, destination: null })], ai: false };
+      who({ id: 3, kind: "train", origin: null, destination: null })] };
     render(ReviewPage);
     expect(await screen.findByText("Stay Harbour Hotel on 2026-12-08")).toBeInTheDocument();
     expect(screen.getByText("Rental SFO → SFO on 2026-12-08 (Example Air)")).toBeInTheDocument();
@@ -597,7 +589,7 @@ describe("Review", () => {
   });
 
   it("lists a booking email that could be more than one of yours, with each candidate and its trip", async () => {
-    held = { matches: [held_match()], items: [], who: [], ai: false };
+    held = { matches: [held_match()], items: [], who: [] };
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Match bookings" });
     expect(within(list).getByText("Stay Harbour Hotel on 2026-11-21 (Example Hotels) · H88231")).toBeInTheDocument();
@@ -609,7 +601,7 @@ describe("Review", () => {
   });
 
   it("fills in the one chosen, and the item goes", async () => {
-    held = { matches: [held_match()], items: [], who: [], ai: false };
+    held = { matches: [held_match()], items: [], who: [] };
     render(ReviewPage);
     await userEvent.click((await screen.findAllByRole("button", { name: /^It’s this one: Stay Harbour Hotel/ }))[1]);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { entry: 1, segment_id: 12 }]));
@@ -618,7 +610,7 @@ describe("Review", () => {
   });
 
   it("adds it as a booking of its own, or dismisses it", async () => {
-    held = { matches: [held_match(), held_match({ item_id: 10, entry: 1 })], items: [], who: [], ai: false };
+    held = { matches: [held_match(), held_match({ item_id: 10, entry: 1 })], items: [], who: [] };
     render(ReviewPage);
     await userEvent.click((await screen.findAllByRole("button", { name: "It’s a new booking" }))[0]);
     await waitFor(() => expect(calls).toContainEqual(["/api/review/9/match", "POST", { entry: 1, segment_id: null }]));
@@ -628,7 +620,7 @@ describe("Review", () => {
   });
 
   it("says so, and still lets it be added, when none of the candidates are the viewer’s to see", async () => {
-    held = { matches: [held_match({ candidates: [], mine: false })], items: [], who: [], ai: false };
+    held = { matches: [held_match({ candidates: [], mine: false })], items: [], who: [] };
     render(ReviewPage);
     expect(await screen.findByText("The bookings it could be aren’t yours to see.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^It’s this one: Stay/ })).toBeNull();
@@ -636,7 +628,7 @@ describe("Review", () => {
   });
 
   it("says when nothing is waiting", async () => {
-    held = { matches: [], items: [], who: [], ai: false };
+    held = { matches: [], items: [], who: [] };
     render(ReviewPage);
     expect(await screen.findByText(/Nothing to review/)).toBeInTheDocument();
   });
@@ -677,7 +669,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("starts the form filled in with it, to confirm or edit, and saves only when added", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
@@ -695,7 +687,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("shows each traveller’s seat outlined, matches a known person, and sends the seats when added", async () => {
     const seated = { ...suggestion, travelers: [{ name: "Doe/Jane", seat: "23A" }, { name: "Sam Printed", seat: "23B" }] };
-    held = { matches: [], items: [item({ suggestions: [seated as never] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [seated as never] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Seat for Doe/Jane")).toHaveValue("23A");
@@ -709,7 +701,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("sends no travellers for a suggestion that read no seats", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByRole("group", { name: "Seats" })).toBeNull();
@@ -721,7 +713,7 @@ describe("Review: the AI’s suggestion", () => {
   it("shows the AI’s address and phone outlined, and sends them when added", async () => {
     const stay = { kind: "hotel" as const, provider: "Example Stays", confirmation: "QW4R7T", origin: "Harbour Hotel", start_local: "2026-12-02T15:00",
       end_local: "2026-12-05T11:00", start_zone: "Europe/London", address: "1 Quay Road, Bristol BS1 4AA, UK", phone: "+44 117 555 0100" };
-    held = { matches: [], items: [item({ suggestions: [stay] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [stay] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByText(/An AI read the email and suggested this/)).toBeNull();
@@ -736,7 +728,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("shows the total the AI read as a cost to check, and sends it in the smallest unit when added", async () => {
-    held = { matches: [], items: [item({ suggestions: [{ ...suggestion, price_minor: 124000, price_currency: "USD" }] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [{ ...suggestion, price_minor: 124000, price_currency: "USD" }] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Cost amount")).toHaveValue("1240.00");
@@ -749,7 +741,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("takes only digits, commas and points in the cost", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.type(screen.getByLabelText("Cost amount"), "$1x2,5a0");
@@ -757,7 +749,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("refuses a cost it can't read and posts nothing", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.type(screen.getByLabelText("Cost amount"), "1.2.3");
@@ -767,7 +759,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("sends no cost when the suggestion has none and none is typed", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Cost amount")).toHaveValue("");
@@ -779,7 +771,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("leaves the address empty and unoutlined when the AI found none", async () => {
     const stay = { kind: "hotel" as const, origin: "Harbour Hotel", start_local: "2026-12-02T15:00", end_local: "2026-12-05T11:00", start_zone: "Europe/London" };
-    held = { matches: [], items: [item({ suggestions: [stay] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [stay] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Address/)).toHaveValue("");
@@ -791,7 +783,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("asks a rental for one pick-up place, keeps a different address and saves an empty drop-off as the pick-up", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
-    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
@@ -803,7 +795,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("lets a kept rental address be cleared, and then the address is the pick-up", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "4 Runway Drive, Bristol BS48 3DY" };
-    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.clear(screen.getByLabelText(/^Pick-up address/));
@@ -814,7 +806,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("shows no address field for a rental whose address is its pick-up, or one without an address", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00" };
-    held = { matches: [], items: [item({ suggestions: [{ ...car, address: "Bristol Airport" }] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [{ ...car, address: "Bristol Airport" }] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.queryByLabelText(/address/i)).toBeNull();
@@ -822,7 +814,7 @@ describe("Review: the AI’s suggestion", () => {
 
   it("sets a rental’s address from the pick-up when the email gave the same text, and keeps a stated drop-off", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Cardiff Station", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00", address: "Bristol Airport" };
-    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -833,7 +825,7 @@ describe("Review: the AI’s suggestion", () => {
   it("takes a rental’s pick-up address and a cruise’s terminal, cabin, ship and deck", async () => {
     const car = { kind: "car" as const, origin: "Bristol Airport", destination: "Bristol Airport", start_local: "2026-12-02T10:00", end_local: "2026-12-05T10:00",
       address: "4 Runway Drive, Bristol BS48 3DY" };
-    held = { matches: [], items: [item({ suggestions: [car] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [car] })], who: [] };
     const first = render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Pick-up address/)).toHaveValue("4 Runway Drive, Bristol BS48 3DY");
@@ -844,7 +836,7 @@ describe("Review: the AI’s suggestion", () => {
     await waitFor(() => expect(document.body.style.pointerEvents).not.toBe("none"));
     const cruise = { kind: "cruise" as const, origin: "Miami", destination: "Nassau", start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00",
       start_zone: "America/New_York", end_zone: "America/Nassau", address: "1015 North America Way, Miami FL 33132", room: "8123", ship: "Example Voyager", deck: "8" };
-    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText(/^Terminal address/)).toHaveValue("1015 North America Way, Miami FL 33132");
@@ -858,7 +850,7 @@ describe("Review: the AI’s suggestion", () => {
   it("opens a cruise suggestion with its port labels and saves its ports and zones", async () => {
     const cruise = { kind: "cruise" as const, provider: "Example Cruise Line", confirmation: "QW4R7T", origin: "Miami", destination: "Nassau",
       start_local: "2026-12-02T16:00", end_local: "2026-12-09T07:00", start_zone: "America/New_York", end_zone: "America/Nassau" };
-    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [cruise] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Embarkation port")).toHaveValue("Miami");
@@ -871,7 +863,7 @@ describe("Review: the AI’s suggestion", () => {
   });
 
   it("says why there’s none, and still offers adding by hand", async () => {
-    held = { matches: [], items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestion_error: "The AI didn’t find a booking in this message." })], who: [] };
     render(ReviewPage);
     expect(await screen.findByText("The AI didn’t find a booking in this message.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Check suggestion: / })).toBeNull();
@@ -885,7 +877,7 @@ describe("Review: a booking Waypoint read but couldn’t place", () => {
     end_local: "2027-03-09T15:00:00", address: "1 Example Avenue", phone: "(555) 010-0100", sources: {}, parsed: true } as unknown as ReviewItem["suggestions"][number];
 
   it("says it was read from the email, not suggested by the AI", async () => {
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [] };
     render(ReviewPage);
     await screen.findByTestId("review-item");
     expect(screen.getByText("Read from the email")).toBeInTheDocument();
@@ -893,7 +885,7 @@ describe("Review: a booking Waypoint read but couldn’t place", () => {
   });
 
   it("still calls an AI suggestion that", async () => {
-    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: true };
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     await screen.findByTestId("review-item");
     expect(screen.getByText("AI suggestion")).toBeInTheDocument();
@@ -901,7 +893,7 @@ describe("Review: a booking Waypoint read but couldn’t place", () => {
   });
 
   it("fills the form with what the email gave and leaves the zone for the address to settle", async () => {
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [], ai: false };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [read] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByLabelText("Confirmation code")).toHaveValue("100200300");
@@ -921,7 +913,7 @@ describe("Review: a stay read two ways", () => {
     end_local: "2027-03-09T15:00", start_zone: "America/Chicago", address: "1 Example Avenue", sources: {}, alternative: 1 } as unknown as ReviewItem["suggestions"][number];
 
   it("offers the email’s reading and the AI’s as alternatives for one booking, not as two bookings", async () => {
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [] };
     render(ReviewPage);
     await screen.findByTestId("review-item");
     expect(screen.getByText("Read two ways")).toBeInTheDocument();
@@ -944,7 +936,7 @@ describe("Review: a stay read two ways", () => {
     secondSegmentFails = "The flight was refused.";
     const flight = { kind: "flight" as const, provider: "Example Air", confirmation: "QW4R7T", origin: "BOS", destination: "DEN", start_local: "2026-12-02T07:15",
       end_local: "2026-12-02T10:05" } as unknown as ReviewItem["suggestions"][number];
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said, flight] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said, flight] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
     await userEvent.click(screen.getByRole("button", { name: "AI suggestion" }));
@@ -959,7 +951,7 @@ describe("Review: a stay read two ways", () => {
   });
 
   it("keeps edits to a reading when going back to the other one and back", async () => {
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, said] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.type(screen.getByLabelText("Confirmation code"), "X");
@@ -970,7 +962,7 @@ describe("Review: a stay read two ways", () => {
 
   it("pairs readings only when the server marked them as two readings of one booking, never by their shape", async () => {
     const unmarked = { ...said, alternative: undefined } as unknown as ReviewItem["suggestions"][number];
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, unmarked] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, unmarked] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
     expect(screen.getAllByTestId("leg")).toHaveLength(2);
@@ -980,7 +972,7 @@ describe("Review: a stay read two ways", () => {
 
   it("keeps a second reading of the reader’s as its own booking beside a marked pair of the same kind", async () => {
     const another = { ...email, confirmation: "100200999", alternative: undefined } as unknown as ReviewItem["suggestions"][number];
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [another, email, said] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [another, email, said] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
     expect(screen.getAllByTestId("leg")).toHaveLength(2);
@@ -989,7 +981,7 @@ describe("Review: a stay read two ways", () => {
 
   it("still lists readings of different kinds as separate bookings", async () => {
     const hotel = { ...said, kind: "hotel" as const } as unknown as ReviewItem["suggestions"][number];
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, hotel] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [email, hotel] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
     expect(screen.getAllByTestId("leg")).toHaveLength(2);
@@ -1095,7 +1087,7 @@ describe("Review: the message beside the form", () => {
   });
 
   it("shows a shared item's message from View email, and the same message as Add by hand", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /View email/ }));
     const viewed = await screen.findByTestId("preview");
@@ -1125,8 +1117,8 @@ describe("Review: the message beside the form", () => {
 });
 
 describe("Review: no manual Ask AI", () => {
-  it.each([[true], [false]])("offers no Ask AI or Ask again control anywhere when the AI is %s", async (ai) => {
-    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3, suggestions: [SUGGESTION] })], who: [], ai };
+  it("offers no Ask AI or Ask again control anywhere", async () => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3, suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const rows = await screen.findAllByTestId("review-item");
     expect(rows).toHaveLength(3);
@@ -1140,8 +1132,21 @@ describe("Review: no manual Ask AI", () => {
     expect(screen.queryByText(/goes to your own Ollama server/)).toBeNull();
   });
 
+  it("shows an item's stored AI error as a note, with no retry control, wording or call", async () => {
+    const notes = ["The AI service is busy or over its limit.", "The AI couldn’t be asked just now. The details are in Waypoint’s log.", "The AI service couldn’t answer."];
+    held = { matches: [], items: notes.map((suggestion_error, n) => item({ id: n + 1, suggestion_error })), who: [] };
+    render(ReviewPage);
+    const rows = await screen.findAllByTestId("review-item");
+    notes.forEach((note, n) => {
+      expect(within(rows[n]).getByRole("status")).toHaveTextContent(note);
+      expect(within(rows[n]).queryByRole("button", { name: /again|retry|try|ask/i })).toBeNull();
+    });
+    expect(screen.queryByText(/try again/i)).toBeNull();
+    expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(0);
+  });
+
   it("offers no Ask AI when the list is narrowed to one sender", async () => {
-    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }), item({ id: 3, sender_domain: "seaside-stays.example" })] };
+    held = { matches: [], who: [], items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }), item({ id: 3, sender_domain: "seaside-stays.example" })] };
     setQuery("sender=seaside-stays.example");
     render(ReviewPage);
     await screen.findByTestId("review-filter");
@@ -1183,7 +1188,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   });
 
   it("opens Check suggestion in the sheet with the message above the form", async () => {
-    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
@@ -1264,7 +1269,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   });
 
   it("moves focus to the heading for a suggestion", async () => {
-    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     const sheet = await screen.findByRole("dialog", { name: "Check this suggestion" });
@@ -1306,7 +1311,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
   });
 
   it("replaces the open form when another item’s Add by hand is used", async () => {
-    held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1, subject: "First booking" }), item({ id: 2, subject: "Second booking" })], who: [] };
     render(ReviewPage);
     await screen.findByText("First booking");
     const first = screen.getByRole("button", { name: "Add by hand: “First booking”" });
@@ -1362,7 +1367,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
 
   it("marks a suggestion the scan asked for on its own as read automatically, and one asked for by hand not", async () => {
     const hotel = { kind: "hotel" as const, provider: "Seaside Inn", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London" };
-    held = { matches: [], items: [item({ id: 1, suggestions: [hotel], auto_read: true }), item({ id: 2, suggestions: [hotel] }), item({ id: 3 })], who: [], ai: true };
+    held = { matches: [], items: [item({ id: 1, suggestions: [hotel], auto_read: true }), item({ id: 2, suggestions: [hotel] }), item({ id: 3 })], who: [] };
     render(ReviewPage);
     expect(await screen.findAllByText("AI suggestion")).toHaveLength(2);
     expect(screen.getAllByText("read automatically")).toHaveLength(1);
@@ -1372,7 +1377,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     const read = { kind: "hotel" as const, provider: "Seaside Inn", confirmation: "SS48213", origin: "Seaside Inn", address: "12 Beach Road, Brighton, UK",
       start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London",
       sources: { origin: "property", start_local: "check-in", end_local: "check-out", confirmation: "confirmation number", address: "address" } };
-    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [], ai: true };
+    held = { matches: [], items: [item({ reason: "generic", sender_domain: "seaside-stays.example", suggestions: [read] })], who: [] };
     render(ReviewPage);
     expect(await screen.findByText("Read from the email")).toBeInTheDocument();
     expect(screen.queryByText("AI suggestion")).toBeNull();
@@ -1396,7 +1401,7 @@ describe("Review: a booking email with several flights", () => {
   const back = { kind: "flight" as const, provider: "Delta", confirmation: "Q7M2KD", origin: "DEN", destination: "BOS", flight_number: "DL 1377", cabin: "Economy",
     start_local: "2026-12-11T16:20", end_local: "2026-12-11T21:50" };
   const open = async () => {
-    held = { matches: [], items: [item({ suggestions: [outbound, back] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [outbound, back] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check 2 suggestions: / }));
   };
@@ -1487,7 +1492,7 @@ describe("Review: a booking email with several flights", () => {
 
   it("does the same for an item with a single suggestion", async () => {
     takeOffFails = "The list is busy.";
-    held = { matches: [], items: [item({ suggestions: [outbound] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [outbound] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -1524,7 +1529,7 @@ describe("Review: a booking email with several flights", () => {
   });
 
   it("looks as before for an item with one suggestion", async () => {
-    held = { matches: [], items: [item({ suggestions: [outbound] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [outbound] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
@@ -1533,7 +1538,7 @@ describe("Review: a booking email with several flights", () => {
   });
 
   it("warns, without blocking, when a suggested flight is far longer than any flight", async () => {
-    held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(await screen.findByText("This flight is 6 days long. Check the times.")).toBeInTheDocument();
@@ -1542,7 +1547,7 @@ describe("Review: a booking email with several flights", () => {
   });
 
   it("shows no warning for an ordinary flight, and the warning goes when the time is put right", async () => {
-    held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [{ ...outbound, end_local: "2026-12-11T21:50" }] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await screen.findByText(/This flight is/);
@@ -1654,7 +1659,7 @@ describe("Review: several legs or bookings added by hand from one email", () => 
   });
 
   it("adds one more leg to the AI’s suggestions", async () => {
-    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Check suggestion: / }));
@@ -1790,7 +1795,7 @@ describe("Review: the form's explanatory text is gone", () => {
   }) as unknown as ReviewItem["suggestions"][number];
 
   it.each(KINDS.flatMap((kind) => [[kind, "2026-10-17"], [kind, null]]))("the suggestion form for %s, received %s, shows none of it", async (kind, received) => {
-    held = { matches: [], items: [item({ suggestions: [suggestionOf(kind)], received })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestionOf(kind)], received })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByRole("heading", { name: "Check this suggestion" })).toBeInTheDocument();
@@ -1799,7 +1804,7 @@ describe("Review: the form's explanatory text is gone", () => {
   });
 
   it.each(["flight", "hotel", "car", "train", "parking"].flatMap((kind) => [[kind, "2026-10-17"], [kind, null]]))("the form by hand for %s, received %s, shows none of it", async (kind, received) => {
-    held = { matches: [], items: [item({ received })], who: [], ai: false };
+    held = { matches: [], items: [item({ received })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /by hand/ }));
     await userEvent.selectOptions(screen.getByLabelText(/What is it/), kind);
@@ -1808,7 +1813,7 @@ describe("Review: the form's explanatory text is gone", () => {
   });
 
   it("keeps the blank zone choice, the generic-reading note and the outlines of a suggestion", async () => {
-    held = { matches: [], items: [item({ reason: "generic", suggestions: [suggestionOf("hotel")] })], who: [], ai: false };
+    held = { matches: [], items: [item({ reason: "generic", suggestions: [suggestionOf("hotel")] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     expect(screen.getByPlaceholderText("Work it out from the address")).toBeInTheDocument();
@@ -1817,7 +1822,7 @@ describe("Review: the form's explanatory text is gone", () => {
   });
 
   it("still says what to enter when a stay has neither a time zone nor an address", async () => {
-    held = { matches: [], items: [item({ suggestions: [suggestionOf("hotel", { address: undefined, start_zone: undefined })] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: [suggestionOf("hotel", { address: undefined, start_zone: undefined })] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /Check suggestion: / }));
     await userEvent.click(screen.getByRole("button", { name: "Add to my trips" }));
@@ -1833,7 +1838,7 @@ describe("Review: a suggestion that is a booking already in your trips", () => {
   const existing = (): ReviewCandidate => ({ segment_id: 31, trip_id: 6, trip_name: "Denver in December", kind: "flight", provider: "Example Air", origin: "BOS", destination: "DEN",
     start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" });
   const open = async (...legs: (typeof suggestion)[]) => {
-    held = { matches: [], items: [item({ suggestions: legs.length ? legs : [suggestion] })], who: [], ai: false };
+    held = { matches: [], items: [item({ suggestions: legs.length ? legs : [suggestion] })], who: [] };
     render(ReviewPage);
     await userEvent.click(await screen.findByRole("button", { name: /^Check (\d+ )?suggestions?: / }));
     await userEvent.click(screen.getByRole("button", { name: /^Add (to my trips|2 flights)$/ }));
@@ -1915,7 +1920,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("groups by the decision needed, with counts, and omits a group with nothing in it", async () => {
-    held = { matches: [held_match()], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 }), item({ id: 3 })], who: [who()], ai: false };
+    held = { matches: [held_match()], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 }), item({ id: 3 })], who: [who()] };
     render(ReviewPage);
     const headings = (await screen.findAllByRole("heading", { level: 2 })).map((h) => h.textContent?.replace(/\s+/g, " ").trim());
     expect(headings).toEqual(["Check suggestions 1", "Add missing details 2", "Match bookings 1", "Match people 1"]);
@@ -1924,7 +1929,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("shows only the groups that have something, and no jump links for a single group", async () => {
-    held = { matches: [], items: [item()], who: [], ai: false };
+    held = { matches: [], items: [item()], who: [] };
     render(ReviewPage);
     await screen.findByRole("list", { name: "Add missing details" });
     expect(screen.queryByRole("heading", { name: /Check suggestions/ })).toBeNull();
@@ -1933,7 +1938,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("moves a partly read email out of the unreadable group, under the suggestion to check", async () => {
-    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ reason: "incomplete", suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const list = await screen.findByRole("list", { name: "Check suggestions" });
     expect(within(list).getByText(REASONS.incomplete)).toBeInTheDocument();
@@ -1941,7 +1946,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("gives each email one prominent next step: check the suggestion if there is one, else add by hand", async () => {
-    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 })], who: [], ai: true };
+    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] }), item({ id: 2 })], who: [] };
     render(ReviewPage);
     const [suggested, bare] = await screen.findAllByTestId("review-item");
     const prominent = (row: HTMLElement) => within(row).getAllByRole("button").filter((b) => /(^| )bg-primary( |$)/.test(b.className));
@@ -1951,7 +1956,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("puts the uncommon actions under a menu labelled More, with this email apart from all future mail from its sender", async () => {
-    held = { matches: [], items: [item({ subject: "Your itinerary" })], who: [], ai: true };
+    held = { matches: [], items: [item({ subject: "Your itinerary" })], who: [] };
     render(ReviewPage);
     const row = await screen.findByTestId("review-item");
     const menu = within(row).getByTestId("action-menu");
@@ -1967,7 +1972,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("offers Add by hand inside the menu for an email with a suggestion", async () => {
-    held = { matches: [], items: [item({ subject: "Your itinerary", suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ subject: "Your itinerary", suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const menu = within(await screen.findByTestId("action-menu"));
     await userEvent.click(menu.getByText("More"));
@@ -2004,7 +2009,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("handles a six-item queue: counts in the headings, jump links, one primary step per row", async () => {
-    held = { matches: [held_match()], items: many(4, (i) => i < 2), who: [who()], ai: false };
+    held = { matches: [held_match()], items: many(4, (i) => i < 2), who: [who()] };
     render(ReviewPage);
     const jump = await screen.findByRole("navigation", { name: "Jump to a group" });
     expect(within(jump).getAllByRole("button").map((b) => b.textContent?.replace(/\s+/g, " ").trim())).toEqual(["Check suggestions 2", "Add missing details 2", "Match bookings 1", "Match people 1"]);
@@ -2015,7 +2020,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("handles a fifty-item queue: every row is there under its group, each with one primary step", async () => {
-    held = { matches: [], items: many(50, (i) => i % 5 === 0), who: [], ai: true };
+    held = { matches: [], items: many(50, (i) => i % 5 === 0), who: [] };
     render(ReviewPage);
     const rows = await screen.findAllByTestId("review-item");
     expect(rows).toHaveLength(50);
@@ -2028,7 +2033,7 @@ describe("Review as a queue of decisions", () => {
   });
 
   it("keeps the filter note from a sender link", async () => {
-    held = { matches: [], items: many(6, () => false), who: [], ai: true };
+    held = { matches: [], items: many(6, () => false), who: [] };
     setQuery("sender=sender1.example");
     render(ReviewPage);
     expect(await screen.findByTestId("review-filter")).toHaveTextContent("Showing only mail from sender1.example");
@@ -2065,7 +2070,7 @@ describe("Review's sheet on a phone", () => {
   afterEach(() => { viewport.phone = false; });
 
   it("starts a hand entry on the email, and a suggestion on the booking", async () => {
-    held = { matches: [], items: [item({ id: 1, subject: "By hand" }), item({ id: 2, subject: "Suggested", suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1, subject: "By hand" }), item({ id: 2, subject: "Suggested", suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: "Add by hand: “By hand”" }));
@@ -2080,7 +2085,7 @@ describe("Review's sheet on a phone", () => {
   });
 
   it("saves from the email pane too, by showing the booking fields it needs first", async () => {
-    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] })], who: [], ai: false };
+    held = { matches: [], items: [item({ id: 1, suggestions: [SUGGESTION] })], who: [] };
     render(ReviewPage);
     const u = userEvent.setup();
     await u.click(await screen.findByRole("button", { name: /Check suggestion: / }));

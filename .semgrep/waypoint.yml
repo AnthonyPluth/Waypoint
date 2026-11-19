@@ -205,8 +205,8 @@ rules:
 
   - id: waypoint-ai-suggest-caller
     message: >-
-      Email text is asked of the AI in one place, scan._read in waypoint/domain/mail/scan.py, which the scan and Ask AI both
-      go through, and only the household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server").
+      Email text is asked of the AI in one place, scan._read in waypoint/domain/mail/scan.py, which every reading by the scan
+      goes through, and only the household's own Ollama server (ai.mail_config(); AGENTS.md, "Email stays on the server").
       Call scan's readers instead of ai.suggest().
     severity: ERROR
     languages: [python]
