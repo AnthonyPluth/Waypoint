@@ -1365,7 +1365,7 @@ describe.each([["a phone", true, "bottom"], ["a desktop", false, "right"]] as co
     expect(within(sheet).getByLabelText("From (airport code)")).toHaveValue("JFK");
   });
 
-  it("marks a suggestion the scan asked for on its own as read automatically, and one asked for by hand not", async () => {
+  it("marks a suggestion the scan asked for on its own as read automatically, and the others not", async () => {
     const hotel = { kind: "hotel" as const, provider: "Seaside Inn", origin: "Seaside Inn", start_local: "2026-11-21T15:00", end_local: "2026-11-25T11:00", start_zone: "Europe/London" };
     held = { matches: [], items: [item({ id: 1, suggestions: [hotel], auto_read: true }), item({ id: 2, suggestions: [hotel] }), item({ id: 3 })], who: [] };
     render(ReviewPage);

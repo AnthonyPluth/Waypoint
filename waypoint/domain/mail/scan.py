@@ -341,7 +341,7 @@ def _file(conn: db.Connection, mailbox_id: int, viewer: Viewer, message_id: str,
 
 
 UNREAD_WITH_SUGGESTION = "Something else in this email couldn’t be read. Add it by hand if you need it."
-SUGGESTION_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
+SUGGESTION_FAILED = ai.ASK_FAILED
 
 
 def _again(owner: str, item_id: int) -> tuple[int, str, dict[str, Any]]:
@@ -530,6 +530,19 @@ def _fill_gaps(token: Callable[[], str], started: float, viewer: Viewer, message
     return asked
 
 
+def _would_send(token: Callable[[], str], message_id: str, reason: str) -> bool | None:
+    try:
+        if reason != "no_markup":
+            message = extract.read(gmail.fetch(token(), message_id))
+            if message.markup or message.bookings:
+                return True
+        return triage.strong(extract.head(gmail.fetch_head(token(), message_id)))
+    except gmail.MessageGone:
+        return False
+    except gmail.GmailError:
+        return None
+
+
 def _requeue(mailbox_id: int, token: Callable[[], str], started: float) -> None:
     with db.session() as conn:
         if not autoask.active(conn):
@@ -538,19 +551,11 @@ def _requeue(mailbox_id: int, token: Callable[[], str], started: float) -> None:
     for message_id, reason in held:
         if BUDGET - (_clock() - started) <= 0:
             return
-        if reason == "no_markup":
-            try:
-                weak = not triage.strong(extract.head(gmail.fetch_head(token(), message_id)))
-            except gmail.MessageGone:
-                weak = True
-            except gmail.GmailError:
-                continue
-            if weak:
-                with db.session() as conn:
-                    autoask.exempt(conn, mailbox_id, message_id)
-                continue
+        eligible = _would_send(token, message_id, reason)
+        if eligible is None:
+            continue
         with db.session() as conn:
-            autoask.queue(conn, mailbox_id, message_id)
+            (autoask.queue if eligible else autoask.exempt)(conn, mailbox_id, message_id)
 
 
 def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, known: Counter[str] | None = None) -> tuple[int, int, int]:
@@ -571,6 +576,7 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         except gmail.MessageGone:
             with db.session() as conn:
                 autoask.stop_waiting(conn, mailbox_id, message_id)
+                autoask.exempt(conn, mailbox_id, message_id)
             continue
         except gmail.GmailError:
             continue
@@ -578,6 +584,10 @@ def _ask_waiting(mailbox_id: int, token: Callable[[], str], started: float, know
         if left <= 0:
             return asked, made, cleared
         asked += 1
+        with db.session() as conn:
+            kept = stored_mail.get(conn, mailbox_id, message_id)
+        if kept is None:
+            _keep_quietly(mailbox_id, message_id, raw, [], time.time(), started)
         subject, revises = extract.guard(raw)
         read = _read(cfg, extract.plain_text(raw), left, subject, revises)
         with db.session() as conn:

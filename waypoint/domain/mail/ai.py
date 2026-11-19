@@ -26,7 +26,6 @@ MAX_BOOKINGS = 10
 KINDS = ("flight", "hotel", "car", "train", "cruise", "parking")
 REMOVED = "[removed]"
 EMAIL_REMOVED = "[email]"
-NEEDS_AI = "Reading email with AI needs an Ollama address and model in Settings → Mail & review → AI."
 
 
 class AiError(Exception):
@@ -175,6 +174,7 @@ UNREACHABLE = "Waypoint couldn’t reach the AI service."
 REFUSED = "The AI server refused the request."
 LIMITED = "The AI service is busy or over its limit."
 FAILED = "The AI service couldn’t answer."
+ASK_FAILED = "The AI couldn’t be asked just now. The details are in Waypoint’s log."
 
 TIME = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d)?")
 FIELDS = ("kind", "provider", "confirmation", "origin", "destination", "start_local", "end_local", "start_zone", "end_zone")

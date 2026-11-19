@@ -10,6 +10,7 @@ TRIES = 3
 ROUNDS = 3
 CAP = TRIES * ROUNDS
 RETRYABLE = ("incomplete", "broken", "no_markup")
+UNANSWERED = (None, ai.BAD_REPLY, ai.TOO_LONG, ai.UNREACHABLE, ai.REFUSED, ai.LIMITED, ai.FAILED, ai.ASK_FAILED)
 WAITING = "waiting"
 READ = "read"
 
@@ -60,10 +61,10 @@ def stranded(conn: db.Connection, mailbox_id: int, unreadable: str) -> list[tupl
         select(ReviewItem.message_id, ReviewItem.reason, ReviewItem.suggestion, ReviewItem.suggestion_error)
         .join(ScannedMessage, and_(ScannedMessage.mailbox_id == ReviewItem.mailbox_id, ScannedMessage.message_id == ReviewItem.message_id))
         .where(ReviewItem.mailbox_id == mailbox_id, ReviewItem.auto_state.is_(None), ReviewItem.reason.in_(RETRYABLE),
-               ReviewItem.auto_tries < CAP, ScannedMessage.outcome == unreadable)
+               ReviewItem.auto_tries < CAP, ReviewItem.matches.is_(None), ScannedMessage.outcome == unreadable)
         .order_by(ReviewItem.received.is_(None), ReviewItem.received.desc(), ReviewItem.id.desc())))
     return [(r["message_id"], r["reason"]) for r in rows
-            if r["suggestion_error"] != ai.NO_BOOKING and all(x.get("parsed") for x in review.suggestions_of(r["suggestion"]))]
+            if r["suggestion_error"] in UNANSWERED and all(x.get("parsed") for x in review.suggestions_of(r["suggestion"]))]
 
 
 def queue(conn: db.Connection, mailbox_id: int, message_id: str) -> None:
