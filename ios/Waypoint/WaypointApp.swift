@@ -27,7 +27,7 @@ struct WaypointApp: App {
             }
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active {
-                    Task { await openIfAllowed() }
+                    Task { await openIfAllowed(active: true) }
                     Task {
                         await ArrivalWatch.shared.foregrounded()
                         await returnToForeground()
@@ -49,7 +49,7 @@ struct WaypointApp: App {
     private var content: some View {
         switch phase {
         case .starting:
-            ProgressView().task { await openIfAllowed() }
+            ProgressView().task { await openIfAllowed(active: scenePhase == .active) }
         case .connect:
             ConnectView { await open() }
         case .signedOut:
@@ -71,13 +71,17 @@ struct WaypointApp: App {
         }
     }
 
+    /// `active` is said by the caller, never read here from `scenePhase`: iOS 16's `onChange(of:perform:)` runs the closure made with the view
+    /// before the change, so `scenePhase` read from it (or from a method it calls) is still the old `.inactive`. A cold launch's first render is
+    /// not active yet either, so reading it here refused both starts and left the spinner up for good. After `open()` the app's live state says
+    /// whether it is still active.
     @MainActor
-    private func openIfAllowed() async {
+    private func openIfAllowed(active: Bool) async {
         guard phase == .starting,
-              launch.begin(active: scenePhase == .active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
+              launch.begin(active: active, protectedDataAvailable: UIApplication.shared.isProtectedDataAvailable) else { return }
         await open()
         launch.end()
-        if LaunchGate.activatesArrival(shellOpen: phase == .shell, active: scenePhase == .active) {
+        if LaunchGate.activatesArrival(shellOpen: phase == .shell, active: UIApplication.shared.applicationState == .active) {
             await ArrivalWatch.shared.activated()
         }
     }

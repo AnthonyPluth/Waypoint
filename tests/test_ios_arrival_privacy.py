@@ -108,11 +108,24 @@ class ArrivalPrivacyTests(unittest.TestCase):
 
     def test_a_launch_that_opened_the_shell_activates_the_arrival_watch_after_the_gate_allowed_it(self):
         app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
-        start = app.index("private func openIfAllowed()")
+        start = app.index("private func openIfAllowed(")
         body = app[start : app.index("private func open()", start)]
         self.assertLess(body.index("launch.begin("), body.index("await open()"))
         self.assertLess(body.index("await open()"), body.index("LaunchGate.activatesArrival("))
         self.assertLess(body.index("LaunchGate.activatesArrival("), body.index("ArrivalWatch.shared.activated()"))
+
+    def test_the_launch_is_told_whether_the_app_is_active_and_never_reads_a_stale_scene_phase(self):
+        app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
+        start = app.index("private func openIfAllowed(")
+        body = app[start : app.index("private func open()", start)]
+        code = "\n".join(line for line in body.splitlines() if not line.strip().startswith("///"))
+        self.assertNotIn("scenePhase", code)
+        self.assertIn("launch.begin(active: active,", code)
+        change = app[app.index(".onChange(of: scenePhase)") : app.index(".onReceive(")]
+        self.assertIn("if newPhase == .active {", change)
+        self.assertIn("openIfAllowed(active: true)", change)
+        self.assertIn("ProgressView().task { await openIfAllowed(active: scenePhase == .active) }", app)
+        self.assertEqual(app.count("openIfAllowed("), 3)
 
     def test_the_usage_strings_are_the_signed_off_ones_and_no_background_mode_is_declared(self):
         plist = plistlib.loads((IOS / "Waypoint" / "Info.plist").read_bytes())
