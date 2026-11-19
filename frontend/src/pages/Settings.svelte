@@ -11,7 +11,6 @@
   import HomeSection from "$lib/components/settings/HomeSection.svelte";
   import GmailSection from "$lib/components/settings/GmailSection.svelte";
   import ImportSection from "$lib/components/settings/ImportSection.svelte";
-  import MapsSection from "$lib/components/settings/MapsSection.svelte";
   import McpSection from "$lib/components/settings/McpSection.svelte";
   import { clearRouteCache } from "$lib/driving-routes";
   import { clearSnapshots } from "$lib/map-snapshots";
@@ -157,8 +156,6 @@
     <HomeSection />
 
     <DistanceSection />
-
-    <MapsSection />
 
     <CostsSection />
 

@@ -221,42 +221,6 @@ describe("Settings index", () => {
   });
 });
 
-describe("Settings maps row", () => {
-  beforeEach(() => { route.sub = "travel"; });
-  const row = () => within(screen.getByTestId("maps-row"));
-
-  it("says Apple Maps is on, and links to what Apple learns, when the server has MapKit", () => {
-    app.state = state({ mapkit: true });
-    render(Settings);
-    expect(screen.getByRole("heading", { level: 2, name: "Maps" })).toBeInTheDocument();
-    expect(row().getByText("Apple Maps. The route replay, Past trips cards and Stats are drawn by Apple; Apple learns the areas shown.")).toBeInTheDocument();
-    expect(row().getByText("On")).toBeInTheDocument();
-    expect(row().getByRole("link", { name: "What Apple learns" })).toHaveAttribute("href", "https://anthonypluth.github.io/Waypoint/start/trips/#apples-map-for-the-route-replay");
-    expect(row().queryByRole("link", { name: "How to turn on maps" })).toBeNull();
-  });
-
-  it.each([[false], [undefined]])("says maps are off, and links to the configuration page, without MapKit (%s)", (mapkit) => {
-    app.state = state({ mapkit });
-    render(Settings);
-    expect(row().getByText("Off: this server has no MapKit key, so Waypoint shows no maps or route replays.")).toBeInTheDocument();
-    expect(row().getByText("Off")).toBeInTheDocument();
-    expect(row().getByRole("link", { name: "How to turn on maps" })).toHaveAttribute("href", "https://anthonypluth.github.io/Waypoint/reference/configuration/");
-    expect(row().queryByRole("link", { name: "What Apple learns" })).toBeNull();
-  });
-
-  it("is read-only: no switch or button", () => {
-    render(Settings);
-    expect(row().queryByRole("switch")).toBeNull();
-    expect(row().queryByRole("button")).toBeNull();
-  });
-
-  it("stays out of the other groups", () => {
-    route.sub = "offline";
-    render(Settings);
-    expect(screen.queryByTestId("maps-row")).toBeNull();
-  });
-});
-
 describe("Settings photos", () => {
   beforeEach(() => { route.sub = "photos"; });
 
