@@ -106,6 +106,14 @@ class ArrivalPrivacyTests(unittest.TestCase):
         self.assertNotIn("task(id:", app)
         self.assertIn("launch.begin(", app)
 
+    def test_a_launch_that_opened_the_shell_activates_the_arrival_watch_after_the_gate_allowed_it(self):
+        app = (IOS / "Waypoint" / "WaypointApp.swift").read_text()
+        start = app.index("private func openIfAllowed()")
+        body = app[start : app.index("private func open()", start)]
+        self.assertLess(body.index("launch.begin("), body.index("await open()"))
+        self.assertLess(body.index("await open()"), body.index("LaunchGate.activatesArrival("))
+        self.assertLess(body.index("LaunchGate.activatesArrival("), body.index("ArrivalWatch.shared.activated()"))
+
     def test_the_usage_strings_are_the_signed_off_ones_and_no_background_mode_is_declared(self):
         plist = plistlib.loads((IOS / "Waypoint" / "Info.plist").read_bytes())
         design = DESIGN.read_text()
