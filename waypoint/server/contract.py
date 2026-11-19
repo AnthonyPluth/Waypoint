@@ -873,6 +873,15 @@ class TripSummary(TypedDict):
     kinds: TripKindCounts
 
 
+class TripSummaryOf(TypedDict):
+    trip_id: int
+    summary: TripSummary
+
+
+class TripSummaries(TypedDict):
+    summaries: list[TripSummaryOf]
+
+
 class TripBody(TypedDict):
     name: NotRequired[str]
     destination: NotRequired[str | None]

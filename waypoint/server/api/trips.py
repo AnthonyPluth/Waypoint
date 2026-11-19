@@ -7,13 +7,13 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from ... import monitoring, validate
-from ...domain import airports, loyalty, money, people, tripmap, trips, tripstats
+from ...domain import airports, driving_routes, loyalty, money, people, tripmap, trips, tripstats
 from ...domain.mail import ai
 from ...domain.visibility import Viewer
 from ...storage import db
 from ..common import NO_IMAGE, ApiError, Response, _current, image_response, own_session, position, row_id
 from ..contract import (Airport, AirportMatches, DestinationBody, DestinationSuggestion, EmailsCleared, GateCodeBody, MergeBody, MoveBody, Ok, Segment, SegmentBody, SegmentEdit, SegmentEmails, SplitBody, StoredEmail, Trip, TripBody,
-                        TripList, TripPlaces, TripSummary)
+                        TripList, TripPlaces, TripSummaries, TripSummary)
 
 NAME_LIMIT = 100
 NOTES_LIMIT = 4000
@@ -202,6 +202,15 @@ def api_trip_places(conn, _q, _b, trip_id) -> TripPlaces:
 def api_trip_summary(conn, _q, _b, trip_id) -> TripSummary:
     who = viewer(conn)
     return _run(lambda: tripstats.summary(conn, who, row_id(trip_id, NO_TRIP)), NO_TRIP)
+
+
+def api_trip_summaries(conn, q, _b) -> TripSummaries:
+    who = viewer(conn)
+    try:
+        found = tripstats.summaries(conn, who, q.get("trip", []))
+    except driving_routes.Invalid as e:
+        raise ApiError(str(e)) from None
+    return {"summaries": [{"trip_id": trip_id, "summary": got} for trip_id, got in found]}
 
 
 def api_trip_edit(conn, _q, body: TripBody, trip_id) -> Trip:

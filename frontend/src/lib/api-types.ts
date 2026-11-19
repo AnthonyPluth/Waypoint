@@ -1464,6 +1464,10 @@ export interface TripStayPoint {
   precision: "airport" | "zip" | "city";
 }
 
+export interface TripSummaries {
+  summaries: TripSummaryOf[];
+}
+
 export interface TripSummary {
   days: number;
   nights: number;
@@ -1475,6 +1479,11 @@ export interface TripSummary {
   countries: string[];
   photos: TripPhotoCounts;
   kinds: TripKindCounts;
+}
+
+export interface TripSummaryOf {
+  trip_id: number;
+  summary: TripSummary;
 }
 
 export interface UnignoreBody {
@@ -1521,6 +1530,7 @@ export interface Endpoints {
   "GET /api/trips/{id}/driving-routes": { body: never; reply: DrivingRoutes };
   "PUT /api/trips/{id}/driving-routes": { body: DrivingRouteBody; reply: DrivingRouteStored };
   "GET /api/trips/{id}/summary": { body: never; reply: TripSummary };
+  "GET /api/trip-summaries": { body: never; reply: TripSummaries };
   "POST /api/trips/{id}/emails/clear": { body: never; reply: EmailsCleared };
   "POST /api/trips/{id}/merge": { body: MergeBody; reply: Trip };
   "POST /api/trips/{id}/split": { body: SplitBody; reply: Trip };

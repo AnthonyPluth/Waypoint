@@ -24,7 +24,9 @@ const auckland = trip([segment({ id: 2, trip_id: 2, origin: "JFK", destination: 
 const orlando = trip([segment({ id: 3, trip_id: 3, start_local: "2026-08-25T08:00", end_local: "2026-08-30T20:00", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] })], { id: 3, name: "Trip to Orlando" });
 
 const nothingToCount = { days: 0, nights: 0, distance_km: 0, flight_km: 0, road_km: 0, road_estimated: false, states: [], countries: [], photos: { total: 0, inferred: 0 }, kinds: { flight: 0, hotel: 0, car: 0, train: 0, cruise: 0, parking: 0, visit: 0 } };
-const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).endsWith("/summary") ? nothingToCount : undefined);
+const askedIds = (path: unknown) => new URLSearchParams(String(path).split("?")[1] ?? "").getAll("trip").map(Number);
+const summariesFor = (path: unknown, each: (id: number) => unknown = () => nothingToCount) => ({ summaries: askedIds(path).map((id) => ({ trip_id: id, summary: each(id) })) });
+const numbers = (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).startsWith("/api/trip-summaries?") ? summariesFor(path) : String(path).endsWith("/summary") ? nothingToCount : undefined);
 
 let coverReply: unknown = { trips: [] };
 function serve(trips = [london, auckland, orlando]) {
@@ -973,7 +975,8 @@ describe("past trips by year", () => {
       const w = watching.filter((x) => x.live).at(-1)!;
       w.cb([{ isIntersecting: true, target: w.el } as unknown as IntersectionObserverEntry], {} as IntersectionObserver);
     };
-    const summaryCalls = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => p.endsWith("/summary"));
+    const summaryCalls = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/trip-summaries"));
+    const oldSummaryCalls = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => /^\/api\/trips\/\d+\/summary$/.test(p));
 
     it("loads one year each time the end of the list comes near, with no button", async () => {
       viewport.phone = true;
@@ -1001,15 +1004,15 @@ describe("past trips by year", () => {
       const base = vi.mocked(api).getMockImplementation()!;
       render(Trips);
       await screen.findByRole("list", { name: "Past trips in 2026" });
-      await waitFor(() => expect(summaryCalls().sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary"]));
-      vi.mocked(api).mockImplementation((path, opts) => (path === "/api/trips/3/summary" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
+      await waitFor(() => expect(summaryCalls()).toEqual(["/api/trip-summaries?trip=1&trip=2"]));
+      vi.mocked(api).mockImplementation((path, opts) => (String(path) === "/api/trip-summaries?trip=3" ? new Promise((r) => { release = r; }) : base(path, opts)) as never);
       await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
       near();
       expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
-      expect(summaryCalls()).not.toContain("/api/trips/4/summary");
+      expect(summaryCalls().join()).not.toContain("trip=4");
       expect(watching.some((w) => w.live)).toBe(false);
       expect(screen.queryByRole("list", { name: "Past trips in 2024" })).toBeNull();
-      release(nothingToCount);
+      release(summariesFor("/api/trip-summaries?trip=3"));
       await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
     });
 
@@ -1018,23 +1021,31 @@ describe("past trips by year", () => {
       serve(history());
       const held: Record<string, (v: unknown) => void> = {};
       const base = vi.mocked(api).getMockImplementation()!;
-      vi.mocked(api).mockImplementation((path, opts) => (/\/api\/trips\/[1-3]\/summary/.test(String(path)) ? new Promise((r) => { held[String(path)] = r; }) : base(path, opts)) as never);
+      vi.mocked(api).mockImplementation((path, opts) => (String(path).startsWith("/api/trip-summaries") ? new Promise((r) => { held[String(path)] = r; }) : base(path, opts)) as never);
       render(Trips);
       await screen.findByRole("list", { name: "Past trips in 2026" });
       await waitFor(() => expect(watching.some((w) => w.live)).toBe(true));
       near();
       expect(await screen.findByText("Loading 2025…")).toBeInTheDocument();
-      await waitFor(() => expect(Object.keys(held).sort()).toEqual(["/api/trips/1/summary", "/api/trips/2/summary", "/api/trips/3/summary"]));
-      held["/api/trips/1/summary"](nothingToCount);
-      held["/api/trips/2/summary"](nothingToCount);
+      await waitFor(() => expect(Object.keys(held).sort()).toEqual(["/api/trip-summaries?trip=1&trip=2", "/api/trip-summaries?trip=3"]));
+      held["/api/trip-summaries?trip=1&trip=2"](summariesFor("/api/trip-summaries?trip=1&trip=2"));
       await tick();
       await new Promise((r) => setTimeout(r, 0));
       expect(screen.getByText("Loading 2025…")).toBeInTheDocument();
       expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("");
       expect(watching.some((w) => w.live)).toBe(false);
-      held["/api/trips/3/summary"](nothingToCount);
+      held["/api/trip-summaries?trip=3"](summariesFor("/api/trip-summaries?trip=3"));
       await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
       expect(screen.getByRole("status", { name: "Past trips loaded" })).toHaveTextContent("Loaded 2025, 1 trip");
+    });
+
+    it("asks for the summaries of a year's trips in one request, never one for each trip", async () => {
+      serve(history());
+      render(Trips);
+      await screen.findByRole("list", { name: "Past trips in 2024" });
+      await waitFor(() => expect(summaryCalls()).toHaveLength(1));
+      expect(summaryCalls()[0]).toMatch(/^\/api\/trip-summaries\?trip=\d+(&trip=\d+)+$/);
+      expect(oldSummaryCalls()).toEqual([]);
     });
 
     it("does not move focus when a year loads", async () => {
@@ -1066,7 +1077,7 @@ describe("past trip cards", () => {
     trip([segment({ id: 31, trip_id: 31, start_local: "2026-08-08T09:00", end_local: "2026-08-15T10:00", travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] })], { id: 31, name: "Beach", destination: "Nags Head, NC" }),
     trip([segment({ id: 32, trip_id: 32, kind: "hotel", start_local: "2026-03-02T15:00", end_local: "2026-03-05T11:00", origin: null, destination: null })], { id: 32, name: "Spring" }),
   ];
-  const distanceFor = (km: number) => (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path) === "/api/trips/31/summary" ? { ...home, distance_km: km } : undefined);
+  const distanceFor = (km: number) => (path: unknown) => (path === "/api/distance-unit" ? { distance_unit: "mi" } : String(path).startsWith("/api/trip-summaries?") ? summariesFor(path, (id) => (id === 31 ? { ...home, distance_km: km } : home)) : undefined);
   const serveCards = (covers: unknown, km = 859.6) => {
     serve(past());
     const base = vi.mocked(api).getMockImplementation()!;
@@ -1114,6 +1125,70 @@ describe("past trip cards", () => {
     expect(within(beach()).getAllByTestId("route-tile")).toHaveLength(1);
   });
 
+  describe("the summaries behind the distances", () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => trip([segment({ id: 100 + i, trip_id: 100 + i, start_local: "2026-03-02T09:00", end_local: "2026-03-03T10:00" })], { id: 100 + i, name: `Short ${100 + i}` }));
+    const summaryPaths = () => vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/trip-summaries"));
+    const kmFor = (id: number) => ({ ...home, distance_km: id * 10 });
+    const serveMany = (n: number, reply: (path: string) => unknown) => {
+      serve(many(n));
+      const base = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => (String(path).startsWith("/api/trip-summaries?") ? reply(String(path)) : base(path, opts)) as never);
+    };
+    const card = (id: number) => screen.getByRole("link", { name: new RegExp(`^Short ${id},`) });
+
+    it("asks in groups of at most twelve trips, and each card shows its own trip's distance", async () => {
+      serveMany(30, (path) => summariesFor(path, kmFor));
+      render(Trips);
+      await waitFor(() => expect(card(129)).toHaveAccessibleName(/, 802 mi,/));
+      expect(summaryPaths().map((p) => askedIds(p).length).sort((a, b) => a - b)).toEqual([6, 12, 12]);
+      expect(new Set(summaryPaths().flatMap(askedIds)).size).toBe(30);
+      expect(card(100)).toHaveAccessibleName(/621 mi/);
+      expect(card(110)).toHaveAccessibleName(/684 mi/);
+    });
+
+    it("leaves a trip the reply leaves out with no distance, and doesn't ask for it another way", async () => {
+      serveMany(3, (path) => ({ summaries: summariesFor(path, kmFor).summaries.filter((s) => s.trip_id !== 101) }));
+      render(Trips);
+      await waitFor(() => expect(card(100)).toHaveAccessibleName(/621 mi/));
+      expect(card(101)).not.toHaveAccessibleName(/ mi,/);
+      expect(card(102)).toHaveAccessibleName(/634 mi/);
+      expect(vi.mocked(api).mock.calls.map((c) => String(c[0])).filter((p) => /^\/api\/trips\/\d+\/summary/.test(p))).toEqual([]);
+    });
+
+    it("keeps the distances of the other groups when one group's request fails, and shows every card", async () => {
+      serveMany(14, (path) => (askedIds(path).includes(100) ? Promise.reject(Object.assign(new Error("down"), { status: 500 })) : summariesFor(path, kmFor)));
+      render(Trips);
+      await waitFor(() => expect(card(112)).toHaveAccessibleName(/, 696 mi,/));
+      expect(summaryPaths()).toHaveLength(2);
+      expect(card(100)).not.toHaveAccessibleName(/ mi,/);
+      expect(card(113)).toHaveAccessibleName(/, 702 mi,/);
+      expect(screen.getAllByRole("link", { name: /^Short \d+,/ })).toHaveLength(14);
+    });
+
+    it("ignores a summary for a trip it didn't ask about, and a reply that isn't a list", async () => {
+      serveMany(2, (path) => (path.includes("trip=100") ? { summaries: [{ trip_id: 100, summary: kmFor(100) }, { trip_id: 999, summary: kmFor(999) }] } : { summaries: null }));
+      render(Trips);
+      await waitFor(() => expect(card(100)).toHaveAccessibleName(/621 mi/));
+      expect(card(101)).not.toHaveAccessibleName(/ mi,/);
+    });
+
+    it("keeps the photo rule for cards when the summaries fail: a card with photos, or with unknown coverage, still asks Apple for nothing", async () => {
+      app.state = state({ mapkit: true });
+      serveCards({ trips: [{ trip_id: 31, count: 168, covers: [11, 12, 13] }] });
+      const base = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (String(path).startsWith("/api/trip-summaries")) throw Object.assign(new Error("down"), { status: 500 });
+        if (String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots")) throw new Error("must not be asked");
+        return base(path, opts);
+      });
+      render(Trips);
+      await waitFor(() => expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168"));
+      await new Promise((r) => setTimeout(r, 300));
+      expect(beach()).not.toHaveAccessibleName(/ mi,/);
+      expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).endsWith("/places") || String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes"))).toHaveLength(0);
+    });
+  });
+
   it("asks Apple for nothing, for any card, when the covers reply fails, since a card may have photos it can't see", async () => {
     app.state = state({ mapkit: true });
     serveCards(Object.assign(new Error("down"), { status: 500 }));
@@ -1151,7 +1226,7 @@ describe("past trip cards", () => {
     await u.click(within(pane).getByRole("button", { name: "Save" }));
     await waitFor(() => expect(vi.mocked(api).mock.calls.some(([path]) => path === "/api/photos/trip-covers")).toBe(true));
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/31/places" || String(path).includes("trip=31"))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/31/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(31)))).toHaveLength(0);
     expect(within(beach()).getByTestId("photo-pill")).toHaveTextContent("168");
   });
 
@@ -1163,7 +1238,7 @@ describe("past trip cards", () => {
     render(Trips);
     await screen.findByRole("link", { name: /^Omitted,/ });
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/70/places" || String(path).includes("trip=70"))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/70/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(70)))).toHaveLength(0);
   });
 
   it("asks Apple nothing about a trip that becomes past while the page is open and isn't in the covers reply", async () => {
@@ -1181,7 +1256,7 @@ describe("past trip cards", () => {
     ticks.forEach((tick) => tick());
     await screen.findByRole("link", { name: /^Just ended,/ });
     await new Promise((r) => setTimeout(r, 300));
-    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/61/places" || String(path).includes("trip=61"))).toHaveLength(0);
+    expect(vi.mocked(api).mock.calls.filter(([path]) => String(path) === "/api/trips/61/places" || ((String(path).startsWith("/api/map-snapshots") || String(path).startsWith("/api/driving-routes")) && askedIds(path).includes(61)))).toHaveLength(0);
     vi.restoreAllMocks();
   });
 
