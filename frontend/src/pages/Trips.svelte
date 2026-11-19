@@ -68,6 +68,7 @@
     }
   }
 
+  const SUMMARIES_AT_ONCE = 12;
   const lookup = limited(4);
   let distances = $state<ReadonlyMap<number, number>>(new Map());
   let unit = $state<"mi" | "km" | null>(null);
@@ -84,9 +85,13 @@
       if (generation !== distanceGeneration) return;
       unit = found;
     }
-    await Promise.all(fresh.map((id) => lookup(
-      () => apiCall<"GET /api/trips/{id}/summary">(`/api/trips/${id}/summary`, { keep: true, background: true }).then((s) => {
-        if (generation === distanceGeneration && s.distance_km > 0) distances = new Map(distances).set(id, s.distance_km);
+    const chunks = Array.from({ length: Math.ceil(fresh.length / SUMMARIES_AT_ONCE) }, (_, i) => fresh.slice(i * SUMMARIES_AT_ONCE, (i + 1) * SUMMARIES_AT_ONCE));
+    await Promise.all(chunks.map((chunk) => lookup(
+      () => apiCall<"GET /api/trip-summaries">(`/api/trip-summaries?${chunk.map((id) => `trip=${id}`).join("&")}`, { keep: true, background: true }).then((reply) => {
+        if (generation !== distanceGeneration || !Array.isArray(reply?.summaries)) return;
+        const found = new Map(distances);
+        for (const { trip_id, summary } of reply.summaries) if (chunk.includes(trip_id) && summary.distance_km > 0) found.set(trip_id, summary.distance_km);
+        distances = found;
       }, () => {}),
       () => generation !== distanceGeneration,
     )));

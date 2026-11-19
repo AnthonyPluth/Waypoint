@@ -178,7 +178,7 @@ Under a trip’s name and dates, its page shows one line of numbers, worked out 
 - **Photos**: how many of the trip’s photos you can see, and how many of those were placed from the itinerary rather than their own location. The line says “248 photos (23 placed from the itinerary)”, and leaves the bracket out when none were. A photo its person hid counts only for that person.
 - **Bookings by kind**: how many flights, stays, rental cars, trains, cruises, parking bookings and past visits the trip has.
 
-Cancelled bookings count for nothing. A trip with no booking Waypoint can place gets zero distance and no places. The bookings by kind are worked out but the line doesn’t show them. [Assistants](/Waypoint/start/mcp/) can’t read these numbers.
+Cancelled bookings count for nothing. A trip with no booking Waypoint can place gets zero distance and no places. The bookings by kind are worked out but the line doesn’t show them. [Assistants](/Waypoint/start/mcp/) can’t read these numbers. The Trips list asks for the distance on its past cards with one request for each group of up to 12 trips (`GET /api/trip-summaries`, which returns each listed trip’s numbers exactly as the trip page’s request does, and leaves out a trip you can’t see, without saying so; more than 12 trips in one request is refused, and so is a request from an assistant or from someone not signed in). If a request fails, the cards of those trips show no distance, the other cards keep theirs, and nothing else on the list changes, including whether a card asks Apple for a map.
 
 ## In a backup
 

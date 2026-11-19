@@ -7,7 +7,7 @@ description: Every API route, with its handler, the web app files that call it, 
 
 Where each feature lives. Every route in `waypoint/server/routes.py` is listed with its handler, the web app files that call it, the tests that exercise it and the docs page that describes it. The same data, for tools and agents, is in [`docs/feature-map.json`](https://github.com/AnthonyPluth/waypoint/blob/main/docs/feature-map.json). `make feature-map` regenerates both; `make check` and CI fail when they are out of date, or when a route has no test and isn't on `tools/feature_map_allowlist.txt` (a list that only shrinks).
 
-126 routes; 0 have no test yet.
+127 routes; 0 have no test yet.
 
 A route counts as tested when a file in `tests/` names its handler, or calls its address (with its method, when the test writes one). A web app caller is an `api(` or `apiCall(` call with a literal address; one built in a variable isn't seen.
 
@@ -32,7 +32,8 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `GET /api/trips/{id}/places` | `trips.py:api_trip_places` | `lib/components/RouteReplay.svelte`, `lib/components/RouteTile.svelte`, `pages/Upcoming.svelte` | `test_api_contract.py`, `test_home.py`, `test_map_snapshots.py`, `test_route_cache.py`, `test_route_warming.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `GET /api/trips/{id}/driving-routes` | `driving_routes.py:api_driving_routes` | `lib/driving-routes.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_route_cache.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
 | `PUT /api/trips/{id}/driving-routes` | `driving_routes.py:api_driving_route_store` | `lib/driving-routes.ts` | `test_api_contract.py`, `test_mcp_routes.py`, `test_route_cache.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
-| `GET /api/trips/{id}/summary` | `trips.py:api_trip_summary` | `lib/components/TripSummary.svelte`, `pages/Trips.svelte` | `test_api_contract.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/trips/{id}/summary` | `trips.py:api_trip_summary` | `lib/components/TripSummary.svelte` | `test_api_contract.py`, `test_photo_access.py`, `test_photos_api.py`, `test_trip_summary.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |
+| `GET /api/trip-summaries` | `trips.py:api_trip_summaries` | `pages/Trips.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_photo_access.py`, `test_trip_summary.py` | [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}` | `trips.py:api_trip_edit` | `lib/components/TripDetails.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_monitoring.py`, `test_offline.py`, `test_photo_access.py`, `test_photo_covers.py`, `test_photos_api.py`, `test_route_cache.py`, `test_routes.py`, `test_trip_destination.py`, `test_trip_emails_clear.py`, `test_trips.py` | [contributing/design](/Waypoint/contributing/design/), [start/trips](/Waypoint/start/trips/) |
 | `DELETE /api/trips/{id}` | `trips.py:api_trip_remove` | `pages/Trip.svelte` | `test_api_contract.py`, `test_mcp.py`, `test_mcp_routes.py`, `test_monitoring.py`, `test_photo_access.py`, `test_photos_api.py`, `test_route_cache.py`, `test_trip_destination.py`, `test_trips.py` | [contributing/design](/Waypoint/contributing/design/), [start/trips](/Waypoint/start/trips/) |
 | `POST /api/trips/{id}/emails/clear` | `trips.py:api_trip_emails_clear` | `lib/components/TripDone.svelte` | `test_api_contract.py`, `test_mcp_routes.py`, `test_trip_emails_clear.py`, `test_trips.py` | [start/trips](/Waypoint/start/trips/) |

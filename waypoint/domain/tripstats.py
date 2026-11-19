@@ -200,3 +200,12 @@ def summary(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripSummary | 
             "distance_km": round(round(flight_km, 1) + round(road_km, 1), 1), "flight_km": round(flight_km, 1), "road_km": round(road_km, 1),
             "road_estimated": estimated, "states": states, "countries": countries,
             "photos": {"total": len(photos), "inferred": sum(1 for p in photos if p["inferred"])}, "kinds": _kinds(live)}
+
+
+def summaries(conn: db.Connection, viewer: Viewer, texts: list[str]) -> list[tuple[int, TripSummary]]:
+    out: list[tuple[int, TripSummary]] = []
+    for trip_id in dict.fromkeys(driving_routes.parse_trips(texts)):
+        found = summary(conn, viewer, trip_id)
+        if found is not None:
+            out.append((trip_id, found))
+    return out
