@@ -206,27 +206,8 @@
     } catch (err) { peeks[item.id] = { state: "error", message: errMsg(err) }; }
   }
 
-  let asking_all = $state(false);
-  const askable = (items: ReviewItem[]) => review?.ai ? items.filter((i) => !i.suggestions.length) : [];
   const suggested = $derived(shown.filter((i) => i.suggestions.length > 0));
   const missing = $derived(shown.filter((i) => i.suggestions.length === 0));
-  const unasked = $derived(askable(shown));
-  const unaskedElsewhere = $derived(only ? askable(items).length - unasked.length : 0);
-  const aiNote = (n: number) => `The text of ${n === 1 ? "this email goes" : `these ${n} emails goes`} to your own Ollama server, unredacted.`;
-  const askAll = (items: ReviewItem[]) => act(async () => {
-    let done = 0;
-    try {
-      for (const item of items) {
-        await apiCall<"POST /api/review/{id}/suggest">(`/api/review/${item.id}/suggest`, { method: "POST" });
-        done++;
-      }
-    } catch (err) {
-      await settle();
-      throw new Error(`Asked about ${done} of ${items.length}: ${errMsg(err)}`, { cause: err });
-    }
-    await settle();
-    toast.success(`Asked the AI about ${done} ${done === 1 ? "message" : "messages"}`);
-  }, { busy: (on) => (asking_all = on) });
 
   const placeLabels = (kind: string) => kind === "flight" ? ["From (airport code)", "To (airport code)"] : kind === "hotel" ? ["Hotel", ""] : kind === "parking" ? ["Lot", ""] : kind === "car" ? ["Pick-up", "Drop-off"] : kind === "cruise" ? ["Embarkation port", "Disembarkation port"] : ["From (station)", "To (station)"];
 
@@ -613,9 +594,6 @@
       {#if only}
         <p class="px-1 text-sm" data-testid="review-filter">Showing only mail from {only.sender}{only.mailbox ? ` in ${only.mailbox}` : ""}{shown.length ? "" : ", and none is waiting"}. <button type="button" class="underline underline-offset-2" onclick={() => setQuery("")}>Show everything</button></p>
       {/if}
-      {#if !unasked.length && only && unaskedElsewhere > 0 && review?.ai}
-        <p class="px-1 text-sm text-muted-foreground" data-testid="ask-none-here">Nothing shown here is waiting for the AI. {unaskedElsewhere} {unaskedElsewhere === 1 ? "email" : "emails"} from other senders or mailboxes {unaskedElsewhere === 1 ? "is" : "are"} hidden by this filter; show everything to ask about them.</p>
-      {/if}
     </div>
 
     {#if suggested.length}
@@ -632,12 +610,6 @@
       <section aria-labelledby="group-missing" class="space-y-2">
         <h2 id="group-missing" tabindex="-1" class="eyebrow px-1 outline-none">Add missing details <Badge variant="secondary">{missing.length}</Badge></h2>
         <p class="px-1 text-sm text-muted-foreground">Waypoint couldn’t get a booking out of these. Read the email and type the booking in, or dismiss it if it isn’t travel.</p>
-        {#if unasked.length > 1 || (only && unasked.length > 0)}
-          <div class="space-y-1 px-1" data-testid="ask-all">
-            <Button variant="outline" size="sm" disabled={asking_all} onclick={() => askAll(unasked)}>{asking_all ? "Asking…" : only ? `Ask AI about these ${unasked.length} ${unasked.length === 1 ? "email" : "emails"}` : `Ask AI about all ${unasked.length}`}</Button>
-            <p class="text-xs text-muted-foreground">{aiNote(unasked.length)}</p>
-          </div>
-        {/if}
         <ul class="rows" aria-label="Add missing details">
           {#each missing as item (item.id)}{@render itemRow(item)}{/each}
         </ul>

@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Settings → Mail & review → AI** is off until you save an Ollama address. That is the whole choice: there is no mode to pick, no hosted provider and no second setting for reading mail automatically. Leave the address empty and nothing is ever sent. Once an address is saved, Waypoint sends the text of booking emails it couldn’t read fully to that [Ollama](https://ollama.com) server to fill the gaps, and you can choose **Ask AI about all** in [Review](/Waypoint/start/review/) to ask about the messages still waiting without a suggestion yourself. A booking Waypoint read completely is never sent.
+**Settings → Mail & review → AI** is off until you save an Ollama address. That is the whole choice: there is no mode to pick, no hosted provider and no second setting for reading mail automatically. Leave the address empty and nothing is ever sent. Once an address is saved, Waypoint sends the text of booking emails it couldn’t read fully to that [Ollama](https://ollama.com) server to fill the gaps. A booking Waypoint read completely is never sent.
 
 ## Your Ollama server
 
@@ -33,11 +33,11 @@ When the AI’s reading of a booking a reader already found can’t be matched t
 
 There is no limit on how many messages a scan asks about. A request that fails leaves the item as it was, with a note that the AI couldn’t be asked, and is tried again on the next scans, at most twice more. Each mailbox’s last-scan line in Settings says how many messages the AI was asked about and how many emails it attached to their bookings as nothing new, counts only.
 
-What is sent and where it goes are exactly as for **Ask AI**. The item in Review shows the suggestion with a **read automatically** label, and a complete result is added to your trips by itself.
+What is sent and where it goes are the same for every AI reading. The item in Review shows the suggestion with a **read automatically** label, and a complete result is added to your trips by itself.
 
 ## Emails that aren’t bookings
 
-When the AI finds no booking in a message, the item stays in Review with a note that no booking was found, whatever the message is: a promotion, a loyalty or account statement, a newsletter, a receipt or anything else. This applies to **Ask AI** and to a scan’s reading alike. Waypoint never dismisses an item because the AI thinks an email isn’t about a booking, and the model isn’t asked to say so (an answer that does is ignored): any pattern Waypoint could check an email against would miss some cancellation, change or booking, and a miss would delete the only copy. You dismiss the item yourself, which deletes the stored copy of the email.
+When the AI finds no booking in a message, the item stays in Review with a note that no booking was found, whatever the message is: a promotion, a loyalty or account statement, a newsletter, a receipt or anything else. This applies to every AI reading. Waypoint never dismisses an item because the AI thinks an email isn’t about a booking, and the model isn’t asked to say so (an answer that does is ignored): any pattern Waypoint could check an email against would miss some cancellation, change or booking, and a miss would delete the only copy. You dismiss the item yourself, which deletes the stored copy of the email.
 
 - The AI’s answer, an error, a timeout or an answer Waypoint can’t read never takes an item off the list or deletes a stored email. A result with a booking in it is filed as before.
 - A scan counts the emails the AI was asked about and the ones it attached as nothing new ([below](#emails-that-add-nothing-new)) in the mailbox’s last-scan line in Settings, never with a subject, sender or text.
@@ -66,7 +66,7 @@ For both, also:
 - Every passenger the text names after a “Passenger”, “Traveller” or “Guest” label is already on the booking, seat or no seat.
 - Every seat (such as 22A) and every time of day the text prints, in any layout, is one the booking already holds (for an older copy, also one the reading itself returned). A check-in deadline or a seat the booking doesn’t have keeps the email.
 - The text holds nothing Waypoint can’t compare: no ticket, loyalty or member number, baggage, meal, price, total or rate, room, suite, bed, breakfast or vehicle, link, itinerary or note, no flight number the model didn’t return (however it is written: `EX102`, `EX 102`, `EX-102`, in lower case or after a “Flight” label), no day other than the days the model returned (a second date for the same flight number keeps it), and no confirmation code other than the booking’s own. Times, totals and passenger labels are recognised in the same formats Waypoint’s own readers accept, in any currency it knows. Any of these keeps the email in Review.
-- The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With no address saved, with the service down or for **Ask AI** by hand, nothing is dismissed this way.
+- The email isn’t about parking, the model answered without an error and could be reached, and AI reading is on. With no address saved, or with the service down, nothing is dismissed this way.
 
 An email’s date is the day its own `Date` line gives, but never later than the day it reached the mailbox (Gmail’s own record of when it arrived), so an email dated in the future can’t make a booking’s real later changes look older.
 
@@ -76,11 +76,7 @@ The mailbox’s last-scan line in Settings counts these with the reason, “alre
 
 The setting is the household’s: any member can change it, and once an address is saved, qualifying mail from every connected mailbox is sent.
 
-Only the message’s plain text goes out, for an item in Check suggestions or Add missing details and for a message a scan found with gaps. It goes unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address. The sender, subject and markup are not sent, and prompts and replies are never logged. Pictures are not sent with the text either; the one case where they are sent is [the gate code of a parking booking](#picking-a-parking-gate-code), below. Only one part of Waypoint sends email text anywhere, and only to your Ollama server.
-
-### Who can ask
-
-Anyone who can see an unread item in Review can choose **Ask AI about all** (or **Ask AI about these N emails** when the list is narrowed): the mailbox’s owner, and every other member for a mailbox its owner [shared with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Someone who can’t see the item gets “No such item”, and an AI assistant connected over MCP can’t ask. The text goes through the same setting whoever asks, and the suggestion is saved on the item for everyone who sees it.
+Only the message’s plain text goes out, for a message a scan found with gaps. It goes unredacted and untrimmed: quoted replies, signatures, email addresses and loyalty, Known Traveler, account and card numbers go as written, including the numbers saved under [Loyalty](/Waypoint/start/loyalty/). Those numbers do reach your Ollama server, so use one you trust and don’t point it at a hosted address. The sender, subject and markup are not sent, and prompts and replies are never logged. Pictures are not sent with the text either; the one case where they are sent is [the gate code of a parking booking](#picking-a-parking-gate-code), below. Only one part of Waypoint sends email text anywhere, and only to your Ollama server.
 
 ### The destination button on a trip
 

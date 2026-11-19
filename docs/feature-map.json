@@ -1863,9 +1863,7 @@
       "method": "POST",
       "path": "/api/review/{id}/suggest",
       "handler": "waypoint/server/api/review.py:api_review_suggest",
-      "web": [
-        "frontend/src/pages/Review.svelte"
-      ],
+      "web": [],
       "tests": [
         "tests/test_api_contract.py",
         "tests/test_mail_scan.py"

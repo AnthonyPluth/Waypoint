@@ -37,9 +37,6 @@ const SUGGESTION = { kind: "flight" as const, provider: "Example Air", confirmat
   start_local: "2026-12-02T07:15", end_local: "2026-12-02T10:05" } as unknown as ReviewItem["suggestions"][number];
 const PREVIEW = "Hello Jane,\nYour flight EX 410 leaves Boston at 7:15 am on 2 January.";
 let previewFails = "";
-let suggestFails = "";
-let suggestOkFirst = 0;
-let suggestGate: Promise<void> | null = null;
 let segmentsMade = 0;
 let secondSegmentFails = "";
 let takeOffGate: Promise<void> | null = null;
@@ -63,7 +60,6 @@ function serve(failOn?: string) {
     if (path.endsWith("/same")) { if (sameFails) throw new Error(sameFails); return { booking: sameQueue.length ? sameQueue.shift() ?? null : sameAs } as never; }
     if (path.endsWith("/attach")) return { ok: true, segment_id: 99 } as never;
     if (path.endsWith("/preview")) { if (previewFails) throw new Error(previewFails); return { text: PREVIEW, html: null, truncated } as never; }
-    if (path.endsWith("/suggest")) { if (suggestGate) await suggestGate; if (suggestFails && suggestOkFirst-- <= 0) throw new Error(suggestFails); held = { ...held, items: held.items.map((i) => ({ ...i, suggestions: [SUGGESTION] })) }; return { ok: true } as never; }
     if (path.endsWith("/unignore")) return { started: true } as never;
     if (path.endsWith("/ignore")) { const id = Number(path.split("/")[3]); const domain = held.items.find((i) => i.id === id)?.sender_domain ?? ""; held = { ...held, items: held.items.filter((i) => i.id !== id) }; return { ok: true, mailbox_id: 5, domain } as never; }
     if (opts?.method === "DELETE" && path.includes("?suggestion=")) { const id = Number(path.split("/")[3]?.split("?")[0]); const gone = path.split("?")[1]?.split("&").map((q) => Number(q.split("=")[1])) ?? []; held = { ...held, items: held.items.map((i) => (i.id === id ? { ...i, suggestions: i.suggestions.filter((_, n) => !gone.includes(n + 1)) } : i)) }; return { ok: true } as never; }
@@ -76,7 +72,7 @@ function serve(failOn?: string) {
 }
 
 afterEach(() => { vi.useRealTimers(); setQuery(""); });
-beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset();  calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = suggestFails = ""; suggestOkFirst = 0; suggestGate = null; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
+beforeEach(() => { sameQueue = []; sameAs = null; sameFails = ""; vi.mocked(api).mockReset(); vi.mocked(toast.success).mockReset(); vi.mocked(toast.error).mockReset();  calls = []; segmentsMade = 0; secondSegmentFails = ""; takeOffGate = null; takeOffFails = ""; forgetAirportZones(); previewFails = ""; truncated = false; held = { matches: [], items: [item()], who: [who()], ai: false }; serve(); });
 
 describe("Review", () => {
   it("lists mail Waypoint couldn’t read, with who it came from and why, and never any text", async () => {
@@ -1128,137 +1124,30 @@ describe("Review: the message beside the form", () => {
   });
 });
 
-describe("Review: Ask AI", () => {
-  it("is offered only when the AI is on", async () => {
-    render(ReviewPage);
-    await screen.findByTestId("review-item");
-    expect(screen.queryByRole("button", { name: /Ask AI/ })).toBeNull();
-  });
-
-  it("has no per-email Ask AI or Ask again in an email’s More menu, whether or not it has a suggestion", async () => {
-    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3, suggestions: [SUGGESTION] })], who: [], ai: true };
+describe("Review: no manual Ask AI", () => {
+  it.each([[true], [false]])("offers no Ask AI or Ask again control anywhere when the AI is %s", async (ai) => {
+    held = { matches: [], items: [item({ id: 1 }), item({ id: 2 }), item({ id: 3, suggestions: [SUGGESTION] })], who: [], ai };
     render(ReviewPage);
     const rows = await screen.findAllByTestId("review-item");
     expect(rows).toHaveLength(3);
     for (const row of rows) {
       expect(within(row).getByLabelText(/^More actions for /)).toBeInTheDocument();
       expect(within(row).getByRole("button", { name: /^Dismiss: / })).toBeInTheDocument();
-      expect(within(row).queryByRole("button", { name: /^(Ask AI|Ask again)/ })).toBeNull();
     }
-    expect(screen.queryByRole("button", { name: /^(Ask AI|Ask again): / })).toBeNull();
-    expect(screen.getByRole("button", { name: "Ask AI about all 2" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ask AI|Ask again/ })).toBeNull();
+    expect(screen.queryByTestId("ask-all")).toBeNull();
+    expect(screen.queryByTestId("ask-none-here")).toBeNull();
+    expect(screen.queryByText(/goes to your own Ollama server/)).toBeNull();
   });
 
-  it("asks the AI, then offers its suggestion to check", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
-    await waitFor(() => expect(calls).toContainEqual(["/api/review/1/suggest", "POST", undefined]));
-    expect(await screen.findAllByRole("button", { name: /Check suggestion: / })).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
-  });
-
-  it("says nothing of a dismissal when the AI left the item in Review", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
-    await screen.findAllByRole("button", { name: /Check suggestion: / });
-    expect(toast.success).not.toHaveBeenCalledWith(expect.stringMatching(/dismiss/i));
-  });
-
-  it("asks about several messages in one go, the bulk button showing its progress", async () => {
-    let open: () => void = () => {};
-    suggestGate = new Promise((r) => { open = r; });
-    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 }), item({ id: 4 })], who: [], ai: true };
-    render(ReviewPage);
-    const all = await screen.findByRole("button", { name: "Ask AI about all 4" });
-    await userEvent.click(all);
-    await waitFor(() => expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest"]));
-    expect(all).toHaveTextContent("Asking…");
-    expect(all).toBeDisabled();
-    open();
-    await waitFor(() => expect(screen.getAllByRole("button", { name: /Check suggestion: / })).toHaveLength(4));
-  });
-
-  it("says when the AI couldn’t be asked", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
-    suggestFails = "Turn on AI suggestions in Settings first.";
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
-  });
-
-  it("asks about every message without a suggestion at once", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3, suggestions: [] })], who: [], ai: true };
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 3 messages"));
-    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest", "/api/review/3/suggest"]);
-  });
-
-  it("asks only about the filtered emails, not the ones the filter hides", async () => {
-    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }),
-      item({ id: 3, sender_domain: "seaside-stays.example" }), item({ id: 4, sender_domain: "other.example" })] };
+  it("offers no Ask AI when the list is narrowed to one sender", async () => {
+    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "seaside-stays.example" }), item({ id: 3, sender_domain: "seaside-stays.example" })] };
     setQuery("sender=seaside-stays.example");
     render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about these 2 emails" }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
-    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/2/suggest", "/api/review/3/suggest"]);
-  });
-
-  it("says where the text goes next to the bulk button", async () => {
-    held = { matches: [], who: [], ai: true, items: [item(), item({ id: 2 })] };
-    render(ReviewPage);
-    expect(await screen.findByTestId("ask-all")).toHaveTextContent("The text of these 2 emails goes to your own Ollama server, unredacted.");
-  });
-
-  it("does not widen the scope when the filter has nothing to ask about", async () => {
-    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "example-air.example" }), item({ id: 2, sender_domain: "example-air.example" }),
-      item({ id: 3, sender_domain: "seaside-stays.example", suggestions: [SUGGESTION] })] };
-    setQuery("sender=seaside-stays.example");
-    render(ReviewPage);
-    expect(await screen.findByTestId("ask-none-here")).toHaveTextContent("2 emails from other senders or mailboxes are hidden by this filter");
-    expect(screen.queryByRole("button", { name: /Ask AI about (all|these)/ })).toBeNull();
+    await screen.findByTestId("review-filter");
+    expect(screen.queryByRole("button", { name: /Ask AI|Ask again/ })).toBeNull();
+    expect(screen.queryByTestId("ask-none-here")).toBeNull();
     expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(0);
-  });
-
-  it("offers the filtered bulk ask for a single email, and keeps the count when stopped by a failure", async () => {
-    held = { matches: [], who: [], ai: true, items: [item({ id: 1, sender_domain: "a.example" }), item({ id: 2, sender_domain: "b.example" }), item({ id: 3, sender_domain: "b.example" })] };
-    suggestFails = "Turn on AI suggestions in Settings first.";
-    setQuery("sender=b.example");
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about these 2 emails" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
-    setQuery("sender=a.example");
-    expect(await screen.findByRole("button", { name: "Ask AI about these 1 email" })).toBeInTheDocument();
-  });
-
-  it("asks about shared items too, alone and in bulk", async () => {
-    held = { matches: [], items: [item({ id: 4, mine: false, owner: "Sam Doe" }), item({ id: 5, mine: true })], who: [], ai: true };
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Asked the AI about 2 messages"));
-    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/4/suggest", "/api/review/5/suggest"]);
-  });
-
-  it("says how many were asked when a later message fails after earlier ones completed", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 }), item({ id: 3 })], who: [], ai: true };
-    suggestFails = "The AI didn’t answer.";
-    suggestOkFirst = 1;
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 3" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 1 of 3: The AI didn’t answer."));
-    expect(toast.success).not.toHaveBeenCalled();
-    expect(calls.filter((c) => c[0].endsWith("/suggest")).map((c) => c[0])).toEqual(["/api/review/1/suggest", "/api/review/2/suggest"]);
-  });
-
-  it("stops the bulk ask at the first failure and says how far it got", async () => {
-    held = { matches: [], items: [item(), item({ id: 2 })], who: [], ai: true };
-    suggestFails = "Turn on AI suggestions in Settings first.";
-    render(ReviewPage);
-    await userEvent.click(await screen.findByRole("button", { name: "Ask AI about all 2" }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Asked about 0 of 2: Turn on AI suggestions in Settings first."));
-    expect(calls.filter((c) => c[0].endsWith("/suggest"))).toHaveLength(1);
   });
 });
 
@@ -2114,15 +2003,6 @@ describe("Review as a queue of decisions", () => {
     await waitFor(() => expect(calls).toContainEqual(["/api/review/1", "DELETE", undefined]));
   });
 
-  it("keeps the warning about where the text goes beside the button that sends it", async () => {
-    held = { matches: [], items: many(2, () => false), who: [], ai: true };
-    render(ReviewPage);
-    const ask = await screen.findByTestId("ask-all");
-    expect(within(ask).getByRole("button", { name: "Ask AI about all 2" })).toBeInTheDocument();
-    expect(ask).toHaveTextContent("your own Ollama server, unredacted");
-    expect(screen.getByRole("list", { name: "Add missing details" })).toBeInTheDocument();
-  });
-
   it("handles a six-item queue: counts in the headings, jump links, one primary step per row", async () => {
     held = { matches: [held_match()], items: many(4, (i) => i < 2), who: [who()], ai: false };
     render(ReviewPage);
@@ -2141,19 +2021,17 @@ describe("Review as a queue of decisions", () => {
     expect(rows).toHaveLength(50);
     expect(screen.getByRole("heading", { name: /Check suggestions/ })).toHaveTextContent("10");
     expect(screen.getByRole("heading", { name: /Add missing details/ })).toHaveTextContent("40");
-    expect(screen.getByRole("button", { name: "Ask AI about all 40" })).toBeInTheDocument();
     for (const row of rows) {
       const primary = within(row).getAllByRole("button").filter((b) => /^(Check|Add by hand)/.test(b.textContent ?? "") && /(^| )bg-primary( |$)/.test(b.className));
       expect(primary).toHaveLength(1);
     }
   });
 
-  it("keeps the filter note and the bulk-ask scoping from a sender link", async () => {
+  it("keeps the filter note from a sender link", async () => {
     held = { matches: [], items: many(6, () => false), who: [], ai: true };
     setQuery("sender=sender1.example");
     render(ReviewPage);
     expect(await screen.findByTestId("review-filter")).toHaveTextContent("Showing only mail from sender1.example");
-    expect(screen.getByRole("button", { name: "Ask AI about these 2 emails" })).toBeInTheDocument();
     expect(screen.getAllByTestId("review-item")).toHaveLength(2);
   });
 });

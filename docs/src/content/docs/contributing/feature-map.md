@@ -124,7 +124,7 @@ A route counts as tested when a file in `tests/` names its handler, or calls its
 | `POST /api/review/{id}/attach` | `review.py:api_review_attach` | `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/preview` | `review.py:api_review_preview` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/review/{id}/images/{id}` | `review.py:api_review_image` | - | `test_mail_scan.py`, `test_mcp_routes.py` | [start/review](/Waypoint/start/review/) |
-| `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | `pages/Review.svelte` | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
+| `POST /api/review/{id}/suggest` | `review.py:api_review_suggest` | - | `test_api_contract.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `DELETE /api/review/{id}` | `review.py:api_review_dismiss` | `pages/Review.svelte` | `test_api_contract.py`, `test_gate_codes.py`, `test_mail_scan.py` | [start/review](/Waypoint/start/review/) |
 | `GET /api/mcp-settings` | `mcp.py:api_mcp_settings` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_app_sign_in.py`, `test_mcp_protocol.py`, `test_mcp_review.py` | [start/mcp](/Waypoint/start/mcp/) |
 | `POST /api/mcp-settings/writes` | `mcp.py:api_mcp_writes` | `lib/components/settings/McpSection.svelte` | `test_api_contract.py`, `test_mcp_protocol.py` | [start/mcp](/Waypoint/start/mcp/) |
