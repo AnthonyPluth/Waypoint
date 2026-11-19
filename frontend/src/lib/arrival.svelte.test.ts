@@ -34,6 +34,25 @@ describe("the arrival the app hands over after a tap on the notification", () =>
     expect(location.hash).toBe("#trip/7?segment=5");
   });
 
+  it("leaves the flight details of the trip for the trip page, so its code can open, and keeps every address of the trip page", async () => {
+    reply("pendingArrival", 5, 7);
+    for (const there of ["#trip/7/flight/34", "#trip/7/flight/34?x=1", "#trip/8/flight/34", "#trip/8", "#trips", "#upcoming"]) {
+      location.hash = there;
+      await takePendingArrival();
+      expect(location.hash).toBe("#trip/7");
+    }
+    for (const stay of ["#trip/7", "#trip/7?segment=5", "#trip/7/other", "#trip/7/flight", "#trip/7/flight/x"]) {
+      location.hash = stay;
+      await takePendingArrival();
+      expect(location.hash).toBe(stay);
+    }
+    openBooking(6, 7);
+    expect(location.hash).toBe("#trip/7/flight/x");
+    location.hash = "#trip/7/flight/9";
+    openBooking(6, 7);
+    expect(location.hash).toBe("#trip/7");
+  });
+
   it("forgets the arrival once its trip page has used it, and after two minutes", async () => {
     reply("pendingArrival", 5, 7);
     await takePendingArrival();

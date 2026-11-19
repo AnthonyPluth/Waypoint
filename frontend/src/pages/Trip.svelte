@@ -24,7 +24,7 @@
   import { Sheet } from "$lib/components/ui/sheet";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { flightStatus, loadFlightStatus, followFlightStatus, statusFor } from "$lib/flightstatus.svelte";
-  import { isSavedCopy, type SavedCopy } from "$lib/offline";
+  import { expiryOf, isSavedCopy, type SavedCopy } from "$lib/offline";
   import { inShell, shellLoad } from "$lib/offline-shell";
   import OfflineTrip from "$lib/components/OfflineTrip.svelte";
   import { askAboutOffline, offline, refreshOffline, saveTripCopy } from "$lib/offline.svelte";
@@ -115,11 +115,39 @@
 
   const unreachable = (err: unknown) => !(err && typeof err === "object" && "status" in err && typeof err.status === "number" && err.status > 0 && ![502, 503, 504].includes(err.status));
 
+  const copyLive = (copy: SavedCopy) => { const expires = expiryOf(copy); return expires === null || Date.now() < expires; };
+
+  function dropExpiredShellCopy(held: SavedCopy) {
+    if (shellCopy !== held || copyLive(held)) return;
+    shellCopy = null;
+    void load();
+  }
+
+  $effect(() => {
+    const held = shellCopy;
+    if (!held) return;
+    const expires = expiryOf(held);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const arm = () => {
+      if (expires === null) return;
+      timer = setTimeout(() => { dropExpiredShellCopy(held); if (shellCopy === held) arm(); }, Math.min(Math.max(0, expires - Date.now()), 2 ** 31 - 1));
+    };
+    arm();
+    const foreground = () => { if (document.visibilityState !== "hidden") dropExpiredShellCopy(held); };
+    document.addEventListener("visibilitychange", foreground);
+    window.addEventListener("focus", foreground);
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", foreground);
+      window.removeEventListener("focus", foreground);
+    };
+  });
+
   async function offerShellCopy(err: unknown, mine: number): Promise<boolean> {
     if (!inShell() || !unreachable(err)) return false;
     try {
       const found = (await shellLoad()).filter(isSavedCopy).find((c) => String(c.trip.id) === id);
-      if (!found || mine !== latest) return false;
+      if (!found || mine !== latest || !copyLive(found)) return false;
       shellCopy = found;
       return true;
     } catch { return false; }

@@ -46,13 +46,26 @@ enum ArrivalHereRules {
 }
 
 /// A single location request through the system's manager, with a time limit. A fix less precise than `widest` metres counts as none.
+/// An ask that comes while a request is outstanding joins it and gets its answer, so being busy is never an answer of none. A request
+/// whose askers are all cancelled (the app went to the background) is ended at once, so the next check makes its own.
 final class LiveArrivalFix: NSObject, ArrivalFixing, CLLocationManagerDelegate, @unchecked Sendable {
     static let timeout: TimeInterval = 10
     static let widest = 500.0
 
+    /// One ask of `current()`; `cancelled` is set when its task is cancelled, even before the request has been made.
+    private final class Ask: @unchecked Sendable {
+        var cancelled = false
+    }
+
     private let lock = NSLock()
+    private let ask: @Sendable (CLLocationManager) -> Void
     private var manager: CLLocationManager?
-    private var waiting: CheckedContinuation<PlacePoint?, Never>?
+    private var waiters: [(ask: Ask, continuation: CheckedContinuation<PlacePoint?, Never>)] = []
+
+    init(ask: @escaping @Sendable (CLLocationManager) -> Void = { $0.requestLocation() }) {
+        self.ask = ask
+        super.init()
+    }
 
     var isAllowed: Bool {
         let status = CLLocationManager()
@@ -60,45 +73,93 @@ final class LiveArrivalFix: NSObject, ArrivalFixing, CLLocationManagerDelegate, 
         return permitted && status.accuracyAuthorization == .fullAccuracy
     }
 
+    /// Whether a request is outstanding.
+    var hasOutstandingRequest: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return manager != nil
+    }
+
+    /// How many asks are waiting on the outstanding request.
+    var waitingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return waiters.count
+    }
+
     func current() async -> PlacePoint? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.main.async { [self] in
-                let asking = CLLocationManager()
-                lock.lock()
-                let busy = waiting != nil
-                if !busy {
-                    waiting = continuation
-                    manager = asking
-                }
-                lock.unlock()
-                if busy {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                asking.delegate = self
-                asking.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-                asking.requestLocation()
-                DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) { [self] in
-                    finish(nil, asked: asking)
+        let thisAsk = Ask()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { [self] in
+                    let asking = CLLocationManager()
+                    lock.lock()
+                    if thisAsk.cancelled {
+                        lock.unlock()
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    waiters.append((thisAsk, continuation))
+                    let starting = manager == nil
+                    if starting { manager = asking }
+                    lock.unlock()
+                    guard starting else { return }
+                    asking.delegate = self
+                    asking.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+                    ask(asking)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) { [self] in
+                        finish(nil, asked: asking)
+                    }
                 }
             }
+        } onCancel: {
+            release(thisAsk)
         }
+    }
+
+    /// The task behind `thisAsk` was cancelled: it stops waiting, answering none, and the request ends if nobody else waits on it.
+    private func release(_ thisAsk: Ask) {
+        lock.lock()
+        thisAsk.cancelled = true
+        guard let index = waiters.firstIndex(where: { $0.ask === thisAsk }) else {
+            lock.unlock()
+            return
+        }
+        let gone = waiters.remove(at: index)
+        var ended: CLLocationManager?
+        if waiters.isEmpty {
+            ended = manager
+            manager = nil
+        }
+        lock.unlock()
+        if let ended {
+            DispatchQueue.main.async {
+                ended.delegate = nil
+                ended.stopUpdatingLocation()
+            }
+        }
+        gone.continuation.resume(returning: nil)
     }
 
     private func finish(_ point: PlacePoint?, asked: CLLocationManager) {
         lock.lock()
-        guard manager === asked, let continuation = waiting else {
+        guard manager === asked else {
             lock.unlock()
             return
         }
-        waiting = nil
+        let held = waiters
+        waiters = []
         manager = nil
         lock.unlock()
         asked.delegate = nil
-        continuation.resume(returning: point)
+        for one in held { one.continuation.resume(returning: point) }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        received(locations, from: manager)
+    }
+
+    func received(_ locations: [CLLocation], from manager: CLLocationManager) {
         guard let last = locations.last, last.horizontalAccuracy >= 0, last.horizontalAccuracy <= Self.widest else {
             finish(nil, asked: manager)
             return

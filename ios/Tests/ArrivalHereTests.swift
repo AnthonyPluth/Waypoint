@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import Waypoint
 
@@ -241,6 +242,123 @@ final class ArrivalHereTests: XCTestCase {
         let found = await phone.here.answer(server: phone.home)
         XCTAssertNil(found)
         XCTAssertEqual(phone.fix.requests, 0)
+    }
+
+    // MARK: A request that is cancelled
+
+    private final class AskCounter: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+        private var latest: CLLocationManager?
+
+        func add(_ manager: CLLocationManager) {
+            lock.lock()
+            count += 1
+            latest = manager
+            lock.unlock()
+        }
+
+        var lastManager: CLLocationManager? {
+            lock.lock()
+            defer { lock.unlock() }
+            return latest
+        }
+
+        var total: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return count
+        }
+    }
+
+    private func waitForRequest(number: Int, in counter: AskCounter) async {
+        for _ in 0..<300 where counter.total < number {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+    }
+
+    func testACancelledLocationRequestIsReleasedSoTheNextOneMakesItsOwn() async {
+        let counter = AskCounter()
+        let live = LiveArrivalFix(ask: { counter.add($0) })
+        let first = Task { await live.current() }
+        await waitForRequest(number: 1, in: counter)
+        let outstanding = live.hasOutstandingRequest
+        XCTAssertTrue(outstanding)
+        first.cancel()
+        let cancelled = await first.value
+        XCTAssertNil(cancelled)
+        let released = !live.hasOutstandingRequest
+        XCTAssertTrue(released)
+        let second = Task { await live.current() }
+        await waitForRequest(number: 2, in: counter)
+        let made = counter.total
+        XCTAssertEqual(made, 2)
+        let waiting = live.hasOutstandingRequest
+        XCTAssertTrue(waiting)
+        second.cancel()
+        _ = await second.value
+    }
+
+    func testAnAskWhileARequestIsOutstandingJoinsItInsteadOfAnsweringNone() async {
+        let counter = AskCounter()
+        let live = LiveArrivalFix(ask: { counter.add($0) })
+        let first = Task { await live.current() }
+        await waitForRequest(number: 1, in: counter)
+        let second = Task { await live.current() }
+        for _ in 0..<300 where live.waitingCount < 2 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        let joined = live.waitingCount
+        XCTAssertEqual(joined, 2)
+        let manager = counter.lastManager
+        XCTAssertNotNil(manager)
+        live.received([CLLocation(latitude: 40.0, longitude: -105.0)], from: manager ?? CLLocationManager())
+        let one = await first.value
+        let two = await second.value
+        XCTAssertEqual(one, PlacePoint(latitude: 40.0, longitude: -105.0))
+        XCTAssertEqual(two, one)
+        let made = counter.total
+        XCTAssertEqual(made, 1)
+        let later = Task { await live.current() }
+        await waitForRequest(number: 2, in: counter)
+        let again = counter.total
+        XCTAssertEqual(again, 2)
+        later.cancel()
+        _ = await later.value
+    }
+
+    func testCancellingOneOfTwoAsksLeavesTheRequestForTheOther() async {
+        let counter = AskCounter()
+        let live = LiveArrivalFix(ask: { counter.add($0) })
+        let first = Task { await live.current() }
+        await waitForRequest(number: 1, in: counter)
+        let second = Task { await live.current() }
+        for _ in 0..<300 where live.waitingCount < 2 {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        first.cancel()
+        let cancelled = await first.value
+        XCTAssertNil(cancelled)
+        let stillThere = live.hasOutstandingRequest
+        XCTAssertTrue(stillThere)
+        live.received([CLLocation(latitude: 40.0, longitude: -105.0)], from: counter.lastManager ?? CLLocationManager())
+        let answer = await second.value
+        XCTAssertNotNil(answer)
+    }
+
+    func testARequestWhoseTaskIsAlreadyCancelledIsNeverMade() async {
+        let counter = AskCounter()
+        let live = LiveArrivalFix(ask: { counter.add($0) })
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return await live.current()
+        }
+        let found = await task.value
+        XCTAssertNil(found)
+        let made = counter.total
+        XCTAssertEqual(made, 0)
+        let outstanding = live.hasOutstandingRequest
+        XCTAssertFalse(outstanding)
     }
 
     // MARK: Nothing is kept

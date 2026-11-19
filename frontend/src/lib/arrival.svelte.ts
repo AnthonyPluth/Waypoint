@@ -1,5 +1,6 @@
 import type { Segment } from "./api-types";
 import { inShell, shellArrivalHere, shellPendingArrival, type ShellArrival } from "./offline-shell";
+import { flightRoute } from "./nav";
 import { endAt } from "./trips";
 
 export const ARRIVAL_EVENT = "waypointarrival";
@@ -30,10 +31,10 @@ export function settleTarget(): void {
 }
 
 function showTrip(tripId: number): void {
-  const wanted = `#trip/${tripId}`;
-  const now = location.hash;
-  if (now === wanted || now.startsWith(`${wanted}?`) || now.startsWith(`${wanted}/`)) return;
-  location.hash = wanted;
+  const [path] = location.hash.slice(1).split(/\?(.*)/s);
+  const [page, sub = "", ...rest] = path.split("/");
+  if (page === "trip" && sub === String(tripId) && flightRoute(rest.join("/")) === null) return;
+  location.hash = `#trip/${tripId}`;
 }
 
 export async function takePendingArrival(): Promise<void> {
