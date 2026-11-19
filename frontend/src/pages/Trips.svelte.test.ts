@@ -1016,7 +1016,7 @@ describe("past trips by year", () => {
       await waitFor(() => expect(screen.queryByText("Loading 2025…")).toBeNull());
     });
 
-    it("does not let the first year's slower lookup finish the next year's loading", async () => {
+    it("does not let the first year's slower lookups finish the next year's loading", async () => {
       viewport.phone = true;
       serve(history());
       const held: Record<string, (v: unknown) => void> = {};
