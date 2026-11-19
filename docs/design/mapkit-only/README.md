@@ -1,6 +1,6 @@
 # MapKit only: the design (#828)
 
-This is phase 1 of [#828](https://github.com/AnthonyPluth/Waypoint/issues/828): the design for showing every map in Waypoint on Apple's MapKit, removing the bundled SVG renderer and the server's road and state-line code and data. **Signed off by the owner on 2026-11-18** (the frames and the privacy statement; the sign-off is recorded in [this comment on #833](https://github.com/AnthonyPluth/Waypoint/pull/833#issuecomment-6980482363)). The build follows the plan below, one issue per pull request. The owner has already decided three things (2026-11-18, in chat, recorded on #828):
+This is phase 1 of [#828](https://github.com/AnthonyPluth/Waypoint/issues/828): the design for showing every map in Waypoint on Apple's MapKit, removing the bundled SVG renderer and the server's road and state-line code and data. **Signed off by the owner on 2026-11-18** (the frames and the privacy statement; the sign-off is recorded in [this comment on #833](https://github.com/AnthonyPluth/Waypoint/pull/833#issuecomment-6980482363)). **Status: built** (#835 to #839; the promises and docs were rewritten in #839, the last step; the owner dropped the Settings → Travel "Maps" row (frame c4) on 2026-11-19, so it was not built and the issue's Settings-row acceptance criterion is not met). The build followed the plan below, one issue per pull request. The owner has already decided three things (2026-11-18, in chat, recorded on #828):
 
 1. The Trips list cards and the Stats world map load Apple's maps too, instead of the bundled SVG.
 2. With no MapKit key, or when Apple's map fails to load, the map and the replay are hidden. There is no fallback renderer.
@@ -21,7 +21,7 @@ Later the same day the owner signed off the design and answered the last questio
 
 5. **The frames are signed off**: a (Trips cards), b (the Stats map with the visited shading) and c (the replay with no key).
 6. **The privacy statement is signed off as written**, including that Apple sees each no-photo trip's city-level area as the list scrolls (so a card's map is never closer than city level, zoom 12) and that Apple's script is handed the visited countries' and states' outlines, which are bundled and never fetched from Apple.
-7. **Settings → Travel gets the read-only "Maps" row** (frame c4).
+7. **Settings → Travel gets the read-only "Maps" row** (frame c4) (not built: the owner dropped the row on 2026-11-19).
 8. **A map failing during a replay shows a short "The map couldn't load" message**: a quiet line where the replay was, also announced politely (frame c3).
 
 The frames are self-contained HTML pages in the style of the other `docs/design/` pages: vector only, Waypoint's tokens from `frontend/src/app.css`, dark only, made-up names and places, and a toggle for phone (390 px) and desktop (1280 px) widths. Apple's map is drawn as a stylised stand-in, because a real tile can't be committed.
@@ -30,7 +30,7 @@ The frames are self-contained HTML pages in the style of the other `docs/design/
 | --- | --- | --- |
 | a | [a-trip-cards.html](a-trip-cards.html) | Past trips list cards on Apple's snapshot (decided on #833): a card's map loaded, loading, failed and with no key; the photo card that never asks Apple; how many maps load on a long list; the options that were weighed |
 | b | [b-stats-map.html](b-stats-map.html) | The Stats world map on one live MapKit map with the visited countries and states shaded from the bundled outlines (decided on #833): loaded, zoomed into the states, a tapped airport and a tapped state, loading, and the section with no key or a failed map |
-| c | [c-replay-no-key.html](c-replay-no-key.html) | A completed trip's page with and without a key (phone and desktop), the replay failing after it started ("The map couldn't load"), and the Settings → Travel "Maps" row that says maps need a key |
+| c | [c-replay-no-key.html](c-replay-no-key.html) | A completed trip's page with and without a key (phone and desktop), the replay failing after it started ("The map couldn't load"), and the Settings → Travel "Maps" row that says maps need a key (not built: the owner dropped the row on 2026-11-19) |
 
 Images of each page at phone and desktop width were rendered with Playwright for the owner's review in chat; they are not committed, as the other design pages' images aren't (the pages are vector only).
 
@@ -132,7 +132,7 @@ Because the job already has the server ask Apple for every drive of every ended 
 | `components/RouteReplayMapKit.svelte.test.ts`, `lib/replay-mapkit.test.ts`, `lib/mapkit.test.ts`, `lib/driving-routes.test.ts`, `App.svelte.test.ts` ("preloading MapKit") | Keep; change the "keeps the bundled line" cases to "draws a straight line" | 2 |
 | `components/RouteTile.svelte.test.ts`, `PastTripCard.svelte.test.ts`, `PastTrip.svelte.test.ts`, `pages/Trips.svelte.test.ts`, `pages/Trip.svelte.test.ts`, `pages/Upcoming.svelte.test.ts`, `lib/side-column.test.ts`, `components/TripSummary.svelte.test.ts` | Change (places fixtures lose `roads`/`boundaries`; cards on MapKit) | 1, 2, 3 |
 | `lib/map.test.ts` | Change: keep the outline, visited and state-source cases; drop the projection, zoom and pan cases | 4 |
-| `pages/Settings.svelte.test.ts` | Change: the "Maps" row (decided on #833) | 5 |
+| `pages/Settings.svelte.test.ts` | Change: the "Maps" row (decided on #833) (not built: the owner dropped the row on 2026-11-19) | 5 |
 
 ### Python tests
 
@@ -257,7 +257,7 @@ With no key, or when MapKit fails before the replay starts:
 ### Where it says maps need a key (frame c, c4)
 
 - **Docs**: "Trips" and "Stats" each open their map section with "Maps need a MapKit key on the server. Without one Waypoint shows no maps or route replays", linking to "Apple's map" in the Trips page.
-- **Settings (decided on #833)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings.
+- **Settings (decided on #833)**: a read-only row in Settings → Travel, "Maps", reading "Apple Maps" with a "What Apple learns" link when MapKit is active, and "Off: this server has no MapKit key" with a "How to turn on maps" link otherwise. The app has no switch for it: the key and the flag stay server settings. (not built: the owner dropped the row on 2026-11-19).
 
 ## Privacy: what Apple learns
 
@@ -477,7 +477,7 @@ Steps #835 to #838 make every map Apple's and remove the bundled one. AGENTS.md 
 **Scope**
 - Rewrite the passages listed there in AGENTS.md, SECURITY.md and `invariants.md`, citing the owner's decisions on #828 and #833 and keeping every earlier decision cited.
 - User docs: `start/trips.md`, `start/stats.md`, `start/docker.md`, `reference/configuration.md`, `privacy/email-scanning.md`, `README.md`, `docs/PHOTOS.md`; a status line in `docs/design/mapkit-only/README.md` and `docs/design/mapkit-spike.md`.
-- The Settings → Travel "Maps" row (frame c4, decided on #833): read-only, "Apple Maps" with an "On" chip and a "What Apple learns" link to the trips docs' Apple's map section when `app.state.mapkit` is true; "Off: this server has no MapKit key, so Waypoint shows no maps or route replays." with an "Off" chip and a "How to turn on maps" link to the configuration docs otherwise. No switch.
+- The Settings → Travel "Maps" row (frame c4, decided on #833): read-only, "Apple Maps" with an "On" chip and a "What Apple learns" link to the trips docs' Apple's map section when `app.state.mapkit` is true; "Off: this server has no MapKit key, so Waypoint shows no maps or route replays." with an "Off" chip and a "How to turn on maps" link to the configuration docs otherwise. No switch. (Not built: the owner dropped the row on 2026-11-19.)
 - `make feature-map`, `make user-feature-map`.
 
 **Out of scope**
