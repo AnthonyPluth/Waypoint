@@ -143,6 +143,22 @@ describe("RouteReplay with the flag on", () => {
     expect([...map.annotations].filter((a) => a.factory().hasAttribute("data-stop"))).toHaveLength(2);
   });
 
+  it("keeps the same map, and the replay going, when the trip is read again with the same route", async () => {
+    const view = render(RouteReplay, { trip: trip(flights), now: after });
+    await loadScript();
+    await screen.findByRole("button", { name: "Pause" });
+    advance(3000);
+    await Promise.resolve();
+    const slider = () => (screen.getByRole("slider", { name: "Position along the route" }) as HTMLInputElement).value;
+    const before = slider();
+    await view.rerender({ trip: trip(flights), now: after });
+    await waitFor(() => expect(vi.mocked(api).mock.calls.filter((c) => String(c[0]).includes("/places"))).toHaveLength(2));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(fake.maps).toHaveLength(1);
+    expect(fake.maps[0].destroyed).toBe(false);
+    expect(slider()).toBe(before);
+  });
+
   it("follows the slider on the MapKit map", async () => {
     const { container } = render(RouteReplay, { trip: trip(flights), now: after });
     await loadScript();

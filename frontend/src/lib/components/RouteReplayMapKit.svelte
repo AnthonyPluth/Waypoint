@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type { Maps } from "$lib/mapkit";
   import { createReplayMap, DEFAULT_PALETTE, type ReplayMap } from "$lib/replay-mapkit";
   import type { Stop } from "$lib/route-replay";
@@ -10,27 +11,40 @@
   let host = $state<HTMLElement | null>(null);
   let replay = $state.raw<ReplayMap | null>(null);
 
+  // Rebuild the map only when what it draws changes. The same route read again arrives as new objects,
+  // and Svelte counts a re-set object prop as changed, so the build below depends on these keys alone.
+  const shape = $derived(JSON.stringify(stops));
+  const tripKey = $derived(tripId);
+  const wide = $derived(width);
+  const high = $derived(height);
+
   $effect(() => {
     const element = host;
+    void shape;
+    void wide;
+    void high;
+    void tripKey;
     if (!element) return;
-    if (maps.failed()) {
-      onfailure();
-      return;
-    }
-    const css = getComputedStyle(document.documentElement);
-    const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
-    const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay) };
-    let made: ReplayMap;
-    try {
-      made = createReplayMap(maps.mk, element, { stops, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId });
-    } catch {
-      onfailure();
-      return;
-    }
-    const stop = maps.onFailure(onfailure);
-    replay = made;
-    onready?.();
-    return () => { stop(); made.destroy(); replay = null; };
+    return untrack(() => {
+      if (maps.failed()) {
+        onfailure();
+        return;
+      }
+      const css = getComputedStyle(document.documentElement);
+      const color = (name: string, fallback: string) => css.getPropertyValue(name).trim() || fallback;
+      const palette = { route: color("--map-route", DEFAULT_PALETTE.route), stay: color("--map-stay", DEFAULT_PALETTE.stay) };
+      let made: ReplayMap;
+      try {
+        made = createReplayMap(maps.mk, element, { stops, width, height, palette, scale: element.clientWidth / width || 1, onFailure: onfailure, tripId });
+      } catch {
+        onfailure();
+        return;
+      }
+      const stop = maps.onFailure(onfailure);
+      replay = made;
+      onready?.();
+      return () => { stop(); made.destroy(); replay = null; };
+    });
   });
 
   $effect(() => { replay?.update({ progress, playing, calm }); });
