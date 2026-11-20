@@ -72,10 +72,27 @@ try {
         assert.equal(await page.getByRole('button',{name:'Add a booking',exact:true}).isDisabled(),true,'Trip editing enabled');
         const trip = data.trips.find(item=>item.id === Number(route.slice(5)));
         const buttons = page.getByRole('button',{name:/^View email for/});
-        assert.equal(await buttons.count(),trip.segments.length,`${route}: missing source emails`);
-        for (let index = 0; index < trip.segments.length; index++) await buttons.first().click();
-        await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
-        assert.equal(await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).count(),trip.segments.length);
+        const onPage = await buttons.count();
+        const cards = page.locator('button[data-booking]');
+        const inDetail = await cards.count();
+        let behindCards = 0;
+        for (let index = 0; index < inDetail; index++) {
+          await cards.nth(index).click();
+          const dialog = page.getByRole('dialog');
+          await dialog.waitFor();
+          const mail = dialog.getByRole('button',{name:/^View email for/});
+          behindCards += await mail.count();
+          if (await mail.count()) {
+            await mail.first().click();
+            await dialog.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
+          }
+          await page.keyboard.press('Escape');
+          await dialog.waitFor({state:'detached'});
+        }
+        assert.equal(onPage + behindCards,trip.segments.length,`${route}: missing source emails`);
+        for (let index = 0; index < onPage; index++) await buttons.first().click();
+        if (onPage) await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
+        assert.equal(await page.getByText('SIMULATED BOOKING EMAIL',{exact:false}).count(),onPage);
         if (trip.end_date < data.asOf) assert.equal(await page.locator('[data-testid="offline-status"]').count(),0);
       }
       await page.screenshot({path:`artifacts/static-demo/${route.replace('/','-')}-${width}.png`,fullPage:true});
