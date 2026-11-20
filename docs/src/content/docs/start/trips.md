@@ -7,7 +7,7 @@ sidebar:
 
 A **trip** is a journey. It holds **bookings** (segments): one flight leg, hotel stay, car rental, train, cruise or parking reservation each. You add them by hand, import past flights, or let Waypoint add them from the booking emails in a connected Gmail (see [Scanning](/Waypoint/start/gmail/#scanning)).
 
-![Upcoming on a desktop: the next booking as a pass card with its confirmation code, times and travellers, the trip laid out day by day beneath it, and the later trips in a side column](../../../assets/screenshots/upcoming-desktop-hero.png)
+![Upcoming on a desktop: the next booking as a pass card with its confirmation code, times and travellers, the trip laid out day by day beside it, and the later trips under the list](../../../assets/screenshots/upcoming-desktop-hero.png)
 
 ## The pages
 
@@ -15,7 +15,7 @@ A **trip** is a journey. It holds **bookings** (segments): one flight leg, hotel
 
 A flight that is next, from a day before it leaves until it lands, shows as a smaller **flight card** instead: the two airports and their times (amber when late, with the zone beside a time only where it differs from the other end or from yours) around a dotted line with a plane at how far along it is, the status, the terminal and gate, and when the status was last updated. The whole card opens the flight’s live status view, and under it stay the confirmation code, **Check in** or **Open in app**, **Directions** and **Call** where the booking has them, **Open trip**, who is travelling and the cost (unless the household has turned costs off). Under it, **Flights today** lists each of today’s flights as a row (route, flight number, time and status) that opens the same view, and a flight opened from the day-by-day list shows a compact booking in a panel: a one-line progress bar with when it left and when it lands. These show what Waypoint holds, with no Refresh button; a quiet line says when live updates are paused.
 
-Below the card, that trip is laid out day by day, each booking at its local time. While you travel, the days already past fold under **Earlier in this trip**. On a wide window a side column shows the trip’s totals (nights, bookings, cities) and **Later**, every other trip still to come; on a phone, **Later** is a row of tiles under the list. When emails are waiting in Review, a banner says how many, and only how many.
+Below the title, when emails are waiting in Review, one quiet line says how many (an amber dot, “2 emails to review”, a chevron) and links to Review; it says only how many. Below the card, that trip is laid out day by day: a small day label, then one row per booking with its local time in bold, its title and a grey line, separated by hairlines. A blue dot and **Next** mark the first day that still has something to come, and a parking booking with a gate code shows a blue **Show code** in place of the chevron. While you travel, the days already past fold under **Earlier in this trip**. On a wide window the card and the list sit in two columns, the list headed **Coming up**, with **Later**, every other trip still to come, under it; on a phone, **Later** is a row of tiles under the list. Upcoming has no totals and no banners.
 
 With no trips yet, Upcoming says what to do next: **Connect Gmail**, **Add a booking**, and a short setup checklist that disappears with your first trip.
 

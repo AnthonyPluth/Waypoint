@@ -245,13 +245,14 @@ describe("Upcoming", () => {
     expect(within(card).getByText("LHR")).toBeInTheDocument();
   });
 
-  it("shows a booking’s brand logo in the day-by-day list, and no airline logo on the flight card", async () => {
+  it("leaves a booking’s brand logo out of the day-by-day rows, as drawn, and off the flight card", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([trip([segment({ id: 1, logo: "/api/segments/1/logo" }), stay, home])]);
     const { container } = render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(card.querySelector("img")).toBeNull();
-    expect([...container.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["/api/segments/1/logo"]);
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    expect(screen.getByRole("list", { name: /day by day/ }).querySelector("[data-tile]")).toBeNull();
   });
 
   it("shows the flight’s live status on the Next up card", async () => {
@@ -626,28 +627,33 @@ describe("Upcoming header, review banner and timeline", () => {
     expect(screen.getByRole("link", { name: "Add a booking" })).toHaveAttribute("href", "#trips?add=booking");
   });
 
-  it("shows the review banner only with trips and a review count, above the next-up card", async () => {
+  it("shows the review line only with trips and a review count, above the next-up card, as one quiet link", async () => {
     app.state = { review_count: 2 } as never;
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    const banner = screen.getByTestId("review-banner");
-    expect(banner).toHaveTextContent("2 emails to review. Waypoint found what look like bookings and needs you to check them.");
-    expect(within(banner).getByRole("link", { name: "Review emails" })).toHaveAttribute("href", "#review");
-    expect(banner.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const line = screen.getByTestId("review-line");
+    expect(line.tagName).toBe("A");
+    expect(line).toHaveAttribute("href", "#review");
+    expect(line).toHaveTextContent(/^2 emails to review$/);
+    expect(line).toHaveAccessibleName("2 emails to review");
+    expect(line.querySelector("button")).toBeNull();
+    expect(line.className).not.toMatch(/\b(border|bg-signal-soft|rounded)/);
+    expect(line.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("says one email in the singular and shows no banner for none", async () => {
+  it("says one email in the singular and shows no review line for none", async () => {
     app.state = { review_count: 1 } as never;
     serve([london]);
     const { unmount } = render(Upcoming);
     await screen.findByRole("heading", { name: "JFK → LHR" });
-    expect(screen.getByTestId("review-banner")).toHaveTextContent("1 email to review.");
+    expect(screen.getByTestId("review-line")).toHaveTextContent(/^1 email to review$/);
     unmount();
     app.state = { review_count: 0 } as never;
     render(Upcoming);
     await screen.findByRole("heading", { name: "JFK → LHR" });
-    expect(screen.queryByTestId("review-banner")).toBeNull();
+    expect(screen.queryByTestId("review-line")).toBeNull();
+    expect(screen.queryByText(/to review/)).toBeNull();
   });
 
   it("keeps the empty-state review wording, with no banner, when there are no trips", async () => {
@@ -655,32 +661,103 @@ describe("Upcoming header, review banner and timeline", () => {
     serve([], [], { configured: true, mailboxes: [box()] });
     render(Upcoming);
     expect(await screen.findByRole("heading", { name: "3 emails are waiting for your review" })).toBeInTheDocument();
-    expect(screen.queryByTestId("review-banner")).toBeNull();
+    expect(screen.queryByTestId("review-line")).toBeNull();
   });
 
-  it("is one compact link to Review on a phone, with no explanation and no email details", async () => {
-    viewport.phone = true;
+  it("is the same quiet line on a phone and on a computer, with counts only and no email details", async () => {
     app.state = { review_count: 2 } as never;
     serve([london]);
+    const { unmount } = render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    const wide = screen.getByTestId("review-line");
+    expect(wide).toHaveTextContent(/^2 emails to review$/);
+    unmount();
+    viewport.phone = true;
     render(Upcoming);
     await screen.findByRole("heading", { name: "JFK → LHR" });
-    const banner = screen.getByTestId("review-banner");
-    expect(banner.tagName).toBe("A");
-    expect(banner).toHaveAttribute("href", "#review");
-    expect(banner).toHaveTextContent("2 emails to review Review");
-    expect(banner).not.toHaveTextContent("Waypoint found");
+    const line = screen.getByTestId("review-line");
+    expect(line).toHaveAttribute("href", "#review");
+    expect(line).toHaveTextContent(/^2 emails to review$/);
+    expect(line).not.toHaveTextContent("Waypoint found");
+    expect(screen.queryByRole("link", { name: "Review emails" })).toBeNull();
   });
 
-  it("marks the next-up booking's row with a Next up pill instead of a chevron", async () => {
+  it("marks the first day with something still to come with a blue dot and Next, and no row or pill", async () => {
     serve([london]);
     render(Upcoming);
     const list = await screen.findByRole("list", { name: /day by day/ });
-    const rows = within(list).getAllByRole("listitem").filter((li) => li.classList.contains("row-tap"));
-    const marked = rows.filter((r) => r.dataset.next === "true");
-    expect(marked).toHaveLength(1);
-    expect(within(marked[0]).getByTestId("next-up-pill")).toHaveTextContent("Next up");
-    expect(within(marked[0]).getByRole("link")).toHaveTextContent("JFK → LHR");
-    expect(rows.filter((r) => r !== marked[0]).every((r) => within(r).queryByTestId("next-up-pill") === null)).toBe(true);
+    const markers = within(list).getAllByTestId("next-marker");
+    expect(markers).toHaveLength(1);
+    expect(markers[0]).toHaveTextContent("Next");
+    const day = markers[0].closest("li")!;
+    expect(within(day).getByRole("heading", { level: 3 })).toHaveTextContent("Fri, Nov 20");
+    expect(within(day).getByRole("link")).toHaveTextContent("JFK → LHR");
+    expect(markers[0].previousElementSibling!.className).toMatch(/bg-primary/);
+    expect(screen.queryByTestId("next-up-pill")).toBeNull();
+    expect(list.querySelector("[data-next]")).toBeNull();
+  });
+
+  it("puts the Next marker on the day after an earlier day that is over, not on the earlier day", async () => {
+    at("2026-11-24T12:00:00+00:00");
+    serve([trip([outbound, stay])]);
+    render(Upcoming);
+    const toggle = await screen.findByText(/Earlier in this trip/);
+    const details = toggle.closest("details")!;
+    const list = screen.getByRole("list", { name: "Trip to London, day by day" });
+    const markers = within(list).getAllByTestId("next-marker");
+    expect(markers).toHaveLength(1);
+    expect(details.contains(markers[0])).toBe(false);
+    expect(markers[0].closest("li")).toHaveTextContent("Check-out: Harbour Hotel");
+  });
+
+  it("shows Show code in place of the chevron only on a booking with a QR code", async () => {
+    const lot = segment({ id: 9, kind: "parking", provider: "Example Parking", origin: "Example Airport Long-Term Lot", destination: null, confirmation: "PK30417",
+      start_local: "2099-01-09T05:15", start_zone: NY, end_local: "2099-01-13T03:00", end_zone: NY, details: {}, gate_code: { state: "ready", day: "2098-12-20" }, travelers: [] });
+    const bare = segment({ id: 10, kind: "parking", provider: "Other Parking", origin: "Other Lot", destination: null, start_local: "2099-01-09T06:00", start_zone: NY,
+      end_local: "2099-01-13T03:00", end_zone: NY, details: {}, gate_code: null, travelers: [] });
+    at("2099-01-08T09:00:00-05:00");
+    serve([trip([lot, bare, segment({ id: 11, start_local: "2099-01-09T09:00", end_local: "2099-01-09T12:00", end_zone: NY })])]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const rows = [...list.querySelectorAll("li.row-tap")] as HTMLElement[];
+    expect(rows).toHaveLength(5);
+    const shown = rows.filter((r) => within(r).queryByRole("button", { name: /^Show code/ }));
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toHaveTextContent("Example Airport Long-Term Lot");
+    expect(shown[0].querySelector("svg")).toBeNull();
+    expect(within(shown[0]).getByRole("button", { name: "Show code for Example Airport Long-Term Lot" })).toHaveClass("text-primary");
+    for (const r of rows.filter((r) => r !== shown[0])) expect(r.querySelector("svg")).not.toBeNull();
+  });
+
+  it("puts the list beside the hero only for a flight, and leaves a stay’s pass card full width above it", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    const flight = render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    expect(flight.container.querySelector("[data-columns]")).toHaveAttribute("data-columns", "two");
+    expect(screen.getByText("Coming up")).toBeInTheDocument();
+    flight.unmount();
+    at("2026-11-24T12:00:00+00:00");
+    serve([trip([stay])]);
+    const only = render(Upcoming);
+    await screen.findByRole("list", { name: /day by day/ });
+    expect(only.container.querySelector("[data-columns]")).toHaveAttribute("data-columns", "one");
+    expect(screen.queryByText("Coming up")).toBeNull();
+  });
+
+  it("draws no stat tile and no banner, on a phone or a computer", async () => {
+    app.state = { review_count: 2 } as never;
+    serve([london]);
+    const wide = render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    for (const gone of ["trip-totals", "review-banner", "next-up-pill"]) expect(screen.queryByTestId(gone)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Emails to review" })).toBeNull();
+    expect(screen.queryByText(/^(Nights|Bookings|Cities)$/i)).toBeNull();
+    wide.unmount();
+    viewport.phone = true;
+    render(Upcoming);
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    for (const gone of ["trip-totals", "review-banner", "next-up-pill"]) expect(screen.queryByTestId(gone)).toBeNull();
   });
 
   it("counts the nights of the trip across a month end, and none for a one-day trip", async () => {
@@ -716,20 +793,6 @@ describe("Upcoming header, review banner and timeline", () => {
     expect(screen.getByText("Dec 30, 2026 – Jan 2, 2027 · 3 nights")).toBeInTheDocument();
   });
 
-  it("marks the end row of an ongoing stay as next up when its start day is in the collapsed earlier days", async () => {
-    at("2026-11-24T12:00:00+00:00");
-    serve([trip([outbound, stay])]);
-    render(Upcoming);
-    const toggle = await screen.findByText(/Earlier in this trip/);
-    const details = toggle.closest("details")!;
-    const list = screen.getByRole("list", { name: "Trip to London, day by day" });
-    const marked = [...list.querySelectorAll("li[data-next='true']")];
-    expect(marked).toHaveLength(1);
-    expect(details.contains(marked[0])).toBe(false);
-    expect(marked[0]).toHaveTextContent("Check-out: Harbour Hotel");
-    expect(within(marked[0] as HTMLElement).getByTestId("next-up-pill")).toBeInTheDocument();
-  });
-
   it("shows the Saved for offline pill only when offline saving is working", async () => {
     Object.assign(offline, { setUp: true, hasCopy: true, savedAt: Date.now(), trips: [{ id: 1, name: "Trip" }] });
     serve([london]);
@@ -763,26 +826,6 @@ describe("Upcoming side column", () => {
   const placesCalls = () => vi.mocked(api).mock.calls.map(([path]) => path as string).filter((p) => p.startsWith("/api/trips/"));
   const withPlaces = (path: string) => (path === "/api/trips/1/places" ? places : undefined);
 
-  it("counts nights, live bookings and distinct cities", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    const cancelled = segment({ id: 9, kind: "hotel", status: "cancelled", origin: "Gone Inn", destination: "Paris", start_local: "2026-11-21T15:00", end_local: "2026-11-22T10:00" });
-    serveWith([trip([outbound, stay, home, cancelled], { end_date: "2026-11-27" })], (path) => { if (path.endsWith("/places")) throw new Error("offline"); return undefined; });
-    render(Upcoming);
-    const totals = await screen.findByTestId("trip-totals");
-    expect(totals.children[0]).toHaveTextContent("Nights7");
-    expect(totals.children[1]).toHaveTextContent("Bookings3");
-    expect(totals.children[2]).toHaveTextContent("Cities3");
-  });
-
-  it("names a city once when its airport and its stay agree", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    serveWith([london], withPlaces);
-    render(Upcoming);
-    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
-  });
-
   it("lists every trip after the featured one, soonest first, with an All trips link", async () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([porto, london, third, lisbon], withPlaces);
@@ -804,54 +847,9 @@ describe("Upcoming side column", () => {
     at("2026-11-20T09:00:00-05:00");
     serveWith([london], withPlaces);
     render(Upcoming);
-    await screen.findByTestId("trip-totals");
+    await screen.findByRole("heading", { name: "Trip to London" });
     expect(screen.queryByRole("region", { name: "Later" })).toBeNull();
     expect(screen.queryByRole("link", { name: "All trips" })).toBeNull();
-  });
-
-  it("keeps the totals, without an error, when the places request fails", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    serveWith([london], (path) => { if (path === "/api/trips/1/places") throw new Error("offline"); return undefined; });
-    render(Upcoming);
-    await screen.findByTestId("trip-totals");
-    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
-  });
-
-  it("keeps the city count while the same trip’s places load again", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    let held = false;
-    serveWith([london], (path) => (path === "/api/trips/1/places" ? (held ? new Promise(() => {}) : places) : undefined));
-    render(Upcoming);
-    await screen.findByTestId("trip-totals");
-    await waitFor(() => expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2"));
-    held = true;
-    viewport.phone = true;
-    await vi.advanceTimersByTimeAsync(0);
-    viewport.phone = false;
-    await vi.advanceTimersByTimeAsync(0);
-    await waitFor(() => expect(placesCalls().length).toBeGreaterThan(1));
-    expect(screen.getByTestId("trip-totals").children[2]).toHaveTextContent("Cities2");
-  });
-
-  it("keeps the page when the places reply is malformed", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    serveWith([london], (path) => (path === "/api/trips/1/places" ? { trips: [] } : undefined));
-    render(Upcoming);
-    await screen.findByTestId("trip-totals");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(screen.getByTestId("trip-totals")).toBeInTheDocument();
-  });
-
-  it("keeps the page when the places reply lacks a collection", async () => {
-    at("2026-11-20T09:00:00-05:00");
-    serveWith([london], (path) => (path === "/api/trips/1/places" ? { ...places, stays: undefined } : undefined));
-    render(Upcoming);
-    await screen.findByTestId("trip-totals");
-    await vi.advanceTimersByTimeAsync(0);
-    expect(screen.getByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
   });
 
   it("leaves out an overlapping trip that has already started", async () => {
@@ -867,13 +865,14 @@ describe("Upcoming side column", () => {
     expect(card).not.toHaveTextContent("Starting today");
   });
 
-  it("makes no request but the featured trip’s own places, and no outside fetch", async () => {
+  it("asks for no trip’s places and makes no outside fetch", async () => {
     at("2026-11-20T09:00:00-05:00");
     const outside = vi.spyOn(globalThis, "fetch");
     serveWith([london, lisbon], withPlaces);
     render(Upcoming);
-    await screen.findByTestId("trip-totals");
-    await waitFor(() => expect(placesCalls()).toEqual(["/api/trips/1/places"]));
+    await screen.findByRole("heading", { name: "Trip to London" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(placesCalls()).toEqual([]);
     expect(outside).not.toHaveBeenCalled();
     outside.mockRestore();
   });

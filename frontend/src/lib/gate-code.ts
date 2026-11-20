@@ -1,3 +1,6 @@
+import type { Segment } from "./api-types";
+import { endAt } from "./trips";
+
 export const MARGIN = 0.2;
 export const SHARE = 1 / (1 + 2 * MARGIN);
 export const WHOLE_ENOUGH = 0.8;
@@ -8,3 +11,6 @@ export function squareSide(room: number, natural: number): number {
   const whole = Math.floor(share / natural) * natural;
   return whole >= share * WHOLE_ENOUGH ? whole / SHARE : room;
 }
+
+export const codeReady = (segment: Segment, now: number): boolean =>
+  segment.kind === "parking" && segment.status !== "cancelled" && segment.gate_code?.state === "ready" && endAt(segment) > now;
