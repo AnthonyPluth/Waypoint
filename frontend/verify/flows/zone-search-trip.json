@@ -4,6 +4,7 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "click": "button[data-booking]:has-text('Camden Guesthouse'):has-text('Stay · Confirmed')" },
     { "wait_for": "text=Add address" },
     { "click": "button:has-text('Add address') >> visible=true" },
     { "wait_for": "#segment-address" },

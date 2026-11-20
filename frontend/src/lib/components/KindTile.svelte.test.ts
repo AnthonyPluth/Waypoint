@@ -54,4 +54,10 @@ describe("KindTile", () => {
     expect(cls).toContain("bg-kind-quiet-soft");
     expect(cls).toContain("text-kind-quiet");
   });
+  it("draws the outline form as a coloured icon with no chip, and keeps its accessible name", () => {
+    render(KindTile, { kind: "hotel", outline: true });
+    const tile = screen.getByRole("img", { name: "stay" });
+    expect(tile.className).toContain("text-kind-stay");
+    expect(tile.className).not.toMatch(/bg-kind|rounded/);
+  });
 });

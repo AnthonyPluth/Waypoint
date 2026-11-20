@@ -12,11 +12,14 @@
       "click": "a[href^='#trip/']:has-text('Seattle') >> visible=true"
     },
     {
+      "click": "[data-booking-card='cruise'] button[data-booking]"
+    },
+    {
       "wait_for": "[data-itinerary]"
     },
     {
       "expect_text": {
-        "selector": "main",
+        "selector": "[role='dialog']",
         "text": "Skagway"
       }
     },

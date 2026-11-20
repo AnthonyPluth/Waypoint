@@ -8,3 +8,6 @@ export function squareSide(room: number, natural: number): number {
   const whole = Math.floor(share / natural) * natural;
   return whole >= share * WHOLE_ENOUGH ? whole / SHARE : room;
 }
+
+export const showsCode = (s: { kind: string; status: string; gate_code: { state: string } | null }, endMs: number, now: number): boolean =>
+  s.kind === "parking" && s.status !== "cancelled" && s.gate_code?.state === "ready" && endMs > now;

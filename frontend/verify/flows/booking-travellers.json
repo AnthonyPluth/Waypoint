@@ -4,9 +4,11 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('Seattle') >> visible=true" },
+    { "click": "[data-booking-card='cruise'] button[data-booking]" },
     { "wait_for": "[data-itinerary]" },
     { "scroll_to": "[data-itinerary]" },
     { "screenshot": "cruise-card" },
+    { "press": { "selector": "[role='dialog']", "key": "Escape" } },
     { "click": "button:has-text('Add a booking') >> visible=true" },
     { "wait_for": "label:has-text('What is it') select" },
     { "select": { "selector": "label:has-text('What is it') select", "index": 1 } },
