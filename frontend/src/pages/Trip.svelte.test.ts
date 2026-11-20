@@ -135,12 +135,12 @@ describe("Trip", () => {
     expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).startsWith("/api/flight-status/"))).toEqual([]);
   });
 
-  it("draws a stay’s kind icon on its card, with no brand logo, and never an airline’s on a flight, whose mark is Waypoint’s own", async () => {
+  it("shows a stay’s brand logo on its card beside its kind icon, and never an airline’s on a flight, whose mark is Waypoint’s own", async () => {
     held = trip([{ ...flight, logo: "/api/segments/1/logo" }, { ...stay, logo: "/api/segments/2/logo" }]);
     render(TripPage);
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     expect(cards[0].querySelector("img")).toBeNull();
-    expect(cards[1].querySelector("img")).toBeNull();
+    expect(cards[1].querySelector("img")?.getAttribute("src")).toBe("/api/segments/2/logo");
     expect(within(cards[1]).getByRole("img", { name: "stay" })).toBeInTheDocument();
   });
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Segment } from "$lib/api-types";
+  import BrandLogo from "$lib/components/BrandLogo.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import KindTile from "$lib/components/KindTile.svelte";
   import { Button } from "$lib/components/ui/button";
@@ -37,6 +38,7 @@
       <b class={`truncate text-[17px] font-bold ${struck ? "text-muted-foreground" : ""}`}>{name}</b>
       <span class="text-sm text-muted-foreground">{subtitle}{#if status}{" · "}<span class={`font-semibold ${status.tone}`}>{status.word}</span>{/if}</span>
     </span>
+    <BrandLogo src={s.logo} size={32} />
     <ChevronRight class="size-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
   </button>
   <div class="mb-3 mt-1 h-px bg-border"></div>
