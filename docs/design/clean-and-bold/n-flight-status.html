@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: flight status</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:30px 30px 0 0;padding:8px 20px 28px;max-height:92%;overflow:hidden}
+.grab{width:40px;height:5px;border-radius:99px;background:#3a3940;margin:4px auto 10px}
+.panel{position:absolute;top:0;right:0;bottom:0;width:544px;background:var(--card);padding:24px 28px;overflow:hidden}
+.dh{display:flex;align-items:flex-start;gap:12px}
+.dh .kic{width:28px;height:28px;margin-top:3px}
+.dh .n{flex:1;min-width:0}.dh .n b{display:block;font-size:20px;font-weight:800;letter-spacing:-0.01em}.dh .n span{display:block;font-size:14px;color:var(--secondary)}
+.dh .n .g{color:var(--green);font-weight:600}
+.dh .tools{display:flex;gap:6px;flex:none}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:68px;border-radius:18px;background:#141319;font-size:13px;font-weight:650;color:var(--text)}
+.act .ic{width:20px;height:20px}
+.dl{margin-top:14px}
+.dl>div{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--hair);align-items:flex-start}
+.dl dt{width:104px;flex:none;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding-top:3px}
+.dl dd{flex:1;min-width:0;font-size:15px}
+.dl dd small{display:block;color:var(--secondary);font-size:13px}
+.dl .cc{display:flex;align-items:center;gap:8px}
+.dl .cc .mono{font-size:17px;letter-spacing:.06em;font-weight:600}
+.cbtn{background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;color:var(--secondary);margin:-12px 0}
+.ppl{display:flex;flex-direction:column;gap:8px}
+.ppl span{display:flex;align-items:center;gap:10px}
+.ppl .mono{margin-left:auto;font-weight:600}
+.dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);background:var(--card);border-radius:30px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:14px}
+body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);padding:26px}
+.dlg .qr{padding:14px;background:#fff;border-radius:22px}
+.dlg .cap{text-align:center;color:var(--secondary);font-size:14px}
+.side{position:absolute;top:0;left:0;bottom:0;width:248px;padding:22px 14px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--hair);background:var(--page)}
+.side .wm{font-size:20px;font-weight:800;letter-spacing:-0.02em;padding:0 12px;min-height:44px;display:flex;align-items:center}
+.side nav{display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;color:var(--secondary);font-weight:600;font-size:15px}
+.side a.cur{background:var(--card);color:var(--text)}
+.side a.cur .ic{color:var(--blue)}
+.side .badge{margin-left:auto}
+.side .me{margin-top:auto}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--amber);color:#000;font-size:11px;font-weight:800}
+.main{position:absolute;top:0;left:248px;right:0;bottom:0;padding:40px 48px;overflow:hidden}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;margin-top:28px;align-items:start}
+.tabbar{position:absolute;left:12px;right:12px;bottom:14px;display:flex;gap:4px;padding:4px;border-radius:24px}
+.tabbar.frost{background:rgb(13 12 18 / 75%);backdrop-filter:blur(28px) saturate(2) brightness(1.1);-webkit-backdrop-filter:blur(28px) saturate(2) brightness(1.1);box-shadow:inset 0 1px 0 rgb(255 255 255 / 12%)}
+.tabbar.plain{background:#000;left:0;right:0;bottom:0;border-radius:0;padding:4px 8px 22px;border-top:1px solid var(--hair)}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:18px;font-size:11.5px;font-weight:600;color:var(--label)}
+.tab .ic{width:24px;height:24px}
+.tab.cur{color:var(--text)}
+.tab.cur .ic{color:var(--blue)}
+.tab .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+.moremenu{position:absolute;right:16px;bottom:92px;width:200px;background:#141319;border-radius:20px;padding:6px;display:flex;flex-direction:column}
+.moremenu a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;font-weight:600;color:var(--secondary)}
+.empty{background:var(--card);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.empty h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.empty p{color:var(--secondary)}
+.empty .btns{display:flex;flex-wrap:wrap;gap:8px}
+.empty summary{min-height:44px;display:inline-flex;align-items:center;color:var(--secondary);font-weight:600}
+
+/* group B additions: built from the same tokens, no new colours */
+.dev.page .tpage{padding-bottom:110px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--secondary);font-size:14px;font-weight:600;min-width:0}
+.back span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.trow .r{display:inline-flex;align-items:center;gap:12px;color:var(--secondary);font-size:13px}
+.crd{background:var(--card);border-radius:24px;padding:16px 18px}
+body.desk .crd{padding:20px 22px}
+.prog{height:6px;border-radius:99px;background:var(--hair);overflow:hidden;margin-top:16px}
+.prog>i{display:block;height:100%;background:var(--blue);border-radius:99px}
+.cities{display:flex;justify-content:space-between;font-size:12px;color:var(--secondary);margin-top:2px}
+.tl{background:var(--card);border-radius:24px;padding:2px 18px}
+.tl li{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid var(--hair)}
+.tl li:last-child{border-bottom:0}
+.tl .d{width:10px;height:10px;border-radius:99px;flex:none;margin-top:6px;box-shadow:inset 0 0 0 2px var(--label)}
+.tl .d.done{background:var(--green);box-shadow:none}
+.tl .d.now{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.tl .w{flex:1;min-width:0}.tl .w b{display:block;font-weight:650;font-size:15px}.tl .w span{display:block;color:var(--secondary);font-size:13px}
+.tl .t{font-family:var(--mono);font-weight:600;font-size:15px;text-align:right;white-space:nowrap}
+.tl .t small{display:block;font-size:11px;color:var(--label);font-weight:500}
+.fcard .facts dd{font-size:22px}
+.pill{white-space:nowrap}
+.h-top .carrier{min-width:0}
+body.desk .fcard .facts dd{font-size:32px}
+.fcard .lbl-s{margin-bottom:10px}
+.note{font-size:13px;color:var(--secondary)}
+.slist{background:var(--card);border-radius:24px;padding:2px 18px}
+.slist li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.slist li:last-child{border-bottom:0}
+.slist b{display:block;font-weight:650}.slist span{display:block;color:var(--secondary);font-size:13px}
+.sline{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--secondary)}
+.sline .mono{color:var(--text)}
+.fs-cols{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px;align-items:start;margin-top:18px}
+.stack{display:flex;flex-direction:column;gap:14px}
+body.desk .stack{gap:18px}
+.alert{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.alert .btns{display:flex;flex-wrap:wrap;gap:8px}
+.skel{background:#141319;border-radius:24px}
+.chip{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:99px;background:#1a1920;color:var(--secondary);font-size:12.5px;font-weight:600;white-space:nowrap}
+.chip.o{background:transparent;box-shadow:inset 0 0 0 1px var(--hair)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.lead{font-size:18px;color:var(--text);max-width:60ch}
+.disc{min-height:44px;display:inline-flex;align-items:center;gap:8px;color:var(--secondary);font-weight:600;font-size:14px}
+.disc::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin-right:2px}
+.disc.op::before{transform:rotate(45deg)}
+.jump{display:flex;flex-wrap:wrap;gap:8px}
+.jump a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:14px;background:#1a1920;font-weight:650;font-size:14px}
+.jump a .mono{color:var(--secondary)}
+.grp{display:flex;flex-direction:column;gap:8px}
+.grp h2{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.grp h2 .mono{letter-spacing:0;color:var(--secondary)}
+.grp>p{font-size:14px;color:var(--secondary);max-width:70ch}
+.rlist{background:var(--card);border-radius:24px;padding:0 18px}
+.ritem{padding:16px 0;border-bottom:1px solid var(--hair);display:flex;flex-direction:column;gap:8px}
+.ritem:last-child{border-bottom:0}
+.ritem .s{font-weight:650;font-size:16px;overflow-wrap:anywhere}
+.ritem .m{color:var(--secondary);font-size:13.5px;overflow-wrap:anywhere}
+.ra{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn.out{background:transparent;box-shadow:inset 0 0 0 1px #34333a}
+.mail{display:flex;flex-direction:column;gap:10px;padding:4px 0 6px}
+.mail pre{margin:0;font-family:var(--sans);font-size:14px;line-height:1.55;white-space:pre-wrap;background:#141319;color:var(--doc-ink);border-radius:16px;padding:14px;max-height:260px;overflow:hidden}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:16px;background:#141319}
+.seg2 b{min-height:40px;display:grid;place-items:center;border-radius:12px;font-size:14px;font-weight:650;color:var(--secondary)}
+.seg2 b.on{background:var(--text);color:#000}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.fld>span{font-weight:600}
+.fld>span small{color:var(--secondary);font-weight:500;font-size:13px}
+.inp{min-height:44px;border-radius:14px;background:#141319;padding:0 14px;display:flex;align-items:center;font-size:15px;color:var(--text);gap:10px}
+.inp.read{box-shadow:inset 0 0 0 2px var(--blue)}
+.inp.sel::after{content:"";margin-left:auto;width:7px;height:7px;border-right:2px solid var(--secondary);border-bottom:2px solid var(--secondary);transform:rotate(45deg);margin-top:-4px}
+.inp.ph{color:var(--label)}
+.form{display:flex;flex-direction:column;gap:14px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:10px}
+.flen{font-size:13px;color:var(--secondary)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;height:100%}
+.sheet.wide{left:auto;right:0;top:0;bottom:0;width:1032px;border-radius:30px 0 0 30px;padding:24px 28px;max-height:none}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.shead b{font-size:20px;font-weight:800;letter-spacing:-0.01em}
+.same{border-radius:20px;background:#141319;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.same ul{list-style:disc;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.same .q{color:var(--secondary)}
+.cand{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border-radius:18px;background:#141319;padding:12px 14px}
+.cand b{display:block;font-weight:650;font-size:14px}.cand span{display:block;color:var(--secondary);font-size:13px}
+.dlg h3{font-size:18px;font-weight:800}
+.dlg p{font-size:14px;color:var(--secondary)}
+.dlg .warn{color:var(--amber)}
+.dlg .btns{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.toast{position:absolute;left:16px;right:16px;bottom:96px;background:#1a1920;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:14px}
+.toast .w{flex:1}.toast .w span{display:block;color:var(--secondary);font-size:13px}
+.toast a{color:var(--text);font-weight:700}
+.filterrow{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border-radius:24px;padding:8px 8px 8px 18px}
+.filterrow .btn{position:relative}
+.filterrow .bdot{position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:99px;background:var(--blue)}
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;background:var(--card);border-radius:24px;padding:12px 16px}
+.ychips{display:flex;flex-wrap:wrap;gap:6px}
+.ychips b{min-height:40px;display:inline-flex;align-items:center;padding:0 14px;border-radius:99px;background:#1a1920;color:var(--secondary);font-size:14px;font-weight:650}
+.ychips b.on{background:var(--text);color:#000}
+.people{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.people .p{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px 0 6px;border-radius:99px;font-size:14px;font-weight:600;color:var(--secondary)}
+.people .p.on{color:var(--text);box-shadow:inset 0 0 0 2px var(--blue)}
+.people .p.all{padding:0 14px;background:#1a1920}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.desk .tiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tile{background:var(--card);border-radius:24px;padding:16px 18px;min-width:0}
+.tile dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.tile dd{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin-top:4px;overflow-wrap:anywhere}
+.tile dd.n{font-size:13.5px;font-weight:500;letter-spacing:0;color:var(--secondary);margin-top:2px}
+.tile.w2{grid-column:span 2}
+body.desk .tile.w2{grid-column:span 1}
+.tiles.head .tile dd{font-size:30px}
+body.desk .tiles.head .tile dd{font-size:40px}
+.h2row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.h2row h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.h2row .kic{width:28px;height:28px;stroke-width:1.9}
+.tlist{display:flex;flex-direction:column;gap:8px}
+.tlist h3{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding:0 4px}
+.tlist ol,.tlist dl{background:var(--card);border-radius:24px;padding:0 18px}
+.tlist li,.tlist dl>div{display:flex;align-items:center;gap:12px;min-height:56px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.tlist li:last-child,.tlist dl>div:last-child{border-bottom:0}
+.tlist .i{width:20px;flex:none;font-size:13px;color:var(--label);font-family:var(--mono)}
+.tlist .w{flex:1;min-width:0}.tlist .w b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tlist .w span{display:block;color:var(--secondary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tlist .v{flex:none;color:var(--secondary);font-size:13.5px;white-space:nowrap}
+.tlist dt{flex:1;color:var(--secondary);font-size:14px}
+.tlist dd{text-align:right;font-weight:650;max-width:60%}.tlist dd span{display:block;font-weight:500;color:var(--secondary);font-size:13px}
+.showall{align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--secondary);font-weight:650;font-size:14px}
+.barsc{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-direction:column;gap:18px}
+.barsc h4{font-size:14px;font-weight:650;margin-bottom:8px}
+.barsc li{margin-top:10px}
+.barsc .bl{display:flex;justify-content:space-between;font-size:14px}.barsc .bl span{color:var(--secondary)}
+.barsc .tr{height:10px;border-radius:99px;background:var(--hair);margin-top:6px}
+.barsc .tr i{display:block;height:100%;border-radius:99px;background:var(--text)}
+.mapslot{position:relative;border-radius:24px;overflow:hidden;background:var(--card);height:240px}
+body.desk .mapslot{height:360px}
+.mapslot svg{position:absolute;inset:0;width:100%;height:100%}
+.mapslot .tag{position:absolute;left:14px;bottom:14px;right:14px;font-size:12px;color:var(--secondary)}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.yir{position:absolute;inset:0;background:var(--page);display:flex;flex-direction:column}
+.yir .top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+.yir .segs{display:flex;gap:6px}.yir .segs i{width:24px;height:6px;border-radius:99px;background:var(--hair)}.yir .segs i.on{background:var(--blue)}
+.yir .mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:16px 24px;max-width:576px;width:100%;margin:0 auto}
+.yir .mid .big2{font-size:52px;font-weight:800;letter-spacing:-0.03em;line-height:1}
+body.desk .yir .mid .big2{font-size:72px}
+.yir .mid p.l{font-size:18px;color:var(--secondary)}
+.yir .foot{display:flex;justify-content:space-between;gap:12px;padding:16px}
+.cardimg{position:relative;aspect-ratio:4/5;width:100%;max-width:320px;border-radius:24px;background:#141319;box-shadow:inset 0 0 0 2px #34333a;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--secondary);font-size:13px}
+.cardimg svg{position:absolute;inset:0;width:100%;height:100%}
+.yir .savegrid{display:grid;gap:20px}
+body.desk .yir .savegrid{grid-template-columns:320px minmax(0,1fr);align-items:start}
+body.desk .yir .mid.wide{max-width:768px}
+.btn.dis{opacity:.45}
+.slist span span{display:inline;font-size:inherit}
+.tlist.seats-s li{display:block;min-height:0;border:0;padding:0}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>The live flight status view</h1>
+    <p>Item 3 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/879">#879</a>: <code>frontend/src/pages/FlightStatus.svelte</code>, signed off on <a href="https://github.com/AnthonyPluth/Waypoint/issues/666">#666</a> (frame b) and built in #715, in the clean and bold look. Made-up flight, people and times. Not signed off yet.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="README-group-b.md">Group B</a><a href="n-flight-status.html" aria-current="page">n Flight status</a><a href="n-review.html">n Review</a><a href="n-stats.html">n Stats</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>A flight in the air at phone and desktop width (n1).</li><li>Before take-off, delayed, with the three departure facts (n2).</li><li>Boarding, landed, cancelled and diverted (n3).</li><li>Updates paused and a refresh that failed (n4).</li><li>Loading and the page's errors (n5).</li></ol>
+  </section>
+<section class="sec" id="air" aria-labelledby="air-h">
+  <div class="sechead"><span class="letter">n1</span><h2 id="air-h">A flight in the air</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">The page a flight opens on, from the hero on Upcoming, the trip page or the Flights today list. Its parts and order are today's (#715): the back link to the trip with Refresh, the flight card, the timeline, the facts, and seats with where the values come from.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>n1 · In the air, phone</figcaption><div class="dev page" style="height:820px"><div class="tpage"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a><button class="btn icon ghost" aria-label="Refresh flight status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-blue"><i class="dot blue"></i>In the air</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q65.0 10.3 122.1 19.8" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(122.1 19.8) rotate(9.5) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Landing in 2 hours 5 minutes</h1><p class="quiet"><span data-w="phone">Expected 5:55 PM WET at Lisbon. Departed 2 minutes late.</span><span data-w="desk">Departed 2 minutes late. Expected to land on time.</span></p><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="62"><i style="width:62%"></i></div></article><ul class="tl" role="list" aria-label="Flight timeline"><li><i class="d done"></i><span class="w"><b>Departed Boston</b><span>Scheduled 6:10 AM</span></span><span class=t>6:12 AM</span></li><li><i class="d now"></i><span class="w"><b>In the air</b><span>2 h 5 m flight time left</span></span><span class=t>now</span></li><li><i class="d "></i><span class="w"><b>Lands in Lisbon</b><span>Scheduled 5:55 PM</span></span><span class=t>5:55 PM</span></li></ul><div class="crd fcard"><p class="lbl-s">Arrival · Lisbon</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div></dl></div><div class="sline"><span data-updated>Updated 4 minutes ago · live status</span><span>Seats: Mara <span class="mono">14A</span>, Tomas <span class="mono">14B</span></span></div></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>n1 · In the air, desktop</figcaption><div class="dev wide" style="height:860px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:960px"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a><span class="r"><span data-updated>Updated 4 minutes ago · live status</span><button class="btn out" style="min-height:40px;font-size:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button></span></div><div class="fs-cols"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-blue"><i class="dot blue"></i>In the air</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q65.0 10.3 122.1 19.8" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(122.1 19.8) rotate(9.5) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Landing in 2 hours 5 minutes</h1><p class="quiet"><span data-w="phone">Expected 5:55 PM WET at Lisbon. Departed 2 minutes late.</span><span data-w="desk">Departed 2 minutes late. Expected to land on time.</span></p><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="62"><i style="width:62%"></i></div></article><ul class="tl" role="list" aria-label="Flight timeline"><li><i class="d done"></i><span class="w"><b>Departed Boston</b><span>Scheduled 6:10 AM</span></span><span class=t>6:12 AM</span></li><li><i class="d now"></i><span class="w"><b>In the air</b><span>2 h 5 m flight time left</span></span><span class=t>now</span></li><li><i class="d "></i><span class="w"><b>Lands in Lisbon</b><span>Scheduled 5:55 PM</span></span><span class=t>5:55 PM</span></li></ul></div><div class="stack"><div class="crd fcard"><p class="lbl-s">Arrival · Lisbon</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div></dl></div><p class="note" style="margin-top:-6px">The belt appears after landing.</p><ul class="slist" role="list" aria-label="Seats by traveller"><li><i class="av">MQ</i><span style="flex:1"><b>Mara Quill</b><span>Seat <span class="mono">14A</span> · Economy</span></span></li><li><i class="av">TR</i><span style="flex:1"><b>Tomas Reyna</b><span>Seat <span class="mono">14B</span> · Economy</span></span></li></ul><p class="note">Seats and cabin come from the booking. Gate, terminal and belt come from live status and can change.</p></div></div></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>Every part and its order (#715); the headline as a polite live region with its countdown; the detail line, phone and desktop wording as built.</li><li>The progress bar, the timeline of #666 frame b with done, now and next dots, scheduled times under each step.</li><li>Refresh only while live status can be fetched (an icon on phone, a button with &ldquo;Updated &hellip; · live status&rdquo; on desktop); seats per traveller (a line on phone, a list with cabin on desktop); the sentence on where values come from.</li><li>Times under the codes on desktop with zone and &ldquo;scheduled&rdquo;; on phone the times are in the timeline, as today.</li></ul></div><div><h3>What changes</h3><ul><li>The card is the clean and bold hero: black, 30 px, no border or shadow, codes in heavy white, the arc and plane of #876.</li><li>No Waypoint mark tile: &ldquo;AU 212&rdquo; leads the top line, with the airline and day in grey (#876 departure 2).</li><li>The status is a blue marker (&ldquo;In the air&rdquo;), not a pill; a pill only for delayed, cancelled and diverted, amber.</li><li>Three facts with the hero's labels (Arrival term, Arrival gate, Bag claim); the live and booked dots (<code>SourceDot</code>) go.</li></ul></div><div><h3>Open for the owner</h3><ul><li>&ldquo;The belt appears after landing.&rdquo; under a fact now labelled Bag claim: keep the word belt (drawn, today's wording) or say &ldquo;Bag claim appears after landing.&rdquo;</li></ul></div></div>
+</section>
+<section class="sec" id="before" aria-labelledby="before-h">
+  <div class="sechead"><span class="letter">n2</span><h2 id="before-h">Before take-off, delayed</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">The same page before departure: the departure side's facts, the timeline with the new times in amber and the booked ones under each step. Today's departure facts are Terminal and Gate; the third fact is Seats, as on the hero.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>n2 · Delayed, phone</figcaption><div class="dev page" style="height:820px"><div class="tpage"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a><button class="btn icon ghost" aria-label="Refresh flight status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="pill amber">Delayed 45 min</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm am"><s>6:10 AM</s>6:55 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm am"><s>5:55 PM</s>6:40 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Departs in 2 hours 10 minutes</h1></article><ul class="tl" role="list" aria-label="Flight timeline"><li><i class="d "></i><span class="w"><b>Departs Boston</b><span>Scheduled 6:10 AM</span></span><span class=t><span style="color:var(--amber)">6:55 AM</span></span></li><li><i class="d "></i><span class="w"><b>Lands in Lisbon</b><span>Scheduled 5:55 PM</span></span><span class=t><span style="color:var(--amber)">6:40 PM</span></span></li></ul><div class="crd fcard"><p class="lbl-s">Departure · Boston</p><dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="">B14</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl></div><div class="sline"><span data-updated>Updated 2 minutes ago · live status</span></div></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>n2 · Delayed, desktop</figcaption><div class="dev wide" style="height:800px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:960px"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a><span class="r"><span data-updated>Updated 2 minutes ago · live status</span><button class="btn out" style="min-height:40px;font-size:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>Refresh</button></span></div><div class="fs-cols"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="pill amber">Delayed 45 min</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm am"><s>6:10 AM</s>6:55 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm am"><s>5:55 PM</s>6:40 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Departs in 2 hours 10 minutes</h1></article><ul class="tl" role="list" aria-label="Flight timeline"><li><i class="d "></i><span class="w"><b>Departs Boston</b><span>Scheduled 6:10 AM</span></span><span class=t><span style="color:var(--amber)">6:55 AM</span></span></li><li><i class="d "></i><span class="w"><b>Lands in Lisbon</b><span>Scheduled 5:55 PM</span></span><span class=t><span style="color:var(--amber)">6:40 PM</span></span></li></ul></div><div class="stack"><div class="crd fcard"><p class="lbl-s">Departure · Boston</p><dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="">B14</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl></div><ul class="slist" role="list" aria-label="Seats by traveller"><li><i class="av">MQ</i><span style="flex:1"><b>Mara Quill</b><span>Seat <span class="mono">14A</span> · Economy</span></span></li><li><i class="av">TR</i><span style="flex:1"><b>Tomas Reyna</b><span>Seat <span class="mono">14B</span> · Economy</span></span></li></ul><p class="note">Seats and cabin come from the booking. Gate, terminal and belt come from live status and can change.</p></div></div></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>The headline &ldquo;Departs in &hellip;&rdquo; (owner, 2026-11-17); no line under it when delayed (the card never repeats itself, #714).</li><li>Times turn amber with the booked time struck through above the new one (#666, #878 item 3).</li></ul></div><div><h3>What changes</h3><ul><li>Departure facts become three: Terminal, Gate and Seats (the hero's set, #878 item 2). Seats was left out of this page's facts until now.</li><li>On phone the &ldquo;Seats:&rdquo; line is not drawn before take-off, since the Seats fact shows the same seats; it returns from take-off, when the facts are the arrival side.</li></ul></div><div><h3>Open for the owner</h3><ul><li>Seats as the third departure fact (drawn), or keep two facts before take-off as built and the seats only in the line and list.</li><li>On desktop the seat list stays beside the Seats fact for the names and cabin; or drop the list before take-off.</li></ul></div></div>
+</section>
+<section class="sec" id="states" aria-labelledby="states-h">
+  <div class="sechead"><span class="letter">n3</span><h2 id="states-h">The other states</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Boarding, landed, cancelled and diverted: the flight card and the facts card of each, the rest of the page as in n1 and n2. The timeline steps are today's for each state (&ldquo;Was due to depart Boston&rdquo; when cancelled; no landing step when diverted with no airport known).</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>n3a · Boarding</figcaption><div class="dev"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-blue"><i class="dot blue"></i>Boarding</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:10 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Boarding now at gate B14</h1></article><div class="crd fcard"><p class="lbl-s">Departure · Boston</p><dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="">B14</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl></div></div></div></figure><figure class="fig"><figcaption>n3b · Landed</figcaption><div class="dev"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-green">Landed</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q100.0 -14.0 192.0 50.0" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(192.0 50.0) rotate(34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:52 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Landed 3 minutes early</h1><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="100"><i style="width:100%"></i></div></article><div class="crd fcard"><p class="lbl-s">Arrival · Lisbon</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="">7</dd></div></dl></div></div></div></figure><figure class="fig"><figcaption>n3c · Cancelled</figcaption><div class="dev"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="pill amber">Cancelled</span></div><div class="route"><div class="ap"><span class="code gone">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm gone">6:10 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/></svg></div><div class="ap r"><span class="code gone">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm gone">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Cancelled</h1><p class="quiet">Contact Aurora Air about rebooking.</p></article><div class="crd fcard"><p class="lbl-s">Departure · Boston</p><dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl></div></div></div></figure><figure class="fig"><figcaption>n3d · Diverted</figcaption><div class="dev"><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="pill amber">Diverted</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q79.8 0.1 151.5 28.0" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(151.5 28.0) rotate(21.3) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code-was">LIS</span><span class="code ">OPO</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Porto</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm am">6:20 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Diverted</h1><p class="quiet">Was headed to Lisbon.</p><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="78"><i style="width:78%"></i></div></article><div class="crd fcard"><p class="lbl-s">Arrival · Porto</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div><div class="c2"><dt>Arrival gate</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div><div class="c3"><dt>Bag claim</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div></dl></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>Every headline as built: &ldquo;Boarding now at gate B14&rdquo;, &ldquo;Landed 3 minutes early&rdquo;, &ldquo;Cancelled&rdquo;, &ldquo;Diverted&rdquo;; the lines &ldquo;Contact Aurora Air about rebooking.&rdquo; and &ldquo;Was headed to Lisbon.&rdquo; (#714).</li><li>A dash for every unknown value, never a missing fact.</li></ul></div><div><h3>What changes</h3><ul><li>The colours follow #878 item 1: blue marker for boarding and in the air, green for an early or on-time landing (amber for a late one), amber pill for cancelled and diverted, grey struck codes and no plane when cancelled.</li></ul></div><div><h3>Open for the owner</h3><ul><li>Cancelled in amber (drawn) or grey, the same question as #878's open point 1, answered there for the hero.</li></ul></div></div>
+</section>
+<section class="sec" id="paused" aria-labelledby="paused-h">
+  <div class="sechead"><span class="letter">n4</span><h2 id="paused-h">Paused and couldn’t refresh</h2></div>
+  <p class="lede">The two quiet lines the page has today: updates paused (Refresh is hidden while paused) and a refresh that failed. Neither is coloured: nothing on the page needs acting on.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>n4a · Updates paused</figcaption><div class="dev page" style="height:760px"><div class="tpage"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a></div><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-blue"><i class="dot blue"></i>In the air</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q65.0 10.3 122.1 19.8" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(122.1 19.8) rotate(9.5) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Landing in 2 hours 5 minutes</h1><p class="quiet">Expected 5:55 PM WET at Lisbon. Departed 2 minutes late.</p><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="62"><i style="width:62%"></i></div><p class="quiet" style="font-size:13px">Live updates paused until 3:00 PM (rate limit)</p></article><div class="crd fcard"><p class="lbl-s">Arrival · Lisbon</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div></dl></div><div class="sline"><span data-updated>Updated 41 minutes ago · live status</span><span>Seats: Mara <span class="mono">14A</span>, Tomas <span class="mono">14B</span></span></div></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>n4b · Couldn’t refresh</figcaption><div class="dev page" style="height:760px"><div class="tpage"><div class="trow"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>Lisbon in spring</span></a><button class="btn icon ghost" aria-label="Refresh flight status"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg></button></div><div class="stack"><article class="hero"><div class="h-top"><span class="carrier">AU 212 <span style="color:var(--label);font-weight:500">· Aurora Air · Tue, Mar 9</span></span><span class="m-blue"><i class="dot blue"></i>In the air</span></div><div class="route"><div class="ap"><span class="code ">BOS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Boston</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">6:12 AM</span><span class="tz">EST · scheduled 6:10 AM</span></span></div><div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q65.0 10.3 122.1 19.8" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(122.1 19.8) rotate(9.5) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div><div class="ap r"><span class="code ">LIS</span><span class="tz" style="font-family:var(--sans);font-size:12px;color:var(--secondary);letter-spacing:0">Lisbon</span><span data-w="desk" style="display:flex;flex-direction:column;gap:3px"><span class="tm ">5:55 PM</span><span class="tz">WET · scheduled 5:55 PM</span></span></div></div><h1 class="big" style="font-size:30px;margin-top:16px" aria-live="polite">Landing in 2 hours 5 minutes</h1><p class="quiet"><span data-w="phone">Expected 5:55 PM WET at Lisbon. Departed 2 minutes late.</span><span data-w="desk">Departed 2 minutes late. Expected to land on time.</span></p><div class="prog" role="progressbar" aria-label="Flight progress" aria-valuenow="62"><i style="width:62%"></i></div></article><div class="crd fcard"><p class="lbl-s">Arrival · Lisbon</p><dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na"><span aria-hidden="true">—</span><span class="sr">Not known yet</span></dd></div></dl></div><div class="sline"><span data-updated>Couldn’t refresh. Last updated 9:41 AM.</span><span>Seats: Mara <span class="mono">14A</span>, Tomas <span class="mono">14B</span></span></div></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>&ldquo;Live updates paused until 3:00 PM (rate limit)&rdquo; and the monthly-limit and refused-key wordings, on the card (#714).</li><li>&ldquo;Couldn’t refresh. Last updated 9:41 AM.&rdquo; in place of the updated line (#715); the toast &ldquo;No live status found for this flight yet.&rdquo; after a refresh that finds none.</li></ul></div></div>
+</section>
+<section class="sec" id="load" aria-labelledby="load-h">
+  <div class="sechead"><span class="letter">n5</span><h2 id="load-h">Loading and the page’s errors</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">What the page shows before it has a flight: the loading block, a trip that could not be loaded, a flight that is not on the trip, and a flight with no time yet. The words and buttons are today's.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>n5a · Loading</figcaption><div class="dev page" style="height:360px"><div class="tpage"><div class="skel" style="height:160px" role="progressbar" aria-busy="true" aria-label="Loading"></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>n5b · Couldn’t load</figcaption><div class="dev page" style="height:360px"><div class="tpage"><div class="alert" role="alert"><span>Couldn’t reach Waypoint</span><span class="btns"><a class="btn" href="#">Back to trips</a><a class="btn" href="#">Try again</a></span></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>n5c · No such flight</figcaption><div class="dev page" style="height:360px"><div class="tpage"><div class="alert" role="alert"><span>No such flight</span><span class="btns"><a class="btn" href="#">Back to Lisbon in spring</a></span></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>n5d · No time yet</figcaption><div class="dev page" style="height:400px"><div class="tpage"><div class="alert" role="alert"><span>This flight has no time recorded yet, so there’s no live status to show.</span><span class="btns"><a class="btn" href="#">Back to Lisbon in spring</a></span></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>n5 · No time yet, desktop</figcaption><div class="dev wide" style="height:300px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:960px"><div class="alert" role="alert"><span>This flight has no time recorded yet, so there’s no live status to show.</span><span class="btns"><a class="btn" href="#">Back to Lisbon in spring</a></span></div></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>The four cases, their words and buttons; the error text is the server's message (here a made-up one).</li></ul></div><div><h3>What changes</h3><ul><li>Alerts are black cards with 24 px corners and grey buttons; none is blue, as no case has one action that matters more.</li></ul></div><div><h3>Open for the owner</h3><ul><li>Group C draws alerts and buttons for every page; where its signed-off pieces differ, they win.</li></ul></div></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:30px 30px 0 0;padding:8px 20px 28px;max-height:92%;overflow:hidden}
+.grab{width:40px;height:5px;border-radius:99px;background:#3a3940;margin:4px auto 10px}
+.panel{position:absolute;top:0;right:0;bottom:0;width:544px;background:var(--card);padding:24px 28px;overflow:hidden}
+.dh{display:flex;align-items:flex-start;gap:12px}
+.dh .kic{width:28px;height:28px;margin-top:3px}
+.dh .n{flex:1;min-width:0}.dh .n b{display:block;font-size:20px;font-weight:800;letter-spacing:-0.01em}.dh .n span{display:block;font-size:14px;color:var(--secondary)}
+.dh .n .g{color:var(--green);font-weight:600}
+.dh .tools{display:flex;gap:6px;flex:none}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:68px;border-radius:18px;background:#141319;font-size:13px;font-weight:650;color:var(--text)}
+.act .ic{width:20px;height:20px}
+.dl{margin-top:14px}
+.dl>div{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--hair);align-items:flex-start}
+.dl dt{width:104px;flex:none;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding-top:3px}
+.dl dd{flex:1;min-width:0;font-size:15px}
+.dl dd small{display:block;color:var(--secondary);font-size:13px}
+.dl .cc{display:flex;align-items:center;gap:8px}
+.dl .cc .mono{font-size:17px;letter-spacing:.06em;font-weight:600}
+.cbtn{background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;color:var(--secondary);margin:-12px 0}
+.ppl{display:flex;flex-direction:column;gap:8px}
+.ppl span{display:flex;align-items:center;gap:10px}
+.ppl .mono{margin-left:auto;font-weight:600}
+.dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);background:var(--card);border-radius:30px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:14px}
+body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);padding:26px}
+.dlg .qr{padding:14px;background:#fff;border-radius:22px}
+.dlg .cap{text-align:center;color:var(--secondary);font-size:14px}
+.side{position:absolute;top:0;left:0;bottom:0;width:248px;padding:22px 14px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--hair);background:var(--page)}
+.side .wm{font-size:20px;font-weight:800;letter-spacing:-0.02em;padding:0 12px;min-height:44px;display:flex;align-items:center}
+.side nav{display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;color:var(--secondary);font-weight:600;font-size:15px}
+.side a.cur{background:var(--card);color:var(--text)}
+.side a.cur .ic{color:var(--blue)}
+.side .badge{margin-left:auto}
+.side .me{margin-top:auto}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--amber);color:#000;font-size:11px;font-weight:800}
+.main{position:absolute;top:0;left:248px;right:0;bottom:0;padding:40px 48px;overflow:hidden}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;margin-top:28px;align-items:start}
+.tabbar{position:absolute;left:12px;right:12px;bottom:14px;display:flex;gap:4px;padding:4px;border-radius:24px}
+.tabbar.frost{background:rgb(13 12 18 / 75%);backdrop-filter:blur(28px) saturate(2) brightness(1.1);-webkit-backdrop-filter:blur(28px) saturate(2) brightness(1.1);box-shadow:inset 0 1px 0 rgb(255 255 255 / 12%)}
+.tabbar.plain{background:#000;left:0;right:0;bottom:0;border-radius:0;padding:4px 8px 22px;border-top:1px solid var(--hair)}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:18px;font-size:11.5px;font-weight:600;color:var(--label)}
+.tab .ic{width:24px;height:24px}
+.tab.cur{color:var(--text)}
+.tab.cur .ic{color:var(--blue)}
+.tab .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+.moremenu{position:absolute;right:16px;bottom:92px;width:200px;background:#141319;border-radius:20px;padding:6px;display:flex;flex-direction:column}
+.moremenu a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;font-weight:600;color:var(--secondary)}
+.empty{background:var(--card);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.empty h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.empty p{color:var(--secondary)}
+.empty .btns{display:flex;flex-wrap:wrap;gap:8px}
+.empty summary{min-height:44px;display:inline-flex;align-items:center;color:var(--secondary);font-weight:600}
+
+/* group B additions: built from the same tokens, no new colours */
+.dev.page .tpage{padding-bottom:110px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--secondary);font-size:14px;font-weight:600;min-width:0}
+.back span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.trow .r{display:inline-flex;align-items:center;gap:12px;color:var(--secondary);font-size:13px}
+.crd{background:var(--card);border-radius:24px;padding:16px 18px}
+body.desk .crd{padding:20px 22px}
+.prog{height:6px;border-radius:99px;background:var(--hair);overflow:hidden;margin-top:16px}
+.prog>i{display:block;height:100%;background:var(--blue);border-radius:99px}
+.cities{display:flex;justify-content:space-between;font-size:12px;color:var(--secondary);margin-top:2px}
+.tl{background:var(--card);border-radius:24px;padding:2px 18px}
+.tl li{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-bottom:1px solid var(--hair)}
+.tl li:last-child{border-bottom:0}
+.tl .d{width:10px;height:10px;border-radius:99px;flex:none;margin-top:6px;box-shadow:inset 0 0 0 2px var(--label)}
+.tl .d.done{background:var(--green);box-shadow:none}
+.tl .d.now{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.tl .w{flex:1;min-width:0}.tl .w b{display:block;font-weight:650;font-size:15px}.tl .w span{display:block;color:var(--secondary);font-size:13px}
+.tl .t{font-family:var(--mono);font-weight:600;font-size:15px;text-align:right;white-space:nowrap}
+.tl .t small{display:block;font-size:11px;color:var(--label);font-weight:500}
+.fcard .facts dd{font-size:22px}
+.pill{white-space:nowrap}
+.h-top .carrier{min-width:0}
+body.desk .fcard .facts dd{font-size:32px}
+.fcard .lbl-s{margin-bottom:10px}
+.note{font-size:13px;color:var(--secondary)}
+.slist{background:var(--card);border-radius:24px;padding:2px 18px}
+.slist li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--hair)}
+.slist li:last-child{border-bottom:0}
+.slist b{display:block;font-weight:650}.slist span{display:block;color:var(--secondary);font-size:13px}
+.sline{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--secondary)}
+.sline .mono{color:var(--text)}
+.fs-cols{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:20px;align-items:start;margin-top:18px}
+.stack{display:flex;flex-direction:column;gap:14px}
+body.desk .stack{gap:18px}
+.alert{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+.alert .btns{display:flex;flex-wrap:wrap;gap:8px}
+.skel{background:#141319;border-radius:24px}
+.chip{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:99px;background:#1a1920;color:var(--secondary);font-size:12.5px;font-weight:600;white-space:nowrap}
+.chip.o{background:transparent;box-shadow:inset 0 0 0 1px var(--hair)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.lead{font-size:18px;color:var(--text);max-width:60ch}
+.disc{min-height:44px;display:inline-flex;align-items:center;gap:8px;color:var(--secondary);font-weight:600;font-size:14px}
+.disc::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin-right:2px}
+.disc.op::before{transform:rotate(45deg)}
+.jump{display:flex;flex-wrap:wrap;gap:8px}
+.jump a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border-radius:14px;background:#1a1920;font-weight:650;font-size:14px}
+.jump a .mono{color:var(--secondary)}
+.grp{display:flex;flex-direction:column;gap:8px}
+.grp h2{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.grp h2 .mono{letter-spacing:0;color:var(--secondary)}
+.grp>p{font-size:14px;color:var(--secondary);max-width:70ch}
+.rlist{background:var(--card);border-radius:24px;padding:0 18px}
+.ritem{padding:16px 0;border-bottom:1px solid var(--hair);display:flex;flex-direction:column;gap:8px}
+.ritem:last-child{border-bottom:0}
+.ritem .s{font-weight:650;font-size:16px;overflow-wrap:anywhere}
+.ritem .m{color:var(--secondary);font-size:13.5px;overflow-wrap:anywhere}
+.ra{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn.out{background:transparent;box-shadow:inset 0 0 0 1px #34333a}
+.mail{display:flex;flex-direction:column;gap:10px;padding:4px 0 6px}
+.mail pre{margin:0;font-family:var(--sans);font-size:14px;line-height:1.55;white-space:pre-wrap;background:#141319;color:var(--doc-ink);border-radius:16px;padding:14px;max-height:260px;overflow:hidden}
+.seg2{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:16px;background:#141319}
+.seg2 b{min-height:40px;display:grid;place-items:center;border-radius:12px;font-size:14px;font-weight:650;color:var(--secondary)}
+.seg2 b.on{background:var(--text);color:#000}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:14px}
+.fld>span{font-weight:600}
+.fld>span small{color:var(--secondary);font-weight:500;font-size:13px}
+.inp{min-height:44px;border-radius:14px;background:#141319;padding:0 14px;display:flex;align-items:center;font-size:15px;color:var(--text);gap:10px}
+.inp.read{box-shadow:inset 0 0 0 2px var(--blue)}
+.inp.sel::after{content:"";margin-left:auto;width:7px;height:7px;border-right:2px solid var(--secondary);border-bottom:2px solid var(--secondary);transform:rotate(45deg);margin-top:-4px}
+.inp.ph{color:var(--label)}
+.form{display:flex;flex-direction:column;gap:14px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:10px}
+.flen{font-size:13px;color:var(--secondary)}
+.split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;height:100%}
+.sheet.wide{left:auto;right:0;top:0;bottom:0;width:1032px;border-radius:30px 0 0 30px;padding:24px 28px;max-height:none}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.shead b{font-size:20px;font-weight:800;letter-spacing:-0.01em}
+.same{border-radius:20px;background:#141319;padding:14px;display:flex;flex-direction:column;gap:10px;font-size:14px}
+.same ul{list-style:disc;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.same .q{color:var(--secondary)}
+.cand{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border-radius:18px;background:#141319;padding:12px 14px}
+.cand b{display:block;font-weight:650;font-size:14px}.cand span{display:block;color:var(--secondary);font-size:13px}
+.dlg h3{font-size:18px;font-weight:800}
+.dlg p{font-size:14px;color:var(--secondary)}
+.dlg .warn{color:var(--amber)}
+.dlg .btns{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.toast{position:absolute;left:16px;right:16px;bottom:96px;background:#1a1920;border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:12px;font-size:14px}
+.toast .w{flex:1}.toast .w span{display:block;color:var(--secondary);font-size:13px}
+.toast a{color:var(--text);font-weight:700}
+.filterrow{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border-radius:24px;padding:8px 8px 8px 18px}
+.filterrow .btn{position:relative}
+.filterrow .bdot{position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:99px;background:var(--blue)}
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;background:var(--card);border-radius:24px;padding:12px 16px}
+.ychips{display:flex;flex-wrap:wrap;gap:6px}
+.ychips b{min-height:40px;display:inline-flex;align-items:center;padding:0 14px;border-radius:99px;background:#1a1920;color:var(--secondary);font-size:14px;font-weight:650}
+.ychips b.on{background:var(--text);color:#000}
+.people{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.people .p{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 12px 0 6px;border-radius:99px;font-size:14px;font-weight:600;color:var(--secondary)}
+.people .p.on{color:var(--text);box-shadow:inset 0 0 0 2px var(--blue)}
+.people .p.all{padding:0 14px;background:#1a1920}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+body.desk .tiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.tile{background:var(--card);border-radius:24px;padding:16px 18px;min-width:0}
+.tile dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.tile dd{font-size:26px;font-weight:800;letter-spacing:-0.02em;margin-top:4px;overflow-wrap:anywhere}
+.tile dd.n{font-size:13.5px;font-weight:500;letter-spacing:0;color:var(--secondary);margin-top:2px}
+.tile.w2{grid-column:span 2}
+body.desk .tile.w2{grid-column:span 1}
+.tiles.head .tile dd{font-size:30px}
+body.desk .tiles.head .tile dd{font-size:40px}
+.h2row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.h2row h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.h2row .kic{width:28px;height:28px;stroke-width:1.9}
+.tlist{display:flex;flex-direction:column;gap:8px}
+.tlist h3{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding:0 4px}
+.tlist ol,.tlist dl{background:var(--card);border-radius:24px;padding:0 18px}
+.tlist li,.tlist dl>div{display:flex;align-items:center;gap:12px;min-height:56px;padding:9px 0;border-bottom:1px solid var(--hair)}
+.tlist li:last-child,.tlist dl>div:last-child{border-bottom:0}
+.tlist .i{width:20px;flex:none;font-size:13px;color:var(--label);font-family:var(--mono)}
+.tlist .w{flex:1;min-width:0}.tlist .w b{display:block;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tlist .w span{display:block;color:var(--secondary);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tlist .v{flex:none;color:var(--secondary);font-size:13.5px;white-space:nowrap}
+.tlist dt{flex:1;color:var(--secondary);font-size:14px}
+.tlist dd{text-align:right;font-weight:650;max-width:60%}.tlist dd span{display:block;font-weight:500;color:var(--secondary);font-size:13px}
+.showall{align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;padding:0 4px;color:var(--secondary);font-weight:650;font-size:14px}
+.barsc{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-direction:column;gap:18px}
+.barsc h4{font-size:14px;font-weight:650;margin-bottom:8px}
+.barsc li{margin-top:10px}
+.barsc .bl{display:flex;justify-content:space-between;font-size:14px}.barsc .bl span{color:var(--secondary)}
+.barsc .tr{height:10px;border-radius:99px;background:var(--hair);margin-top:6px}
+.barsc .tr i{display:block;height:100%;border-radius:99px;background:var(--text)}
+.mapslot{position:relative;border-radius:24px;overflow:hidden;background:var(--card);height:240px}
+body.desk .mapslot{height:360px}
+.mapslot svg{position:absolute;inset:0;width:100%;height:100%}
+.mapslot .tag{position:absolute;left:14px;bottom:14px;right:14px;font-size:12px;color:var(--secondary)}
+.cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+.yir{position:absolute;inset:0;background:var(--page);display:flex;flex-direction:column}
+.yir .top{display:flex;align-items:center;justify-content:space-between;padding:12px 16px}
+.yir .segs{display:flex;gap:6px}.yir .segs i{width:24px;height:6px;border-radius:99px;background:var(--hair)}.yir .segs i.on{background:var(--blue)}
+.yir .mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:16px 24px;max-width:576px;width:100%;margin:0 auto}
+.yir .mid .big2{font-size:52px;font-weight:800;letter-spacing:-0.03em;line-height:1}
+body.desk .yir .mid .big2{font-size:72px}
+.yir .mid p.l{font-size:18px;color:var(--secondary)}
+.yir .foot{display:flex;justify-content:space-between;gap:12px;padding:16px}
+.cardimg{position:relative;aspect-ratio:4/5;width:100%;max-width:320px;border-radius:24px;background:#141319;box-shadow:inset 0 0 0 2px #34333a;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--secondary);font-size:13px}
+.cardimg svg{position:absolute;inset:0;width:100%;height:100%}
+.yir .savegrid{display:grid;gap:20px}
+body.desk .yir .savegrid{grid-template-columns:320px minmax(0,1fr);align-items:start}
+body.desk .yir .mid.wide{max-width:768px}
+.btn.dis{opacity:.45}
+.slist span span{display:inline;font-size:inherit}
+.tlist.seats-s li{display:block;min-height:0;border:0;padding:0}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>Review</h1>
+    <p>Item 4 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/879">#879</a>: <code>frontend/src/pages/Review.svelte</code> in the clean and bold look, drawing what the page does today and adding nothing. Made-up emails, senders, mailboxes and bookings. Not signed off yet.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="README-group-b.md">Group B</a><a href="n-flight-status.html">n Flight status</a><a href="n-review.html" aria-current="page">n Review</a><a href="n-stats.html">n Stats</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>The Review list at phone and desktop width, all four groups (r1).</li><li>View email, the kept email where it shows today (r2).</li><li>Check this suggestion: the sheet on phone and split on desktop (r3).</li><li>Read two ways and a booking you already have (r4).</li><li>More, ignoring a sender and undo (r5).</li><li>Nothing to review, one sender only, loading and errors (r6).</li></ol>
+  </section>
+<section class="sec" id="list" aria-labelledby="list-h">
+  <div class="sechead"><span class="letter">r1</span><h2 id="list-h">The Review list</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Today's page in the new look: the title, the one-line lede, the privacy note (closed), the jump buttons when there is more than one group, and the four groups in today's order. Each row shows what Waypoint knows about the email (its subject, when it was sent, which mailbox) and what it read, never the email's text.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>r1 · Review, phone</figcaption><div class="dev page" style="height:2200px"><div class="tpage"><h1 class="title">Review</h1><p class="lead">These emails need your help before they can become bookings.</p><span class="disc">How Waypoint handles these emails</span><nav class="jump" aria-label="Jump to a group"><a href="#">Check suggestions <span class="mono">2</span></a><a href="#">Add missing details <span class="mono">1</span></a><a href="#">Match bookings <span class="mono">1</span></a><a href="#">Match people <span class="mono">1</span></a></nav><section class="grp" aria-labelledby="g1"><h2 id="g1">Check suggestions <span class="mono">2</span></h2><p>Waypoint read a booking from each of these. Check it against the email, change what’s off, then add it.</p><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li><li class="ritem" data-testid="review-item"><p class="s">Itinerary for your rail journey</p><p class="m">Sent Mar 3 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read two ways</span><span class="chip o">read automatically</span></div><div class="ra"><a class="btn" href="#">Check 2 suggestions</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></section><section class="grp" aria-labelledby="g2"><h2 id="g2">Add missing details <span class="mono">1</span></h2><p>Waypoint couldn’t get a booking out of these. Read the email and type the booking in, or dismiss it if it isn’t travel.</p><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your parking reservation</p><p class="m">Sent Mar 4 · in Tomas’s mailbox, shared with the household</p><div class="chips"><span class="chip">No booking details found</span></div><div class="ra"><a class="btn" href="#">Add by hand</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></section><section class="grp" aria-labelledby="g3"><h2 id="g3">Match bookings <span class="mono">1</span></h2><p>Each email fits more than one booking you added yourself, so Waypoint hasn’t guessed. Choose which one it is and the email fills in its confirmation code and link, or add it as a booking of its own.</p><ul class="rlist"><li class="ritem" data-testid="match-item"><p class="s">Stay Harbour Hotel on 2026-03-09 (Harbour Hotels) · <span class="mono">HX4T2Q</span></p><p class="m">Your reservation is confirmed · Mar 1</p><ul class="stack" style="gap:8px" aria-label="It could be"><li class="cand"><span><b>Stay Harbour Hotel on 2026-03-09</b><span>Lisbon in spring</span></span><a class="btn" href="#">It’s this one</a></li><li class="cand"><span><b>Stay Harbour Hotel on 2026-03-11</b><span>Lisbon in spring</span></span><a class="btn" href="#">It’s this one</a></li></ul><div class="ra"><a class="btn out" href="#">It’s a new booking</a><a class="btn ghost" href="#">Dismiss</a></div></li></ul></section><section class="grp" aria-labelledby="g4"><h2 id="g4">Match people <span class="mono">1</span></h2><p>A booking’s name that Waypoint couldn’t match to anyone in People. Choose who it is, and every booking with that name becomes theirs, and the next one matches by itself.</p><ul class="rlist"><li class="ritem" data-testid="who-item"><p class="s mono">REYNA/TOMAS MR</p><p class="m">Flight BOS → LIS on 2026-03-09 (Aurora Air)</p><div class="ra"><span class="inp sel" style="min-width:180px">Tomas Reyna</span><a class="btn" href="#">That’s them</a></div></li></ul></section></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>r1 · Review, desktop</figcaption><div class="dev wide" style="height:1180px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:760px;display:flex;flex-direction:column;gap:14px"><h1 class="title">Review</h1><p class="lead">These emails need your help before they can become bookings.</p><span class="disc">How Waypoint handles these emails</span><nav class="jump" aria-label="Jump to a group"><a href="#">Check suggestions <span class="mono">2</span></a><a href="#">Add missing details <span class="mono">1</span></a><a href="#">Match bookings <span class="mono">1</span></a><a href="#">Match people <span class="mono">1</span></a></nav><section class="grp" aria-labelledby="g1"><h2 id="g1">Check suggestions <span class="mono">2</span></h2><p>Waypoint read a booking from each of these. Check it against the email, change what’s off, then add it.</p><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li><li class="ritem" data-testid="review-item"><p class="s">Itinerary for your rail journey</p><p class="m">Sent Mar 3 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read two ways</span><span class="chip o">read automatically</span></div><div class="ra"><a class="btn" href="#">Check 2 suggestions</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></section><section class="grp" aria-labelledby="g2"><h2 id="g2">Add missing details <span class="mono">1</span></h2><p>Waypoint couldn’t get a booking out of these. Read the email and type the booking in, or dismiss it if it isn’t travel.</p><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your parking reservation</p><p class="m">Sent Mar 4 · in Tomas’s mailbox, shared with the household</p><div class="chips"><span class="chip">No booking details found</span></div><div class="ra"><a class="btn" href="#">Add by hand</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></section></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>Every group, its heading, count and explanation word for word; the order Check suggestions, Add missing details, Match bookings, Match people.</li><li>A row's subject (or &ldquo;Mail from &hellip; on &hellip;&rdquo; when there is none), &ldquo;Sent &hellip; · to &hellip;&rdquo; or &ldquo;in Tomas’s mailbox, shared with the household&rdquo;, the reason, how it was read (&ldquo;Read from the email&rdquo;, &ldquo;AI suggestion&rdquo;, &ldquo;Read two ways&rdquo;, &ldquo;read automatically&rdquo;), a suggestion error, and &ldquo;3 emails about the same reservation&rdquo;.</li><li>The row's actions: Check suggestion (or Check N suggestions, or Add by hand), View email and the More menu; Match people's chooser with &ldquo;A new guest&hellip;&rdquo;; Match bookings' candidates or &ldquo;The bookings it could be aren’t yours to see.&rdquo;</li></ul></div><div><h3>What changes</h3><ul><li>Groups are black cards with 24 px corners and hairlines between rows; the group heading is the small grey label with its count in mono.</li><li>Today's secondary and outline badges become quiet grey chips (filled for the reason, outlined for how it was read). Nothing on the list is amber: the Review tab's badge already says there is something to look at.</li><li>Nothing is added: no Ask AI (the owner's decision of 2026-11-19), no preview of the email's text in the list.</li></ul></div><div><h3>Open for the owner</h3><ul><li>No blue on the list (drawn): with one primary button per row, blue would no longer mean &ldquo;the one primary action&rdquo;. The blue action is &ldquo;Add to my trips&rdquo; in the sheet (r3). Or keep today's primary Check suggestion and Add by hand.</li></ul></div></div>
+</section>
+<section class="sec" id="view" aria-labelledby="view-h">
+  <div class="sechead"><span class="letter">r2</span><h2 id="view-h">View email</h2></div>
+  <p class="lede">The kept email, shown where the app shows it today: under its row after View email, and in the sheet (r3). It reads &ldquo;Fetching the message from Gmail…&rdquo; while it loads. Every word of this one is made up.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>r2 · View email opened, phone</figcaption><div class="dev page" style="height:860px"><div class="tpage"><h1 class="title">Review</h1><section class="grp"><h2>Check suggestions <span class="mono">2</span></h2><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#" aria-expanded="true">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li><li class="ritem" data-testid="preview"><div class="mail" role="region" aria-label="The message from harbourhotels.example"><p class="s">Your trip to Lisbon: booking confirmed</p><a class="btn out" href="#" style="align-self:flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Larger view</a><pre>Hello Mara,
+
+Thank you for booking with Harbour Hotel.
+Check-in: Tue 9 March 2026, from 3:00 PM
+Check-out: Thu 11 March 2026, by 11:00 AM
+Confirmation: HX4T2Q
+Room: Deluxe King, 1 guest
+Total: EUR 412.00
+
+We look forward to welcoming you.</pre></div></li></ul></section></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>r2 · View email opened, desktop</figcaption><div class="dev wide" style="height:860px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:760px;display:flex;flex-direction:column;gap:14px"><h1 class="title">Review</h1><section class="grp"><h2>Check suggestions <span class="mono">2</span></h2><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#" aria-expanded="true">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li><li class="ritem" data-testid="preview"><div class="mail" role="region" aria-label="The message from harbourhotels.example"><p class="s">Your trip to Lisbon: booking confirmed</p><a class="btn out" href="#" style="align-self:flex-start"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>Larger view</a><pre>Hello Mara,
+
+Thank you for booking with Harbour Hotel.
+Check-in: Tue 9 March 2026, from 3:00 PM
+Check-out: Thu 11 March 2026, by 11:00 AM
+Confirmation: HX4T2Q
+Room: Deluxe King, 1 guest
+Total: EUR 412.00
+
+We look forward to welcoming you.</pre></div></li></ul></section></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>Where the email shows and how: the subject, Larger view for an HTML email, the text in a scrolling block, &ldquo;This email was cut short.&rdquo; when it was.</li></ul></div><div><h3>What changes</h3><ul><li>The block is the dark input surface, not today's muted grey.</li></ul></div></div>
+</section>
+<section class="sec" id="sheet" aria-labelledby="sheet-h">
+  <div class="sechead"><span class="letter">r3</span><h2 id="sheet-h">Check this suggestion</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">The sheet a row opens: on phone the Email and Booking switch, at the split width the email beside the fields. A field Waypoint filled from the email keeps its ring and says where it read it.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>r3 · The Booking side, phone</figcaption><div class="dev page" style="height:1180px"><div class="tpage"><h1 class="title">Review</h1></div><div class="dim"></div><div class="sheet" style="top:40px;max-height:none"><div class="grab"></div><div class="shead"><b data-dialog-title>Check this suggestion</b><button class="btn icon ghost" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="seg2" role="group" aria-label="Show"><b>Email</b><b class="on">Booking</b></div><div style="margin-top:14px"><div class="form"><label class="fld"><span>What is it?</span><span class="inp sel">Hotel stay</span></label><label class="fld"><span>Provider</span><span class="inp">Harbour Hotels</span></label><label class="fld"><span>Confirmation code <small>from “HX4T2Q”</small></span><span class="inp read"><span class="mono">HX4T2Q</span></span></label><label class="fld"><span>Hotel <small>from “Harbour Hotel”</small></span><span class="inp read">Harbour Hotel Lisbon</span></label><label class="fld"><span>Check-in <small>from “Tue 9 March 2026, from 3:00 PM”</small></span><span class="inp read"><span class="mono">03/09/2026, 03:00 PM</span></span></label><label class="fld"><span>Check-out <small>from “Thu 11 March 2026, by 11:00 AM”</small></span><span class="inp read"><span class="mono">03/11/2026, 11:00 AM</span></span></label><div class="fld"><span>Cost</span><div class="two"><span class="inp read">412.00</span><span class="inp">EUR</span></div></div><label class="fld"><span>Address <small>from “Rua do Cais 12, Lisbon”</small></span><span class="inp read">Rua do Cais 12, Lisbon</span></label><label class="fld"><span>Time zone</span><span class="inp sel ph">Work it out from the address</span></label><label class="fld"><span>Phone</span><span class="inp ph"></span></label><a class="btn out" href="#" style="align-self:flex-start">Add another leg or booking</a><div class="ra"><a class="btn blue" href="#">Add to my trips</a><a class="btn out" href="#">Cancel</a></div></div></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>r3 · Email and booking side by side, desktop</figcaption><div class="dev wide" style="height:1140px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><h1 class="title">Review</h1></div><div class="dim"></div><div class="sheet wide"><div class="shead"><b data-dialog-title>Check this suggestion</b><button class="btn icon ghost" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div class="split"><div class="mail"><p class="s" style="font-weight:650">Your trip to Lisbon: booking confirmed</p><pre style="max-height:none">Hello Mara,
+
+Thank you for booking with Harbour Hotel.
+Check-in: Tue 9 March 2026, from 3:00 PM
+Check-out: Thu 11 March 2026, by 11:00 AM
+Confirmation: HX4T2Q
+Room: Deluxe King, 1 guest
+Total: EUR 412.00
+
+We look forward to welcoming you.</pre></div><div><div class="form"><label class="fld"><span>What is it?</span><span class="inp sel">Hotel stay</span></label><label class="fld"><span>Provider</span><span class="inp">Harbour Hotels</span></label><label class="fld"><span>Confirmation code <small>from “HX4T2Q”</small></span><span class="inp read"><span class="mono">HX4T2Q</span></span></label><label class="fld"><span>Hotel <small>from “Harbour Hotel”</small></span><span class="inp read">Harbour Hotel Lisbon</span></label><label class="fld"><span>Check-in <small>from “Tue 9 March 2026, from 3:00 PM”</small></span><span class="inp read"><span class="mono">03/09/2026, 03:00 PM</span></span></label><label class="fld"><span>Check-out <small>from “Thu 11 March 2026, by 11:00 AM”</small></span><span class="inp read"><span class="mono">03/11/2026, 11:00 AM</span></span></label><div class="fld"><span>Cost</span><div class="two"><span class="inp read">412.00</span><span class="inp">EUR</span></div></div><label class="fld"><span>Address <small>from “Rua do Cais 12, Lisbon”</small></span><span class="inp read">Rua do Cais 12, Lisbon</span></label><label class="fld"><span>Time zone</span><span class="inp sel ph">Work it out from the address</span></label><label class="fld"><span>Phone</span><span class="inp ph"></span></label><a class="btn out" href="#" style="align-self:flex-start">Add another leg or booking</a><div class="ra"><a class="btn blue" href="#">Add to my trips</a><a class="btn out" href="#">Cancel</a></div></div></div></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>The titles (&ldquo;Check this suggestion&rdquo;, &ldquo;Check these suggestions&rdquo;, &ldquo;Add this booking by hand&rdquo;), every field and label per kind, &ldquo;from “…”&rdquo; beside a field read from the email, the flight length line, the seats &ldquo;as the email prints them&rdquo;, legs as fieldsets with &ldquo;Dismiss this flight&rdquo;, Add another leg or booking, the discard guard.</li><li>Show the email / Hide the email between phone and split widths.</li></ul></div><div><h3>What changes</h3><ul><li>&ldquo;Add to my trips&rdquo; (or &ldquo;Add 2 flights&rdquo;) is the page's one blue action. Inputs are the dark surface with 14 px corners.</li></ul></div><div><h3>Open for the owner</h3><ul><li>The ring on a field read from the email: blue as today (drawn, the primary token) or white, so blue stays for the one action. Group C's inputs may settle this.</li></ul></div></div>
+</section>
+<section class="sec" id="two" aria-labelledby="two-h">
+  <div class="sechead"><span class="letter">r4</span><h2 id="two-h">Read two ways, and a booking you already have</h2></div>
+  <p class="lede">Two parts of the sheet that only some emails reach: the switch between the reading from the email and the AI suggestion when they disagree, and the prompt when the booking looks like one already on a trip.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>r4a · Read two ways</figcaption><div class="dev"><div class="stack" style="gap:8px" role="group" aria-label="Which reading is right?"><p class="note">Waypoint read this booking two ways and they didn’t line up. Pick the one that matches the email; it is added as one booking.</p><div class="seg2"><b class="on">Read from the email</b><b>AI suggestion</b></div></div></div></figure><figure class="fig"><figcaption>r4b · A booking you already have</figcaption><div class="dev"><div class="same" role="group" aria-label="This looks like a booking you already have"><b>This looks like a booking you already have</b><ul><li>Train Lisboa Oriente → Porto Campanhã on 2026-03-12 (CP), in Lisbon in spring</li></ul><p class="q">The same confirmation code on the same kind of booking, around the same dates. Add this email to it instead of making another booking? Nothing already there is changed, only what’s missing is filled in.</p><div class="ra"><a class="btn blue" href="#">Add the email to that booking</a><a class="btn out" href="#">Add as a separate booking</a><a class="btn ghost" href="#">Go back</a></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>Both texts word for word; the reading switch's two labels; the three choices of the prompt.</li></ul></div><div><h3>What changes</h3><ul><li>The prompt is a dark panel, not today's blue outline; its first choice is the blue action, as it replaces Add to my trips.</li></ul></div></div>
+</section>
+<section class="sec" id="menu" aria-labelledby="menu-h">
+  <div class="sechead"><span class="letter">r5</span><h2 id="menu-h">More, ignoring a sender, and undo</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">The row's More menu (the sender group only for mail in your own mailbox), the confirmation before ignoring a sender, with the warning for a travel company Waypoint knows, and the toast with Undo.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>r5a · More</figcaption><div class="dev page" style="height:620px"><div class="tpage"><h1 class="title">Review</h1><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></div><div class="dim"></div><div class="moremenu" style="bottom:auto;top:250px;width:290px;right:16px"><p class="lbl-s" style="padding:8px 12px 4px">This email</p><a href="#">Add by hand instead</a><a href="#">Dismiss all</a><p class="lbl-s" style="padding:10px 12px 4px;border-top:1px solid var(--hair);margin-top:4px">All future mail from harbourhotels.example</p><a href="#">Not travel: ignore this sender</a></div></div></figure><figure class="fig" data-w="phone"><figcaption>r5b · Ignore, a known travel company</figcaption><div class="dev page" style="height:620px"><div class="tpage"><h1 class="title">Review</h1><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></div><div class="dim"></div><div class="dlg" role="alertdialog"><h3>Ignore harbourhotels.example?</h3><p class="warn">This sender is a travel company Waypoint knows. Ignoring it means its bookings won’t be added.</p><p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and 3 items from them (this one included) leave this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p><p>You can undo this in Settings → Mail &amp; review → Gmail.</p><div class="btns"><a class="btn out" href="#">Cancel</a><a class="btn" href="#">Ignore</a></div></div></div></figure><figure class="fig" data-w="phone"><figcaption>r5c · Ignored, with Undo</figcaption><div class="dev page" style="height:620px"><div class="tpage"><h1 class="title">Review</h1></div><div class="toast" role="status"><span class="w">Ignoring harbourhotels.example<span>You can undo this in Settings → Mail &amp; review → Gmail</span></span><a href="#">Undo</a></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">1</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>r5 · Ignore, desktop</figcaption><div class="dev wide" style="height:620px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review<span class="badge">4</span></a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><h1 class="title">Review</h1><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></div><div class="dim"></div><div class="dlg" role="alertdialog"><h3>Ignore harbourhotels.example?</h3><p>Not travel: Waypoint stops looking at mail from this sender in that mailbox, and 3 items from them (this one included) leave this list. Bookings already made from their emails stay. Other mailboxes aren’t affected.</p><p>You can undo this in Settings → Mail &amp; review → Gmail.</p><div class="btns"><a class="btn out" href="#">Cancel</a><a class="btn" href="#">Ignore</a></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>The menu's groups and items, the dialog's title, texts and count, the undo time and where to undo it.</li></ul></div><div><h3>What changes</h3><ul><li>The warning is amber (needs attention) instead of today's signal ink, which is the same colour.</li></ul></div><div><h3>Open for the owner</h3><ul><li>&ldquo;Ignore&rdquo; drawn as a plain button, not red: #876 allows only blue, green and amber. Or keep today's destructive red. The same question as group A's point 8; group C's dialogs may settle it for every page.</li></ul></div></div>
+</section>
+<section class="sec" id="empty" aria-labelledby="empty-h">
+  <div class="sechead"><span class="letter">r6</span><h2 id="empty-h">Nothing to review, a filtered list, loading and errors</h2></div>
+  <p class="lede">The page's other states: nothing waiting, the list filtered to one sender (from Settings → Mail &amp; review), the loading block and a list that could not load.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>r6a · Nothing to review</figcaption><div class="dev page" style="height:420px"><div class="tpage"><h1 class="title">Review</h1><div class="crd stack" style="gap:12px"><svg class="ic" style="width:26px;height:26px;color:var(--green)" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><p style="color:var(--secondary)">Nothing to review. Mail Waypoint can’t read, and names on bookings it can’t match to a person, will show up here.</p></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>r6b · One sender only</figcaption><div class="dev page" style="height:760px"><div class="tpage"><h1 class="title">Review</h1><p class="lead">These emails need your help before they can become bookings.</p><p style="font-size:14px">Showing only mail from harbourhotels.example in mara@example.com. <a href="#" style="text-decoration:underline">Show everything</a></p><ul class="rlist"><li class="ritem" data-testid="review-item"><p class="s">Your trip to Lisbon: booking confirmed</p><p class="m">Sent Mar 2 · to mara@example.com</p><div class="chips"><span class="chip">Some details missing</span><span class="chip o">Read from the email</span></div><span class="disc">3 emails about the same reservation</span><div class="ra"><a class="btn" href="#">Check suggestion</a><a class="btn out" href="#">View email</a><button class="btn icon ghost" aria-label="More actions"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></div></li></ul></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>r6c · Loading</figcaption><div class="dev page" style="height:360px"><div class="tpage"><h1 class="title">Review</h1><div class="skel" style="height:160px" role="progressbar" aria-label="Loading"></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="phone"><figcaption>r6d · Couldn’t load</figcaption><div class="dev page" style="height:360px"><div class="tpage"><h1 class="title">Review</h1><div class="alert" role="alert"><span>Couldn’t reach Waypoint</span><a class="btn" href="#">Try again</a></div></div><nav class="tabbar frost" aria-label="Main"><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg><span>Upcoming</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg><span>Trips</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg><span>Stats</span></a><a class="tab cur" aria-current="page" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span>Review</span><span class="badge">4</span></a><a class="tab" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg><span>More</span></a></nav></div></figure><figure class="fig" data-w="desk"><figcaption>r6 · Nothing to review, desktop</figcaption><div class="dev wide" style="height:420px"><aside class="side"><a class="wm" href="#">Waypoint</a><nav aria-label="Main"><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 22h20M6.36 17.4 4 17l-2-4 1.1-.55a2 2 0 0 1 1.8 0l.17.1a2 2 0 0 0 1.8 0L8 12 5 6l.9-.45a2 2 0 0 1 2.09.2l4.02 3a2 2 0 0 0 2.1.2l4.19-2.06a2.41 2.41 0 0 1 1.73-.17L21 7a1.4 1.4 0 0 1 .87 1.99l-.38.76c-.23.46-.6.84-1.07 1.08L7.58 17.2a2 2 0 0 1-1.22.18Z"/></svg>Upcoming</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14M10 20h4"/><circle cx="16" cy="20" r="2"/><circle cx="8" cy="20" r="2"/></svg>Trips</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16M18 17V9M13 17V5M8 17v-3"/></svg>Stats</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>People</a><a href="#" class="cur" aria-current="page"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>Review</a><a href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>Settings</a></nav><a class="me" href="#"><i class="av">MQ</i>Mara Quill</a></aside><div class="main"><div style="max-width:760px"><h1 class="title">Review</h1><div class="crd stack" style="gap:12px"><svg class="ic" style="width:26px;height:26px;color:var(--green)" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><p style="color:var(--secondary)">Nothing to review. Mail Waypoint can’t read, and names on bookings it can’t match to a person, will show up here.</p></div></div></div></div></figure></div></div>
+  <div class="spec"><div><h3>Kept from today</h3><ul><li>The texts word for word; the filter line with Show everything and &ldquo;, and none is waiting&rdquo; when nothing is left.</li></ul></div><div><h3>What changes</h3><ul><li>The empty state is a black card with the check in green (good news), not a dashed outline with a blue icon.</li></ul></div></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>
