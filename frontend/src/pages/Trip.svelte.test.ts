@@ -1053,6 +1053,17 @@ describe("Trip", () => {
       expect(screen.getByRole("button", { name: "Remove JFK → LHR booking BBBBBB" })).toBeInTheDocument();
     });
 
+    it("keeps each booking’s actions in a group named for its confirmation code", async () => {
+      held = trip([{ ...flight, has_email: true }, { ...sams, has_email: true }, stay]);
+      render(TripPage);
+      const detail = (await open("JFK → LHR"))!;
+      for (const code of ["KQ7M2X", "BBBBBB"]) {
+        const group = within(detail).getByRole("group", { name: `Actions for JFK → LHR booking ${code}` });
+        expect(within(group).getByRole("button", { name: `View email for JFK → LHR booking ${code}` })).toBeInTheDocument();
+        expect(group.previousElementSibling).toHaveTextContent(`Booking ${code}`);
+      }
+    });
+
     it("removes the one booking whose Remove was pressed, and keeps the flight", async () => {
       render(TripPage);
       const u = userEvent.setup();
@@ -2069,6 +2080,17 @@ describe("Trip photos", () => {
 });
 
 describe("Trip layout", () => {
+  it("offers each timed flight’s live status in its opened booking, so a flight that left the hero keeps it", async () => {
+    held = trip([flight, { ...later, id: 3 }, { ...later, id: 5, status: "cancelled", details: { flight_number: "AA 103" } }, stay]);
+    render(TripPage);
+    await screen.findByTestId("trip-bookings");
+    const tap = async (id: number) => { await userEvent.click(document.querySelector(`#segment-${id} button[data-booking]`)!); return screen.findByRole("dialog"); };
+    const detail = await tap(3);
+    expect(within(detail).getByRole("link", { name: "Live status" })).toHaveAttribute("href", "#trip/1/flight/3");
+    await closeDetail(detail);
+    expect(within(await tap(5)).queryByRole("link", { name: "Live status" })).toBeNull();
+  });
+
   const later = segment({ id: 3, kind: "flight", origin: "LHR", destination: "JFK", start_local: "2026-11-27T11:00", start_zone: "Europe/London", end_local: "2026-11-27T14:00", end_zone: "America/New_York", details: { flight_number: "AA 102" }, confirmation: "RET123" });
   const car = segment({ id: 4, kind: "car", provider: "Local Cars", origin: "LHR", destination: null, confirmation: "C1", start_local: "2026-11-22T09:00", start_zone: "Europe/London", end_local: "2026-11-25T09:00", end_zone: "Europe/London" });
 

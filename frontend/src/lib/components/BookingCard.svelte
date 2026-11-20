@@ -44,9 +44,10 @@
   <div class="mb-3 mt-1 h-px bg-border"></div>
   <dl class="grid grid-cols-3 gap-2.5">
     {#each facts as [label, value], i (label)}
+    {@const shifted = /^(.*?) ([+−]\d+ days?)$/.exec(value)}
       <div class={`min-w-0 ${i === 1 ? "text-center" : i === 2 ? "text-right" : ""}`}>
         <dt class="eyebrow whitespace-nowrap">{label}</dt>
-        <dd class={`mt-[3px] truncate text-[17px] font-bold ${struck ? "text-label line-through" : ""} ${/\d:\d\d/.test(value) ? "mono" : ""}`}>{value}</dd>
+        <dd class={`mt-[3px] text-[17px] font-bold ${shifted ? "" : "truncate"} ${struck ? "text-label line-through" : ""} ${/\d:\d\d/.test(value) ? "mono" : ""}`}>{#if shifted}{shifted[1]}<span class="ml-1 text-xs font-medium text-label" data-shift>{shifted[2]}</span>{:else}{value}{/if}</dd>
       </div>
     {/each}
   </dl>

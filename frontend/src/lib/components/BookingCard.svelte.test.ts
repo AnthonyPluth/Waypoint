@@ -40,6 +40,13 @@ describe("BookingCard facts", () => {
     expect(facts(container)).toEqual([["Departs", "—"], ["Flight", "—"], ["Arrives", "—"]]);
   });
 
+  it("shows that an overnight flight arrives on another day, without converting its time", () => {
+    const { container } = show({ ...leg, end_local: "2026-03-21T07:10" });
+    expect(facts(container)[2]).toEqual(["Arrives", "7:10 AM+1 day"]);
+    expect(container.querySelector("[data-shift]")).toHaveTextContent("+1 day");
+    expect(facts(show(leg).container)[2]).toEqual(["Arrives", "1:20 PM"]);
+  });
+
   it("opens a flight’s booking from its card, like every other kind", async () => {
     const onopen = vi.fn();
     show(leg, { onopen } as never);

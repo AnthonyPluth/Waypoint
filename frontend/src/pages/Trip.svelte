@@ -41,7 +41,7 @@
   import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, bookingCounts, dateLabel, dayIn, dayLabel, headline, isPast, loyaltyNumbers, nextUp, showBookingTravellers, showTripTravellers, tripPeople, tripTravellers, vendorLink, viewerZone } from "$lib/trips";
+  import { appWord, bookingCards, bookingCounts, dateLabel, dayIn, dayLabel, headline, isPast, loyaltyNumbers, nextUp, showBookingTravellers, showTripTravellers, tripPeople, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
   import AvatarStack from "$lib/components/AvatarStack.svelte";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
@@ -506,10 +506,12 @@
   {/if}
 </Sheet>
 
-{#snippet actionRow(s: Segment, tone: "action" | "outline" = "action")}
+{#snippet actionRow(s: Segment, tone: "action" | "outline" = "action", name = headline(s))}
   {@const vendor = vendorLink(s, isMobile())}
-  {#if (!over || staticDemo) && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
-    <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
+  {@const live = s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && !over}
+  {#if (!over || staticDemo) && (live || s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
+    <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${name}`}>
+      {#if live}<Button variant="outline" size="sm" href={`#trip/${s.trip_id}/flight/${s.id}`}>Live status</Button>{/if}
       {#if s.links.app}<Button variant={tone} size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant={tone} size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
@@ -517,14 +519,14 @@
       <GateCode segment={s} {now} onchanged={() => void load()} />
       {#if s.has_email}
         {@const mail = mails[s.id]}
-        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} email for ${name}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
       {/if}
     </div>
   {/if}
   {#if (!over || staticDemo) && s.has_email}
     {@const mail = mails[s.id]}
     {#if mail}
-      <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
+      <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${name}`}>
         {#if mail.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>
         {:else if mail.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{mail.message}</p>
         {:else if !mail.emails.length}<p class="text-sm text-muted-foreground">This email isn’t kept any more.</p>
@@ -548,7 +550,10 @@
       {#if (s.kind === "hotel" || s.kind === "cruise" || s.kind === "parking") && !s.details.address && s.status !== "cancelled" && !over}
         <p class="text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => editFromDetail(s, "segment-address")} aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
       {/if}
-      {@render actionRow(s, "outline")}
+      {@const several = detailCard.segments.length > 1}
+      {@const label = several && s.confirmation ? `${headline(s)} booking ${s.confirmation}` : headline(s)}
+      {#if several}<p class="eyebrow" data-booking-actions>Booking {s.confirmation ?? "without a code"}</p>{/if}
+      {@render actionRow(s, "outline", label)}
     {/each}
   {/if}
 {/snippet}
