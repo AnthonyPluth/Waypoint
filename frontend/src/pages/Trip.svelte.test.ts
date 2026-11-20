@@ -812,6 +812,17 @@ describe("Trip", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("scrolls to the form and focuses its first field when Add booking is pressed in the footer", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    render(TripPage);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Add booking" }));
+    const form = document.querySelector("form") as HTMLElement;
+    expect(scroll).toHaveBeenCalledWith({ block: "nearest", behavior: "smooth" });
+    expect(scroll.mock.contexts.some((c) => (c as HTMLElement).contains(form))).toBe(true);
+    expect(form.contains(document.activeElement)).toBe(true);
+  });
+
   it("still opens Add a booking at the top, above the cards", async () => {
     render(TripPage);
     const u = userEvent.setup();
@@ -1061,6 +1072,12 @@ describe("Trip", () => {
       expect(detail).toHaveTextContent(/9:30 PM/);
       expect(detail).toHaveTextContent(/7:00 PM/);
       expect(within(detail).getAllByText("Departs")).toHaveLength(2);
+      const labels = [...detail.querySelectorAll("dt")].map((d) => d.textContent?.trim());
+      const first = labels.indexOf("Booking");
+      expect(labels.filter((l) => l === "Booking")).toHaveLength(2);
+      expect(labels.slice(first, first + 3)).toEqual(["Booking", "Departs", "Arrives"]);
+      const codes = [...detail.querySelectorAll("dt")].filter((d) => d.textContent?.trim() === "Booking").map((d) => d.nextElementSibling?.textContent?.trim());
+      expect(codes).toEqual(["KQ7M2X", "BBBBBB"]);
     });
   });
 

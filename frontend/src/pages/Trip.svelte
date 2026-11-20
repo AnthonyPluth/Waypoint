@@ -254,6 +254,11 @@
     node.scrollIntoView?.({ block: "nearest", behavior: calm ? "auto" : "smooth" });
   }
 
+  function revealForm(node: HTMLElement) {
+    reveal(node);
+    node.querySelector<HTMLElement>("select, input, textarea")?.focus({ preventScroll: true });
+  }
+
   function edit(s: Segment, field = "") {
     leave(() => {
       focus = field;
@@ -421,7 +426,7 @@
   {#if !over}<OfflineStatus tripId={t.id} />{/if}
 
   {#if form && form.id === null}
-    <div class="mt-6"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
+    <div class="mt-6" use:revealForm><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
   {/if}
 
   {#if t.segments.length === 0}
