@@ -297,21 +297,25 @@ describe("two panes", () => {
     render(Trips);
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     const u = user();
-    await u.click(await within(pane).findByRole("button", { name: "Edit JFK → LHR" }));
-    await u.type(within(pane).getByLabelText("Confirmation code"), "Z");
+    const detail = await openBooking(u, "JFK → LHR");
+    await u.click(within(detail!).getByRole("button", { name: "Edit" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "JFK → LHR" })).toBeNull());
+    document.body.style.pointerEvents = "";
+    await u.type(screen.getByLabelText("Confirmation code"), "Z");
     const links = within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link");
-    await u.click(links[1]);
-    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    document.body.style.pointerEvents = "";
+    const keepEditing = async () => {
+      await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull());
+      document.body.style.pointerEvents = "";
+    };
+    fireEvent.click(links[1]);
+    await keepEditing();
     expect(within(pane).getByRole("heading", { level: 1, name: "Trip to London" })).toBeInTheDocument();
-    expect((within(pane).getByLabelText("Confirmation code") as HTMLInputElement).value.endsWith("Z")).toBe(true);
-    await u.click(person("Sam Doe"));
-    await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Keep editing" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    document.body.style.pointerEvents = "";
+    expect((screen.getByLabelText("Confirmation code") as HTMLInputElement).value.endsWith("Z")).toBe(true);
+    fireEvent.click(person("Sam Doe"));
+    await keepEditing();
     expect(person("Sam Doe")).toHaveAttribute("aria-pressed", "false");
-    await u.click(links[1]);
+    fireEvent.click(links[1]);
     await u.click(within(await screen.findByRole("dialog", { name: "Discard changes?" })).getByRole("button", { name: "Discard changes" }));
     expect(await within(screen.getByRole("region", { name: "Selected trip" })).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
   });
@@ -424,7 +428,7 @@ describe("changing a trip in the pane", () => {
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     await confirmRemove(user(), "Remove Harbour Hotel");
     await waitFor(() => expect(within(pane).queryByRole("button", { name: /Harbour Hotel/ })).toBeNull());
-    expect(within(pane).getByRole("button", { name: "Edit JFK → LHR" })).toBeInTheDocument();
+    expect(pane.querySelector("[data-hero]")).not.toBeNull();
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getByText("Trip to London")).toBeInTheDocument();
   });
 
@@ -472,9 +476,9 @@ describe("changing a trip in the pane", () => {
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     const detail = await openBooking(u, "Harbour Hotel");
     await u.click(within(detail!).getByRole("button", { name: "Edit" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull());
     document.body.style.pointerEvents = "";
-    await u.click(within(pane).getByRole("button", { name: "Save changes" }));
+    await u.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(within(pane).getByRole("button", { name: /Harbour Hotel/ })).toBeInTheDocument();
     expect(location.hash).toBe("#trips?trip=2");
@@ -488,7 +492,7 @@ describe("changing a trip in the pane", () => {
     await u.type(screen.getByLabelText(/^Departs/), "2026-12-01T19:00");
     await u.type(screen.getByLabelText(/^Arrives/), "2026-12-02T07:10");
     await u.click(screen.getByRole("checkbox", { name: "Jane Doe" }));
-    await u.click(screen.getByRole("button", { name: "Add booking" }));
+    await u.click(within(document.querySelector("form")!).getByRole("button", { name: "Add booking" }));
   }
   const addToLondon = () => {
     const answer = vi.mocked(api).getMockImplementation()!;
@@ -508,7 +512,7 @@ describe("changing a trip in the pane", () => {
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     addToLondon();
     await fillBooking(user());
-    expect(await within(pane).findByRole("button", { name: "Edit BOS → CDG" })).toBeInTheDocument();
+    expect(await within(pane).findByRole("button", { name: /BOS → CDG/ })).toBeInTheDocument();
   });
 
   it("says so and offers Try again when the reload after adding a booking fails", async () => {
@@ -526,7 +530,7 @@ describe("changing a trip in the pane", () => {
     expect(await within(pane).findByText("Waypoint is unreachable")).toBeInTheDocument();
     failing = false;
     await user().click(within(pane).getByRole("button", { name: "Try again" }));
-    expect(await within(pane).findByRole("button", { name: "Edit BOS → CDG" })).toBeInTheDocument();
+    expect(await within(pane).findByRole("button", { name: /BOS → CDG/ })).toBeInTheDocument();
   });
 });
 
