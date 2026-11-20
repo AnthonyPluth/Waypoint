@@ -28,6 +28,7 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
 const open = (name: string | RegExp) => openBooking(userEvent, name);
+const value = (dialog: HTMLElement, label: string) => [...dialog.querySelectorAll("dt")].find((d) => d.textContent?.trim() === label)?.nextElementSibling as HTMLElement;
 const editBooking = async (name: string) => {
   const detail = await open(name);
   await userEvent.click(within(detail!).getByRole("button", { name: "Edit" }));
@@ -276,6 +277,27 @@ describe("Trip", () => {
       expect(within(detail).getByRole("button", { name: "View email for Harbour Hotel" })).toBeInTheDocument();
       expect(within(detail).getByRole("button", { name: "Edit" })).toBeInTheDocument();
       expect(within(detail).getByRole("button", { name: "More options for Harbour Hotel" })).toBeInTheDocument();
+    });
+
+    it("keeps a stay's and a parking booking's recorded times, at their place, in the opened booking, and says when a time is not recorded", async () => {
+      const lot = segment({ id: 6, kind: "parking", provider: "Example Parking", origin: "Example Long-Term Lot", destination: null, start_zone: "America/New_York", end_zone: "America/New_York",
+        start_local: "2026-11-20T16:00", end_local: "2026-11-27T21:00", confirmation: "PK1234", details: {} });
+      held = trip([{ ...stay, start_local: "2026-11-21T15:00", end_local: "2026-11-27T10:30" }, lot, { ...stay, id: 7, origin: "Quay Street Lodge", details: { time_unknown: "yes" } }]);
+      render(TripPage);
+      let detail = (await open("Harbour Hotel"))!;
+      expect(value(detail, "Check-in")).toHaveTextContent("Sat, Nov 21 · 3:00 PM");
+      expect(value(detail, "Check-out")).toHaveTextContent("Fri, Nov 27 · 10:30 AM");
+      await userEvent.click(within(detail).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
+      detail = (await open("Example Long-Term Lot"))!;
+      expect(value(detail, "Entry")).toHaveTextContent("Fri, Nov 20 · 4:00 PM");
+      expect(value(detail, "Exit")).toHaveTextContent("Fri, Nov 27 · 9:00 PM");
+      await userEvent.click(within(detail).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
+      detail = (await open("Quay Street Lodge"))!;
+      expect(value(detail, "Check-in")).toHaveTextContent("time not recorded");
     });
 
     it("keeps Edit and the More menu in the opened booking, with Move and Remove under More, and none on the card", async () => {

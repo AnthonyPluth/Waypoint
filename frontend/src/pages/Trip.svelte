@@ -487,7 +487,7 @@
 <PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} onopen={openDetail} />
 
 {#if detailCard}
-  <BookingDetail card={detailCard} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail} above={(!over || staticDemo) ? detailActions : undefined} below={detailMore} />
+  <BookingDetail card={detailCard} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail} above={(!over || staticDemo) ? detailActions : undefined} below={detailMore} withTimes={!over || staticDemo} />
 {/if}
 
 {#snippet pastBookings()}

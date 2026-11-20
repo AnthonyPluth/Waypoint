@@ -19,9 +19,9 @@
   type Props = {
     card: Card; everyone: TripTraveller[]; canChange: boolean; onclose: () => void; onedit: (segment: Segment) => void;
     onmove: (segment: Segment) => void; onremove: (segment: Segment) => void; onCloseAutoFocus?: (event: Event) => void;
-    above?: Snippet; below?: Snippet;
+    above?: Snippet; below?: Snippet; withTimes?: boolean;
   };
-  let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus, above, below }: Props = $props();
+  let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus, above, below, withTimes = false }: Props = $props();
 
   type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; link?: boolean; code?: string; codes?: string[]; people?: { id: number | null; name: string; notes: string[] }[] };
 
@@ -59,7 +59,7 @@
       if (s.kind === "flight") rows.push({ label: "Terminal", value: s.details.terminal });
       rows.push({ label: "Seat", value: unnamed }, { label: "Cabin", value: s.details.cabin });
     } else if (s.kind === "hotel") {
-      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Room", value: s.details.room });
+      rows.push(dates(), ...(withTimes ? [when(START_WORD.hotel, at(s, s.start_local, null, true)), when(END_WORD.hotel, at(s, s.end_local, null, true))] : []), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Room", value: s.details.room });
     } else if (s.kind === "car") {
       const pickup = extraAddress(s)?.trim();
       rows.push(when(START_WORD.car, at(s, s.start_local, s.origin, true)), when(END_WORD.car, at(s, s.end_local, s.destination, true)),
@@ -69,7 +69,7 @@
       rows.push(when(START_WORD.cruise, at(s, s.start_local, s.origin, true)), when(END_WORD.cruise, at(s, s.end_local, s.destination || s.origin, true)),
         { label: "Ports", value: ports, lines: true }, { label: "Terminal address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Ship", value: s.details.ship }, { label: "Cabin", value: s.details.room }, { label: "Deck", value: s.details.deck });
     } else if (s.kind === "parking") {
-      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Space", value: s.details.space_type },
+      rows.push(dates(), ...(withTimes ? [when(START_WORD.parking, at(s, s.start_local, null, true)), when(END_WORD.parking, at(s, s.end_local, null, true))] : []), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Space", value: s.details.space_type },
         { label: "Vehicle", value: s.details.vehicle }, { label: "Notes", value: s.details.notes, lines: true });
     } else {
       const from = dayOf(s, s.start_local), to = dayOf(s, s.end_local);
