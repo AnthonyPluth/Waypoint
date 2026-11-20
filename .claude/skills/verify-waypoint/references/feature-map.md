@@ -248,7 +248,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`, `Add address`.
+- **Touches:** `London`, `Harbour Hotel`, `Camden Guesthouse`, `Stay · Confirmed`, `Add address`.
 - **Expects to see:** `Trips`, `1 Quay Street`.
 - **Drive it:** `tools/control flow hotel-address`; or `poetry run python run.py verify --flow hotel-address`.
 
@@ -271,7 +271,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `San Francisco`, `Show QR code`, `Choose another picture`.
+- **Touches:** `San Francisco`, `Show code for`, `Choose another picture`.
 - **Expects to see:** `Trips`, `Example Airport Long-Term Lot`, `Turn your screen brightness up`.
 - **Drive it:** `tools/control flow parking-gate-code`; or `poetry run python run.py verify --flow parking-gate-code`.
 
@@ -279,8 +279,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `San Francisco`, `Edit Example Airport Long-Term Lot`.
-- **Expects to see:** `Trips`, `Example Airport Long-Term Lot`, `Entry`, `Space type`.
+- **Touches:** `San Francisco`, `Edit`.
+- **Expects to see:** `Trips`, `Example Airport Long-Term Lot`, `ENTRY`, `Space type`.
 - **Drive it:** `tools/control flow parking`; or `poetry run python run.py verify --flow parking`.
 
 #### `past-booking-detail`
@@ -489,7 +489,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`, `Quay Street Lodge`, `San Francisco`.
-- **Expects to see:** `Trips`, `Check-in`, `Pick-up`.
+- **Expects to see:** `Trips`, `CHECK-IN`, `PICK-UP`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
 
 #### `trip-photos`
@@ -579,7 +579,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`, `Add address`, `Time zone`.
+- **Touches:** `London`, `Camden Guesthouse`, `Stay · Confirmed`, `Add address`, `Time zone`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow zone-search-trip`; or `poetry run python run.py verify --flow zone-search-trip`.
 
