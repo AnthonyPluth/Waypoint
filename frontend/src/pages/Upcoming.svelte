@@ -25,7 +25,7 @@
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, laterLine, laterTrips, startsIn } from "$lib/side-column";
-  import { codeReady } from "$lib/gate-code";
+  import { showsCode } from "$lib/gate-code";
   import RowShowCode from "$lib/components/RowShowCode.svelte";
   import { type Day, type DayItem, appWord, bookingTravellers, vendorLink, dayIn, dayLabel, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
@@ -164,7 +164,7 @@
           {#if seg.logo}
             <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} />
           {:else}
-            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative />
+            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative outline />
           {/if}
           <div class="min-w-0 flex-1">
             <p class="break-words text-body font-semibold" class:line-through={seg.status === "cancelled"}>
@@ -173,7 +173,7 @@
             {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
             {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
           </div>
-          {#if item.role === "start" && codeReady(seg, now)}
+          {#if item.role === "start" && showsCode(seg, endAt(seg), now)}
             <RowShowCode segment={seg} {now} />
           {:else}
             <ChevronRight class="size-4 shrink-0 text-label" aria-hidden="true" />

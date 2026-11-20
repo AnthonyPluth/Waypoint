@@ -6,7 +6,7 @@
     {"click": "a[href^='#trip/']:has-text('London') >> visible=true"},
     {"wait_for": "h1:has-text('London')"},
     {"wait_for": "ul[aria-label='Bookings']"},
-    {"expect_text": {"selector": "main", "text": "Check-in"}},
+    {"expect_text": {"selector": "main", "text": "CHECK-IN"}},
     {"screenshot": "flight-trip"},
     {"goto": "#trips"},
     {"click": "a[href^='#trip/']:has-text('Quay Street Lodge') >> visible=true"},
@@ -17,7 +17,7 @@
     {"click": "a[href^='#trip/']:has-text('San Francisco') >> visible=true"},
     {"wait_for": "h1:has-text('San Francisco')"},
     {"wait_for": "ul[aria-label='Bookings']"},
-    {"expect_text": {"selector": "main", "text": "Pick-up"}},
+    {"expect_text": {"selector": "main", "text": "PICK-UP"}},
     {"screenshot": "car-trip"}
   ]
 }

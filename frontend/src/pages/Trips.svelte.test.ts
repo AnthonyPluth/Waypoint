@@ -13,7 +13,7 @@ import { app, backToTrips, layout, route } from "$lib/app.svelte";
 import { panes } from "$lib/panes.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { segment, state, trip } from "../test/fixtures";
-import { bookingOptions } from "../test/menu";
+import { bookingOptions, openBooking, topDialog } from "../test/menu";
 import Trips from "./Trips.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -377,7 +377,7 @@ describe("changing a trip in the pane", () => {
 
   const confirmRemove = async (u: ReturnType<typeof user>, name: string) => {
     await bookingOptions(u, name);
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     document.body.style.pointerEvents = "";
   };
@@ -407,7 +407,7 @@ describe("changing a trip in the pane", () => {
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     const u = user();
     await bookingOptions(u, "Move Harbour Hotel");
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await topDialog();
     const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
     await waitFor(() => expect(within(choose).getByRole("option", { name: /Trip to Orlando/ })).toBeInTheDocument());
     await u.selectOptions(choose, "3");
@@ -423,7 +423,7 @@ describe("changing a trip in the pane", () => {
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     await confirmRemove(user(), "Remove Harbour Hotel");
-    await waitFor(() => expect(within(pane).queryByRole("button", { name: "Edit Harbour Hotel" })).toBeNull());
+    await waitFor(() => expect(within(pane).queryByRole("button", { name: /Harbour Hotel/ })).toBeNull());
     expect(within(pane).getByRole("button", { name: "Edit JFK → LHR" })).toBeInTheDocument();
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getByText("Trip to London")).toBeInTheDocument();
   });
@@ -469,10 +469,14 @@ describe("changing a trip in the pane", () => {
     render(Trips);
     const pane = await screen.findByRole("region", { name: "Selected trip" });
     const u = user();
-    await u.click(await within(pane).findByRole("button", { name: "Edit Harbour Hotel" }));
+    await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
+    const detail = await openBooking(u, "Harbour Hotel");
+    await u.click(within(detail!).getByRole("button", { name: "Edit" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    document.body.style.pointerEvents = "";
     await u.click(within(pane).getByRole("button", { name: "Save changes" }));
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
-    expect(within(pane).getByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+    expect(within(pane).getByRole("button", { name: /Harbour Hotel/ })).toBeInTheDocument();
     expect(location.hash).toBe("#trips?trip=2");
     expect(within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link")[1]).toHaveAttribute("aria-current", "true");
   });

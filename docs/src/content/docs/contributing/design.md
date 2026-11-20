@@ -48,6 +48,18 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - Progress comes from the booked times, so the line needs no live data.
 - Pass `label` to give the line an accessible description; otherwise it is hidden from assistive technology.
 
+## Booking card
+
+`BookingCard.svelte` is the card for a stay, car, train, cruise, parking booking or past visit on a trip that is not over (`pages/Trip.svelte`). The design is `docs/design/clean-and-bold/` (#876, #878); the card is built in #882.
+
+- A black card with 24 px corners and no border or shadow. The header row is the tap target (at least 64 px) and opens the booking’s detail, `BookingDetail.svelte`, the same component a completed trip uses.
+- The header: the kind icon as a coloured outline with no chip (`KindTile` with `outline`), the name in bold, a grey line such as “Stay · Alfama” or “Train · Sat, Mar 13” ending in the status word (a green “Confirmed”, an amber “Changed” or “Cancelled”), and a chevron.
+- Three label-over-value facts from `cardFacts` in `frontend/src/lib/trips.ts`: stay Check-in, Nights, Check-out; car Pick-up, Days, Return; train Departs, From, Arrives; cruise Embarks, Nights, Disembarks; parking Entry, Days, Exit; visit From, Days, To. The mockup words Nights, Days, Return and From sit beside today’s `START_WORD` and `END_WORD`. Times are in Geist Mono.
+- “Show code” is the one blue button, on a parking booking that has a QR code and has not ended (`showsCode` in `gate-code.ts`, the rule `GateCode` uses), and nowhere else.
+- No confirmation code, cost, address, traveller or loyalty number is on the card. They are in the detail, with the actions (booking link, directions, call, the email, Edit, Move, Remove), which `Trip.svelte` passes to `BookingDetail` as its `above` and `below` snippets while the trip is not over.
+
+`PassCard.svelte` is still the card for flights `FlightCard` does not draw (cancelled, or with no time recorded), for the Upcoming page’s next booking and day list, for the offline trip and for this design page.
+
 ## Pass card
 
 `PassCard.svelte` is the one card for a booking you are planning or checking in for, with a variant for each kind (flight, hotel, car, train, cruise). Top to bottom:
@@ -106,7 +118,7 @@ The headline, the plane and the Next up card follow set rules:
 
 ## Kind tiles and avatar stacks
 
-`KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car` as the icon stroke; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
+`KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. With `outline` it is the clean and bold form: the icon alone, 26 px, in the kind’s colour, with no square or tint; the booking card and the booking detail use it, and other pages keep the tinted form until #879 decides them. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car` as the icon stroke; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
 
 `AvatarStack.svelte` overlaps up to four initials circles and then shows a “+N” circle.
 
@@ -146,7 +158,7 @@ The labels keep their contrast over bright content too (an expanded email previe
   - `Upcoming.svelte` splits the list at today, with earlier days in a native `<details>` so the toggle is keyboard accessible without script.
   - The page is the title in the large heavy face (`text-display`, `text-display-lg` from `md`), the review line, the next-up hero and the day list, to `docs/design/clean-and-bold/i-upcoming.html`. From a container width of 900px the hero and what goes with it sit in the left column and the day list, headed “Coming up”, in the right; below it the list goes under the hero. There are no stat tiles and no banners.
   - The review line is one link of at least 44px, with an amber dot, the count in the muted text colour and a chevron, shown only when `review_count` is above zero; it carries the count and nothing of any email.
-  - A day is a small uppercase label over its rows. The first day with a booking that is not cancelled and still has something to come, at the times of its places, carries a blue dot and “Next”; a day whose bookings are all over or cancelled never does. A row is the time in bold tabular figures, the booking’s brand logo (or its `KindTile` when it has none), the title and a grey line, at least 44px, with a hairline under it, and opens what it opened before. A parking booking whose gate code is ready (`codeReady` in `frontend/src/lib/gate-code.ts`) shows a blue “Show code”, `RowShowCode.svelte`, in place of the chevron.
+  - A day is a small uppercase label over its rows. The first day with a booking that is not cancelled and still has something to come, at the times of its places, carries a blue dot and “Next”; a day whose bookings are all over or cancelled never does. A row is the time in bold tabular figures, the booking’s brand logo (or its outline `KindTile` when it has none), the title and a grey line, at least 44px, with a hairline under it, and opens what it opened before. A parking booking whose gate code is ready (`showsCode` in `frontend/src/lib/gate-code.ts`) shows a blue “Show code”, `RowShowCode.svelte`, in place of the chevron.
   - Not drawn in the designs and kept as they were, on the new tokens: the hero when the next booking is not a flight, Also under way, the arrival card and the offline status.
 - **Review: the form.** The add-by-hand and check-suggestion form, with the email, opens in the sheet at every width.
   - It takes `wide` (a side sheet of up to 40rem), `split` (from 1100px, `SPLIT_QUERY` in `phone.svelte.ts`, up to 72rem with the email beside the form) and `onOpenAutoFocus` to choose where focus lands.
