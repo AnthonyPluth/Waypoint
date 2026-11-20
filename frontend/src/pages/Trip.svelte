@@ -433,7 +433,7 @@
       {@const s = card.lead}
       {#if flightCard(card)}
         <li id={`segment-${s.id}`} class="scroll-mt-20" data-flight-card>
-          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`}>
+          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showTripTravellers(everyone, app.state?.person_id ?? null)} ondetail={(from) => openDetail(s, from)}>
             {#snippet footer()}
               {#if card.segments.length === 1}
                 {@render flightBooking(s)}
