@@ -10,6 +10,8 @@
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
+  import PassCard from "$lib/components/PassCard.svelte";
+  import BookingCard from "$lib/components/BookingCard.svelte";
   import BookingDetail from "$lib/components/BookingDetail.svelte";
   import PastBookings from "$lib/components/PastBookings.svelte";
   import PastBookingsSheet from "$lib/components/PastBookingsSheet.svelte";
@@ -33,7 +35,6 @@
   import MessageView from "$lib/components/MessageView.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
-  import PassCard from "$lib/components/PassCard.svelte";
   import StatusChip from "$lib/components/StatusChip.svelte";
   import { bookingChip } from "$lib/status";
   import PastTrip from "$lib/components/PastTrip.svelte";
@@ -231,7 +232,7 @@
     opener = null;
     if (back?.isConnected) { e.preventDefault(); back.focus(); }
   };
-  const editFromDetail = (s: Segment) => { detailId = null; bookingsOpen = false; edit(s); };
+  const editFromDetail = (s: Segment, field = "") => { detailId = null; bookingsOpen = false; edit(s, field); };
   const moveFromDetail = (s: Segment) => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); };
   const removeFromDetail = (s: Segment) => { removing = s; asking = true; };
   const liveOn = $derived(flightStatus.list?.enabled === true);
@@ -446,6 +447,8 @@
             {/snippet}
           </FlightCard>
         </li>
+      {:else if s.kind !== "flight"}
+        <BookingCard {card} {now} id={`segment-${s.id}`} highlight={wanted === String(s.id)} onopen={openDetail} />
       {:else if card.segments.length === 1}
         <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={omitted(s)}>
           {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
@@ -484,7 +487,7 @@
 <PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} onopen={openDetail} />
 
 {#if detailCard}
-  <BookingDetail card={detailCard} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail} />
+  <BookingDetail card={detailCard} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail} above={(!over || staticDemo) ? detailActions : undefined} below={detailMore} />
 {/if}
 
 {#snippet pastBookings()}
@@ -584,11 +587,15 @@
         aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
     {/if}
   {/if}
+  {@render actionRow(s)}
+{/snippet}
+
+{#snippet actionRow(s: Segment, tone: "action" | "outline" = "action")}
   {@const vendor = vendorLink(s, isMobile())}
   {#if (!over || staticDemo) && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
     <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
-      {#if s.links.app}<Button variant="action" size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
-      {:else if vendor}<Button variant="action" size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
+      {#if s.links.app}<Button variant={tone} size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
+      {:else if vendor}<Button variant={tone} size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
       {#if s.status !== "cancelled" && s.links.call}<Button variant="outline" size="sm" href={s.links.call}>Call</Button>{/if}
       <GateCode segment={s} {now} onchanged={() => void load()} />
@@ -615,6 +622,26 @@
         {/if}
       </div>
     {/if}
+  {/if}
+{/snippet}
+
+{#snippet detailActions()}
+  {#if detailCard}
+    {#each detailCard.segments as s (s.id)}
+      {#if (s.kind === "hotel" || s.kind === "cruise" || s.kind === "parking") && !s.details.address && s.status !== "cancelled" && !over}
+        <p class="text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => editFromDetail(s, "segment-address")} aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
+      {/if}
+      {@render actionRow(s, "outline")}
+    {/each}
+  {/if}
+{/snippet}
+
+{#snippet detailMore()}
+  {#if detailCard}
+    {#each detailCard.segments as s (s.id)}
+      {@render ports(s)}
+      {#if !over}{@render membershipList(s)}{/if}
+    {/each}
   {/if}
 {/snippet}
 

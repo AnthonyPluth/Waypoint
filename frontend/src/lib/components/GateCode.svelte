@@ -13,8 +13,8 @@
   import X from "@lucide/svelte/icons/x";
   import { toast } from "svelte-sonner";
 
-  type Props = { segment: Segment; now: number; onchanged?: () => void; showing?: boolean; buttons?: boolean; readOnly?: boolean };
-  let { segment, now, onchanged, showing = $bindable(false), buttons = true, readOnly = false }: Props = $props();
+  type Props = { segment: Segment; now: number; onchanged?: () => void; showing?: boolean; buttons?: boolean; readOnly?: boolean; returnFocus?: HTMLElement | null };
+  let { segment, now, onchanged, showing = $bindable(false), buttons = true, readOnly = false, returnFocus = null }: Props = $props();
 
   type Picture = { email: number; image: number; src: string };
 
@@ -80,7 +80,7 @@
 
   function giveFocusBack(e: Event) {
     e.preventDefault();
-    returnTo?.focus();
+    (returnTo ?? returnFocus)?.focus();
   }
 
   async function loadPictures() {

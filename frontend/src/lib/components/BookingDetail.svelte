@@ -1,6 +1,8 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { Segment } from "$lib/api-types";
   import { app } from "$lib/app.svelte";
+  import AddressLink from "$lib/components/AddressLink.svelte";
   import AvatarStack from "$lib/components/AvatarStack.svelte";
   import CopyButton from "$lib/components/CopyButton.svelte";
   import KindTile from "$lib/components/KindTile.svelte";
@@ -17,10 +19,11 @@
   type Props = {
     card: Card; everyone: TripTraveller[]; canChange: boolean; onclose: () => void; onedit: (segment: Segment) => void;
     onmove: (segment: Segment) => void; onremove: (segment: Segment) => void; onCloseAutoFocus?: (event: Event) => void;
+    above?: Snippet; below?: Snippet;
   };
-  let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus }: Props = $props();
+  let { card, everyone, canChange, onclose, onedit, onmove, onremove, onCloseAutoFocus, above, below }: Props = $props();
 
-  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; code?: string; codes?: string[]; people?: { id: number | null; name: string; notes: string[] }[] };
+  type Row = { label: string; value?: string; lines?: boolean; strike?: boolean; address?: string; link?: boolean; code?: string; codes?: string[]; people?: { id: number | null; name: string; notes: string[] }[] };
 
   const first = $derived(card.lead);
   const name = $derived(first.kind === "flight" || first.kind === "train" ? bookingName(first) : headline(first));
@@ -56,17 +59,17 @@
       if (s.kind === "flight") rows.push({ label: "Terminal", value: s.details.terminal });
       rows.push({ label: "Seat", value: unnamed }, { label: "Cabin", value: s.details.cabin });
     } else if (s.kind === "hotel") {
-      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim() }, { label: "Room", value: s.details.room });
+      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Room", value: s.details.room });
     } else if (s.kind === "car") {
       const pickup = extraAddress(s)?.trim();
       rows.push(when(START_WORD.car, at(s, s.start_local, s.origin, true)), when(END_WORD.car, at(s, s.end_local, s.destination, true)),
-        { label: "Car", value: s.details.car_class }, { label: "Pick-up address", value: pickup, address: pickup });
+        { label: "Car", value: s.details.car_class }, { label: "Pick-up address", value: pickup, address: pickup, link: !struck });
     } else if (s.kind === "cruise") {
       const ports = [...new Set(s.days.flatMap((d) => (d.sea ? [] : d.stops.map((p) => p.name))))].join(", ");
       rows.push(when(START_WORD.cruise, at(s, s.start_local, s.origin, true)), when(END_WORD.cruise, at(s, s.end_local, s.destination || s.origin, true)),
-        { label: "Ports", value: ports, lines: true }, { label: "Ship", value: s.details.ship }, { label: "Cabin", value: s.details.room }, { label: "Deck", value: s.details.deck });
+        { label: "Ports", value: ports, lines: true }, { label: "Terminal address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Ship", value: s.details.ship }, { label: "Cabin", value: s.details.room }, { label: "Deck", value: s.details.deck });
     } else if (s.kind === "parking") {
-      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim() }, { label: "Space", value: s.details.space_type },
+      rows.push(dates(), { label: "Address", value: s.details.address?.trim(), address: s.details.address?.trim(), link: !struck }, { label: "Space", value: s.details.space_type },
         { label: "Vehicle", value: s.details.vehicle }, { label: "Notes", value: s.details.notes, lines: true });
     } else {
       const from = dayOf(s, s.start_local), to = dayOf(s, s.end_local);
@@ -121,7 +124,7 @@
 </script>
 
 <Sheet bind:open={() => true, (v) => { if (!v) onclose(); }} title={name} description={subtitle} panel {onCloseAutoFocus}>
-  {#snippet lead()}<KindTile kind={first.kind} size={viewport.phone ? 40 : 44} decorative />{/snippet}
+  {#snippet lead()}<KindTile kind={first.kind} size={viewport.phone ? 40 : 44} decorative outline />{/snippet}
   {#snippet actions()}
     {#if canChange}
       <Button variant="outline" size="sm" onclick={() => onedit(first)}>Edit</Button>
@@ -138,6 +141,7 @@
       <StatusChip chip={bookingChip("changed")} />
     {/if}
     {#each notes as note (note)}<p class="text-sm text-signal-ink" role="note">{note}</p>{/each}
+    {@render above?.()}
     <dl class="border-t border-border">
       {#each rows as row, i (i)}
         <div class="flex items-start justify-between gap-4 border-b border-border py-[11px] last:border-b-0 md:py-[13px]">
@@ -154,7 +158,7 @@
                 {/if}
               </span>
             {:else}
-              <span class={`min-w-0 break-words ${row.strike ? "text-muted-foreground line-through" : ""}`}>{row.value}</span>
+              {#if row.address && row.link}<AddressLink address={row.address} text={row.value} class="min-w-0 break-words" />{:else}<span class={`min-w-0 break-words ${row.strike ? "text-muted-foreground line-through" : ""}`}>{row.value}</span>{/if}
               {#if row.code}<span class="mono text-muted-foreground">{row.code}</span>{/if}
               {#if row.address}<CopyButton text={row.address} name="Copy address" />{/if}
             {/if}
@@ -162,5 +166,6 @@
         </div>
       {/each}
     </dl>
+    {@render below?.()}
   </div>
 </Sheet>

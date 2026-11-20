@@ -13,7 +13,7 @@ import { app, layout, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
 import { membership, segment, state, trip } from "../test/fixtures";
-import { bookingOptions, tripOptions } from "../test/menu";
+import { bookingOptions, openBooking, tripOptions, topDialog } from "../test/menu";
 import TripPage from "./Trip.svelte";
 
 const jane: Person = { id: 1, display_name: "Jane Doe", first_name: "Jane", legal_name: null, aliases: [], member: true, links: [] };
@@ -27,7 +27,9 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   segment_id: 1, state: "delayed", origin: "JFK", destination: "LHR", dep_scheduled: "2026-11-20T19:00", dep_estimated: "2026-11-20T19:50",
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
-const isCard = (li: Element) => li.classList.contains("pass") || li.hasAttribute("data-flight-card");
+const open = (name: string | RegExp) => openBooking(userEvent, name);
+const editBooking = async (name: string) => { const detail = await open(name); await userEvent.click(within(detail!).getByRole("button", { name: "Edit" })); };
+const isCard = (li: Element) => li.classList.contains("pass") || li.hasAttribute("data-flight-card") || li.hasAttribute("data-booking-card");
 let held: TripT;
 let summary: TripSummaryT;
 let loyalty: LoyaltyEntry[];
@@ -128,12 +130,13 @@ describe("Trip", () => {
     expect(vi.mocked(api).mock.calls.filter(([path]) => String(path).startsWith("/api/flight-status/"))).toEqual([]);
   });
 
-  it("shows a stay’s brand logo on its card, and never an airline’s on a flight, whose mark is Waypoint’s own", async () => {
+  it("draws a stay’s kind icon on its card, with no brand logo, and never an airline’s on a flight, whose mark is Waypoint’s own", async () => {
     held = trip([{ ...flight, logo: "/api/segments/1/logo" }, { ...stay, logo: "/api/segments/2/logo" }]);
     render(TripPage);
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
     expect(cards[0].querySelector("img")).toBeNull();
-    expect(cards[1].querySelector("img")?.getAttribute("src")).toBe("/api/segments/2/logo");
+    expect(cards[1].querySelector("img")).toBeNull();
+    expect(within(cards[1]).getByRole("img", { name: "stay" })).toBeInTheDocument();
   });
 
   describe("travellers", () => {
@@ -198,7 +201,8 @@ describe("Trip", () => {
       held = trip([flightFor, { ...stay, booked_by: 1, travelers: [
         { id: 4, person_id: 1, name: "Jane Doe", seat: null }, { id: 5, person_id: 2, name: "Sam Doe", seat: null }, { id: 6, person_id: null, name: "DOE/MIA MISS", seat: null }] }]);
       render(TripPage);
-      const card = await cardOf(stay);
+      await cardOf(stay);
+      const card = (await open("Harbour Hotel"))!;
       expect(within(card).queryByText("Travellers")).toBeNull();
       expect(card).not.toHaveTextContent("Sam Doe");
       expect(card).not.toHaveTextContent("DOE/MIA MISS");
@@ -212,15 +216,16 @@ describe("Trip", () => {
       loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" }), membership({ id: 13, person_id: 2, kind: "hotel", program: "Marriott Bonvoy", masked: "••••5512" })];
       held = trip([flightFor, { ...stay, travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }, { id: 5, person_id: 2, name: "Sam Doe", seat: null }] }]);
       const { unmount } = render(TripPage);
-      let card = await cardOf(stay);
+      let card = (await open("Harbour Hotel"))!;
       expect(card.querySelectorAll("[data-membership] li")).toHaveLength(2);
       expect(within(card).getByText("Loyalty")).toBeInTheDocument();
       expect(card).not.toHaveTextContent("Sam Doe");
       expect(card).not.toHaveTextContent("Jane Doe");
       unmount();
       loyalty = [];
+      document.body.style.pointerEvents = "";
       render(TripPage);
-      card = await cardOf(stay);
+      card = (await open("Harbour Hotel"))!;
       expect(card.querySelector("[data-membership]")).toBeNull();
       expect(within(card).queryByText("Loyalty")).toBeNull();
     });
@@ -250,10 +255,32 @@ describe("Trip", () => {
       expect(screen.getByRole("button", { name: "Delete trip" })).toBeInTheDocument();
     });
 
-    it("keeps Edit on each booking and Move and Remove under that booking’s More menu", async () => {
+    it("lists a stay as a compact card with no confirmation code, cost, address or traveller, and keeps all of them behind its tap", async () => {
+      held = trip([flight, { ...stay, has_email: true, price: { amount_minor: 31000, currency: "GBP", source: "manual" } }]);
+      render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      const card = document.querySelector("[data-booking-card='hotel']") as HTMLElement;
+      for (const hidden of ["H88231", "310", "Quay Street", "Jane Doe", "Loyalty", "Marriott Bonvoy"]) expect(card).not.toHaveTextContent(hidden);
+      expect(card.querySelectorAll("dt")).toHaveLength(3);
+      const detail = (await open("Harbour Hotel"))!;
+      expect(within(detail).getByRole("button", { name: "Copy confirmation code H88231" })).toBeInTheDocument();
+      expect(within(detail).getByRole("button", { name: /Copy address 1 Quay Street/ })).toBeInTheDocument();
+      expect(within(detail).getByText(/£310\.00/)).toBeInTheDocument();
+      expect(within(detail).getByRole("link", { name: "Directions" })).toBeInTheDocument();
+      expect(within(detail).getByRole("link", { name: "Call" })).toBeInTheDocument();
+      expect(within(detail).getByRole("button", { name: "View email for Harbour Hotel" })).toBeInTheDocument();
+      expect(within(detail).getByRole("button", { name: "Edit" })).toBeInTheDocument();
+      expect(within(detail).getByRole("button", { name: "More options for Harbour Hotel" })).toBeInTheDocument();
+    });
+
+    it("keeps Edit and the More menu in the opened booking, with Move and Remove under More, and none on the card", async () => {
       render(TripPage);
       const u = userEvent.setup();
-      expect(await screen.findByRole("button", { name: "Edit Harbour Hotel" })).toBeInTheDocument();
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.queryByRole("button", { name: "Edit Harbour Hotel" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "More options for Harbour Hotel" })).toBeNull();
+      const detail = (await open("Harbour Hotel"))!;
+      expect(within(detail).getByRole("button", { name: "Edit" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Move Harbour Hotel" })).toBeNull();
       expect(screen.queryByRole("button", { name: "Remove Harbour Hotel" })).toBeNull();
       await u.click(screen.getByRole("button", { name: "More options for Harbour Hotel" }));
@@ -267,7 +294,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Delete trip");
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await topDialog();
       expect(dialog).toHaveTextContent(/Delete .*\?/);
       expect(dialog).toHaveTextContent("Its 2 bookings are removed too. This can’t be undone.");
       await u.click(within(dialog).getByRole("button", { name: "Cancel" }));
@@ -278,14 +305,14 @@ describe("Trip", () => {
       held = trip([flight]);
       render(TripPage);
       await tripOptions(userEvent, "Delete trip");
-      expect(await screen.findByRole("dialog")).toHaveTextContent("Its 1 booking is removed too.");
+      expect(await topDialog()).toHaveTextContent("Its 1 booking is removed too.");
     });
 
     it("deletes the trip once confirmed and goes back to Trips", async () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Delete trip");
-      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await u.click(within(await topDialog()).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       await waitFor(() => expect(location.hash).toBe("#trips"));
     });
@@ -296,7 +323,7 @@ describe("Trip", () => {
       await u.click(await screen.findByRole("button", { name: "Edit trip details" }));
       await u.type(screen.getByLabelText("Name"), " again");
       await tripOptions(u, "Delete trip");
-      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await u.click(within(await topDialog()).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(route.page).toBe("trips"));
       expect(location.hash).toBe("#trips");
       expect(screen.queryByRole("dialog", { name: "Discard changes?" })).toBeNull();
@@ -311,7 +338,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Delete trip");
-      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete trip" }));
+      await u.click(within(await topDialog()).getByRole("button", { name: "Delete trip" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "DELETE" }));
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
@@ -335,7 +362,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Merge another trip");
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await topDialog();
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
       expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument();
@@ -358,7 +385,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Merge another trip");
-      let dialog = await screen.findByRole("dialog");
+      let dialog = await topDialog();
       const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
       await u.selectOptions(choose, "7");
@@ -381,7 +408,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await tripOptions(u, "Merge another trip");
-      const choose = await within(await screen.findByRole("dialog")).findByRole("combobox", { name: "Trip to merge in" });
+      const choose = await within(await topDialog()).findByRole("combobox", { name: "Trip to merge in" });
       await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(5));
       const names = within(choose).getAllByRole("option").slice(1).map((o) => o.textContent?.split(" · ")[0]);
       expect(names).toEqual(["Newest", "Middle", "Oldest", "Undated"]);
@@ -393,7 +420,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await bookingOptions(u, /^Move /);
-      const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
+      const choose = within(await topDialog()).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
       expect(within(choose).queryByRole("option", { name: "A new trip of its own" })).toBeNull();
     });
@@ -403,7 +430,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await bookingOptions(u, "Move Harbour Hotel");
-      let dialog = await screen.findByRole("dialog");
+      let dialog = await topDialog();
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       expect(within(dialog).getByRole("button", { name: "Move" })).toBeDisabled();
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
@@ -414,7 +441,7 @@ describe("Trip", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       await waitFor(() => expect(getComputedStyle(document.body).pointerEvents).not.toBe("none"));
       await bookingOptions(u, "Move Harbour Hotel");
-      dialog = await screen.findByRole("dialog");
+      dialog = await topDialog();
       await u.selectOptions(within(dialog).getByRole("combobox", { name: "Move it to" }), "new");
       await u.click(within(dialog).getByRole("button", { name: "Move" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2/move", { method: "POST", body: { trip_id: null } }));
@@ -432,7 +459,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await bookingOptions(u, "Move Harbour Hotel");
-      const choose = within(await screen.findByRole("dialog")).getByRole("combobox", { name: "Move it to" });
+      const choose = within(await topDialog()).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Newest trip/ })).toBeInTheDocument());
       const names = within(choose).getAllByRole("option").map((o) => o.textContent ?? "");
       expect(names.filter((n) => n.includes(" · ")).map((n) => n.split(" · ")[0])).toEqual(["Newest trip", "Same day, later id", "Spring trip", "Older trip"]);
@@ -452,7 +479,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await bookingOptions(u, "Move Harbour Hotel");
-      let dialog = await screen.findByRole("dialog");
+      let dialog = await topDialog();
       const choose = within(dialog).getByRole("combobox", { name: "Move it to" });
       await waitFor(() => expect(within(choose).getByRole("option", { name: /Spring trip/ })).toBeInTheDocument());
       await u.selectOptions(choose, "7");
@@ -538,8 +565,8 @@ describe("Trip", () => {
     ], { start_date: "2005-03-10", end_date: "2999-01-01" });
     render(TripPage);
     const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
-    expect(cards[0]).toHaveTextContent(/Check-out\s*Tue, Mar 10, time not recorded/);
-    expect(cards[1]).toHaveTextContent(/From\s*Thu, Mar 10, 2005\s*To\s*Tue, Mar 29, 2005/);
+    expect(cards[0]).toHaveTextContent(/Check-out\s*Mar 10/);
+    expect(cards[1]).toHaveTextContent(/From\s*Mar 10, 2005\s*Days\s*19\s*To\s*Mar 29, 2005/);
     expect(cards[1]).not.toHaveTextContent("time not recorded");
     expect(cards[1]).not.toHaveTextContent("Time not recorded");
   });
@@ -547,6 +574,7 @@ describe("Trip", () => {
   it("offers each booking’s actions, and no Wallet", async () => {
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
+    await open("Harbour Hotel");
     const hotel = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
     expect(hotel.getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=1%20Quay%20Street%2C%20London");
     expect(hotel.getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+442079460000");
@@ -567,6 +595,7 @@ describe("Trip", () => {
     held = trip([{ ...stay, links: { app: null, open: "https://www.example-vendor.example/", open_kind: "website", directions: null, call: null } }]);
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
+    await open("Harbour Hotel");
     const site = screen.getAllByRole("link", { name: "Open website" });
     expect(site.length).toBeGreaterThan(0);
     for (const link of site) {
@@ -595,6 +624,7 @@ describe("Trip", () => {
     held = trip([{ ...stay, status: "cancelled", links: { app: "https://example.com/manage", open: null, open_kind: null, directions: "https://www.google.com/maps/search/?api=1&query=x", call: "tel:+442079460000" } }]);
     render(TripPage);
     await screen.findByRole("heading", { name: "Trip to London" });
+    await open("Harbour Hotel");
     const group = within(screen.getByRole("group", { name: /Actions for Harbour Hotel/ }));
     expect(group.getByRole("link", { name: "Manage booking" })).toHaveAttribute("href", "https://example.com/manage");
     expect(group.queryByRole("link", { name: "Directions" })).toBeNull();
@@ -619,12 +649,15 @@ describe("Trip", () => {
     expect(first.getByText(/Not matched to a person/)).toBeInTheDocument();
     const hotel = within(cards[1]);
     expect(hotel.getByText("Changed")).toBeInTheDocument();
-    expect(hotel.getByRole("button", { name: /^Show and copy Marriott Bonvoy number/ })).toHaveTextContent("••••8899");
+    expect(hotel.queryByRole("button", { name: /Marriott Bonvoy number/ })).toBeNull();
+    const detail = (await open("Harbour Hotel"))!;
+    expect(within(detail).getByRole("button", { name: /^Show and copy Marriott Bonvoy number/ })).toHaveTextContent("••••8899");
   });
 
   it("reveals a number only when asked, copies it, and hides it again", async () => {
     render(TripPage);
     const u = userEvent.setup();
+    await open("Harbour Hotel");
     const button = await screen.findByRole("button", { name: /^Show and copy Marriott Bonvoy number/ });
     expect(api).not.toHaveBeenCalledWith(expect.stringContaining("/reveal"), expect.anything());
     await u.click(button);
@@ -637,6 +670,7 @@ describe("Trip", () => {
   it("says a number can't be read with this key rather than showing nothing", async () => {
     loyalty = [membership({ id: 12, kind: "hotel", program: "Marriott Bonvoy", readable: false, masked: "••••" })];
     render(TripPage);
+    await open("Harbour Hotel");
     expect(await screen.findByText(/Can’t be read with this key/)).toBeInTheDocument();
   });
 
@@ -681,7 +715,7 @@ describe("Trip", () => {
       if (opts?.method === "DELETE") return { ok: true };
       throw new Error("Waypoint is unreachable");
     });
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(await screen.findByText("Waypoint is unreachable")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Trip to London" })).toBeNull();
@@ -710,7 +744,7 @@ describe("Trip", () => {
     Element.prototype.scrollIntoView = scrollIntoView;
     render(TripPage);
     const u = userEvent.setup();
-    await u.click(await screen.findByRole("button", { name: "Edit Harbour Hotel" }));
+    await editBooking("Harbour Hotel");
     const form = screen.getByRole("listitem", { name: "Edit booking" });
     expect(form.previousElementSibling).toHaveTextContent("Harbour Hotel");
     expect(within(form).getByLabelText("Hotel name")).toBeInTheDocument();
@@ -879,14 +913,17 @@ describe("Trip", () => {
     it("leads with the lot, shows Entry and Exit at the lot’s times, its address, details and a Directions button", async () => {
       held = trip([lot]);
       render(TripPage);
-      const card = (await screen.findByRole("heading", { name: "Example Long-Term Lot" })).closest(".pass") as HTMLElement;
+      await screen.findByRole("list", { name: "Bookings" });
+      const card = document.querySelector("[data-booking-card='parking']") as HTMLElement;
       expect(within(card).getByText("Entry")).toBeInTheDocument();
+      expect(within(card).getByText("Days")).toBeInTheDocument();
       expect(within(card).getByText("Exit")).toBeInTheDocument();
       expect(within(card).getByText("4:00 PM")).toBeInTheDocument();
-      expect(within(card).getByText("9:00 PM")).toBeInTheDocument();
-      expect(within(card).getByText("Covered")).toBeInTheDocument();
-      expect(within(card).getByText("Blue hatchback")).toBeInTheDocument();
-      expect(screen.getByText("Address")).toBeInTheDocument();
+      expect(card).not.toHaveTextContent(/Covered|Blue hatchback|Terminal Road|PK1234/);
+      const detail = (await open("Example Long-Term Lot"))!;
+      expect(within(detail).getByText("Covered")).toBeInTheDocument();
+      expect(within(detail).getByText("Blue hatchback")).toBeInTheDocument();
+      expect(within(detail).getByText("Address")).toBeInTheDocument();
       expect(screen.queryByTestId("stay-zone")).toBeNull();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", lot.links.directions!);
     });
@@ -895,7 +932,7 @@ describe("Trip", () => {
       held = trip([{ ...lot, details: { ...lot.details, time_unknown: "no" } }]);
       const u = userEvent.setup();
       render(TripPage);
-      await u.click(await screen.findByRole("button", { name: "Edit Example Long-Term Lot" }));
+      await editBooking("Example Long-Term Lot");
       expect(screen.getByLabelText("Lot name")).toHaveValue("Example Long-Term Lot");
       expect(screen.getByLabelText("Space type (covered, economy, valet)")).toHaveValue("Covered");
       await u.clear(screen.getByLabelText("Space type (covered, economy, valet)"));
@@ -908,6 +945,7 @@ describe("Trip", () => {
     it("offers adding an address when there is none", async () => {
       held = trip([{ ...lot, details: {}, links: { ...lot.links, directions: null } }]);
       render(TripPage);
+      await open("Example Long-Term Lot");
       expect(await screen.findByRole("button", { name: "Add address to Example Long-Term Lot" })).toBeInTheDocument();
     });
   });
@@ -916,7 +954,7 @@ describe("Trip", () => {
     render(TripPage);
     const u = userEvent.setup();
     await bookingOptions(u, "Remove Harbour Hotel");
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/2", { method: "DELETE" }));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Harbour Hotel" })).toBeNull());
   });
@@ -951,7 +989,7 @@ describe("Trip", () => {
       render(TripPage);
       const u = userEvent.setup();
       await bookingOptions(u, "Remove JFK → LHR booking BBBBBB");
-      await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+      await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/segments/5", { method: "DELETE" }));
       expect(api).not.toHaveBeenCalledWith("/api/segments/1", expect.anything());
     });
@@ -1006,9 +1044,8 @@ describe("Trip", () => {
 
     it("gives a hotel guest no seat field", async () => {
       held = trip([stay]);
-      const u = userEvent.setup();
       render(TripPage);
-      await u.click(await screen.findByRole("button", { name: "Edit Harbour Hotel" }));
+      await editBooking("Harbour Hotel");
       expect(screen.queryByLabelText(/^Seat/)).toBeNull();
     });
   });
@@ -1057,6 +1094,7 @@ describe("Trip", () => {
       Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
       held = trip([{ ...stay, details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       render(TripPage);
+      await open("Harbour Hotel");
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
       expect(writeText).toHaveBeenCalledWith("1 Quay Street\nLondon E1 0AA");
       expect(screen.queryByRole("button", { name: /Add address/ })).toBeNull();
@@ -1067,14 +1105,17 @@ describe("Trip", () => {
       Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
       held = trip([{ ...stay, details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       const first = render(TripPage);
+      await open("Harbour Hotel");
       await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
       expect(await screen.findByRole("link", { name: "Google Maps" })).toBeTruthy();
       first.unmount();
       document.body.style.pointerEvents = "";
       held = trip([{ ...stay, status: "cancelled", details: { address: "1 Quay Street\nLondon E1 0AA" } }]);
       render(TripPage);
-      await userEvent.click(await screen.findByRole("button", { name: /Copy address 1 Quay Street/ }));
+      await open("Harbour Hotel");
+      await userEvent.click(await screen.findByRole("button", { name: "Copy address" }));
       expect(screen.queryByRole("link", { name: "Google Maps" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /and get directions/ })).toBeNull();
     });
 
     it("shows no address line for a rental whose address is its pick-up, and never offers Add address for it", async () => {
@@ -1092,6 +1133,7 @@ describe("Trip", () => {
         start_zone: "Europe/London", end_local: "2026-11-25T09:00", end_zone: "Europe/London", details: { address: "1 Rental Way, Bristol BS48 3DY" } });
       held = trip([flight, car]);
       render(TripPage);
+      await open("Local Cars");
       expect((await screen.findAllByText("Pick-up address")).length).toBeGreaterThan(0);
       expect(screen.getByRole("button", { name: /Copy address 1 Rental Way/ })).toBeInTheDocument();
     });
@@ -1101,8 +1143,11 @@ describe("Trip", () => {
       const u = userEvent.setup();
       render(TripPage);
       await screen.findByRole("heading", { name: "Trip to London" });
+      await open("Harbour Hotel");
       expect(screen.getAllByRole("button", { name: /Add address/ })).toHaveLength(1);
       await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
       const field = await screen.findByLabelText("Address");
       expect(field.tagName).toBe("TEXTAREA");
       expect(field).toHaveFocus();
@@ -1112,7 +1157,10 @@ describe("Trip", () => {
       held = trip([{ ...stay, details: {} }]);
       const u = userEvent.setup();
       render(TripPage);
+      await open("Harbour Hotel");
       await u.click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
       await u.type(await screen.findByLabelText("Address"), "  7 Mill Lane{Enter}London N1 1AA ");
       await u.click(screen.getByRole("button", { name: "Save changes" }));
       const post = vi.mocked(api).mock.calls.find(([path, o]) => path === "/api/segments/2" && o?.method === "POST")!;
@@ -1126,6 +1174,7 @@ describe("Trip", () => {
     it("puts View email in the same row as Directions and Call, after them", async () => {
       held = trip([{ ...stay, has_email: true }]);
       render(TripPage);
+      await open("Harbour Hotel");
       const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
       expect(group).toHaveClass("flex", "flex-wrap");
       expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Directions", "Call", "View email"]);
@@ -1135,6 +1184,7 @@ describe("Trip", () => {
     it("renders View email on its own when the booking has no action links", async () => {
       held = trip([{ ...stay, has_email: true, links: { app: null, open: null, open_kind: null, directions: null, call: null } }]);
       render(TripPage);
+      await open("Harbour Hotel");
       const button = await screen.findByRole("button", { name: "View email for Harbour Hotel" });
       expect(button).toHaveTextContent("View email");
       expect(button).toHaveAttribute("aria-expanded", "false");
@@ -1146,6 +1196,7 @@ describe("Trip", () => {
       const answer = vi.mocked(api).getMockImplementation()!;
       vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/2/emails" ? emailed : answer(path, opts)) as never);
       render(TripPage);
+      await open("Harbour Hotel");
       const group = await screen.findByRole("group", { name: /Actions for Harbour Hotel/ });
       await userEvent.click(within(group).getByRole("button", { name: "View email for Harbour Hotel" }));
       const region = await screen.findByRole("region", { name: "The email for Harbour Hotel" });
@@ -1174,6 +1225,7 @@ describe("Trip", () => {
     it("lists its ports of call with their local times, its terminal address, and Directions to it", async () => {
       held = trip([ship], { end_date: "2999-01-01" });
       render(TripPage);
+      const detail = (await open("Example Voyager"))!;
       const days = (await screen.findByText("Itinerary")).closest("[data-itinerary]") as HTMLElement;
       const rows = within(days).getAllByRole("listitem");
       expect(rows).toHaveLength(5);
@@ -1184,33 +1236,33 @@ describe("Trip", () => {
       expect(rows[4]).toHaveTextContent(/Day 5 · Thu, Mar 5\s*Miami\s*arrives .*7:00 AM/);
       expect(screen.getByText("Terminal address")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Directions" })).toHaveAttribute("href", ship.links.directions!);
-      expect(screen.getByText("Embarks")).toBeInTheDocument();
+      expect(within(detail).getByText("Embarks")).toBeInTheDocument();
     });
 
     it("shows the traveller's cruise-line membership number masked on the cruise card", async () => {
       loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
       held = trip([{ ...ship, provider: "Disney Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }], { end_date: "2999-01-01" });
       render(TripPage);
-      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      const detail = (await open("Example Voyager"))!;
       const line = document.querySelector("[data-membership]")!;
       expect(line).toHaveTextContent("Disney Castaway Club");
       expect(line).toHaveTextContent("••••0042");
       expect(within(line as HTMLElement).getByRole("button", { name: /Show/ })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { name: "Travellers" })).toBeInTheDocument();
+      expect(within(detail).getByText("Travellers")).toBeInTheDocument();
     });
 
     it("shows no membership on a cruise from a line with no program saved for the traveller", async () => {
       loyalty = [membership({ id: 31, person_id: 1, kind: "cruise", program: "Disney Castaway Club", masked: "••••0042" })];
       held = trip([{ ...ship, provider: "Carnival Cruise Line", travelers: [{ id: 4, person_id: 1, name: "Jane Doe", seat: null }] }], { end_date: "2999-01-01" });
       render(TripPage);
-      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      await open("Example Voyager");
       expect(document.querySelector("[data-membership]")).toBeNull();
     });
 
     it("shows no ports section for a cruise without any", async () => {
       held = trip([{ ...ship, itinerary: [], days: [] }], { end_date: "2999-01-01" });
       render(TripPage);
-      await screen.findByRole("heading", { name: "Example Voyager · Miami" });
+      await open("Example Voyager");
       expect(screen.queryByText("Itinerary")).toBeNull();
     });
 
@@ -1218,7 +1270,7 @@ describe("Trip", () => {
       held = trip([ship], { end_date: "2999-01-01" });
       const u = userEvent.setup();
       render(TripPage);
-      await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
+      await editBooking("Example Voyager · Miami");
       expect(screen.getByLabelText("Port 1 name")).toHaveValue("Nassau");
       await u.click(screen.getByRole("button", { name: "Add a port" }));
       expect(screen.getByLabelText("Port 3 time zone")).toHaveValue("America/Cancun");
@@ -1238,7 +1290,7 @@ describe("Trip", () => {
       held = trip([ship, flight]);
       const u = userEvent.setup();
       render(TripPage);
-      await u.click(await screen.findByRole("button", { name: "Edit Example Voyager · Miami" }));
+      await editBooking("Example Voyager · Miami");
       await u.clear(screen.getByLabelText("Port 1 name"));
       await u.click(screen.getByRole("button", { name: "Save changes" }));
       expect(await screen.findByText(/Name port 1/)).toBeInTheDocument();
@@ -1463,7 +1515,8 @@ describe("Trip", () => {
       loyalty = [membership({ id: 12, person_id: 1, kind: "hotel", program: "Marriott Bonvoy", masked: "••••821L" })];
       held = past({ end_date: "2999-01-01" });
       render(TripPage);
-      const card = await cardOf(hotel);
+      await cardOf(hotel);
+      const card = (await open("Harbour Hotel"))!;
       expect(within(card).getByRole("link", { name: "Directions" })).toBeInTheDocument();
       expect(within(card).getByRole("link", { name: "Call" })).toBeInTheDocument();
       expect(card.querySelector("[data-membership]")).not.toBeNull();
@@ -1531,8 +1584,9 @@ describe("Trip on a phone", () => {
   it("opens Edit in a sheet, not under the booking, and Cancel closes it with focus back on Edit", async () => {
     render(TripPage);
     const u = userEvent.setup();
-    const edit = await screen.findByRole("button", { name: "Edit Harbour Hotel" });
-    await u.click(edit);
+    await screen.findByRole("list", { name: "Bookings" });
+    const edit = (await screen.findAllByRole("button")).find((b) => b.getAttribute("data-booking") === "2")!;
+    await editBooking("Harbour Hotel");
     const sheet = await screen.findByRole("dialog", { name: "Edit this booking" });
     expect(sheet).toHaveAttribute("data-side", "bottom");
     expect(within(sheet).getByLabelText("Hotel name")).toBeInTheDocument();
@@ -1644,8 +1698,9 @@ describe("Trip on a phone", () => {
   it("opens Add address in the sheet too", async () => {
     held = trip([flight, { ...stay, details: {} }]);
     render(TripPage);
+    await open("Harbour Hotel");
     await userEvent.setup().click(await screen.findByRole("button", { name: "Add address to Harbour Hotel" }));
-    expect(within(await screen.findByRole("dialog")).getByLabelText("Address")).toBeInTheDocument();
+    expect(within(await screen.findByRole("dialog", { name: "Edit this booking" })).getByLabelText("Address")).toBeInTheDocument();
   });
 
   it("still adds a booking inline at the top", async () => {
@@ -1669,7 +1724,7 @@ describe("Trip on a phone", () => {
 describe("beside a list of trips", () => {
   const removeFlightAndConfirm = async (u: ReturnType<typeof userEvent.setup>) => {
     await bookingOptions(u, "Remove JFK → LHR");
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   };
   const moveOnSave = () => vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/1" && opts?.method === "POST" ? segment({ ...flight, trip_id: 7 }) : path === "/api/people" ? { people: [jane, sam] } : path === "/api/loyalty" ? { loyalty, programs: {} } : held) as never);
@@ -1701,7 +1756,7 @@ describe("beside a list of trips", () => {
     render(TripPage, { tripId: 1, onchanged });
     const u = userEvent.setup();
     await bookingOptions(u, "Remove Harbour Hotel");
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(onchanged).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
     expect(location.hash).toBe("#trip/1");
@@ -1734,7 +1789,7 @@ describe("on its own page", () => {
     render(TripPage);
     const u = userEvent.setup();
     await bookingOptions(u, "Remove JFK → LHR");
-    await u.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await u.click(within(await topDialog()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(location.hash).toBe("#trips"));
   });
 
@@ -1768,8 +1823,10 @@ describe("on its own page", () => {
       render(TripPage);
       const cards = within(await screen.findByRole("list", { name: "Bookings" })).getAllByRole("listitem").filter(isCard);
       expect(within(cards[0]).getByText(/\$1,240\.00/)).not.toHaveClass("line-through");
-      expect(within(cards[1]).getByText(/€310\.00/)).toHaveClass("line-through");
-      expect(within(cards[1]).getByText("Cancelled, so not in the trip’s total")).toBeInTheDocument();
+      expect(cards[1]).not.toHaveTextContent(/€310/);
+      const detail = (await open("Harbour Hotel"))!;
+      expect(within(detail).getByText(/€310\.00/)).toHaveClass("line-through");
+      expect(within(detail).getByText("Cancelled, so not in the trip’s total")).toBeInTheDocument();
     });
 
     it("shows each booking's cost when several share one card", async () => {
@@ -1833,6 +1890,9 @@ describe("on its own page", () => {
     it("puts Show QR code in the booking’s row of actions, ahead of View email, and Choose another picture after it", async () => {
       held = trip([lot]);
       render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.getByRole("button", { name: "Show code for Example Airport Long-Term Lot" })).toHaveTextContent("Show code");
+      await open("Example Airport Long-Term Lot");
       const group = await screen.findByRole("group", { name: "Actions for Example Airport Long-Term Lot" });
       expect(Array.from(group.querySelectorAll("a, button"), (el) => el.textContent?.trim())).toEqual(["Show QR code", "Choose another picture", "View email"]);
     });
@@ -1840,12 +1900,18 @@ describe("on its own page", () => {
     it("offers Choose the code when several pictures qualify, and nothing for a parking booking with no code", async () => {
       held = trip([{ ...lot, gate_code: { state: "choose", day: "2098-12-20" } }]);
       const { unmount } = render(TripPage);
+      await screen.findByRole("list", { name: "Bookings" });
+      expect(screen.queryByText("Show code")).toBeNull();
+      await open("Example Airport Long-Term Lot");
       expect(await screen.findByRole("button", { name: "Choose the code for Example Airport Long-Term Lot" })).toBeInTheDocument();
       unmount();
+      document.body.style.pointerEvents = "";
       held = trip([{ ...lot, gate_code: null, has_email: false }]);
       render(TripPage);
       await screen.findByRole("list", { name: "Bookings" });
-      expect(screen.queryByRole("button", { name: /QR code|Choose the code/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /QR code|Choose the code|Show code/ })).toBeNull();
+      await open("Example Airport Long-Term Lot");
+      expect(screen.queryByRole("button", { name: /QR code|Choose the code|Show code/ })).toBeNull();
     });
 
     it("shows nothing once the booking’s exit time has passed", async () => {
@@ -1860,6 +1926,7 @@ describe("on its own page", () => {
       const answer = vi.mocked(api).getMockImplementation()!;
       vi.mocked(api).mockImplementation(async (path, opts) => (path === "/api/segments/5/emails" ? { emails: [{ subject: "x", sender_domain: "d.example", received: "2098-12-20", text: "", html: null, truncated: false, original: true, images: 0 }] } : answer(path, opts)) as never);
       render(TripPage);
+      await open("Example Airport Long-Term Lot");
       await userEvent.click(await screen.findByRole("button", { name: "Choose the code for Example Airport Long-Term Lot" }));
       expect(await screen.findByRole("dialog", { name: "Choose the code" })).toBeInTheDocument();
     });
@@ -2012,7 +2079,7 @@ describe("Trip summary", () => {
     expect(await screen.findByTestId("trip-summary")).toHaveTextContent("7 days");
     const u = userEvent.setup();
     await tripOptions(u, "Merge another trip");
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await topDialog();
     const choose = await within(dialog).findByRole("combobox", { name: "Trip to merge in" });
     await waitFor(() => expect(within(choose).getAllByRole("option")).toHaveLength(2));
     await u.selectOptions(choose, "7");

@@ -72,9 +72,9 @@
   --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
   --kind-cruise: var(--chart-5);
   --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
-  --kind-parking: var(--chart-6);
+  --kind-parking: #d9d8e0;
   --kind-parking-soft: color-mix(in srgb, var(--kind-parking) 15%, transparent);
-  --kind-quiet: var(--muted-foreground);
+  --kind-quiet: #8f8e98;
   --kind-quiet-soft: var(--surface-3);
   --avatar-1: #1d3a63;
   --avatar-1-ink: #d6e6ff;
