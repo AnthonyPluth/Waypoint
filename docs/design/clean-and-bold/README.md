@@ -58,3 +58,5 @@ Drawn as the recommendation; each needs the owner's answer before it is built.
 10. **A connection** (item 10): whole-journey codes (drawn) or the current leg's; the amber short-connection hint under 45 minutes is a suggestion (the app has no such rule).
 11. **Not drawn here**, though #883 and #884 name #878 for them: the hero when the next booking is not a flight, "Also under way", the arrival card and the offline status on Upcoming. They keep today's rendering on the new tokens until the owner says whether this issue or a follow-up draws them.
 12. Still open on #876 and followed here as the mockups draw them: the bed icon for a stay (the app uses a building) and neutral grey avatars (not the six avatar tones).
+
+People, Settings with the design specimen, and the shared pieces in this look (#879, group C): see [README-group-c.md](README-group-c.md).
