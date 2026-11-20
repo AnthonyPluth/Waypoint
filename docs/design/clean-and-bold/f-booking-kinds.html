@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: Booking kinds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>Booking cards: cruise, parking, visit, changed and cancelled</h1>
+    <p>Items 4 and 5 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/878">#878</a>: booking cards for a cruise, a parking booking and a past visit, and how a changed or cancelled booking reads when green means confirmed and amber means changed. Cards follow #876's stay, car and train cards: a black card with 24 px corners, a header row that is the tap target, a hairline, three facts, and “Show code” only on a booking with a QR code. Phone frames show cards on a 390 px screen; desktop shows them at the 576 px width of the “Then” column.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="e-flight-states.html">e Flight states</a><a href="f-booking-kinds.html" aria-current="page">f Booking kinds</a><a href="g-booking-detail.html">g Opened booking</a><a href="h-show-code.html">h Show code</a><a href="i-upcoming.html">i Upcoming</a><a href="j-navigation.html">j Navigation</a><a href="k-travellers-connection.html">k Travellers and connection</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>Cruise, parking and past-visit cards with their three facts and icon colours (item 4).</li><li>A changed and a cancelled booking on a card (item 5).</li></ol>
+  </section>
+<section class="sec" id="kinds" aria-labelledby="kinds-h">
+  <div class="sechead"><span class="letter">4</span><h2 id="kinds-h">Cruise, parking and past visit</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Labels are the words the app uses today (<code>START_WORD</code> and <code>END_WORD</code> in <code>frontend/src/lib/trips.ts</code>: Embarks and Disembarks, Entry and Exit, From and To) with Nights or Days in the middle, as the owner adopted for #876's cards on 2026-11-20. A past visit has no status, so its grey line has no “Confirmed”. Parking is the one kind here that can have a QR code, so it carries “Show code”.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Cruise, parking with a code, past visit</figcaption><div class="dev "><div style="display:flex;flex-direction:column;gap:12px"><article class="bk">
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-cruise)"><path d="M12 10.19V14M12 2v3M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6M19.38 20A11.6 11.6 0 0 0 21 14l-8.19-3.64a2 2 0 0 0-1.62 0L3 14a11.6 11.6 0 0 0 2.81 7.76M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg><div class="bk-n"><b>Azure Meridian</b><span>Cruise · Sat, Mar 13 · <span class="g">Confirmed</span></span></div><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Embarks</dt><dd class="">Mar 13</dd></div><div class="c2"><dt>Nights</dt><dd class="">7</dd></div><div class="c3"><dt>Disembarks</dt><dd class="">Mar 20</dd></div></dl>
+</article><article class="bk">
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-parking)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg><div class="bk-n"><b>Bayside Park &amp; Fly</b><span>Parking · Tue, Mar 9 · <span class="g">Confirmed</span></span></div><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Entry</dt><dd class=""><span class="mono">4:30 AM</span></dd></div><div class="c2"><dt>Days</dt><dd class="">12</dd></div><div class="c3"><dt>Exit</dt><dd class="">Mar 20</dd></div></dl><button class="btn blue" type="button">Show code</button>
+</article><article class="bk">
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-visit)"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M12 7v5l4 2"/></svg><div class="bk-n"><b>Sintra</b><span>Past visit · Thu, Mar 11</span></div><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>From</dt><dd class="">Mar 11</dd></div><div class="c2"><dt>Days</dt><dd class="">1</dd></div><div class="c3"><dt>To</dt><dd class="">Mar 11</dd></div></dl>
+</article></div></div></figure></div></div>
+  <div class="spec"><div><h3>Icon colour (recommended)</h3><ul><li>Cruise <code>#ff8fab</code>, as #876 and #880 give it.</li><li>Parking <code>#d9d8e0</code>, a light neutral: today’s <code>--kind-parking</code> (<code>#9be15d</code>, lime) sits next to the green “Confirmed” the way the old stay teal did, the reason #880 moved stay and car.</li><li>Past visit <code>#8f8e98</code>, the label grey: today’s <code>--kind-quiet</code> is the muted grey, and a visit is a record, not a booking to act on.</li><li>All three are at least 3:1 on the black card.</li></ul></div><div><h3>Facts</h3><ul><li>Cruise: Embarks, Nights, Disembarks.</li><li>Parking: Entry (the time, in Geist Mono), Days, Exit.</li><li>Past visit: From, Days, To.</li><li>Open for the owner: parking and visit colours, and whether a single-day visit keeps From and To or shows only the day.</li></ul></div></div>
+</section><section class="sec" id="status" aria-labelledby="status-h">
+  <div class="sechead"><span class="letter">5</span><h2 id="status-h">Changed and cancelled bookings</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Recommended: the word at the end of the grey line carries the status, in place of the green “Confirmed”: amber “Changed”, amber “Cancelled”. A changed booking also marks in amber the facts a newer email changed, when the app knows which (the “Updated from a newer email” note that <code>BookingDetail.svelte</code> shows names them); otherwise only the word is amber. A cancelled booking keeps its place in date order with its name in grey, its icon faded and its facts struck through, and loses “Show code”. No red anywhere, as #876 allows only blue, green and amber.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Changed, cancelled</figcaption><div class="dev "><div style="display:flex;flex-direction:column;gap:12px"><article class="bk">
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><div class="bk-n"><b>Casa do Largo</b><span>Stay · Alfama · <span class="a">Changed</span></span></div><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Check-in</dt><dd class="">Mar 9</dd></div><div class="c2"><dt>Nights</dt><dd class=""><span class="am">5</span></dd></div><div class="c3"><dt>Check-out</dt><dd class=""><span class="am">Mar 14</span></dd></div></dl>
+</article><article class="bk gone">
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-car)"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><div class="bk-n"><b>Oeste Car Hire</b><span>Car · Thu, Mar 11 · <span class="a">Cancelled</span></span></div><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Pick-up</dt><dd class=""><span class="st">Mar 11</span></dd></div><div class="c2"><dt>Days</dt><dd class=""><span class="st">3</span></dd></div><div class="c3"><dt>Return</dt><dd class=""><span class="st">Mar 14</span></dd></div></dl>
+</article></div></div></figure></div></div>
+  <div class="spec"><div><h3>Colour</h3><ul><li><b class="am">Amber</b>: “Changed” and the changed values; “Cancelled”.</li><li>Green is never shown on a changed or cancelled card.</li><li>Open for the owner: cancelled in amber (recommended: you may need to rebook) or in grey (it no longer asks anything of you).</li></ul></div><div><h3>What the reader hears</h3><ul><li>The header row's accessible name ends with the status: “Oeste Car Hire, car, Thursday 11 March, cancelled”.</li><li>Struck-through values are read with “was”, as the cancelled stay of the completed-trip detail is today.</li></ul></div></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>

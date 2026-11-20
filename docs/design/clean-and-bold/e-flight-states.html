@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: Flight states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>Flight hero states, facts and zones</h1>
+    <p>Item 1, 2 and 3 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/878">#878</a>: the flight hero card in the four states the clean and bold mockups (<a href="https://github.com/AnthonyPluth/Waypoint/issues/876">#876</a>) do not draw, which three facts each of the eight states shows, and where a time's zone and a delayed flight's original time sit. The look is the tokens of <a href="https://github.com/AnthonyPluth/Waypoint/issues/880">#880</a>. Phone frames are the 358 px card on a 390 px screen; the desktop toggle shows the card at the 576 px width of the desktop trip page's "Next up" column, with the desktop type sizes. Every flight, seat and time here is made up.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="e-flight-states.html" aria-current="page">e Flight states</a><a href="f-booking-kinds.html">f Booking kinds</a><a href="g-booking-detail.html">g Opened booking</a><a href="h-show-code.html">h Show code</a><a href="i-upcoming.html">i Upcoming</a><a href="j-navigation.html">j Navigation</a><a href="k-travellers-connection.html">k Travellers and connection</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>Boarding, cancelled, diverted and scheduled with no live data on the hero card, with where blue, green and amber appear (item 1).</li><li>The three facts for all eight states, and what replaces the fourth fact and the live or booked marks (item 2).</li><li>Where a time's zone shows and how a delayed time is struck through (item 3).</li></ol>
+  </section>
+<section class="sec" id="boarding" aria-labelledby="boarding-h">
+  <div class="sechead"><span class="letter">1a</span><h2 id="boarding-h">Boarding</h2></div>
+  <p class="lede">Boarding is derived today (a live status with a gate, within 40 minutes of departure). The card reads like the on-time card of #876, with the top-right marker saying Boarding. The gate is a fact, not the big fact, so the card does not repeat itself (owner rule from #714).</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Boarding · 6:10 AM departure, at gate B14</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue"><i class="dot blue"></i>Boarding</span></div>
+  <p class="sent">Boarding now, to Lisbon</p>
+  <p class="big">Departs <span class="mono">6:10 AM</span></p>
+  <p class="quiet">Tue, Mar 9 · <span class="g">on time</span></p>
+  <div class="route">
+    <div class="ap"><span class="code ">BOS</span><span class="tm ">6:10 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div>
+    <div class="ap r"><span class="code ">LIS</span><span class="tm ">5:55 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="">B14</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure></div></div>
+  <div class="spec"><div><h3>Colour</h3><ul><li><b class="bl">Blue</b>: the "Boarding" marker with a live dot, and the plane at the origin.</li><li><b class="gr">Green</b>: "on time" in the quiet line.</li><li>No amber.</li></ul></div><div><h3>Facts</h3><ul><li>Terminal, Gate, Seats (departure side).</li><li>Big fact: Departs and the time. Sentence: Boarding now, to the city.</li></ul></div></div>
+</section><section class="sec" id="cancelled" aria-labelledby="cancelled-h">
+  <div class="sechead"><span class="letter">1b</span><h2 id="cancelled-h">Cancelled</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Today the pill is red (the bad tone); #876 allows only blue, green and amber, so the recommendation is the amber pill: it needs attention. The codes and times go grey and the times are struck through; the arc is dotted grey with no plane, as today (no plane on a cancelled flight).</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Cancelled</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="pill amber">Cancelled</span></div>
+  <p class="sent">Your flight to Lisbon</p>
+  <p class="big">Cancelled</p>
+  <p class="quiet">Contact Aurora Air about rebooking.</p>
+  <div class="route">
+    <div class="ap"><span class="code gone">BOS</span><span class="tm gone">6:10 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="var(--label)" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/></svg></div>
+    <div class="ap r"><span class="code gone">LIS</span><span class="tm gone">5:55 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="na">—</dd></div><div class="c2"><dt>Gate</dt><dd class="na">—</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure></div></div>
+  <div class="spec"><div><h3>Colour</h3><ul><li><b class="am">Amber</b>: the "Cancelled" pill only.</li><li>No blue (nothing live, no plane) and no green.</li><li>Open for the owner: amber, or a white-on-grey pill so amber stays for changes you can still act on.</li></ul></div><div><h3>Facts</h3><ul><li>Terminal and Gate are a dash (live values are not shown for a cancelled flight today).</li><li>Seats stay: they come from the booking.</li><li>Quiet line: today's sentence, “Contact Aurora Air about rebooking.”</li></ul></div></div>
+</section><section class="sec" id="diverted" aria-labelledby="diverted-h">
+  <div class="sechead"><span class="letter">1c</span><h2 id="diverted-h">Diverted</h2></div>
+  <p class="lede">The destination code becomes the airport it is diverted to, with the booked one struck through small above it. The plane keeps its place on the arc while the flight is in the air. Arrival facts are dashes: today the card shows no live arrival values once a flight is diverted.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Diverted, still in the air</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="pill amber">Diverted</span></div>
+  <p class="sent">Diverted to Porto</p>
+  <p class="big">Lands <span class="mono">6:20 PM</span></p>
+  <p class="quiet">Was headed to Lisbon · Updated 4 min ago</p>
+  <div class="route">
+    <div class="ap"><span class="code ">BOS</span><span class="tm ">6:22 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q79.8 0.1 151.5 28.0" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(151.5 28.0) rotate(21.3) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div>
+    <div class="ap r"><span class="code-was">LIS</span><span class="code ">OPO</span><span class="tm am">6:20 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="na">—</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="na">—</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na">—</dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure></div></div>
+  <div class="spec"><div><h3>Colour</h3><ul><li><b class="am">Amber</b>: the "Diverted" pill and the new arrival time.</li><li><b class="bl">Blue</b>: the plane and the travelled part of the arc (it is live).</li><li>No green.</li></ul></div><div><h3>Facts</h3><ul><li>Arrival term, Arrival gate, Bag claim, all a dash.</li><li>Quiet line: “Was headed to Lisbon” (or “Where it lands isn’t known yet.” with no other airport) and the update time.</li></ul></div></div>
+</section><section class="sec" id="nolive" aria-labelledby="nolive-h">
+  <div class="sechead"><span class="letter">1d</span><h2 id="nolive-h">Scheduled, no live data</h2></div>
+  <p class="lede">More than a day before departure there is no live status. The card is the on-time card without the green “on time” (nothing says it is on time yet); the quiet line says the times are from the booking, which replaces the booked marks of #666 for the whole card.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Scheduled, 12 days out</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue">In 12 days</span></div>
+  <p class="sent">Your flight to Lisbon</p>
+  <p class="big">Departs <span class="mono">6:10 AM</span></p>
+  <p class="quiet">Tue, Mar 9 · Times from your booking. Live status starts 1 day before.</p>
+  <div class="route">
+    <div class="ap"><span class="code ">BOS</span><span class="tm ">6:10 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div>
+    <div class="ap r"><span class="code ">LIS</span><span class="tm ">5:55 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="na">—</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure></div></div>
+  <div class="spec"><div><h3>Colour</h3><ul><li><b class="bl">Blue</b>: the countdown “In 12 days” and the plane at the origin.</li><li>No green and no amber.</li></ul></div><div><h3>Facts</h3><ul><li>Terminal from the booking when it has one, Gate a dash, Seats from the booking.</li><li>Quiet line: the date, then “Times from your booking. Live status starts 1 day before.”</li></ul></div></div>
+</section><section class="sec" id="facts" aria-labelledby="facts-h">
+  <div class="sechead"><span class="letter">2</span><h2 id="facts-h">The three facts in every state, and what replaces the fourth fact and the marks</h2></div>
+  <p class="lede">Before departure the facts are the departure side, from take-off on the arrival side. An unknown value is a dash in grey, never a missing column. The fourth fact of #666 (Cabin before departure, Seat on arrival) leaves the hero and stays in the opened booking (frame g), which already lists Seat and Cabin. Belt is renamed Bag claim, as #881 words it. The live dot and booked ring of #666 go: where values come from is said once for the whole card in the quiet line (“Updated 9 minutes ago” for live status, “Times from your booking” with none). A late landing (“12 min late”) is amber, under the rule that amber is a change.</p>
+  <div class="stage"><table class="grid"><thead><tr><th>State</th><th>Marker, top right</th><th>Sentence / big fact</th><th>Three facts</th><th>Where colour goes</th></tr></thead><tbody>
+<tr><td>Scheduled, live</td><td>Countdown, blue</td><td>Your flight to … / Departs</td><td>Terminal · Gate · Seats</td><td>Blue countdown and plane; green “on time”</td></tr>
+<tr><td>Scheduled, no live data</td><td>Countdown, blue</td><td>Your flight to … / Departs</td><td>Terminal (booking) · Gate — · Seats</td><td>Blue countdown and plane; no green</td></tr>
+<tr><td>Boarding</td><td>“Boarding” with a dot, blue</td><td>Boarding now, to … / Departs</td><td>Terminal · Gate · Seats</td><td>Blue marker and plane; green “on time”</td></tr>
+<tr><td>Delayed</td><td>“Delayed” pill, amber</td><td>Your flight to … / Departs (new time)</td><td>Terminal · Gate · Seats</td><td>Amber pill and both new times; blue plane</td></tr>
+<tr><td>In the air</td><td>Time left with a plane, blue</td><td>In the air to … / Lands</td><td>Arrival term · Arrival gate · Bag claim</td><td>Blue marker, plane and travelled arc</td></tr>
+<tr><td>Landed</td><td>“7 min early”, green (or “on time” green; “N min late” amber)</td><td>You are in … / Landed</td><td>Arrival term · Arrival gate · Bag claim</td><td>Green or amber marker; the plane white at the destination</td></tr>
+<tr><td>Cancelled</td><td>“Cancelled” pill, amber</td><td>Your flight to … / Cancelled</td><td>Terminal — · Gate — · Seats</td><td>Amber pill only</td></tr>
+<tr><td>Diverted</td><td>“Diverted” pill, amber</td><td>Diverted to … / Lands</td><td>Arrival term — · Arrival gate — · Bag claim —</td><td>Amber pill and new time; blue plane while in the air</td></tr>
+</tbody></table></div>
+</section><section class="sec" id="zones" aria-labelledby="zones-h">
+  <div class="sechead"><span class="letter">3</span><h2 id="zones-h">Where a time's zone shows, and the struck-through original time</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Recommended: each time under an airport code carries its zone as a small grey abbreviation on its own line (EST, WET), so each time reads as the clock at that airport and nothing is converted. The big fact and the sentences carry no zone: they name the place (“Departs 6:55 AM” is under BOS). When delayed, the booked time sits struck through and small above the new one, and the quiet line repeats it once (“45 min late · was 6:10 AM”). An alternative is a zone only when the two airports' zones differ; that hides the zone on most domestic flights, which is why it is not the recommendation.</p>
+  <div class="stage"><div class="frames"><figure class="fig"><figcaption>Delayed, with zones</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="pill amber">Delayed</span></div>
+  <p class="sent">Your flight to Lisbon</p>
+  <p class="big">Departs <span class="mono">6:55 AM</span></p>
+  <p class="quiet">45 min late · was <s class="mono">6:10 AM</s></p>
+  <div class="route">
+    <div class="ap"><span class="code ">BOS</span><span class="tm am"><s>6:10 AM</s>6:55 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><g transform="translate(8.0 50.0) rotate(-34.8) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div>
+    <div class="ap r"><span class="code ">LIS</span><span class="tm am"><s>5:55 PM</s>6:40 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Terminal</dt><dd class="">E</dd></div><div class="c2"><dt>Gate</dt><dd class="">B14</dd></div><div class="c3"><dt>Seats</dt><dd class=""><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure><figure class="fig"><figcaption>In the air, with zones</figcaption><div class="dev "><article class="hero">
+  <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>2 h 05 m left</span></div>
+  <p class="sent">In the air to Lisbon</p>
+  <p class="big">Lands <span class="mono">5:55 PM</span></p>
+  <p class="quiet">Updated 9 minutes ago</p>
+  <div class="route">
+    <div class="ap"><span class="code ">BOS</span><span class="tm ">6:12 AM</span><span class="tz">EST</span></div>
+    <div class="arcbox"><svg viewBox="0 -6 200 64" aria-hidden="true"><path d="M8 50 Q100 -14 192 50" fill="none" stroke="#5b5a63" stroke-width="2" stroke-dasharray="1 6" stroke-linecap="round"/><path d="M8 50 Q70.6 6.5 133.1 22.1" fill="none" stroke="var(--blue)" stroke-width="2.5" stroke-linecap="round"/><g transform="translate(133.1 22.1) rotate(14.1) scale(.85)"><circle r="13" fill="#000"/><path d="M-9 -1.6 L1 -1.6 L-3 -8 L0.5 -8 L6.5 -1.6 L10 -1.6 Q12.5 0 10 1.6 L6.5 1.6 L0.5 8 L-3 8 L1 1.6 L-9 1.6 L-11 4.5 L-13 4.5 L-12 0 L-13 -4.5 L-11 -4.5 Z" fill="var(--blue)"/></g></svg></div>
+    <div class="ap r"><span class="code ">LIS</span><span class="tm ">5:55 PM</span><span class="tz">WET</span></div>
+  </div>
+  <div class="hair"></div>
+  <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd class="">1</dd></div><div class="c2"><dt>Arrival gate</dt><dd class="">14</dd></div><div class="c3"><dt>Bag claim</dt><dd class="na">—</dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+</article></div></figure></div></div>
+  <div class="spec"><div><h3>Zone</h3><ul><li>Under each time, 11 px Geist Mono, the label grey #8f8e98.</li><li>The abbreviation the app already has for that airport's zone at that date; with none, the zone is left out rather than guessed.</li><li>Lists and the day-by-day list keep the time alone (they name the place).</li></ul></div><div><h3>Delayed time</h3><ul><li>Struck time 12 px grey above the new time; the new time amber.</li><li>Both airports' times move: the arrival time is the new estimate when live status gives one.</li><li>Quiet line: “N min late · was <time>” with the old time struck through.</li></ul></div></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>
