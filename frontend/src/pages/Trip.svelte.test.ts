@@ -28,7 +28,12 @@ const delayed = { enabled: true, month: "2026-11", used: 3, limit: 400, paused: 
   dep_actual: null, dep_zone: "America/New_York", dep_terminal: "7", dep_gate: "B24", arr_scheduled: "2026-11-21T07:10", arr_estimated: "2026-11-21T08:05",
   arr_actual: null, arr_zone: "Europe/London", arr_terminal: null, arr_gate: null, delay_minutes: 50, fetched_at: "2026-11-20T14:05:00+00:00" }] };
 const open = (name: string | RegExp) => openBooking(userEvent, name);
-const editBooking = async (name: string) => { const detail = await open(name); await userEvent.click(within(detail!).getByRole("button", { name: "Edit" })); };
+const editBooking = async (name: string) => {
+  const detail = await open(name);
+  await userEvent.click(within(detail!).getByRole("button", { name: "Edit" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name })).toBeNull());
+  document.body.style.pointerEvents = "";
+};
 const isCard = (li: Element) => li.classList.contains("pass") || li.hasAttribute("data-flight-card") || li.hasAttribute("data-booking-card");
 let held: TripT;
 let summary: TripSummaryT;
