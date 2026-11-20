@@ -93,7 +93,7 @@ export function flightNumber(raw: string | undefined): string {
   return found ? `${found[1]} ${found[2]}` : text;
 }
 
-const stamp = (local: string, zone: string, tone: Stamp["tone"] = "plain", original: string | null = null, from: string | null = null): Stamp => {
+export const stamp = (local: string, zone: string, tone: Stamp["tone"] = "plain", original: string | null = null, from: string | null = null): Stamp => {
   const days = from ? daysBetween(from, local) : 0;
   return {
     local, zone, time: wallClock(local), zoneName: zoneName(zone, instant(local, zone)), original, tone,

@@ -267,7 +267,7 @@
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
     {#if homeFlight}
-      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} class="mb-6">
+      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} tripSegments={next.trip.segments} statusOf={statusFor} class="mb-6">
         {#snippet footer()}
           {@render differing(next.bookings)}
           {@const manage = s.links.app ?? s.manage_url}
