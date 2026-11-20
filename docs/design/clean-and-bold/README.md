@@ -1,35 +1,39 @@
-# Clean and bold: the states and screens the mockups do not draw
+# Clean and bold: trip detail, Upcoming and the states the first mockups do not draw
 
-These designs are for [#878](https://github.com/AnthonyPluth/Waypoint/issues/878), a sub-issue of the clean and bold redesign ([#875](https://github.com/AnthonyPluth/Waypoint/issues/875)). The approved mockups of [#876](https://github.com/AnthonyPluth/Waypoint/issues/876) draw trip detail, Upcoming at phone width, the flight card in four states and the stay, car and train cards; these files draw what the build issues ([#881](https://github.com/AnthonyPluth/Waypoint/issues/881) to [#884](https://github.com/AnthonyPluth/Waypoint/issues/884)) need beyond that. **Not signed off yet**: nothing here is built until the owner writes "Signed off" on #878 after the last revision.
+This folder holds the designs of the clean and bold redesign ([#875](https://github.com/AnthonyPluth/Waypoint/issues/875)). Screens a to d are for [#876](https://github.com/AnthonyPluth/Waypoint/issues/876): trip detail, Upcoming, the cards and the colour rules. They are **reconstructed** from the written spec and the shipped app, because the owner's approved mockups live only on a private design canvas (see "Screens a to d: reconstructed" below); they wait for the owner to write "Signed off" on #876. Screens e to k are for [#878](https://github.com/AnthonyPluth/Waypoint/issues/878), a sub-issue of #875, and draw what the build issues ([#881](https://github.com/AnthonyPluth/Waypoint/issues/881) to [#884](https://github.com/AnthonyPluth/Waypoint/issues/884)) needed beyond the first mockups; the owner signed them off on #878 on 2026-11-20, and they are built (#902, #904, #905, #906).
 
-#876's own files (screens a to d) are not on `main` yet, so this folder starts at e. Until they land, **the tokens in [#880](https://github.com/AnthonyPluth/Waypoint/issues/880) are the source for the look**, and these frames use them and add none:
+Screens e to k were drawn before a to d were in the repository, from the tokens in [#880](https://github.com/AnthonyPluth/Waypoint/issues/880); a to d use the same tokens and add none:
 
 - Page `#0d0c12`, cards `#000000` with no border, gradient or shadow; corners 30 px on the flight hero card and 24 px on booking cards.
 - Text `#ffffff`, secondary `#a9a8b2`, small uppercase labels `#8f8e98` (11 px, weight 600, 0.09em), one hairline `#27262c` per card.
 - Blue `#3d8ef7` is live, now or the one primary action; green `#4cc38a` is confirmed, on time or good news; amber `#eba43b` is changed or needs attention. Nothing else is coloured.
 - Kind icons are coloured outlines with no chip: flight `#4f9dff`, stay `#38c6d9`, car `#f4d35e`, train `#c79bff`, cruise `#ff8fab`; parking and visit are proposed here (item 4).
-- Type: Inter for everything, with Geist Mono kept for confirmation codes, times and seats, as `docs/src/content/docs/contributing/design.md` documents and as given for this work; [#877](https://github.com/AnthonyPluth/Waypoint/issues/877) records the owner's choice, and the frames follow it if it differs.
+- Type: Inter for everything, with Geist Mono kept for confirmation codes, times and seats, as `docs/src/content/docs/contributing/design.md` documents; the owner chose this on [#877](https://github.com/AnthonyPluth/Waypoint/issues/877) on 2026-11-20.
 
 Each file is a self-contained HTML page (vector only, no raster images, dark only) for one screen group. Open it in a browser and use the toggle at the top for phone (390 px) or desktop (1280 px). Cards drawn alone show at desktop width at 576 px, the width of a column of the desktop trip page; full screens show the whole 1280 px. Every name, place, flight, seat, code, price and date is made up, and the QR pattern is random. The pages load Inter and Geist Mono from Google Fonts for viewing only; the app bundles its own fonts and loads nothing from outside.
 
 | Item | File | What it shows |
 | --- | --- | --- |
-| 1, 2, 3 | [e-flight-states.html](e-flight-states.html) | The flight hero card boarding, cancelled, diverted and scheduled with no live data; the three facts and the colours of all eight states; where a time's zone shows and the struck-through original time when delayed |
-| 4, 5 | [f-booking-kinds.html](f-booking-kinds.html) | Booking cards for a cruise, a parking booking (with Show code) and a past visit; a changed and a cancelled booking |
-| 6 | [g-booking-detail.html](g-booking-detail.html) | The opened booking: `BookingDetail.svelte` restyled, as a phone sheet and a desktop panel, for a flight and a stay on a trip still to come and the same flight on a completed trip |
-| 7 | [h-show-code.html](h-show-code.html) | The gate code dialog opened, phone and desktop |
-| 8 | [i-upcoming.html](i-upcoming.html) | Upcoming at desktop width; the empty states (no trips, with and without Gmail to connect; nothing next) at phone and desktop |
-| 9 | [j-navigation.html](j-navigation.html) | The phone tab bar, frosted (recommended) and plain black, More opened; the side navigation from `lg` |
-| 10 | [k-travellers-connection.html](k-travellers-connection.html) | The hero with three travellers' seats, and a connection before the first leg and at the stop |
+| #876 a | [a-trip-detail.html](a-trip-detail.html) | Trip detail of a trip still to come, phone and desktop (reconstructed) |
+| #876 b | [b-upcoming.html](b-upcoming.html) | Upcoming with a flight next, phone and desktop (reconstructed) |
+| #876 c | [c-cards.html](c-cards.html) | The flight hero card on time, delayed, in the air and landed; the stay, car and train cards, and the compact card of a flight that is not the hero (reconstructed) |
+| #876 d | [d-colour-rules.html](d-colour-rules.html) | Surfaces and greys, the three colour rules, the kind icon colours, and the three colour options with option C (blue and green) marked (reconstructed) |
+| #878 1, 2, 3 | [e-flight-states.html](e-flight-states.html) | The flight hero card boarding, cancelled, diverted and scheduled with no live data; the three facts and the colours of all eight states; where a time's zone shows and the struck-through original time when delayed |
+| #878 4, 5 | [f-booking-kinds.html](f-booking-kinds.html) | Booking cards for a cruise, a parking booking (with Show code) and a past visit; a changed and a cancelled booking |
+| #878 6 | [g-booking-detail.html](g-booking-detail.html) | The opened booking: `BookingDetail.svelte` restyled, as a phone sheet and a desktop panel, for a flight and a stay on a trip still to come and the same flight on a completed trip |
+| #878 7 | [h-show-code.html](h-show-code.html) | The gate code dialog opened, phone and desktop |
+| #878 8 | [i-upcoming.html](i-upcoming.html) | Upcoming at desktop width; the empty states (no trips, with and without Gmail to connect; nothing next) at phone and desktop |
+| #878 9 | [j-navigation.html](j-navigation.html) | The phone tab bar, frosted (recommended) and plain black, More opened; the side navigation from `lg` |
+| #878 10 | [k-travellers-connection.html](k-travellers-connection.html) | The hero with three travellers' seats, and a connection before the first leg and at the stop |
 
-## Owner decisions (2026-11-20)
+## Owner decisions on #878 (2026-11-20)
 
 Given in chat on 2026-11-20 and recorded in [a comment on #878](https://github.com/AnthonyPluth/Waypoint/issues/878#issuecomment-7043311182):
 
 1. **Item 6: the opened state is `BookingDetail.svelte` (#712) restyled**, one component for completed and upcoming trips. It keeps its sheet and panel, header, More menu (Move, Remove) and rows; a trip not yet over adds the action row (email, directions, call, the airline app) the old booking card had, and a completed trip shows none, as today.
 2. **The mockup labels Nights, Days, Return and From are adopted**, beside the words `frontend/src/lib/trips.ts` uses today (`START_WORD`, `END_WORD`): a card's middle fact is Nights or Days, and the cruise, parking and visit cards use today's Embarks and Disembarks, Entry and Exit, From and To.
 
-## Decisions the designs propose
+## Decisions the designs of #878 propose
 
 These follow from the issue, #876's colour rules and how the app works today; they stand unless the owner says otherwise in review.
 
@@ -42,9 +46,9 @@ These follow from the issue, #876's colour rules and how the app works today; th
 - **Item 10.** Codes for the whole journey with the stop on the arc and "1 stop, JFK"; facts and seats for the leg you are on; a "Then" line for the next leg, "Earlier" during the connection.
 - Nothing here changes what a page shows a person: travellers appear only where the app shows them today, price only when costs are shown, and a confirmation code only in the opened booking. Every time is a wall-clock time at its place.
 
-## Open for the owner
+## Open for the owner on #878
 
-Drawn as the recommendation; each needs the owner's answer before it is built.
+Drawn as the recommendation. Answered on 2026-11-20: the owner's sign-off accepts the recommendation drawn for each of the twelve points ([comment on #878](https://github.com/AnthonyPluth/Waypoint/issues/878#issuecomment-7044163401)); for point 11, today's rendering stays on the new tokens until a follow-up draws it.
 
 1. **Cancelled colour** (items 1 and 5): amber, as drawn (you may need to act), or grey. Red is not used, as #876 allows only blue, green and amber.
 2. **Zone placement** (item 3): the zone abbreviation under each time on the hero, always (drawn), or only when the two airports' zones differ. The big fact and lists carry no zone.
@@ -58,3 +62,65 @@ Drawn as the recommendation; each needs the owner's answer before it is built.
 10. **A connection** (item 10): whole-journey codes (drawn) or the current leg's; the amber short-connection hint under 45 minutes is a suggestion (the app has no such rule).
 11. **Not drawn here**, though #883 and #884 name #878 for them: the hero when the next booking is not a flight, "Also under way", the arrival card and the offline status on Upcoming. They keep today's rendering on the new tokens until the owner says whether this issue or a follow-up draws them.
 12. Still open on #876 and followed here as the mockups draw them: the bed icon for a stay (the app uses a building) and neutral grey avatars (not the six avatar tones).
+
+## Screens a to d: reconstructed
+
+#876 asked for the owner's approved mockups (screens a to d) to be put in this folder. They are on the owner's private design canvas, which the agents working on this repository cannot open, so the files here are **reconstructions, not copies of the canvas**. Each is drawn from the decisions written in #876 and #875, the tokens of #880 and the components as built (`FlightHero.svelte` in #902, `BookingCard.svelte` in #904, `Upcoming.svelte` in #905 and #907, `Trip.svelte` in #906, the tokens in `frontend/src/app.css` from #899), so it shows what the app now shows; the `make verify` images in `docs/src/assets/screenshots` were a reference and none is copied here. Each file says so in a banner at the top. The owner signed the look off in chat on 2026-11-20; "Signed off" on #876 after reviewing these files confirms that they match it.
+
+| Screen | File | What it shows |
+| --- | --- | --- |
+| a | [a-trip-detail.html](a-trip-detail.html) | A trip still to come: back link, Edit and Trip options, the trip name at 40 px (64 px desktop), dates, summary, neutral avatars, the total; the next flight as the hero with the travellers' seats and "Confirmation, travellers and price"; Then: stay, car, train and the return flight as compact cards; the footer line. Desktop: side navigation, Next up and Then in two columns. |
+| b | [b-upcoming.html](b-upcoming.html) | Upcoming with a flight next: date, title, offline status and Add a booking; the one review line; the hero under "Next up" with its footer; the day-by-day list with the blue Next marker; Later. Desktop: hero and "Coming up" in two columns. #876 asked for phone only; desktop is drawn as built (frame i is its design). |
+| c | [c-cards.html](c-cards.html) | The flight hero on time, delayed, in the air and landed (the other four states are frame e); the stay, car and train cards and the compact flight card. |
+| d | [d-colour-rules.html](d-colour-rules.html) | Page, card, greys and hairline; blue, green and amber with what each means; the kind icon colours; the three colour options with option C (blue and green) marked. |
+
+### Colour options A and B
+
+#875 says only that the owner chose "option C of the colour options board", blue and green with amber for change. Neither issue nor any comment describes options A and B, so frame d shows them as empty, labelled "not drawn", and draws the chosen rule only. Inventing them would misstate what the owner saw.
+
+### The decisions #876 fixes
+
+As approved by the owner in the design session, and as drawn in a to d:
+
+1. Page `#0d0c12`, true-black `#000000` cards, no borders, gradients or shadows; corners 30 px (flight card) and 24 px (booking cards).
+2. Big heavy white type for codes, times and facts; grey `#a9a8b2` for secondary text and `#8f8e98` for small uppercase labels; one hairline `#27262c` per card.
+3. Blue `#3d8ef7` is live, now, or the one primary action; green `#4cc38a` is confirmed, on time, or good news; amber `#eba43b` is changed or needs attention. Nothing else is coloured.
+4. Booking-type icons are coloured outlines with no tinted chip: flight `#4f9dff`, stay `#38c6d9`, car `#f4d35e`, train `#c79bff`, cruise `#ff8fab`.
+5. Confirmation code, cost, address and travellers are behind a tap; "Show code" stays visible on a booking with a QR code.
+6. Upcoming has no stat tiles and no banners; emails to review are one quiet line.
+
+### Departures from recorded decisions, and the owner's answers
+
+The six #876 lists:
+
+| # | Departure | Owner's answer |
+| --- | --- | --- |
+| 1 | `docs/design/trips/README.md` (#712, decision 2): a trip still to come keeps its cards; the new trip detail replaces them (frame a). | Drawn in the mockups the owner approved and signed off in chat on 2026-11-20; built in #906. No answer to this point on its own was found: recorded in the build, not separately confirmed. |
+| 2 | `docs/design/flights/README.md` (#666): pill in every state, four facts, live or booked marks, mark tile. The new hero has three facts, no marks, no mark tile, a pill only when delayed, cancelled or diverted (frames c and e). | Item 2 of #878 (the fourth fact moves to the opened booking, one quiet line replaces the marks) was signed off on #878 on 2026-11-20; built in #902. The removal itself has no separate answer: recorded in the build, not separately confirmed. |
+| 3a | `design.md`: kind icons "on its tint". The cards use the outline (frames a to c). | Recorded in the build (#904: outline on the cards and the opened booking, tinted tiles elsewhere until #879), not separately confirmed. |
+| 3b | `design.md`: times, codes and seats in Geist Mono; the mockups set them in the sans face. | Confirmed on #877, 2026-11-20: Inter for the sans face, Geist Mono kept as documented for times, airport codes, confirmation codes and seats. The build sets times, seats and confirmation codes in Geist Mono, but the hero's airport codes in Inter at weight 800 (frame c): that part is recorded in the build, not separately confirmed. |
+| 3c | `design.md`: the frosted tab bar; the mockup draws a plain black bar. | Confirmed: frosted, point 7 of #878 accepted as drawn on 2026-11-20 (frames a and b draw it frosted). |
+| 4 | Times in the mockups show no zone. | Confirmed: point 2 of #878 accepted as drawn, the zone abbreviation under each time on the hero; the big fact and lists carry none (frames b and c). |
+| 5 | The stay icon in the mockups is a bed; the app uses a building. | Point 12 of #878 followed the mockups (bed) and was accepted with the sign-off, but the build kept the building (#904 left it as the open question of #876). Frames a to c draw the building, as the app shows it: recorded in the build, not separately confirmed. |
+| 6 | Traveller avatars are neutral grey, not the six avatar tones. | Confirmed: point 12 of #878 accepted; built in #906 (`AvatarStack` `neutral`). |
+
+Departures found in the build that #876 does not list, drawn as built:
+
+| Departure | Owner's answer |
+| --- | --- |
+| A flight that is not the hero is a compact card with Departs, Flight and Arrives (frames a and c). | Owner decision on #883, recorded in #906. |
+| A stay card and the Upcoming day rows keep the booking's brand logo (frames a to c). | Owner's wish, recorded in #904 and #905. |
+| When the next booking is not a flight, Upcoming and the trip page keep today's card on the new tokens, and Also under way, the arrival card and the offline status are unchanged. Not drawn here. | Confirmed: point 11 of #878. |
+| Connections (frame k) are not built. | Deferred by the owner to #903. |
+| The Later dates on Upcoming are amber, though amber otherwise means changed (frame b). | Owner decision, #907. |
+| The flight hero keeps a 1 px `#27262c` edge and the card shadow (`border border-border shadow-card`), against decision 1 (frames a to c). | Recorded in the build, not separately confirmed. |
+| On Upcoming the flight hero keeps its footer: the airline action, the confirmation code, Open trip, the travellers and the cost, against decision 5 (frame b; #905 kept it so no behaviour was lost). | Recorded in the build, not separately confirmed. |
+| The airline action ("Check in", "Open in app") is the existing action blue `#3563e0` (`--action`), not the status blue (frame b). | Recorded in the build, not separately confirmed. |
+| Amber text (a late time, "45 min late") uses the light ink `#ffd58a` (`--signal-ink`) for contrast; pills and dots use `#eba43b` (frames c and d). | Recorded in the build, not separately confirmed. |
+| Upcoming keeps the small date over the title, the green saved-for-offline status and Add a booking in the header (frame b). | Recorded in the build (#905), not separately confirmed. |
+| The trip page keeps the trip total under the title (frame a). Costs follow the "show costs" setting, as before. | Recorded in the build (#906), not separately confirmed. |
+
+### Open questions
+
+- The six "recorded in the build, not separately confirmed" rows above, and departures 1, 2, 3a and 5: the owner's "Signed off" on #876 accepts them as built, or names the ones to change.
+- The typeface is decided (#877). Screens not drawn in a to d (the other pages, the states of #878) are in e to k and in their own sub-issues of #875.
