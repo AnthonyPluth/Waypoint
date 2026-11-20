@@ -433,15 +433,15 @@
       {@const s = card.lead}
       {#if flightCard(card)}
         <li id={`segment-${s.id}`} class="scroll-mt-20" data-flight-card>
-          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showTripTravellers(everyone, app.state?.person_id ?? null)} ondetail={(from) => openDetail(s, from)}>
+          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} ondetail={(from) => openDetail(s, from)}>
             {#snippet footer()}
               {#if card.segments.length === 1}
                 {@render flightBooking(s)}
                 {@render ports(s)}{@render links(s)}
-                {@render singleFooter(s)}
+                {@render singleFooter(s, true)}
               {:else}
                 {#if card.timesDiffer}<p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>{/if}
-                {@render multiFooter(card)}
+                {@render multiFooter(card, true)}
               {/if}
             {/snippet}
           </FlightCard>
@@ -510,9 +510,9 @@
   {/if}
 </Sheet>
 
-{#snippet singleFooter(s: Segment)}
+{#snippet singleFooter(s: Segment, hero = false)}
   <div class="flex flex-col gap-3">
-    {#if showBookingTravellers(s, everyone)}
+    {#if showBookingTravellers(s, everyone) && !hero}
       <h3 class="eyebrow">Travellers</h3>
       {@render travellerList(s)}
       {#if s.kind === "cruise" && !over}{@render membershipList(s)}{/if}
@@ -523,7 +523,7 @@
   </div>
 {/snippet}
 
-{#snippet multiFooter(card: Card)}
+{#snippet multiFooter(card: Card, hero = false)}
   <div class="flex flex-col gap-4">
     <h3 class="eyebrow">Bookings</h3>
     <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(card.lead)}`}>
@@ -541,8 +541,10 @@
               {#if b.status === "cancelled"}<span class="text-muted-foreground"> · cancelled, so not in the trip’s total</span>{/if}</p>
           {/if}
           {@render links(b)}
-          <h4 class="eyebrow">Travellers</h4>
-          {@render travellerList(b)}
+          {#if !hero}
+            <h4 class="eyebrow">Travellers</h4>
+            {@render travellerList(b)}
+          {/if}
           {@render buttons(b, name)}
         </li>
       {/each}

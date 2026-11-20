@@ -6,7 +6,7 @@
     { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
     { "wait_for": "ul[aria-label='Bookings']" },
     { "expect_text": { "selector": "[data-trip-travellers]", "text": "Jane Doe" } },
-    { "expect_text": { "selector": "main", "text": "Seat 31A" } },
+    { "expect_text": { "selector": "[data-seats]", "text": "31A" } },
     { "screenshot": "trip-travellers" }
   ]
 }

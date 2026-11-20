@@ -5,7 +5,7 @@ import { instant } from "./trips";
 export type HeroTone = "primary" | "success" | "signal";
 export type HeroTop = { text: string; tone: HeroTone; pill: boolean; plane: boolean; dot: boolean };
 export type HeroFact = { label: string; value: string | null; mono: boolean };
-export type HeroSeat = { name: string; initials: string; seat: string };
+export type HeroSeat = { name: string; initials: string; seat: string | null };
 export type HeroQuiet = { late: string; struck: string | null; text: string; onTime: boolean };
 export type HeroView = {
   carrierLine: string;
@@ -109,7 +109,9 @@ export function heroView(v: FlightCardView, segment: Segment, city: (code: strin
       case "delayed": return { late: delay ? `${delay} min late` : "Running late", struck: v.depart.original ? upper(v.depart.original) : null, text: "", onTime: false };
       case "scheduled": {
         if (v.noLive) return { late: "", struck: null, text: `${shortDay(v.depart.local)} · Times from your booking. Live status starts ${LIVE_STATUS_STARTS_DAYS} ${LIVE_STATUS_STARTS_DAYS === 1 ? "day" : "days"} before.`, onTime: false };
-        return v.live ? { late: "", struck: null, text: shortDay(v.depart.local), onTime: true } : { late: "", struck: null, text: `${shortDay(v.depart.local)} · Times from your booking.`, onTime: false };
+        if (v.live) return { late: "", struck: null, text: shortDay(v.depart.local), onTime: true };
+        const cached = v.facts.some((f) => f.source === "live" && f.value);
+        return { late: "", struck: null, text: `${shortDay(v.depart.local)} · ${cached && updated ? updated : "Times from your booking."}`, onTime: false };
       }
       case "boarding": return { late: "", struck: null, text: shortDay(v.depart.local), onTime: true };
       case "cancelled": return { late: "", struck: null, text: v.sentence, onTime: false };
@@ -125,7 +127,7 @@ export function heroView(v: FlightCardView, segment: Segment, city: (code: strin
     ? { label: f.label, value: seatList.length ? seatsValue(seatList) : null, mono: true }
     : { label: names[i] ?? f.label, value: f.value, mono: false }));
 
-  const seats: HeroSeat[] = travellers ? segment.travelers.flatMap((t) => (t.seat ? [{ name: t.name, initials: initialsOf(t.name), seat: t.seat }] : [])) : [];
+  const seats: HeroSeat[] = travellers ? segment.travelers.map((t) => ({ name: t.name, initials: initialsOf(t.name), seat: t.seat })) : [];
 
   const was = v.divertedTo ? segment.destination ?? null : null;
   return { carrierLine, top, sentence, big, bigTime, quiet, facts, seats: seats.length > 1 ? seats : [], landed: arrived, cancelled: v.state === "cancelled", was };

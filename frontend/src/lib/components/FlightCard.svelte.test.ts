@@ -334,6 +334,16 @@ describe("a stored status that is too old to trust", () => {
     expect(card.textContent).not.toMatch(/Originally|Delayed/);
     expect(facts(card).slice(0, 2)).toEqual([["Terminal", "B"], ["Gate", "B14"]]);
   });
+
+  it("keeps the age of a cached gate on the quiet line, and says the times are from the booking only when no live fact is kept", async () => {
+    const first = draw({ now: NOW.delayed, status: CASES[2].status }, { online: false });
+    let card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Updated 4 minutes ago");
+    first.unmount();
+    draw({ now: NOW.delayed, status: mk(NOW.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", delay_minutes: 35 }) }, { online: false });
+    card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
+  });
 });
 
 describe("when live updates are paused", () => {

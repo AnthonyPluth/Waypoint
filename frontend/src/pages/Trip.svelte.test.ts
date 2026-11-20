@@ -169,8 +169,8 @@ describe("Trip", () => {
       held = trip([flightFor, car]);
       render(TripPage);
       const card = await cardOf(flightFor);
-      expect(card).toHaveTextContent("Jane Doe · Seat 31A");
-      expect(card).toHaveTextContent("Sam Doe · Seat 31B");
+      expect(card.querySelector("[data-seats]")).toHaveTextContent("Jane Doe31A");
+      expect(card.querySelector("[data-seats]")).toHaveTextContent("Sam Doe31B");
     });
 
     it("keeps a booking-level seat that no traveller holds", async () => {
@@ -179,14 +179,16 @@ describe("Trip", () => {
       render(TripPage);
       const card = await cardOf(odd);
       expect(card).toHaveTextContent("99Z");
-      expect(card).toHaveTextContent("Jane Doe · Seat 12A");
+      expect(card.querySelector("[data-seats]")).toHaveTextContent("Jane Doe12A");
     });
 
     it("lists each seat beside its traveller, and in the card’s Seats fact", async () => {
       held = trip([flightFor, car]);
       render(TripPage);
       const card = await cardOf(flightFor);
-      expect(within(card).getAllByText("Jane Doe").map((el) => el.parentElement?.textContent)).toEqual([expect.stringContaining("31A"), expect.stringContaining("Seat 31A")]);
+      expect(within(card).getAllByText("Jane Doe")).toHaveLength(1);
+      expect(card).not.toHaveTextContent("· Seat");
+      expect(within(card).queryByRole("heading", { name: "Travellers" })).toBeNull();
       expect(card.querySelector("[data-seats]")).toHaveTextContent("Jane Doe31A");
       expect(card.querySelector("[data-seats]")).toHaveTextContent("Sam Doe31B");
       expect(card.querySelector("[data-facts]")).toHaveTextContent("Seats 31A, 31B");
@@ -629,7 +631,6 @@ describe("Trip", () => {
     expect(first.queryByText(/••••4567/)).toBeNull();
     expect(first.queryByText(/number yet/)).toBeNull();
     expect(first.getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
-    expect(first.getByText(/Not matched to a person/)).toBeInTheDocument();
     const hotel = within(cards[1]);
     expect(hotel.getByText("Changed")).toBeInTheDocument();
     expect(hotel.getByRole("button", { name: /^Show and copy Marriott Bonvoy number/ })).toHaveTextContent("••••8899");
@@ -948,11 +949,10 @@ describe("Trip", () => {
       const blocks = within(cards[0]).getAllByRole("listitem").filter((li) => li.hasAttribute("data-booking"));
       expect(blocks).toHaveLength(2);
       expect(within(blocks[0]).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
-      expect(within(blocks[0]).getByText("Jane Doe")).toBeInTheDocument();
-      expect(within(blocks[0]).queryByText("Sam Doe")).toBeInTheDocument();
+      expect(within(blocks[0]).queryByText("Jane Doe")).toBeNull();
+      expect(within(cards[0]).queryByRole("heading", { name: "Travellers" })).toBeNull();
       expect(within(blocks[1]).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
-      expect(within(blocks[1]).getByText("Sam Doe")).toBeInTheDocument();
-      expect(within(blocks[1]).queryByText("Jane Doe")).toBeNull();
+      expect(within(blocks[1]).queryByText("Sam Doe")).toBeNull();
       expect(within(blocks[1]).getByRole("link", { name: /Manage booking|Open in app/ })).toHaveAttribute("href", "https://example.com/manage/b");
       expect(within(blocks[0]).getByRole("button", { name: "Edit JFK → LHR booking KQ7M2X" })).toBeInTheDocument();
       expect(within(blocks[1]).getByRole("button", { name: "Edit JFK → LHR booking BBBBBB" })).toBeInTheDocument();
@@ -985,10 +985,10 @@ describe("Trip", () => {
       held = trip([{ ...flight, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "31A" }, { id: 2, person_id: 2, name: "Sam Doe", seat: "31B" }, { id: 3, person_id: null, name: "DOE/MIA MISS", seat: null }] }]);
       render(TripPage);
       await screen.findByRole("heading", { name: "Trip to London" });
-      const who = within(screen.getByRole("heading", { name: "Travellers" }).parentElement!);
-      expect(who.getByText("Jane Doe").closest("li")).toHaveTextContent("Jane Doe · Seat 31A");
-      expect(who.getByText("Sam Doe").closest("li")).toHaveTextContent("Sam Doe · Seat 31B");
-      expect(who.getByText("DOE/MIA MISS").closest("li")).not.toHaveTextContent("Seat");
+      const who = within(document.querySelector("[data-seats]") as HTMLElement);
+      expect(who.getByText("Jane Doe").closest("li")).toHaveTextContent("Jane Doe31A");
+      expect(who.getByText("Sam Doe").closest("li")).toHaveTextContent("Sam Doe31B");
+      expect(who.getByText("DOE/MIA MISS").closest("li")).toHaveTextContent(/^DMDOE\/MIA MISS$/);
     });
 
     it("has a seat field for each ticked traveller, and sends them", async () => {

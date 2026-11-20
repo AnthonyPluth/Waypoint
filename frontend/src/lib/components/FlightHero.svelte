@@ -78,8 +78,8 @@
 
   {#if hero.seats.length}
     <ul class="mt-3.5 flex flex-wrap gap-x-4 gap-y-2" data-seats>
-      {#each hero.seats as s (s.name + s.seat)}
-        <li class="inline-flex items-center gap-2 text-sm text-muted-foreground"><i class="grid size-6 place-items-center rounded-full bg-secondary text-[10px] font-bold not-italic text-secondary-foreground" aria-hidden="true">{s.initials}</i>{s.name}<span class="font-mono text-[15px] font-semibold text-foreground">{s.seat}</span></li>
+      {#each hero.seats as s, i (i)}
+        <li class="inline-flex items-center gap-2 text-sm text-muted-foreground"><i class="grid size-6 place-items-center rounded-full bg-secondary text-[10px] font-bold not-italic text-secondary-foreground" aria-hidden="true">{s.initials}</i>{s.name}{#if s.seat}<span class="font-mono text-[15px] font-semibold text-foreground">{s.seat}</span>{/if}</li>
       {/each}
     </ul>
   {/if}
