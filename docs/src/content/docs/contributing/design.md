@@ -13,11 +13,14 @@ The specimen page at `#design` (Settings, then Design) shows everything below on
 
 Tokens live in `frontend/src/app.css`: one `:root`, then `@theme inline` to expose them to Tailwind.
 
-- **Surfaces**: `bg-surface-1`, `bg-surface-2` and `bg-surface-3`, from the page background up to a raised card. Pair them with `shadow-elevation-1`, `-2` or `-3`.
-- **Status**: `status-{ok,warn,bad,info,quiet}-soft` is the background and `-ink` is the text. Use them through the chip, not by hand.
-- **Type scale**: `text-display`, `text-title`, `text-heading`, `text-body`, `text-caption` and `text-eyebrow`. Each sets size, line height, letter spacing and weight.
+- **Surfaces**: the page is `#0d0c12` (`bg-background`) and a card is pure black (`bg-card`). `bg-surface-1`, `bg-surface-2` and `bg-surface-3` raise from there, with `shadow-elevation-1`, `-2` or `-3`. `--border` is the hairline `#27262c`; cards in the clean and bold look carry no border or shadow, but `--shadow` and `--elevation-*` stay until each component is rebuilt.
+- **Text**: `text-foreground` is white, `text-muted-foreground` the secondary grey (`#a9a8b2`) and `text-label` the grey for small uppercase labels (`#8f8e98`).
+- **Colour rules**: blue (`--primary`, `#3d8ef7`) is live, now and the one primary action; green (`--success`, `#4cc38a`) is confirmed, on time and good news; amber (`--signal`, `#eba43b`) is changed or needs attention. They feed `status-{ok,warn,bad,info,quiet}-soft` (the background) and `-ink` (the text); use those through the chip, not by hand.
+- **Kind colours**, used as the icon stroke: flight `#4f9dff`, stay `#38c6d9`, car `#f4d35e`, train `#c79bff`, cruise `#ff8fab`. Flight and car have values of their own, so a status change no longer moves them, and the car colour and the stay colour are never a status colour (a test holds it).
+- **Radius**: `rounded-hero` (30 px) for the flight hero card and `rounded-booking` (24 px) for booking cards. `--radius` is unchanged for everything else.
+- **Type scale**: `text-display` (40 px, weight 800; `text-display-lg` is 64 px on desktop), `text-hero-fact` (34 px; `-lg` 44 px), `text-airport` (36 px; `-lg` 44 px), `text-fact` (22 px; `-lg` 26 px), `text-fact-card` (17 px), `text-title`, `text-heading`, `text-body`, `text-caption` and `text-eyebrow` (11 px, weight 600, uppercase, 0.09em). Each sets size, line height, letter spacing and weight.
 
-Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page background. `src/app.css.test.ts` parses the tokens and fails if a change breaks that.
+Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page background; the secondary and label greys meet 4.5:1 on the page and the card, and every kind colour 3:1 on the card. `src/app.css.test.ts` parses the tokens and fails if a change breaks that.
 
 ## Status chips
 
@@ -91,7 +94,7 @@ The headline, the plane and the Next up card follow set rules:
 
 ## Kind tiles and avatar stacks
 
-`KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car`; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
+`KindTile.svelte` is a 28 or 36 px square holding a booking kind’s icon on its tint. The kinds use `--kind-flight`, `--kind-stay`, `--kind-train` and `--kind-car` as the icon stroke; cruise, parking and past visit use `--kind-quiet`. Each has a `-soft` tint for the background. A tile has an accessible name matching its kind’s label in `TripKinds`, unless you pass `decorative`. `TripKinds.svelte` is a row of them.
 
 `AvatarStack.svelte` overlaps up to four initials circles and then shows a “+N” circle.
 
@@ -101,7 +104,7 @@ The headline, the plane and the Next up card follow set rules:
 
 ## Monospace type
 
-Times, airport codes, confirmation codes and seat numbers use `font-mono`: Geist Mono, bundled under `waypoint/static/fonts`, with tabular and slashed-zero figures. The `.mono` class sets them on any element, and `.code` adds the confirmation-code style. No font is loaded from outside Waypoint.
+Text is set in Inter, a variable font bundled under `waypoint/static/fonts` with its licence, with tabular figures. Times, airport codes, confirmation codes and seat numbers use `font-mono`: Geist Mono, bundled under `waypoint/static/fonts`, with tabular and slashed-zero figures. The `.mono` class sets them on any element, and `.code` adds the confirmation-code style. No font is loaded from outside Waypoint.
 
 ## Navigation
 

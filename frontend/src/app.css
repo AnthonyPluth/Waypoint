@@ -5,33 +5,34 @@
 @custom-variant desktop (@media not ((max-width: 767px) or ((max-height: 500px) and (pointer: coarse))));
 @custom-variant hoverable (@media (hover: hover));
 
-@font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
 :root {
   color-scheme: dark;
   --radius: 1.25rem;
-  --background: #07090e;
-  --foreground: #f3f5f9;
-  --card: #12151d;
+  --background: #0d0c12;
+  --foreground: #ffffff;
+  --card: #000000;
   --card-foreground: #f3f5f9;
   --popover: #181c26;
   --popover-foreground: #f3f5f9;
-  --primary: #4f9dff;
+  --primary: #3d8ef7;
   --primary-foreground: #04101f;
   --action: #3563e0;
   --action-foreground: #ffffff;
   --secondary: #1a1e29;
   --secondary-foreground: #f3f5f9;
   --muted: #1a1e29;
-  --muted-foreground: #9aa4b8;
+  --muted-foreground: #a9a8b2;
+  --label: #8f8e98;
   --accent: #1a1e29;
   --accent-foreground: #f3f5f9;
   --destructive: #ff7b72;
-  --border: #232837;
+  --border: #27262c;
   --input: #2c3243;
-  --ring: #4f9dff;
-  --signal: #f6b73c;
+  --ring: #3d8ef7;
+  --signal: #eba43b;
   --signal-foreground: #2b1a00;
   --signal-soft: #34270c;
   --signal-ink: #ffd58a;
@@ -41,14 +42,15 @@
   --sidebar-accent-foreground: #f3f5f9;
   --sidebar-border: #1b1f2b;
   --shadow: 0 0 0 1px rgb(255 255 255 / 3%), 0 14px 32px -16px rgb(0 0 0 / 70%);
+  --success: #4cc38a;
   --status-ok-soft: #0f2a1b;
-  --status-ok-ink: #7ee0a5;
+  --status-ok-ink: #4cc38a;
   --status-warn-soft: var(--signal-soft);
   --status-warn-ink: var(--signal-ink);
   --status-bad-soft: #3a1512;
   --status-bad-ink: #ff9d96;
   --status-info-soft: #11233d;
-  --status-info-ink: #8fc2ff;
+  --status-info-ink: #6fb0ff;
   --status-quiet-soft: var(--secondary);
   --status-quiet-ink: var(--muted-foreground);
   --surface-1: var(--card);
@@ -60,13 +62,13 @@
   --chart-4: #c79bff;
   --chart-5: #ff8fab;
   --chart-6: #9be15d;
-  --kind-flight: var(--primary);
+  --kind-flight: #4f9dff;
   --kind-flight-soft: color-mix(in srgb, var(--kind-flight) 15%, transparent);
-  --kind-stay: var(--chart-3);
+  --kind-stay: #38c6d9;
   --kind-stay-soft: color-mix(in srgb, var(--kind-stay) 15%, transparent);
   --kind-train: var(--chart-4);
   --kind-train-soft: color-mix(in srgb, var(--kind-train) 15%, transparent);
-  --kind-car: var(--signal);
+  --kind-car: #f4d35e;
   --kind-car-soft: color-mix(in srgb, var(--kind-car) 15%, transparent);
   --kind-cruise: var(--chart-5);
   --kind-cruise-soft: color-mix(in srgb, var(--kind-cruise) 15%, transparent);
@@ -101,7 +103,7 @@
 }
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
   --radius-sm: calc(var(--radius) - 10px);
   --radius-md: calc(var(--radius) - 8px);
@@ -109,6 +111,8 @@
   --radius-xl: calc(var(--radius) - 2px);
   --radius-2xl: var(--radius);
   --radius-3xl: calc(var(--radius) + 8px);
+  --radius-hero: 1.875rem;
+  --radius-booking: 1.5rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -123,12 +127,14 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-label: var(--label);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
   --color-signal: var(--signal);
   --color-signal-foreground: var(--signal-foreground);
   --color-signal-soft: var(--signal-soft);
@@ -197,7 +203,32 @@
   --text-display: 2.5rem;
   --text-display--line-height: 1.05;
   --text-display--letter-spacing: -0.03em;
-  --text-display--font-weight: 600;
+  --text-display--font-weight: 800;
+  --text-display-lg: 4rem;
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.035em;
+  --text-display-lg--font-weight: 800;
+  --text-hero-fact: 2.125rem;
+  --text-hero-fact--line-height: 1.05;
+  --text-hero-fact--font-weight: 800;
+  --text-hero-fact-lg: 2.75rem;
+  --text-hero-fact-lg--line-height: 1.05;
+  --text-hero-fact-lg--font-weight: 800;
+  --text-airport: 2.25rem;
+  --text-airport--line-height: 1;
+  --text-airport--font-weight: 800;
+  --text-airport-lg: 2.75rem;
+  --text-airport-lg--line-height: 1;
+  --text-airport-lg--font-weight: 800;
+  --text-fact: 1.375rem;
+  --text-fact--line-height: 1.2;
+  --text-fact--font-weight: 700;
+  --text-fact-lg: 1.625rem;
+  --text-fact-lg--line-height: 1.2;
+  --text-fact-lg--font-weight: 700;
+  --text-fact-card: 1.0625rem;
+  --text-fact-card--line-height: 1.25;
+  --text-fact-card--font-weight: 700;
   --text-title: 1.5rem;
   --text-title--line-height: 1.2;
   --text-title--letter-spacing: -0.02em;
@@ -212,7 +243,7 @@
   --text-caption--line-height: 1.4;
   --text-eyebrow: 0.6875rem;
   --text-eyebrow--line-height: 1.2;
-  --text-eyebrow--letter-spacing: 0.12em;
+  --text-eyebrow--letter-spacing: 0.09em;
   --text-eyebrow--font-weight: 600;
 }
 
@@ -227,7 +258,7 @@
 }
 
 @layer components {
-  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted-foreground); }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--label); }
   .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; }
   .code { font-family: var(--font-mono); font-variant-numeric: tabular-nums slashed-zero; font-feature-settings: "zero" 1; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
   .pass { position: relative; overflow: hidden; color: var(--card-foreground); border: 1px solid var(--border);
