@@ -347,12 +347,37 @@ describe("what the card says without live data", () => {
   });
 });
 
+describe("the day and the city on the hero", () => {
+  it("puts the day on a landed flight from an earlier day, in the quiet line", async () => {
+    draw({ now: at("2025-06-14T09:00") });
+    const card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
+    expect(flat(card.querySelector("[data-big]"))).toBe("Landed 10:52 AM");
+  });
+
+  it("names the destination city in the sentence once it is known", async () => {
+    draw(CASES[0]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-code='origin']")).toHaveTextContent("DEN");
+    expect(card.querySelector("[data-code='destination']")).toHaveTextContent("GJT");
+    await waitFor(() => expect(card.querySelector("[data-sentence]")).toHaveTextContent("Your flight to Grand Junction"));
+  });
+
+  it("says the code in the sentence when no city is known for the airport", async () => {
+    vi.mocked(api).mockReset().mockImplementation(async () => { throw new Error("No such airport"); });
+    draw(CASES[0]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-sentence]")).toHaveTextContent("Your flight to GJT");
+  });
+});
+
 describe("a stored status that is too old to trust", () => {
   it("shows the booked times, not the old estimate, when it is over three hours old", async () => {
     const old = status(at("2025-06-12T11:00"), 300, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", delay_minutes: 35 });
     draw({ now: at("2025-06-12T11:00"), status: old });
     const card = await screen.findByRole("article");
     expect(flat(card.querySelector("[data-big]"))).toBe("Landed 10:52 AM");
+    await waitFor(() => expect(card.querySelector("[data-sentence]")).toHaveTextContent("You are in Grand Junction"));
     expect(timesOf(card)).toEqual(["9:40 AM", "10:52 AM"]);
     expect(card.textContent).not.toContain("11:27");
     expect(within(card).getByText("Updated 5 h ago")).toBeInTheDocument();
