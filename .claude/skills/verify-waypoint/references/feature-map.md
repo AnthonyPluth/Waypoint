@@ -199,7 +199,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Seattle`, `Add a booking`, `Set the time zone by hand`, `More details`.
+- **Touches:** `Seattle`, `Add booking`, `Set the time zone by hand`, `More details`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow booking-travellers`; or `poetry run python run.py verify --flow booking-travellers`.
 
@@ -231,8 +231,8 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#design`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`.
-- **Expects to see:** `Trips`, `You are in`, `+1 day`, `DELAYED`, `Originally`, `Not known yet`, `50 min late`, `Flight card`, `Live status starts 1 day before.`.
+- **Touches:** `Auckland`.
+- **Expects to see:** `Trips`, `Your flight to`, `Flight card`, `Live status starts 1 day before.`, `You are in`, `DELAYED`, `Originally`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
 
 #### `flight-status`
@@ -264,7 +264,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Expects to see:** `Trips`, `Jane Doe`.
+- **Expects to see:** `Trips`, `THEN`.
 - **Drive it:** `tools/control flow open-trip`; or `poetry run python run.py verify --flow open-trip`.
 
 #### `parking-gate-code`
@@ -470,7 +470,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `Edit trip details`, `Cancel`, `Bookings`, `Edit `.
+- **Touches:** `Edit trip details`, `Cancel`, `Bookings`, `Edit`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow trip-inline-edit`; or `poetry run python run.py verify --flow trip-inline-edit`.
 
@@ -554,7 +554,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`.
-- **Expects to see:** `Trips`, `Jane Doe`, `31A`.
+- **Expects to see:** `Trips`, `31A`.
 - **Drive it:** `tools/control flow trip-travellers`; or `poetry run python run.py verify --flow trip-travellers`.
 
 #### `trips-search`

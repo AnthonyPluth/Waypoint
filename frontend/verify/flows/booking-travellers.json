@@ -9,7 +9,7 @@
     { "scroll_to": "[data-itinerary]" },
     { "screenshot": "cruise-card" },
     { "press": { "selector": "[role='dialog']", "key": "Escape" } },
-    { "click": "button:has-text('Add a booking') >> visible=true" },
+    { "click": "button:has-text('Add booking') >> visible=true" },
     { "wait_for": "label:has-text('What is it') select" },
     { "select": { "selector": "label:has-text('What is it') select", "index": 1 } },
     { "click": "button:has-text('Set the time zone by hand')" },

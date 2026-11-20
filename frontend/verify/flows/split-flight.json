@@ -15,11 +15,14 @@
       "click": "a[href^='#trip/']:has-text('London') >> visible=true"
     },
     {
-      "wait_for": "li[data-booking]"
+      "click": "[data-booking-card='flight'] button[data-booking] >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "expect_text": {
-        "selector": "main",
+        "selector": "[data-testid=booking-detail]",
         "text": "MW5T9Z"
       }
     },
