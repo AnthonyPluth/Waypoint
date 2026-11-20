@@ -2,7 +2,7 @@
   import { avatarTone, type AvatarPerson } from "$lib/avatar";
   import { initials } from "$lib/nav";
 
-  let { people }: { people: AvatarPerson[] } = $props();
+  let { people, neutral = false }: { people: AvatarPerson[]; neutral?: boolean } = $props();
 
   const MAX = 4;
   const shown = $derived(people.slice(0, MAX));
@@ -14,7 +14,7 @@
   <span class="flex shrink-0 items-center" role="img" aria-label={label} data-testid="avatar-stack">
     {#each shown as person, i (i)}
       <span
-        class={`inline-flex size-7 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-card ${i ? "-ml-2" : ""} ${avatarTone(person)}`}
+        class={`inline-flex size-7 items-center justify-center rounded-full text-[11px] font-semibold ring-2 ring-card ${i ? "-ml-2" : ""} ${neutral ? "bg-surface-3 text-muted-foreground" : avatarTone(person)}`}
         aria-hidden="true"
       >{initials(person.name)}</span>
     {/each}

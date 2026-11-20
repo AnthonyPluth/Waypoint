@@ -16,6 +16,8 @@ const train = segment({ id: 3, kind: "train", provider: "Example Rail", origin: 
 const cruise = segment({ id: 4, kind: "cruise", provider: "Example Lines", origin: "Azure Meridian", destination: null, start_local: "2026-03-13T17:00", end_local: "2026-03-20T07:00", ...common });
 const lot = segment({ id: 5, kind: "parking", origin: "Bayside Park & Fly", destination: null, start_local: "2026-03-09T04:30", end_local: "2026-03-20T22:00", gate_code: { state: "ready", day: "2026-03-01" }, ...common });
 
+const leg = segment({ id: 6, kind: "flight", provider: "Example Air", origin: "LIS", destination: "JFK", start_local: "2026-03-20T10:05", end_local: "2026-03-20T13:20", details: { flight_number: "EX 410" }, ...common });
+
 const cardOf = (s: typeof stay) => bookingCards([s])[0];
 const show = (s: typeof stay, extra: Partial<{ now: number }> = {}) => render(BookingCard, { card: cardOf(s), now: NOW, onopen: vi.fn(), ...extra });
 const facts = (container: HTMLElement) => [...container.querySelectorAll("dl > div")].map((d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent]);
@@ -27,9 +29,22 @@ describe("BookingCard facts", () => {
     ["train", train, [["Departs", "9:15 AM"], ["From", "Lisboa"], ["Arrives", "12:40 PM"]]],
     ["cruise", cruise, [["Embarks", "Mar 13"], ["Nights", "7"], ["Disembarks", "Mar 20"]]],
     ["parking", lot, [["Entry", "4:30 AM"], ["Days", "11"], ["Exit", "Mar 20"]]],
+    ["flight", leg, [["Departs", "10:05 AM"], ["Flight", "EX 410"], ["Arrives", "1:20 PM"]]],
   ] as const)("shows the three facts of a %s", (_, s, expected) => {
     const { container } = show(s);
     expect(facts(container)).toEqual(expected);
+  });
+
+  it("shows a flight with no number or no times by dashes, with no repeated label", () => {
+    const { container } = show({ ...leg, details: { time_unknown: "yes" } });
+    expect(facts(container)).toEqual([["Departs", "—"], ["Flight", "—"], ["Arrives", "—"]]);
+  });
+
+  it("opens a flight’s booking from its card, like every other kind", async () => {
+    const onopen = vi.fn();
+    show(leg, { onopen } as never);
+    await userEvent.click(screen.getByRole("button", { name: /LIS/ }));
+    expect(onopen).toHaveBeenCalledOnce();
   });
 
   it("names the booking, its kind and place, and that it is confirmed", () => {

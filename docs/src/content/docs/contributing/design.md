@@ -89,7 +89,7 @@ The headline, the plane and the Next up card follow set rules:
 
 ## Flight card
 
-`FlightCard.svelte` is the card a flight has on the trip page while its trip isn’t over; other kinds, and a flight on a trip that is over, an untimed flight or a cancelled booking, keep the pass card. The design is `docs/design/flights/a-flight-card.html`, signed off on #666. `flightCardView` in `frontend/src/lib/flightcard.ts` works out everything it shows from the segment, the flight’s live status (if any) and the clock, so the component only draws:
+`FlightCard.svelte` is the card the next flight has on the trip page while its trip isn’t over; every other booking there is a `BookingCard`, and a flight on a trip that is over keeps the pass card. The design is `docs/design/flights/a-flight-card.html`, signed off on #666. `flightCardView` in `frontend/src/lib/flightcard.ts` works out everything it shows from the segment, the flight’s live status (if any) and the clock, so the component only draws:
 
 - **State.** Live evidence (`flightEvidence`) gives landed, cancelled, diverted, delayed and in the air; with none, the booked times decide in the air and landed, and Boarding is a status with a gate within `BOARDING_MINUTES` (40) before departure, because the status service folds boarding into scheduled. With no live status at all and a departure more than `LIVE_STATUS_STARTS_DAYS` (1) away, the card has no pill and says when live status starts.
 - **Facts.** Four, each with a source: Terminal and Gate from live status (the booking’s own terminal when live status has none), Seat and Cabin from the booking; the arrival side (Terminal, Gate, Belt) in the air and once landed. The status has no belt, so Belt is a dash. An unknown value is a dash with the hidden text “Not known yet”, never a missing row.
@@ -106,6 +106,16 @@ The headline, the plane and the Next up card follow set rules:
 - **Detail row.** On the trip page, a last row “Confirmation, travellers and price” opens the booking’s detail.
 - **Colour.** Blue is live, now and the primary action; green is confirmed, on time and good news; amber is changed or needs attention. Nothing else on the card is coloured.
 - **Not built yet.** A connection (whole-journey codes, “1 stop, JFK”, the “Then” and “Earlier” lines): the app has no connection between two flights to draw it from.
+
+## Trip page
+
+`pages/Trip.svelte` assembles the page of a trip that is not over (`PastTrip.svelte` keeps a trip that is over), to the frames in `docs/design/clean-and-bold/` and the build issue #883:
+
+- **Header.** The back link (only when the page is not beside the Trips list) and, at the right, the pencil that opens `TripDetails` (`bare`, as `PastTrip` uses it) and **Trip options** (`tripOptions`: Add a booking, Merge another trip, Delete trip). Under it the trip’s name in `text-display` (`text-display-lg` from a 52 rem page), the dates and destination, `TripSummary` as facts, and a neutral `AvatarStack` where `showTripTravellers` allows it. The trip total, notes and the offline status follow.
+- **Next up and Then.** `nextUp([trip], now)` picks the booking for the hero: a flight is `FlightCard` with its travellers on the hero’s rows and its last row opening the detail; any other kind (today’s rendering until the owner decides otherwise, #878 point 11) is its `BookingCard`. Every other card, a cancelled or untimed flight included, is a `BookingCard` in date order under a **Then** label, and the footer line holds the booking count and **Add booking**.
+- **Columns.** The page is a container; from 52 rem wide (`@[52rem]`) **Next up** and **Then** sit side by side, and below it they stack. `layout.wide` gives the page the 80 rem width cap a completed trip has, while it is not beside the Trips list.
+- **Booking detail.** One `BookingDetail` for every booking, as on a completed trip, with the action row, the itinerary and loyalty numbers added for a trip not over.
+- **Not drawn.** A connection between two flights (#903).
 
 ## Live status view
 
@@ -152,7 +162,7 @@ The labels keep their contrast over bright content too (an expanded email previe
 - **Closing and focus.** It closes with the close button, Escape, a tap on the dimmed page or the swipe. Focus is trapped inside while it is open and returns to the control that opened it.
 - **Reduced motion.** With `prefers-reduced-motion: reduce` it fades in and out and does not slide.
 - **Headings.** Content that already has a heading of its own should drop it (`SegmentForm`’s `titled={false}`), since the sheet’s title names the dialog.
-- **Trip page.** **Edit** (and **Add address**) opens `SegmentForm` in the sheet on a phone and inline under the booking on a computer. Which one is decided when it opens, so a form being filled in does not jump if the window is resized.
+- **Trip page.** **Edit** (and **Add address**) in a booking’s detail opens `SegmentForm` in a sheet at every width, with the detail closed.
 - **Upcoming.** A booking in the day-by-day list opens its pass card in the sheet at every width (a modified click still follows the link to the trip page).
   - The Next up card passes `boarding` to `PassCard`, which draws it as a boarding pass: a header strip with the eyebrow, trip name, status chips and countdown; the route or place and times; and a stub with the confirmation code, the details and the travellers. Every other `PassCard` keeps the full pass.
   - `Upcoming.svelte` splits the list at today, with earlier days in a native `<details>` so the toggle is keyboard accessible without script.

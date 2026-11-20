@@ -6,11 +6,15 @@ export async function pickFromMenu(u: Pick<UserEvent, "click">, trigger: string 
   await u.click(await screen.findByRole("button", { name: item }));
 }
 
-export const tripOptions = (u: Pick<UserEvent, "click">, item: "Delete trip" | "Merge another trip") => pickFromMenu(u, "Trip options", item);
+export async function tripOptions(u: Pick<UserEvent, "click">, item: "Add a booking" | "Delete trip" | "Merge another trip") {
+  await u.click(await screen.findByRole("button", { name: "Trip options" }));
+  await u.click(await screen.findByRole("menuitem", { name: item }));
+}
 
 export async function openBooking(u: Pick<UserEvent, "click">, name: string | RegExp): Promise<HTMLElement | null> {
-  await screen.findByRole("list", { name: "Bookings" });
-  const card = (await screen.findAllByRole("button")).find((b) => b.hasAttribute("data-booking") && (typeof name === "string" ? b.textContent?.includes(name) : name.test(b.textContent ?? "")));
+  await screen.findByTestId("trip-bookings");
+  const textOf = (b: HTMLElement) => (b.hasAttribute("data-detail") ? (b.closest("[data-hero]")?.textContent ?? "") : (b.textContent ?? ""));
+  const card = (await screen.findAllByRole("button")).find((b) => (b.hasAttribute("data-booking") || b.hasAttribute("data-detail")) && (typeof name === "string" ? textOf(b).includes(name) : name.test(textOf(b))));
   if (!card) return null;
   await u.click(card);
   return screen.findByRole("dialog");
