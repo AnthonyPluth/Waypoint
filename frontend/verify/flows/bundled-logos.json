@@ -5,7 +5,7 @@
     {"expect_text": {"selector": "h1", "text": "Trips"}},
     {"click": "a[href^='#trip/']:has-text('London') >> visible=true"},
     {"wait_for": "ul[aria-label='Bookings']"},
-    {"wait_for": "ul[aria-label='Bookings'] img[src*='/logo']"},
+    {"wait_for": "[data-booking-card='hotel']"},
     {"screenshot": "included"}
   ]
 }
