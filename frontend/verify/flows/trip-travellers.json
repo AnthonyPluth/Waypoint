@@ -5,8 +5,10 @@
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
     { "wait_for": "ul[aria-label='Bookings']" },
-    { "expect_text": { "selector": "[data-trip-travellers]", "text": "Jane Doe" } },
-    { "expect_text": { "selector": "[data-seats]", "text": "31A" } },
+    { "wait_for": "[data-trip-travellers] [aria-label*='Jane Doe']" },
+    { "click": "[data-booking-card='flight'] button[data-booking] >> visible=true >> nth=0" },
+    { "wait_for": "[data-testid=booking-detail]" },
+    { "expect_text": { "selector": "[data-testid=booking-detail]", "text": "31A" } },
     { "screenshot": "trip-travellers" }
   ]
 }

@@ -101,7 +101,7 @@
   }));
   const seatsNamed = $derived(new Set(people.flatMap((p) => p.seats)));
   const rows = $derived<Row[]>([
-    ...card.segments.flatMap(rowsOf),
+    ...card.segments.flatMap((s): Row[] => [...(combined && card.timesDiffer && s.status !== "cancelled" ? [{ label: "Booking", value: s.confirmation ?? "No confirmation code" }] : []), ...rowsOf(s)]),
     ...(codes.length ? [{ label: codes.length > 1 ? "Confirmations" : "Confirmation", codes }] : []),
     ...(shownTravellers ? [{ label: "Travellers", people }] : []),
     ...(showCosts ? card.segments.filter((s) => s.price).map((s): Row => ({ label: "Price", value: formatMoney(s.price!.amount_minor, s.price!.currency), strike: s.status === "cancelled" })) : []),

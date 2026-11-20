@@ -3,15 +3,10 @@
   "page": "trips",
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
-    { "click": "a[href^='#trip/']:has-text('London') >> visible=true" },
+    { "click": "a[href^='#trip/']:has-text('Auckland') >> visible=true" },
     { "wait_for": "article[data-kind='flight'] [data-code='origin']" },
-    { "expect_text": { "selector": "article[data-state='landed']", "text": "You are in" } },
-    { "expect_text": { "selector": "article[data-state='landed']", "text": "+1 day" } },
-    { "expect_text": { "selector": "article[data-state='delayed']", "text": "DELAYED" } },
-    { "expect_text": { "selector": "article[data-state='delayed']", "text": "Originally" } },
-    { "expect_text": { "selector": "article[data-state='delayed'] [data-facts]", "text": "Not known yet" } },
-    { "expect_text": { "selector": "article[data-state='delayed'] [data-quiet]", "text": "50 min late" } },
-    { "scroll_to": "article[data-state='delayed']" },
+    { "expect_text": { "selector": "article[data-hero]", "text": "Your flight to" } },
+    { "scroll_to": "article[data-hero]" },
     { "screenshot": "trip-flight" },
     { "goto": "#design" },
     { "expect_text": { "selector": "#design-flight-card", "text": "Flight card" } },
@@ -23,6 +18,9 @@
     { "wait_for": "article[data-state='cancelled']" },
     { "wait_for": "article[data-state='diverted']" },
     { "expect_text": { "selector": "article[aria-label$='no live status yet']", "text": "Live status starts 1 day before." } },
+    { "expect_text": { "selector": "article[data-state='landed']", "text": "You are in" } },
+    { "expect_text": { "selector": "article[data-state='delayed']", "text": "DELAYED" } },
+    { "expect_text": { "selector": "article[data-state='delayed']", "text": "Originally" } },
     { "scroll_to": "#design-flight-card" },
     { "screenshot": "eight-states" }
   ]

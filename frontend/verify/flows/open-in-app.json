@@ -7,6 +7,7 @@
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/'] >> visible=true" },
     { "wait_for": "ul[aria-label='Bookings']" },
+    { "click": "[data-booking-card='flight'] button[data-booking] >> visible=true >> nth=0" },
     { "wait_for": "a:has-text('Open in app')" },
     { "screenshot": "vendor-links" }
   ]

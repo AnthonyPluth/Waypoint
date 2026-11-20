@@ -69,11 +69,11 @@ try {
         assert.equal(await page.getByRole('region',{name:'Route replay'}).count(),0,`${route}: a route replay is offered with no MapKit key`);
         assert.equal(await page.getByRole('button',{name:'Replay trip'}).count(),0,`${route}: Replay trip is offered with no MapKit key`);
         assert.equal(await page.locator('[data-mapkit]').count(),0,`${route}: an Apple map is drawn with no MapKit key`);
-        assert.equal(await page.getByRole('button',{name:'Add a booking',exact:true}).isDisabled(),true,'Trip editing enabled');
+        assert.equal(await page.getByRole('button',{name:'Add booking',exact:true}).isDisabled(),true,'Trip editing enabled');
         const trip = data.trips.find(item=>item.id === Number(route.slice(5)));
         const buttons = page.getByRole('button',{name:/^View email for/});
         const onPage = await buttons.count();
-        const cards = page.locator('button[data-booking]');
+        const cards = page.locator('button[data-booking], button[data-detail]');
         const inDetail = await cards.count();
         let behindCards = 0;
         for (let index = 0; index < inDetail; index++) {

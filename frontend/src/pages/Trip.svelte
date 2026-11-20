@@ -3,26 +3,21 @@
   import { app, layout, route } from "$lib/app.svelte";
   import { tick, untrack } from "svelte";
   import { apiCall } from "$lib/contract";
-  import { emailNews } from "$lib/email-news";
   import type { LoyaltyEntry, Person, Segment, StoredEmail, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Badge } from "$lib/components/ui/badge";
   import { Button } from "$lib/components/ui/button";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
-  import PassCard from "$lib/components/PassCard.svelte";
   import BookingCard from "$lib/components/BookingCard.svelte";
   import BookingDetail from "$lib/components/BookingDetail.svelte";
   import PastBookings from "$lib/components/PastBookings.svelte";
   import PastBookingsSheet from "$lib/components/PastBookingsSheet.svelte";
-  import AddressLink from "$lib/components/AddressLink.svelte";
   import ArrivalOpen from "$lib/components/ArrivalOpen.svelte";
   import CopyCode from "$lib/components/CopyCode.svelte";
   import FlightCard from "$lib/components/FlightCard.svelte";
-  import DayTime from "$lib/components/DayTime.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { isMobile } from "$lib/platform";
-  import { viewport } from "$lib/phone.svelte";
   import { Sheet } from "$lib/components/ui/sheet";
   import { dropDrafts, leave } from "$lib/drafts.svelte";
   import { flightStatus, loadFlightStatus, followFlightStatus, statusFor } from "$lib/flightstatus.svelte";
@@ -35,8 +30,6 @@
   import MessageView from "$lib/components/MessageView.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
-  import StatusChip from "$lib/components/StatusChip.svelte";
-  import { bookingChip } from "$lib/status";
   import PastTrip from "$lib/components/PastTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -48,9 +41,12 @@
   import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
   import { blankFor, draftOf, KINDS, type Draft } from "$lib/segment-form";
-  import { appWord, bookingCards, bookingCounts, type Card, dateLabel, dayIn, dayLabel, END_WORD, headline, isPast, membershipFor, loyaltyNumbers, showBookingTravellers, samePlace, showTripTravellers, START_WORD, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
+  import { appWord, bookingCards, bookingCounts, dateLabel, dayIn, dayLabel, headline, isPast, loyaltyNumbers, nextUp, showBookingTravellers, showTripTravellers, tripPeople, tripTravellers, untimed, vendorLink, viewerZone } from "$lib/trips";
+  import AvatarStack from "$lib/components/AvatarStack.svelte";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import GitMerge from "@lucide/svelte/icons/git-merge";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { toast } from "svelte-sonner";
@@ -69,7 +65,8 @@
   let form = $state<Draft | null>(null);
   let editingTrip = $state(false);
   let focus = $state("");
-  let inSheet = $state(false);
+  let details = $state<{ open: () => Promise<void> } | null>(null);
+  let editButton = $state<HTMLElement | null>(null);
   let bookingsOpen = $state(false);
   let detailId = $state<number | null>(null);
   let opener: HTMLElement | null = null;
@@ -206,13 +203,14 @@
   $effect(() => {
     if (!trip || !wanted) return;
     void cards;
-    if (completedPage) {
-      const key = `${id}:${wanted}`;
-      const found = cards.find((c) => c.segments.some((s) => String(s.id) === wanted));
-      if (found && openedWanted !== key) { openedWanted = key; opener = null; detailId = found.lead.id; }
-      return;
-    }
-    tick().then(() => document.getElementById(`segment-${wanted}`)?.scrollIntoView({ block: "start" }));
+    const found = cards.find((c) => c.segments.some((s) => String(s.id) === wanted));
+    if (!found) return;
+    const key = `${id}:${wanted}`;
+    if (openedWanted === key) return;
+    openedWanted = key;
+    tick().then(() => document.getElementById(`segment-${found.lead.id}`)?.scrollIntoView({ block: "start" }));
+    opener = null;
+    detailId = found.lead.id;
   });
 
   const done = $derived(trip?.done_at != null);
@@ -220,7 +218,7 @@
   const over = $derived(trip ? isPast(trip, dayIn(now, viewerZone())) : false);
   const completedPage = $derived(over && !staticDemo);
   $effect(() => {
-    if (!(completedPage && tripId === null)) return;
+    if (!(trip && tripId === null)) return;
     layout.wide = true;
     return () => { layout.wide = false; };
   });
@@ -236,17 +234,15 @@
   const moveFromDetail = (s: Segment) => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); };
   const removeFromDetail = (s: Segment) => { removing = s; asking = true; };
   const liveOn = $derived(flightStatus.list?.enabled === true);
-  const flightCard = (card: Card) => !over && card.lead.kind === "flight" && !card.cancelled && card.lead.status !== "cancelled" && !untimed(card.lead);
+  const upNext = $derived(trip && !completedPage ? nextUp([trip], now) : null);
+  const heroSegment = $derived(upNext?.segment ?? null);
+  const heroCard = $derived(heroSegment ? (cards.find((c) => c.segments.some((b) => b.id === heroSegment.id)) ?? null) : null);
+  const thenCards = $derived(cards.filter((c) => c !== heroCard));
+  const counts = $derived(trip ? bookingCounts(trip) : { total: 0, kinds: [], words: "" });
   const everyone = $derived(trip ? tripTravellers(trip.segments) : []);
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
-  const omitted = (s: Segment) => ["Address", "Pick-up address", ...(seatsListed(s) ? ["Seat"] : [])];
-  const seatsListed = (s: Segment) => {
-    const named = new Set(s.travelers.map((t) => t.seat?.trim()).filter(Boolean));
-    const shown = (s.details.seat || [...named].join(",")).split(",").map((x) => x.trim()).filter(Boolean);
-    return showBookingTravellers(s, everyone) && named.size > 0 && shown.every((x) => named.has(x));
-  };
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
-  const pastOptions = $derived(!trip || form ? [] : [
+  const tripOptions = $derived(!trip || form ? [] : [
     { label: "Add a booking", icon: Plus, onselect: () => { focus = ""; form = blankFor(people, app.state?.person_id, trip!.id, trip!.costs.totals[0]?.currency); } },
     { label: "Merge another trip", icon: GitMerge, onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
     { label: "Delete trip", icon: Trash2, destructive: true, divided: true, onselect: () => { deleting = true; } },
@@ -258,10 +254,14 @@
     node.scrollIntoView?.({ block: "nearest", behavior: calm ? "auto" : "smooth" });
   }
 
+  function revealForm(node: HTMLElement) {
+    reveal(node);
+    node.querySelector<HTMLElement>("select, input, textarea")?.focus({ preventScroll: true });
+  }
+
   function edit(s: Segment, field = "") {
     leave(() => {
       focus = field;
-      inSheet = viewport.phone || completedPage;
       form = draftOf(s, trip?.costs.totals[0]?.currency);
     });
   }
@@ -337,8 +337,8 @@
   });
 </script>
 
-<div class={tripId === null && !completedPage ? "mx-auto max-w-3xl" : ""}>
-{#if tripId === null && !(trip && completedPage)}
+<div>
+{#if tripId === null && !trip}
   <a class="mb-4 inline-flex items-center gap-1.5 phone:min-h-11 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" /> Trips</a>
 {/if}
 
@@ -384,102 +384,95 @@
   {@const t = trip}
   <ArrivalOpen tripId={t.id} segments={t.segments} {now} />
   {#if completedPage}
-    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={pastOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
+    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={tripOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
       onbookings={() => (bookingsOpen = true)} bookings={pastBookings} />
     {#if form && form.id === null}
       <div class="mt-6 mb-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
     {/if}
   {:else}
-  <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
-      {#key id}
-        <TripDetails bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { replace(next); onchanged?.(); }} />
-      {/key}
-      {#if !editingTrip}<TripSummary tripId={t.id} revision={`${loads}.${photoChanges}`} />{/if}
-      {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
-        <p class="mt-1 text-sm" data-trip-travellers><span class="eyebrow">Travellers</span> <span class="break-words font-medium">{everyone.map((who) => who.name).join(", ")}</span></p>
-      {/if}
-      {#if costsShown && t.costs.totals.length}
-        <p class="mt-1 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
-          {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
-      {/if}
-      {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
-      {#if !over}<OfflineStatus tripId={t.id} />{/if}
-    </div>
-    {#if !form}
-      <div class="flex flex-wrap gap-2">
-        <Button onclick={() => { focus = ""; form = blankFor(people, app.state?.person_id, t.id, t.costs.totals[0]?.currency); }}><Plus /> Add a booking</Button>
-        <OptionsMenu label="Trip options" text="Trip options" items={[
-          { label: "Merge another trip", onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
-          { label: "Delete trip", destructive: true, onselect: () => { deleting = true; } },
-        ]} />
-      </div>
+  <div class="@container">
+  <div class="flex items-center justify-between gap-3">
+    {#if tripId === null}
+      <a class="-ml-1 inline-flex min-h-11 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground" href="#trips"><ArrowLeft class="size-4" aria-hidden="true" /> Trips</a>
+    {:else}
+      <span></span>
     {/if}
+    <div class="flex items-center">
+      {#if !editingTrip}<Button bind:ref={editButton} variant="ghost" size="icon" aria-label="Edit trip details" onclick={() => void details?.open()}><Pencil /></Button>{/if}
+      {#if tripOptions.length}<OptionsMenu popup iconOnly variant="ghost" label="Trip options" text="Trip options" icon={Ellipsis} items={tripOptions} />{/if}
+    </div>
   </div>
 
-  <RouteReplay trip={t} {now} />
-  <TripPhotos onchanged={() => photoChanges++} trip={t} {people} {now} />
+  <TripDetails bind:this={details} bind:editing={editingTrip} trip={t} dates={dates(t)} onsaved={(next) => { replace(next); onchanged?.(); }} bare returnFocus={() => editButton} />
+  {#if editingTrip}
+    <h1 class="sr-only">{t.name}</h1>
+  {:else}
+    <div class="mt-1 flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="break-words text-display @[52rem]:text-display-lg">{t.name}</h1>
+        <p class="mt-1 min-w-0 break-words text-muted-foreground">{dates(t)}{t.destination ? ` · ${t.destination}` : ""}</p>
+        <TripSummary tripId={t.id} revision={`${loads}.${photoChanges}`} />
+      </div>
+      {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
+        <span class="mt-2 shrink-0" data-trip-travellers><AvatarStack people={tripPeople(t)} neutral /></span>
+      {/if}
+    </div>
+  {/if}
+  {#if costsShown && t.costs.totals.length}
+    <p class="mt-2 text-sm" data-trip-total><span class="eyebrow">Total</span> <span class="break-words font-medium">{formatTotals(t.costs.totals)}</span>
+      {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
+  {/if}
+  {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
+  {#if !over}<OfflineStatus tripId={t.id} />{/if}
 
   {#if form && form.id === null}
-    <SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} />
-  {/if}
+    <div class="mt-6" use:revealForm><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
   {/if}
 
   {#if t.segments.length === 0}
-    <p class="text-muted-foreground">Nothing booked on this trip yet.</p>
+    <p class="mt-6 text-muted-foreground">Nothing booked on this trip yet.</p>
   {/if}
-  {#if !completedPage}
-  <ul class="ml-2 flex flex-col gap-6 border-l-2 border-dashed border-border pl-4 sm:pl-6" aria-label="Bookings">
-    {#each cards as card (card.id)}
-      {@const s = card.lead}
-      {#if flightCard(card)}
-        <li id={`segment-${s.id}`} class="scroll-mt-20" data-flight-card>
-          <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} ondetail={(from) => openDetail(s, from)}>
-            {#snippet footer()}
-              {#if card.segments.length === 1}
-                {@render flightBooking(s)}
-                {@render ports(s)}{@render links(s)}
-                {@render singleFooter(s, true)}
-              {:else}
-                {#if card.timesDiffer}<p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>{/if}
-                {@render multiFooter(card, true)}
-              {/if}
-            {/snippet}
-          </FlightCard>
-        </li>
-      {:else if s.kind !== "flight"}
-        <BookingCard {card} {now} id={`segment-${s.id}`} highlight={wanted === String(s.id)} onopen={openDetail} />
-      {:else if card.segments.length === 1}
-        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showApp={false} omit={omitted(s)}>
-          {#snippet times()}<dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>{/snippet}
-          {#snippet details()}{@render ports(s)}{@render links(s)}{/snippet}
-          {#snippet live()}{/snippet}
-          {#snippet footer()}
-            {@render singleFooter(s)}
-          {/snippet}
-        </PassCard>
-      {:else}
-        <PassCard as="li" id={`segment-${s.id}`} highlight={wanted === String(s.id)} segment={s} {now} level={2} eyebrow={eyebrowOf(s)} showCode={false} showApp={false} showCost={false}
-          label={`${headline(s)}, on ${card.segments.length} bookings`}>
-          {#snippet times()}
-            {#if card.timesDiffer}
-              <p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are below.</span></p>
-            {:else}
-              <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(s)}</dl>
-            {/if}
-          {/snippet}
-          {#snippet live()}{/snippet}
-          {#snippet footer()}
-            {@render multiFooter(card)}
-          {/snippet}
-        </PassCard>
+  <div data-testid="trip-bookings" class={`mt-6 grid gap-8 ${heroCard ? "@[52rem]:grid-cols-2 @[52rem]:items-start" : ""}`}>
+    {#if heroCard}
+      {@const s = heroSegment ?? heroCard.lead}
+      <section class="min-w-0" aria-labelledby="next-up-title">
+        <h2 id="next-up-title" class="eyebrow sr-only mb-3 @[52rem]:not-sr-only">Next up</h2>
+        <ul class="flex flex-col gap-3" aria-label="Next up">
+          {#if s.kind === "flight"}
+            <li id={`segment-${heroCard.lead.id}`} class="scroll-mt-20" data-flight-card>
+              <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} ondetail={(from) => openDetail(s, from)} />
+            </li>
+          {:else}
+            <BookingCard card={heroCard} {now} id={`segment-${heroCard.lead.id}`} highlight={wanted === String(heroCard.lead.id)} onopen={openDetail} />
+          {/if}
+        </ul>
+      </section>
+    {/if}
+    <section class="min-w-0" aria-label="Then">
+      {#if heroCard && thenCards.length}<h2 class="eyebrow mb-3">Then</h2>{/if}
+      {#if thenCards.length}
+        <ul class="flex flex-col gap-3" aria-label="Bookings">
+          {#each thenCards as card (card.id)}
+            <BookingCard {card} {now} id={`segment-${card.lead.id}`} highlight={wanted === String(card.lead.id)} onopen={openDetail} />
+          {/each}
+        </ul>
       {/if}
-      {#if form && form.id !== null && !inSheet && card.segments.some((b) => b.id === form?.id)}
-        <li use:reveal aria-label="Edit booking"><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></li>
+      {#if !form}
+        <p class="mt-4 flex flex-wrap items-center justify-between gap-x-3 text-sm text-muted-foreground" data-trip-footer>
+          <span>{counts.total === 0 ? "No bookings" : `${counts.total} ${counts.total === 1 ? "booking" : "bookings"}`}</span>
+          <Button variant="link" class="min-h-11 px-0 text-muted-foreground" onclick={() => { focus = ""; form = blankFor(people, app.state?.person_id, t.id, t.costs.totals[0]?.currency); }}>Add booking</Button>
+        </p>
       {/if}
-    {/each}
-  </ul>
+    </section>
+  </div>
+
+  <div class="mt-8 flex flex-col gap-6">
+    <RouteReplay trip={t} {now} />
+    <TripPhotos onchanged={() => photoChanges++} trip={t} {people} {now} />
+  </div>
+  </div>
   {/if}
+
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 </div>
@@ -507,95 +500,18 @@
 
 <OfflineSetup bind:open={askOffline} onenabled={() => trip && void saveTripCopy(trip)} />
 
-<Sheet bind:open={() => inSheet && form !== null && form.id !== null, (v) => { if (!v) form = null; }} title="Edit this booking">
+<Sheet bind:open={() => form !== null && form.id !== null, (v) => { if (!v) form = null; }} title="Edit this booking">
   {#if form && form.id !== null}
     <SegmentForm initial={form} {people} {focus} titled={false} oncancel={() => (form = null)} onsaved={saved} />
   {/if}
 </Sheet>
 
-{#snippet singleFooter(s: Segment, hero = false)}
-  <div class="flex flex-col gap-3">
-    {#if showBookingTravellers(s, everyone) && !hero}
-      <h3 class="eyebrow">Travellers</h3>
-      {@render travellerList(s)}
-      {#if s.kind === "cruise" && !over}{@render membershipList(s)}{/if}
-    {:else if !over}
-      {@render membershipList(s)}
-    {/if}
-    {@render buttons(s, headline(s))}
-  </div>
-{/snippet}
-
-{#snippet multiFooter(card: Card, hero = false)}
-  <div class="flex flex-col gap-4">
-    <h3 class="eyebrow">Bookings</h3>
-    <ul class="flex flex-col gap-4" aria-label={`Bookings of ${headline(card.lead)}`}>
-      {#each card.segments as b (b.id)}
-        {@const name = `${headline(b)} booking${b.confirmation ? ` ${b.confirmation}` : ""}`}
-        <li class="flex flex-col gap-3 rounded-2xl border border-border bg-surface-2 p-4" class:opacity-80={b.status === "cancelled"} data-booking>
-          <p class="flex flex-wrap items-center gap-2">
-            {#if b.confirmation}<span class="text-lg"><CopyCode code={b.confirmation} /></span>{:else}<span class="text-muted-foreground">No confirmation code</span>{/if}
-            {#if b.status !== "confirmed"}<Badge variant={b.status === "cancelled" ? "destructive" : "secondary"}>{b.status === "cancelled" ? "Cancelled" : "Changed"}</Badge>{/if}</p>
-          {#if card.timesDiffer && b.status !== "cancelled"}
-            <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">{@render timeRows(b)}</dl>
-          {/if}
-          {#if costsShown && b.price}
-            <p class="text-sm" data-cost><span class="eyebrow">Cost</span> <span class="font-medium" class:line-through={b.status === "cancelled"}>{formatMoney(b.price.amount_minor, b.price.currency)}</span>
-              {#if b.status === "cancelled"}<span class="text-muted-foreground"> · cancelled, so not in the trip’s total</span>{/if}</p>
-          {/if}
-          {@render links(b)}
-          {#if !hero}
-            <h4 class="eyebrow">Travellers</h4>
-            {@render travellerList(b)}
-          {/if}
-          {@render buttons(b, name)}
-        </li>
-      {/each}
-    </ul>
-  </div>
-{/snippet}
-
-{#snippet flightBooking(s: Segment)}
-  {@const cost = costsShown && s.price ? formatMoney(s.price.amount_minor, s.price.currency) : ""}
-  {#if s.confirmation || cost || s.status !== "confirmed"}
-    <div class="flex flex-wrap items-start gap-x-8 gap-y-3">
-      {#if s.confirmation}<div class="min-w-0"><p class="eyebrow">Confirmation</p><CopyCode code={s.confirmation} class="mono mt-1 min-h-11 max-w-full break-all text-left text-heading font-semibold" /></div>{/if}
-      {#if s.status !== "confirmed"}<StatusChip chip={bookingChip(s.status)} class="mt-5" />{/if}
-      {#if cost}<div class="min-w-0"><p class="eyebrow">Cost</p><p class="mt-1 text-base font-medium" data-cost>{cost}</p></div>{/if}
-    </div>
-  {/if}
-{/snippet}
-
-{#snippet timeRows(s: Segment)}
-  <div><dt class="eyebrow">{START_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium"><DayTime segment={s} dated /></dd></div>
-  <div><dt class="eyebrow">{END_WORD[s.kind]}</dt>
-    <dd class="mt-1 text-base font-medium"><DayTime segment={s} end dated /></dd></div>
-{/snippet}
-
-{#snippet links(s: Segment)}
-  {#if s.email_update}{@const news = emailNews(s.email_update)}
-    {#if news.updated}<p class="text-sm text-signal-ink" role="note">Updated from a newer email: {news.updated} changed.</p>{/if}
-    {#if news.disagreed}<p class="text-sm text-signal-ink" role="note">A newer email disagreed with what you set for {news.disagreed}. It was left as you set it; edit the booking if it should change.</p>{/if}
-  {/if}
-  {#if s.check_times}<p class="text-sm text-signal-ink" role="note">Check the times: the email gave them in UTC and Waypoint couldn’t tell which clock they mean. Edit the booking to correct or confirm them.</p>{/if}
-  {#if s.kind === "hotel" || s.kind === "car" || s.kind === "cruise" || s.kind === "parking"}
-    {#if s.details.address && !(s.kind === "car" && samePlace(s.details.address, s.origin))}
-      <div class="mt-2 text-sm"><p class="eyebrow">{s.kind === "car" ? "Pick-up address" : s.kind === "cruise" ? "Terminal address" : "Address"}</p>
-        {#if s.status === "cancelled"}<CopyCode code={s.details.address} label="address" multiline class="mt-1 text-base font-medium" />
-        {:else}<AddressLink address={s.details.address} multiline class="mt-1 text-base font-medium" />{/if}</div>
-    {:else if s.kind !== "car" && !s.details.address && s.status !== "cancelled" && !over}
-      <p class="mt-2 text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => edit(s, "segment-address")}
-        aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
-    {/if}
-  {/if}
-  {@render actionRow(s)}
-{/snippet}
-
-{#snippet actionRow(s: Segment, tone: "action" | "outline" = "action")}
+{#snippet actionRow(s: Segment, tone: "action" | "outline" = "action", name = headline(s))}
   {@const vendor = vendorLink(s, isMobile())}
-  {#if (!over || staticDemo) && (s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
-    <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
+  {@const live = s.kind === "flight" && s.status !== "cancelled" && !untimed(s) && !over}
+  {#if (!over || staticDemo) && (live || s.links.app || vendor || (s.status !== "cancelled" && (s.links.directions || s.links.call)) || s.has_email || s.gate_code)}
+    <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label={`Actions for ${name}`}>
+      {#if live}<Button variant="outline" size="sm" href={`#trip/${s.trip_id}/flight/${s.id}`}>Live status</Button>{/if}
       {#if s.links.app}<Button variant={tone} size="sm" href={s.links.app} target="_blank" rel="noopener noreferrer">{appWord(s, now, isMobile())}</Button>
       {:else if vendor}<Button variant={tone} size="sm" href={vendor.href}>{vendor.label}</Button>{/if}
       {#if s.status !== "cancelled" && s.links.directions}<Button variant="outline" size="sm" href={s.links.directions} target="_blank" rel="noopener noreferrer">Directions</Button>{/if}
@@ -603,14 +519,14 @@
       <GateCode segment={s} {now} onchanged={() => void load()} />
       {#if s.has_email}
         {@const mail = mails[s.id]}
-        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} email for ${headline(s)}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
+        <Button variant="outline" size="sm" aria-expanded={!!mail} aria-label={`${mail ? "Hide" : "View"} email for ${name}`} onclick={() => toggleMail(s)}>{mail ? "Hide email" : "View email"}</Button>
       {/if}
     </div>
   {/if}
   {#if (!over || staticDemo) && s.has_email}
     {@const mail = mails[s.id]}
     {#if mail}
-      <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${headline(s)}`}>
+      <div class="mt-2 space-y-4" role="region" aria-label={`The email for ${name}`}>
         {#if mail.state === "loading"}<p class="text-sm text-muted-foreground" role="status">Opening the email…</p>
         {:else if mail.state === "error"}<p class="rounded-lg bg-signal-soft p-3 text-sm text-signal-ink" role="alert">{mail.message}</p>
         {:else if !mail.emails.length}<p class="text-sm text-muted-foreground">This email isn’t kept any more.</p>
@@ -629,11 +545,15 @@
 
 {#snippet detailActions()}
   {#if detailCard}
+    {#if detailCard.timesDiffer}<p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are listed here.</span></p>{/if}
     {#each detailCard.segments as s (s.id)}
       {#if (s.kind === "hotel" || s.kind === "cruise" || s.kind === "parking") && !s.details.address && s.status !== "cancelled" && !over}
         <p class="text-sm"><button type="button" class="underline underline-offset-2 phone:min-h-11" onclick={() => editFromDetail(s, "segment-address")} aria-label={`Add address to ${headline(s)}`}>Add address</button></p>
       {/if}
-      {@render actionRow(s, "outline")}
+      {@const several = detailCard.segments.length > 1}
+      {@const label = several && s.confirmation ? `${headline(s)} booking ${s.confirmation}` : headline(s)}
+      {#if several}<p class="eyebrow" data-booking-actions>Booking {s.confirmation ?? "without a code"}</p>{/if}
+      {@render actionRow(s, "outline", label)}
     {/each}
   {/if}
 {/snippet}
@@ -682,33 +602,6 @@
         <li class="text-sm text-muted-foreground">{entry.program} <LoyaltyNumber {entry} /></li>
       {/each}
     </ul>
-  {/if}
-{/snippet}
-
-{#snippet travellerList(s: Segment)}
-  {#if s.travelers.length === 0}<p class="text-sm text-muted-foreground">Nobody is listed on this booking.</p>{/if}
-  <ul class="flex flex-col gap-2">
-    {#each s.travelers as who (who.id)}
-      {@const m = membershipFor(s, who, loyalty)}
-      <li class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-        <span class="break-words font-medium">{who.name}{#if who.seat}{" "}<span class="font-normal text-muted-foreground">· Seat {who.seat}</span>{/if}</span>
-        <span class="text-muted-foreground">
-          {#if m?.state === "unmatched"}Not matched to a person in <a class="underline" href="#people">People</a>{/if}
-        </span>
-      </li>
-    {/each}
-  </ul>
-{/snippet}
-
-{#snippet buttons(s: Segment, name: string)}
-  {#if !done}
-    <div class="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" aria-label={`Edit ${name}`} onclick={() => edit(s)}>Edit</Button>
-      <OptionsMenu size="sm" up align="left" label={`More options for ${name}`} text="More" items={[
-        { label: "Move", name: `Move ${name}`, onselect: () => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); } },
-        { label: "Remove", name: `Remove ${name}`, destructive: true, onselect: () => { removing = s; asking = true; } },
-      ]} />
-    </div>
   {/if}
 {/snippet}
 

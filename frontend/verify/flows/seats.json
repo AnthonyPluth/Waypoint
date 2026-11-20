@@ -15,25 +15,31 @@
       "wait_for": "ul[aria-label='Bookings']"
     },
     {
+      "click": "[data-booking-card='flight'] button[data-booking] >> visible=true >> nth=0"
+    },
+    {
+      "wait_for": "[data-testid=booking-detail]"
+    },
+    {
       "expect_text": {
-        "selector": "[data-seats]",
+        "selector": "[data-testid=booking-detail]",
         "text": "31A"
       }
     },
     {
-      "scroll_to": "[data-seats] >> nth=0"
+      "scroll_to": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "card"
     },
     {
-      "click": "button:has-text('Edit') >> nth=0"
+      "click": "[role='dialog'] button:text-is('Edit') >> visible=true"
     },
     {
       "wait_for": "[aria-label='Seat of Jane Doe']"
     },
     {
-      "scroll_to": "fieldset:has-text('Who\u2019s travelling')"
+      "scroll_to": "fieldset:has-text('Who’s travelling')"
     },
     {
       "screenshot": "form"

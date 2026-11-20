@@ -4,6 +4,8 @@
   "steps": [
     { "expect_text": { "selector": "h1", "text": "Trips" } },
     { "click": "a[href^='#trip/']:has-text('Chicago') >> visible=true" },
+    { "wait_for": "ul[aria-label='Next up']" },
+    { "click": "article[data-hero] button[data-detail], [data-booking-card='flight'] button[data-booking] >> visible=true >> nth=0" },
     { "wait_for": "button:has-text('View email')" },
     { "click": "button:has-text('View email') >> visible=true" },
     { "wait_for": "[data-testid='preview-html'][aria-busy='false']" },

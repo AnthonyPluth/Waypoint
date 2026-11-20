@@ -418,12 +418,13 @@ export function cardFacts(s: Segment): [string, string][] {
   const days = daysBetween(`${from}T00:00`, `${to}T00:00`);
   const date = (local: string) => { const p = dayParts(local.slice(0, 10)); return `${p.month} ${p.day}${yearOf(local) === new Date().getFullYear() ? "" : `, ${yearOf(local)}`}`; };
   const time = (local: string) => (untimed(s) ? "—" : clock(local));
+  if (s.kind === "flight") return [[CARD_START_WORD.flight, time(s.start_local)], ["Flight", s.details.flight_number?.trim() || "—"], [CARD_END_WORD.flight, [time(s.end_local), untimed(s) ? "" : dayShift(s.start_local, s.end_local)].filter(Boolean).join(" ")]];
   if (s.kind === "train") return [[CARD_START_WORD.train, time(s.start_local)], [CARD_MIDDLE_WORD.train, s.origin ?? "—"], [CARD_END_WORD.train, time(s.end_local)]];
   if (s.kind === "hotel") return [[CARD_START_WORD.hotel, date(s.start_local)], [CARD_MIDDLE_WORD.hotel, String(days)], [CARD_END_WORD.hotel, date(s.end_local)]];
   if (s.kind === "cruise") return [[CARD_START_WORD.cruise, date(s.start_local)], [CARD_MIDDLE_WORD.cruise, String(days)], [CARD_END_WORD.cruise, date(s.end_local)]];
   if (s.kind === "parking") return [[CARD_START_WORD.parking, time(s.start_local)], [CARD_MIDDLE_WORD.parking, String(days)], [CARD_END_WORD.parking, date(s.end_local)]];
   if (s.kind === "car") return [[CARD_START_WORD.car, date(s.start_local)], [CARD_MIDDLE_WORD.car, String(Math.max(days, 1))], [CARD_END_WORD.car, date(s.end_local)]];
-  return [[CARD_START_WORD[s.kind], date(s.start_local)], [s.kind === "flight" ? "Departs" : CARD_MIDDLE_WORD[s.kind], String(Math.max(days, 1))], [CARD_END_WORD[s.kind], date(s.end_local)]];
+  return [[CARD_START_WORD[s.kind], date(s.start_local)], [CARD_MIDDLE_WORD[s.kind], String(Math.max(days, 1))], [CARD_END_WORD[s.kind], date(s.end_local)]];
 }
 
 export function when(word: string, ms: number): string {
