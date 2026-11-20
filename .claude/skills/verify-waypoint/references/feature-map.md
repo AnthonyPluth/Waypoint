@@ -232,7 +232,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`; goes to: `#design`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`.
-- **Expects to see:** `Trips`, `LANDED`, `+1 day`, `DELAYED 50 MIN`, `Originally`, `Not known yet`, `Flight card`, `Live status starts 1 day before departure`.
+- **Expects to see:** `Trips`, `You are in`, `+1 day`, `DELAYED`, `Originally`, `Not known yet`, `50 min late`, `Flight card`, `Live status starts 1 day before.`.
 - **Drive it:** `tools/control flow flight-card`; or `poetry run python run.py verify --flow flight-card`.
 
 #### `flight-status`
@@ -406,7 +406,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`, `Edit`.
-- **Expects to see:** `Trips`, `Seat 31A`.
+- **Expects to see:** `Trips`, `31A`.
 - **Drive it:** `tools/control flow seats`; or `poetry run python run.py verify --flow seats`.
 
 #### `settings-trip-costs`
@@ -546,7 +546,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
 - **Touches:** `London`.
-- **Expects to see:** `Trips`, `Jane Doe`, `Seat 31A`.
+- **Expects to see:** `Trips`, `Jane Doe`, `31A`.
 - **Drive it:** `tools/control flow trip-travellers`; or `poetry run python run.py verify --flow trip-travellers`.
 
 #### `trips-search`
