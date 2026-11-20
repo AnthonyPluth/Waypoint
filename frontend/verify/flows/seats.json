@@ -16,12 +16,12 @@
     },
     {
       "expect_text": {
-        "selector": "main",
-        "text": "Seat 31A"
+        "selector": "[data-seats]",
+        "text": "31A"
       }
     },
     {
-      "scroll_to": "text=Seat 31A >> nth=0"
+      "scroll_to": "[data-seats] >> nth=0"
     },
     {
       "screenshot": "card"

@@ -46,7 +46,7 @@ beforeEach(() => {
 describe("the Home next-flight card", () => {
   const draw = (now: number, live?: FlightStatus) => render(FlightHome, { segment: booked, status: live, liveOn: true, now, eyebrow: "Next up", tripName: "Four Corners loop" });
 
-  it("is one link named with the flight, route, state and next time, with the mini route decorative", async () => {
+  it("is one link named with the flight, route, state and next time, with the arc decorative", async () => {
     draw(EARLY, delayed);
     const link = await screen.findByRole("link", { name: "EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am" });
     expect(link).toHaveAttribute("href", "#trip/7/flight/3");
@@ -54,26 +54,28 @@ describe("the Home next-flight card", () => {
     const line = document.querySelector("[data-flight-home] [data-plane]")?.closest("[aria-hidden='true']");
     expect(line).not.toBeNull();
     expect(screen.getByText("DEN").closest("[aria-hidden='true']")).toBeNull();
-    expect(screen.getByText("10:15 am").closest("[aria-hidden='true']")).toBeNull();
+    expect(document.querySelector("[data-when='origin'] time")?.closest("[aria-hidden='true']")).toBeNull();
   });
 
-  it("shows the pill, amber times, the gate and when it was updated when delayed", async () => {
+  it("shows the amber Delayed pill, amber times, the late line with the old time struck and the three facts when delayed", async () => {
     draw(EARLY, delayed);
     await screen.findByRole("link");
-    expect(screen.getByText("Delayed 35 min")).toBeInTheDocument();
-    expect(screen.getByText("10:15 am").parentElement).toHaveClass("text-signal-ink");
-    expect(screen.getByText("11:27 am").parentElement).toHaveClass("text-signal-ink");
-    expect(screen.getByText("Terminal B · Gate B14")).toBeInTheDocument();
-    expect(screen.getByText("Updated 4 min ago")).toBeInTheDocument();
-    expect(screen.getByText("EA 214")).toBeInTheDocument();
-    expect(screen.getByText("Thu Jun 12 · Four Corners loop")).toBeInTheDocument();
-    expect(screen.getAllByText("MDT")).toHaveLength(2);
+    expect(screen.getByText("Delayed")).toHaveClass("bg-signal", "text-signal-foreground");
+    expect(document.querySelector("[data-when='origin']")).toHaveClass("text-signal-ink");
+    expect(document.querySelector("[data-when='destination']")).toHaveClass("text-signal-ink");
+    expect(document.querySelector("[data-quiet]")).toHaveTextContent("35 min late · was Originally 9:40 AM");
+    expect(document.querySelector("[data-quiet] s")).toHaveTextContent("9:40 AM");
+    expect(screen.getByText("B14")).toBeInTheDocument();
+    expect(screen.getByText("Example Air EA 214")).toBeInTheDocument();
+    expect(screen.getByText("Next up").closest("p")).toHaveTextContent("Next up · Four Corners loop");
+    expect(screen.getByText("Your flight to Grand Junction")).toBeInTheDocument();
   });
 
-  it("puts the plane at the flight’s progress while it is in the air", async () => {
+  it("puts the plane at the flight’s progress while it is in the air, with the time left in blue", async () => {
     draw(AIR, flying);
     await screen.findByRole("link", { name: "EA 214, Denver to Grand Junction, in the air, lands 10:52 am in 38 minutes" });
-    expect(screen.getByText("In the air")).toBeInTheDocument();
+    expect(screen.getByText("38 min left")).toHaveClass("text-primary");
+    expect(screen.getByText("In the air to Grand Junction")).toBeInTheDocument();
     const left = Number.parseFloat(document.querySelector<HTMLElement>("[data-plane]")!.style.left);
     expect(left).toBeCloseTo(((AIR - at("2025-06-12T09:46")) / (at("2025-06-12T10:52") - at("2025-06-12T09:46"))) * 100, -1);
   });
@@ -81,9 +83,9 @@ describe("the Home next-flight card", () => {
   it("shows the booked times, dashes and no Updated line with no live data", async () => {
     draw(at("2025-06-12T08:00"));
     await screen.findByRole("link", { name: "EA 214, Denver to Grand Junction, scheduled, departs Thu Jun 12 at 9:40 am" });
-    expect(screen.getByText("9:40 am")).toBeInTheDocument();
-    expect(screen.getByText("10:52 am")).toBeInTheDocument();
-    expect(screen.getByText("Terminal — · Gate —")).toBeInTheDocument();
+    expect(document.querySelector("[data-when='origin'] time")).toHaveTextContent("9:40 AM");
+    expect(document.querySelector("[data-when='destination'] time")).toHaveTextContent("10:52 AM");
+    expect([...document.querySelectorAll("[data-facts] dd")].slice(0, 2).map((dd) => dd.textContent)).toEqual(["—Not known yet", "—Not known yet"]);
     expect(document.querySelector("[data-updated]")).toBeNull();
   });
 });

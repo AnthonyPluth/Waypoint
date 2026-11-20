@@ -33,50 +33,51 @@ const status = (now: number, minutesAgo: number, extra: Partial<FlightStatus> = 
   delay_minutes: null, fetched_at: new Date(now - minutesAgo * 60_000).toISOString(), ...extra,
 });
 
-type Case = { name: string; now: number; status?: FlightStatus; label: string; pill: string | null; sentence: string; times: [string, string]; facts: [string, string][]; updated: string | null };
+
+type Hero = { top: string | null; tone: string | null; sentence: string; big: string; quiet: string; times: [string, string]; zones: [string, string]; facts: [string, string][] };
+type Case = { name: string; now: number; status?: FlightStatus; label: string; hero: Hero };
 const mk = (now: number, minutesAgo: number, extra: Partial<FlightStatus>) => status(now, minutesAgo, extra);
 const NOW = {
   scheduled: at("2025-06-09T08:00"), boarding: at("2025-06-12T09:15"), delayed: at("2025-06-12T08:50"), air: at("2025-06-12T10:14"),
   landed: at("2025-06-12T10:55"), cancelled: at("2025-06-12T08:30"), diverted: at("2025-06-12T10:20"), none: at("2025-06-02T08:00"),
 };
+const ZONES: [string, string] = ["MDT", "MDT"];
 const CASES: Case[] = [
   { name: "scheduled", now: NOW.scheduled, status: mk(NOW.scheduled, 4, { dep_terminal: "B" }), label: "EA 214, Denver to Grand Junction, scheduled, departs Thu Jun 12 at 9:40 am",
-    pill: "Scheduled", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 4 min ago",
-    facts: [["Terminal", "B"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
+    hero: { top: "In 3 days", tone: "primary", sentence: "Your flight to Grand Junction", big: "Departs 9:40 AM", quiet: "Thu Jun 12 · on time", times: ["9:40 AM", "10:52 AM"], zones: ZONES, facts: [["Terminal", "B"], ["Gate", "—Not known yet"], ["Seat", "12A"]] } },
   { name: "boarding", now: NOW.boarding, status: mk(NOW.boarding, 2, { dep_terminal: "B", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, boarding at gate B14, departs 9:40 am",
-    pill: "Boarding", sentence: "", times: ["9:40 am", "10:52 am"], updated: "Updated 2 min ago",
-    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "Economy"]] },
+    hero: { top: "Boarding", tone: "primary", sentence: "Boarding now, to Grand Junction", big: "Departs 9:40 AM", quiet: "Thu Jun 12 · on time", times: ["9:40 AM", "10:52 AM"], zones: ZONES, facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"]] } },
   { name: "delayed", now: NOW.delayed, label: "EA 214, Denver to Grand Junction, delayed 35 minutes, now departs 10:15 am",
     status: mk(NOW.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", dep_terminal: "B", dep_gate: "B14", delay_minutes: 35 }),
-    pill: "Delayed 35 min", sentence: "", times: ["Originally 9:40 am 10:15 am", "Originally 10:52 am 11:27 am"], updated: "Updated 4 min ago",
-    facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"], ["Cabin", "Economy"]] },
+    hero: { top: "Delayed", tone: "signal", sentence: "Your flight to Grand Junction", big: "Departs 10:15 AM", quiet: "35 min late · was Originally 9:40 AM", times: ["10:15 AM", "11:27 AM"], zones: ZONES, facts: [["Terminal", "B"], ["Gate", "B14"], ["Seat", "12A"]] } },
   { name: "in the air", now: NOW.air, label: "EA 214, Denver to Grand Junction, in the air, lands 10:52 am in 38 minutes",
     status: mk(NOW.air, 1, { state: "departed", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:52", arr_terminal: "1", arr_gate: "A3" }),
-    pill: "In the air", sentence: "Lands in 38 minutes.", times: ["9:46 am", "10:52 am"], updated: "Updated 1 min ago",
-    facts: [["Terminal", "1"], ["Gate", "A3"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
+    hero: { top: "38 min left", tone: "primary", sentence: "In the air to Grand Junction", big: "Lands 10:52 AM", quiet: "Updated 1 minute ago", times: ["9:46 AM", "10:52 AM"], zones: ZONES, facts: [["Arrival term", "1"], ["Arrival gate", "A3"], ["Bag claim", "—Not known yet"]] } },
   { name: "landed", now: NOW.landed, label: "EA 214, Denver to Grand Junction, landed 10:49 am, 3 minutes early",
     status: mk(NOW.landed, 1, { state: "landed", dep_actual: "2025-06-12T09:46", arr_actual: "2025-06-12T10:49", arr_terminal: "1", arr_gate: "A3" }),
-    pill: "Landed", sentence: "3 minutes early.", times: ["9:46 am", "10:49 am"], updated: "Updated 1 min ago",
-    facts: [["Terminal", "1"], ["Gate", "A3"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
+    hero: { top: "3 min early", tone: "success", sentence: "You are in Grand Junction", big: "Landed 10:49 AM", quiet: "Updated 1 minute ago", times: ["9:46 AM", "10:49 AM"], zones: ZONES, facts: [["Arrival term", "1"], ["Arrival gate", "A3"], ["Bag claim", "—Not known yet"]] } },
   { name: "cancelled", now: NOW.cancelled, status: mk(NOW.cancelled, 12, { state: "cancelled", dep_gate: "B14" }), label: "EA 214, Denver to Grand Junction, cancelled",
-    pill: "Cancelled", sentence: "Contact Example Air about rebooking.", times: ["9:40 am", "10:52 am"], updated: "Updated 12 min ago",
-    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
+    hero: { top: "Cancelled", tone: "signal", sentence: "Your flight to Grand Junction", big: "Cancelled", quiet: "Contact Example Air about rebooking.", times: ["9:40 AM", "10:52 AM"], zones: ZONES, facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"]] } },
   { name: "diverted", now: NOW.diverted, label: "EA 214, Denver to Montrose, diverted, expected to land 10:41 am",
     status: mk(NOW.diverted, 3, { state: "diverted", destination: "MTJ", dep_actual: "2025-06-12T09:46", arr_estimated: "2025-06-12T10:41", arr_gate: "C2" }),
-    pill: "Diverted", sentence: "Was headed to Grand Junction.", times: ["9:46 am", "10:41 am"], updated: "Updated 3 min ago",
-    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Belt", "—Not known yet"], ["Seat", "12A"]] },
-  { name: "scheduled with no live data", now: NOW.none, label: "EA 214, Denver to Grand Junction, scheduled, no live status yet", pill: null,
-    sentence: "Live status starts 1 day before departure. Until then these are the times on your booking.", times: ["9:40 am", "10:52 am"], updated: null,
-    facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"], ["Cabin", "Economy"]] },
+    hero: { top: "Diverted", tone: "signal", sentence: "Diverted to Montrose", big: "Lands 10:41 AM", quiet: "Was headed to Grand Junction · Updated 3 minutes ago", times: ["9:46 AM", "10:41 AM"], zones: ZONES, facts: [["Arrival term", "—Not known yet"], ["Arrival gate", "—Not known yet"], ["Bag claim", "—Not known yet"]] } },
+  { name: "scheduled with no live data", now: NOW.none, label: "EA 214, Denver to Grand Junction, scheduled, no live status yet",
+    hero: { top: "In 10 days", tone: "primary", sentence: "Your flight to Grand Junction", big: "Departs 9:40 AM", quiet: "Thu Jun 12 · Times from your booking. Live status starts 1 day before.", times: ["9:40 AM", "10:52 AM"], zones: ZONES, facts: [["Terminal", "—Not known yet"], ["Gate", "—Not known yet"], ["Seat", "12A"]] } },
 ];
 
 const draw = (c: { segment?: Segment; now: number; status?: FlightStatus }, extra: Record<string, unknown> = {}) =>
   render(FlightCard, { segment: c.segment ?? booked, status: c.status, liveOn: true, now: c.now, ...extra });
-const times = (card: HTMLElement) => [...card.querySelectorAll("[data-code]")].map((code) => {
-  const spans = code.parentElement?.querySelectorAll("span.font-mono") ?? [];
-  return [spans[0]?.querySelector("s")?.textContent, spans[0]?.querySelector("time")?.textContent, spans[1]?.textContent].filter(Boolean).join(" ").replace(/\s+/g, " ");
-});
+const flat = (el: Element | null | undefined) => el?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+const timesOf = (card: HTMLElement) => ["origin", "destination"].map((side) => card.querySelector(`[data-when='${side}'] time`)?.textContent);
+const zonesOf = (card: HTMLElement) => ["origin", "destination"].map((side) => card.querySelector(`[data-zone='${side}']`)?.textContent);
 const facts = (card: HTMLElement) => [...card.querySelectorAll("[data-facts] > div")].map((f) => [f.querySelector("dt")?.textContent?.trim(), f.querySelector("dd")?.textContent?.replace(/\s+/g, " ").trim()]);
+const classesOf = async (c: Case) => {
+  const { container, unmount } = draw(c);
+  await screen.findByRole("article");
+  const got = [...container.querySelectorAll("article *")].flatMap((el) => [...el.classList].filter((cls) => /^text-(primary|success|signal-ink)$/.test(cls) || /^bg-(primary|success|signal)$/.test(cls)));
+  unmount();
+  return [...new Set(got)].sort();
+};
 
 beforeEach(() => {
   forgetAirportZones();
@@ -87,73 +88,116 @@ beforeEach(() => {
   });
 });
 
-describe("the flight card in eight states", () => {
+describe("the hero card in eight states", () => {
   it.each(CASES)("shows $name", async (c) => {
     draw(c);
     const card = await screen.findByRole("article", { name: c.label });
-    expect(card).toBeInTheDocument();
-    if (c.pill) expect(within(card).getByText(c.pill)).toBeInTheDocument();
-    else expect(card.querySelector("[data-tone]")).toBeNull();
-    if (c.sentence) expect(within(card).getByText(c.sentence)).toBeInTheDocument();
-    else expect(card.querySelector("[data-sentence]")).toBeNull();
-    expect(times(card)).toEqual(c.times.map((t) => `${t} MDT`));
-    expect(facts(card)).toEqual(c.facts.map(([label, value]) => [label, value]));
-    if (c.updated) expect(within(card).getByText(c.updated)).toBeInTheDocument();
-    else expect(card.textContent).not.toMatch(/Updated/);
+    const h = c.hero;
+    expect(card).toHaveAttribute("data-hero");
+    await waitFor(() => expect(card.querySelector("[data-sentence]")).toHaveTextContent(h.sentence));
+    expect(card.querySelector("[data-top]")).toHaveTextContent(h.top as string);
+    expect(card.querySelector("[data-top]")).toHaveAttribute("data-tone", h.tone as string);
+    expect(flat(card.querySelector("[data-big]"))).toBe(h.big);
+    expect(flat(card.querySelector("[data-quiet]"))).toBe(h.quiet);
+    expect(timesOf(card)).toEqual(h.times);
+    expect(zonesOf(card)).toEqual(h.zones);
+    expect(facts(card)).toEqual(h.facts.map(([label, value]) => [label, value]));
+    expect(card.querySelector("[data-carrier]")).toHaveTextContent("Example Air EA 214");
+    expect(card.querySelector("img")).toBeNull();
   });
 
-  it("never repeats the state, the time or the gate in a sentence", async () => {
-    for (const c of CASES.slice(0, 3)) {
+  it("never repeats the state, the time or the gate in the plain sentence", async () => {
+    for (const c of CASES) {
       const { unmount } = draw(c);
-      expect((await screen.findByRole("article")).querySelector("[data-sentence]")).toBeNull();
+      const card = await screen.findByRole("article");
+      await waitFor(() => expect(card.querySelector("[data-sentence]")?.textContent).toMatch(/Grand Junction|Montrose/));
+      expect(card.querySelector("[data-sentence]")?.textContent).not.toMatch(/\d|Delayed|Landed|gate/i);
       unmount();
     }
   });
 
-  it("puts the date of the side it shows in the eyebrow when that is not today, and nothing when it is", async () => {
-    draw(CASES[0]);
-    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")).toHaveTextContent("Departure · Denver · Thu Jun 12"));
+  it("colours only by the three rules: blue for now, green for good news, amber for a change", async () => {
+    expect(await classesOf(CASES[0])).toEqual(["text-primary", "text-success"]);
+    expect(await classesOf(CASES[1])).toEqual(["bg-primary", "text-primary", "text-success"]);
+    expect(await classesOf(CASES[2])).toEqual(["bg-signal", "text-primary", "text-signal-ink"]);
+    expect(await classesOf(CASES[3])).toEqual(["text-primary"]);
+    expect(await classesOf(CASES[4])).toEqual(["text-success"]);
+    expect(await classesOf(CASES[5])).toEqual(["bg-signal"]);
+    expect(await classesOf(CASES[6])).toEqual(["bg-signal", "text-primary", "text-signal-ink"]);
+    expect(await classesOf(CASES[7])).toEqual(["text-primary"]);
   });
 
-  it("uses the tones of the status chip: quiet, info, warn, ok and bad", () => {
-    const tone = (c: Case) => { const { container, unmount } = draw(c); const chip = container.querySelector("[data-tone]")?.getAttribute("data-tone"); unmount(); return chip; };
-    expect(CASES.slice(0, 7).map(tone)).toEqual(["quiet", "info", "warn", "info", "ok", "bad", "bad"]);
-  });
-
-  it("is an article, not a link or a button, until the live status view exists", async () => {
+  it("is an article, not a link or a button, until it is given an address or a detail handler", async () => {
     draw(CASES[0]);
     const card = await screen.findByRole("article");
-    expect(card.tagName).toBe("ARTICLE");
     expect(within(card).queryByRole("link")).toBeNull();
     expect(within(card).queryByRole("button")).toBeNull();
+  });
+
+  it("marks a late landing in amber and an exact one as On time in green", async () => {
+    const late = { ...CASES[4], status: mk(NOW.landed, 1, { state: "landed", dep_actual: "2025-06-12T09:46", arr_actual: "2025-06-12T11:04" }) };
+    const first = draw(late);
+    expect(await screen.findByText("12 min late")).toHaveClass("text-signal-ink");
+    first.unmount();
+    const exact = { ...CASES[4], status: mk(NOW.landed, 1, { state: "landed", dep_actual: "2025-06-12T09:46", arr_actual: "2025-06-12T10:52" }) };
+    draw(exact);
+    expect(await screen.findByText("On time")).toHaveClass("text-success");
   });
 });
 
 describe("times", () => {
-  it("strikes the original through above the new one in amber, and reads it as Originally", async () => {
+  it("shows both changed times in amber with the booked ones struck above, and the old departure struck on the quiet line, read as Originally", async () => {
     draw(CASES[2]);
     const card = await screen.findByRole("article");
-    const [dep, arr] = [...card.querySelectorAll("[data-code]")].map((code) => code.parentElement?.querySelector("span.font-mono") as HTMLElement);
+    const [dep, arr] = ["origin", "destination"].map((side) => card.querySelector(`[data-when='${side}']`) as HTMLElement);
     expect(dep).toHaveClass("text-signal-ink");
-    expect(dep.querySelector("s")).toHaveTextContent("Originally 9:40 am");
-    expect(dep.querySelector("s")?.querySelector(".sr-only")).toHaveTextContent("Originally");
-    expect(dep.querySelector("time")).toHaveTextContent("10:15 am");
-    expect(arr.querySelector("s")).toHaveTextContent("Originally 10:52 am");
-    expect(arr.querySelector("time")).toHaveTextContent("11:27 am");
+    expect(arr).toHaveClass("text-signal-ink");
+    expect(dep.querySelector("s")).toHaveTextContent("Originally 9:40 AM");
+    expect(arr.querySelector("s")).toHaveTextContent("Originally 10:52 AM");
+    const quiet = card.querySelector("[data-quiet]") as HTMLElement;
+    expect(quiet.querySelector("s")).toHaveTextContent("Originally 9:40 AM");
+    expect(quiet.querySelector("span.text-signal-ink")).toHaveTextContent("35 min late");
   });
 
-  it("strikes a cancelled flight’s times and leaves them grey", async () => {
+  it("leaves a time that has not changed white", async () => {
+    draw(CASES[3]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-when='origin']")).not.toHaveClass("text-signal-ink");
+  });
+
+  it("strikes a cancelled flight’s times, greys the codes and draws no plane", async () => {
     draw(CASES[5]);
     const card = await screen.findByRole("article");
-    const [dep] = [...card.querySelectorAll("[data-code]")].map((code) => code.parentElement?.querySelector("span.font-mono") as HTMLElement);
-    expect(dep).toHaveClass("line-through", "text-muted-foreground");
+    expect(card.querySelector("[data-when='origin']")).toHaveClass("line-through", "text-label");
+    expect(card.querySelector("[data-code='origin']")).toHaveClass("text-label");
+    expect(card.querySelector("[data-plane]")).toBeNull();
+    expect(card.querySelector("[data-travelled]")).toBeNull();
+  });
+
+  it("shows the diverted airport with the booked one struck small above it, and the new time in amber", async () => {
+    draw(CASES[6]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-was]")).toHaveTextContent("GJT");
+    expect(card.querySelector("[data-was]")).toHaveClass("line-through");
+    expect(card.querySelector("[data-code='destination']")).toHaveTextContent("MTJ");
+    expect(card.querySelector("[data-when='destination']")).toHaveClass("text-signal-ink");
+    expect(card.querySelector("[data-plane]")).not.toBeNull();
+  });
+
+  it("says where it lands is not known when a diverted status names no other airport", async () => {
+    draw({ now: NOW.diverted, status: mk(NOW.diverted, 3, { state: "diverted", destination: "GJT", dep_actual: "2025-06-12T09:46" }) });
+    const card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Where it lands isn’t known yet. · Updated 3 minutes ago");
+    expect(card.querySelector("[data-was]")).toBeNull();
   });
 
   it("shows each time at its own airport with its zone, never converted, and says when the arrival is a day later", async () => {
     const overnight = segment({ id: 4, provider: "American Airlines", origin: "JFK", destination: "LHR", start_local: "2026-11-20T19:00", start_zone: "America/New_York", end_local: "2026-11-21T07:10", end_zone: "Europe/London", details: { flight_number: "AA 101" } });
     draw({ segment: overnight, now: instant("2026-11-20T12:00", "America/New_York") });
     const card = await screen.findByRole("article", { name: /^AA 101, New York to London, scheduled, departs Fri Nov 20 at 7:00 pm$/ });
-    expect(times(card)).toEqual(["7:00 pm EST", "7:10 am GMT · +1 day, 1 day later on the calendar than departure"]);
+    expect(timesOf(card)).toEqual(["7:00 PM", "7:10 AM"]);
+    expect(zonesOf(card)).toEqual(["EST", "GMT"]);
+    expect(card.querySelector("[data-when='destination'] [data-later]")).toHaveTextContent("+1 day");
     expect(within(card).getByText(/, 1 day later on the calendar than departure/)).toHaveClass("sr-only");
   });
 
@@ -162,129 +206,179 @@ describe("times", () => {
     const card = await screen.findByRole("article");
     expect([...card.querySelectorAll("time")].map((t) => t.getAttribute("datetime"))).toEqual(["2025-06-12T09:40", "2025-06-12T10:52"]);
   });
+
+  it("marks the new departure of a delay past midnight as a later day", async () => {
+    const late = { ...booked, start_local: "2025-06-12T23:40", end_local: "2025-06-13T00:52" };
+    const now = at("2025-06-12T22:00");
+    draw({ segment: late, now, status: status(now, 2, { state: "delayed", dep_scheduled: "2025-06-12T23:40", dep_estimated: "2025-06-13T00:30", arr_scheduled: "2025-06-13T00:52", arr_estimated: "2025-06-13T01:42", delay_minutes: 50 }) });
+    const card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-big]"))).toBe("Departs 12:30 AM");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("50 min late · was Originally 11:40 PM");
+    expect(card.querySelector("[data-when='origin'] [data-later]")).toHaveTextContent("+1 day");
+  });
 });
 
-describe("the four facts", () => {
-  it("marks each as from live status or from the booking, with names a reader hears", async () => {
-    draw(CASES[0]);
-    const card = await screen.findByRole("article");
-    const rows = [...card.querySelectorAll("[data-facts] > div")].map((f) => [f.querySelector("dt")?.textContent?.trim(), f.querySelector("dt [role='img']")?.getAttribute("aria-label")]);
-    expect(rows).toEqual([["Terminal", "From live status"], ["Gate", "From live status"], ["Seat", "From the booking"], ["Cabin", "From the booking"]]);
-    expect(within(card).getAllByRole("img", { name: "From live status" })).toHaveLength(2);
-    expect(within(card).getAllByRole("img", { name: "From the booking" })).toHaveLength(2);
-  });
-
-  it("takes the arrival side in the air and once landed, and the departure side before", async () => {
-    for (const [c, side, labels] of [[CASES[0], "Departure · Denver", "Terminal Gate Seat Cabin"], [CASES[3], "Arrival · Grand Junction", "Terminal Gate Belt Seat"], [CASES[4], "Arrival · Grand Junction", "Terminal Gate Belt Seat"]] as const) {
+describe("the three facts", () => {
+  it("shows Terminal, Gate and Seats before departure and Arrival term, Arrival gate and Bag claim in the air and once landed, under one hairline", async () => {
+    for (const [c, labels] of [[CASES[0], "Terminal Gate Seat"], [CASES[2], "Terminal Gate Seat"], [CASES[3], "Arrival term Arrival gate Bag claim"], [CASES[4], "Arrival term Arrival gate Bag claim"]] as const) {
       const { unmount } = draw(c);
       const card = await screen.findByRole("article");
-      await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent(side));
       expect(facts(card).map(([label]) => label).join(" ")).toBe(labels);
+      expect(card.querySelector("[data-facts]")).toHaveClass("border-t");
       unmount();
     }
   });
 
-  it("shows a dash with the hidden words Not known yet for each fact it doesn’t hold, and never leaves a row out", async () => {
-    draw(CASES[7]);
+  it("aligns the three facts left, centre and right, with a seat in the mono face", async () => {
+    draw(CASES[0]);
     const card = await screen.findByRole("article");
-    const unknown = [...card.querySelectorAll("[data-facts] dd")].filter((dd) => dd.textContent?.includes("Not known yet"));
-    expect(unknown).toHaveLength(2);
-    for (const dd of unknown) {
-      expect(dd.querySelector("[aria-hidden='true']")).toHaveTextContent("—");
-      expect(dd.querySelector(".sr-only")).toHaveTextContent("Not known yet");
-    }
-    expect(card.querySelectorAll("[data-facts] > div")).toHaveLength(4);
+    const cols = [...card.querySelectorAll("[data-facts] > div")];
+    expect(cols.map((c) => ["text-left", "text-center", "text-right"].find((k) => c.classList.contains(k)))).toEqual(["text-left", "text-center", "text-right"]);
+    expect(cols[2].querySelector("dd")).toHaveClass("font-mono");
   });
 
-  it("falls back to the booking’s terminal, marked as from the booking, and to the live one when there is one", async () => {
+  it("shows a dash with the hidden words Not known yet for each fact it doesn’t hold, and never leaves a column out", async () => {
+    draw(CASES[3]);
+    const card = await screen.findByRole("article");
+    const unknown = [...card.querySelectorAll("[data-facts] dd")].filter((dd) => dd.textContent?.includes("Not known yet"));
+    expect(unknown).toHaveLength(1);
+    expect(unknown[0].querySelector("[aria-hidden='true']")).toHaveTextContent("—");
+    expect(unknown[0].querySelector(".sr-only")).toHaveTextContent("Not known yet");
+    expect(card.querySelectorAll("[data-facts] > div")).toHaveLength(3);
+  });
+
+  it("falls back to the booking’s terminal, and to the live one when there is one", async () => {
     const withTerminal = { ...booked, details: { ...booked.details, terminal: "T2" } };
-    const { unmount } = draw({ segment: withTerminal, now: NOW.none });
+    const first = draw({ segment: withTerminal, now: NOW.none });
     let card = await screen.findByRole("article");
-    const first = card.querySelector("[data-facts] > div");
-    expect(first).toHaveTextContent("T2");
-    expect(within(first as HTMLElement).getByRole("img", { name: "From the booking" })).toBeInTheDocument();
-    unmount();
+    expect(card.querySelector("[data-facts] > div")).toHaveTextContent("T2");
+    first.unmount();
     draw({ segment: withTerminal, now: NOW.scheduled, status: CASES[0].status });
     card = await screen.findByRole("article");
     expect(card.querySelector("[data-facts] > div")).toHaveTextContent("B");
-    expect(within(card.querySelector("[data-facts] > div") as HTMLElement).getByRole("img", { name: "From live status" })).toBeInTheDocument();
   });
 
-  it("spells the cabin out in full at every width", async () => {
-    draw(CASES[0]);
-    const card = await screen.findByRole("article");
-    expect(facts(card)[3]).toEqual(["Cabin", "Economy"]);
-    expect(card.querySelector("[data-facts]")).toHaveClass("flex-wrap");
-  });
-
-  it("lets a cabin of several words wrap in its column instead of overflowing", async () => {
-    draw({ segment: { ...booked, details: { ...booked.details, cabin: "Premium Economy" } }, now: NOW.none });
-    const card = await screen.findByRole("article");
-    expect(facts(card)[3]).toEqual(["Cabin", "Premium Economy"]);
-    const value = card.querySelectorAll("[data-facts] dd")[3];
-    expect(value).toHaveClass("break-words");
-    expect(value).not.toHaveClass("whitespace-nowrap");
-  });
-
-  it("lists every traveller’s seat in order", async () => {
+  it("lists every traveller’s seat in order, and the first seat with +N from three", async () => {
     const two = { ...booked, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12B" }, { id: 2, person_id: null, name: "Sam Doe", seat: "12A" }] };
-    draw({ segment: two, now: NOW.none });
+    const first = draw({ segment: two, now: NOW.none });
     expect(facts(await screen.findByRole("article"))[2]).toEqual(["Seats", "12A, 12B"]);
+    first.unmount();
+    const three = { ...two, travelers: [...two.travelers, { id: 3, person_id: null, name: "Kim Doe", seat: "14C" }] };
+    draw({ segment: three, now: NOW.none });
+    expect(facts(await screen.findByRole("article"))[2]).toEqual(["Seats", "12A +2"]);
+  });
+
+  it("lists each traveller beside their seat only when the page says travellers are shown, and with two or more", async () => {
+    const two = { ...booked, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12B" }, { id: 2, person_id: null, name: "Sam Doe", seat: "12A" }] };
+    const first = draw({ segment: two, now: NOW.none });
+    await screen.findByRole("article");
+    expect(first.container.querySelector("[data-seats]")).toBeNull();
+    first.unmount();
+    const shown = draw({ segment: two, now: NOW.none }, { travellers: true });
+    const list = await waitFor(() => { const el = shown.container.querySelector("[data-seats]"); expect(el).not.toBeNull(); return el as HTMLElement; });
+    expect([...list.querySelectorAll("li")].map(flat)).toEqual(["JDJane Doe12B", "SDSam Doe12A"]);
+    shown.unmount();
+    const alone = draw({ now: NOW.none }, { travellers: true });
+    await screen.findByRole("article");
+    expect(alone.container.querySelector("[data-seats]")).toBeNull();
+  });
+});
+
+describe("the traveller rows keep the two notes the footer had", () => {
+  const aa = { ...booked, provider: "American Airlines" };
+
+  it("says a traveller is not matched to a person in People, with a link, even when they are the only one", async () => {
+    draw({ segment: { ...aa, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12B" }] }, now: NOW.none }, { travellers: true });
+    const note = await waitFor(() => { const el = document.querySelector("[data-unmatched]"); expect(el).not.toBeNull(); return el as HTMLElement; });
+    expect(note).toHaveTextContent("Not matched to a person in People");
+    expect(note.querySelector("a")).toHaveAttribute("href", "#people");
+  });
+
+  it("says nothing for a traveller who is matched, or when the page does not show travellers", async () => {
+    const first = draw({ segment: { ...aa, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "12B" }, { id: 2, person_id: 2, name: "Sam Doe", seat: "12A" }] }, now: NOW.none }, { travellers: true });
+    await screen.findByRole("article");
+    expect(first.container.querySelector("[data-unmatched]")).toBeNull();
+    first.unmount();
+    const hidden = draw({ segment: { ...aa, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: null }] }, now: NOW.none });
+    await screen.findByRole("article");
+    expect(hidden.container.querySelector("[data-unmatched]")).toBeNull();
+  });
+
+  it("says nobody is listed on a booking with no travellers, only where travellers are shown", async () => {
+    const none = { ...aa, travelers: [] };
+    const shown = draw({ segment: none, now: NOW.none }, { travellers: true });
+    expect(await screen.findByText("Nobody is listed on this booking.")).toBeInTheDocument();
+    shown.unmount();
+    const hidden = draw({ segment: none, now: NOW.none });
+    await screen.findByRole("article");
+    expect(hidden.container.querySelector("[data-nobody]")).toBeNull();
   });
 });
 
 describe("what the card says without live data", () => {
-  it("has no Updated line and no pill, and names the window as a constant", async () => {
+  it("has no Updated line and no green on time, and names the window as a constant", async () => {
     expect(LIVE_STATUS_STARTS_DAYS).toBe(1);
     draw(CASES[7]);
     const card = await screen.findByRole("article");
     expect(card.querySelector("[data-updated]")).toBeNull();
-    expect(card.querySelector("[data-tone]")).toBeNull();
-    expect(within(card).getByText(/^Live status starts 1 day before departure\./)).toBeInTheDocument();
+    expect(card.querySelector("[data-on-time]")).toBeNull();
   });
 
-  it("says Scheduled instead once the flight is inside the window, with nothing invented", async () => {
-    draw({ now: at("2025-06-11T12:00") });
-    const card = await screen.findByRole("article");
-    expect(within(card).getByText("Scheduled")).toBeInTheDocument();
-    expect(card.querySelector("[data-updated]")).toBeNull();
-    expect(card.textContent).not.toMatch(/Delayed|Boarding|gate B/);
-    expect(facts(card).slice(0, 2)).toEqual([["Terminal", "—Not known yet"], ["Gate", "—Not known yet"]]);
-  });
-
-  it("says Scheduled and no window when live status is off", async () => {
+  it("says the times are from the booking, without the window, once the flight is inside it or live status is off", async () => {
+    const inside = draw({ now: at("2025-06-11T12:00") });
+    expect(flat((await screen.findByRole("article")).querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
+    inside.unmount();
     draw({ now: NOW.none }, { liveOn: false });
-    const card = await screen.findByRole("article");
-    expect(within(card).getByText("Scheduled")).toBeInTheDocument();
-    expect(card.querySelector("[data-sentence]")).toBeNull();
-    await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent("Thu Jun 12"));
+    expect(flat((await screen.findByRole("article")).querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
   });
 
   it("falls back to the booked times for a flight in the air or landed, with no Updated line", async () => {
     draw({ now: NOW.air });
     let card = await screen.findByRole("article");
-    expect(within(card).getByText("In the air")).toBeInTheDocument();
+    expect(card.querySelector("[data-top]")).toHaveTextContent("38 min left");
+    expect(flat(card.querySelector("[data-big]"))).toBe("Lands 10:52 AM");
     expect(card.querySelector("[data-updated]")).toBeNull();
-    expect(facts(card)[2]).toEqual(["Belt", "—Not known yet"]);
+    expect(facts(card)[2]).toEqual(["Bag claim", "—Not known yet"]);
     card.remove();
     draw({ now: NOW.landed });
     card = (await screen.findAllByRole("article")).at(-1) as HTMLElement;
-    expect(within(card).getByText("Landed")).toBeInTheDocument();
+    expect(flat(card.querySelector("[data-big]"))).toBe("Landed 10:52 AM");
+    expect(card.querySelector("[data-top]")).toBeNull();
+  });
+});
+
+describe("the day and the city on the hero", () => {
+  it("puts the day on a landed flight from an earlier day, in the quiet line", async () => {
+    draw({ now: at("2025-06-14T09:00") });
+    const card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
+    expect(flat(card.querySelector("[data-big]"))).toBe("Landed 10:52 AM");
   });
 
-  it("puts the day on a landed flight from an earlier day", async () => {
-    draw({ now: at("2025-06-14T09:00") });
-    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")).toHaveTextContent("Arrival · Grand Junction · Thu Jun 12"));
+  it("names the destination city in the sentence once it is known", async () => {
+    draw(CASES[0]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-code='origin']")).toHaveTextContent("DEN");
+    expect(card.querySelector("[data-code='destination']")).toHaveTextContent("GJT");
+    await waitFor(() => expect(card.querySelector("[data-sentence]")).toHaveTextContent("Your flight to Grand Junction"));
+  });
+
+  it("says the code in the sentence when no city is known for the airport", async () => {
+    vi.mocked(api).mockReset().mockImplementation(async () => { throw new Error("No such airport"); });
+    draw(CASES[0]);
+    const card = await screen.findByRole("article");
+    expect(card.querySelector("[data-sentence]")).toHaveTextContent("Your flight to GJT");
   });
 });
 
 describe("a stored status that is too old to trust", () => {
-  it("shows the booked times and sentence, not the old estimate, when it is over three hours old", async () => {
+  it("shows the booked times, not the old estimate, when it is over three hours old", async () => {
     const old = status(at("2025-06-12T11:00"), 300, { state: "delayed", dep_estimated: "2025-06-12T10:15", arr_estimated: "2025-06-12T11:27", delay_minutes: 35 });
     draw({ now: at("2025-06-12T11:00"), status: old });
     const card = await screen.findByRole("article");
-    expect(within(card).getByText("Landed")).toBeInTheDocument();
-    expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
+    expect(flat(card.querySelector("[data-big]"))).toBe("Landed 10:52 AM");
+    await waitFor(() => expect(card.querySelector("[data-sentence]")).toHaveTextContent("You are in Grand Junction"));
+    expect(timesOf(card)).toEqual(["9:40 AM", "10:52 AM"]);
     expect(card.textContent).not.toContain("11:27");
     expect(within(card).getByText("Updated 5 h ago")).toBeInTheDocument();
   });
@@ -292,10 +386,19 @@ describe("a stored status that is too old to trust", () => {
   it("does the same when the device is offline", async () => {
     draw({ now: NOW.delayed, status: CASES[2].status }, { online: false });
     const card = await screen.findByRole("article");
-    expect(times(card)).toEqual(["9:40 am MDT", "10:52 am MDT"]);
+    expect(timesOf(card)).toEqual(["9:40 AM", "10:52 AM"]);
     expect(card.textContent).not.toMatch(/Originally|Delayed/);
     expect(facts(card).slice(0, 2)).toEqual([["Terminal", "B"], ["Gate", "B14"]]);
-    expect(within(card).getByText("Updated 4 min ago")).toBeInTheDocument();
+  });
+
+  it("keeps the age of a cached gate on the quiet line, and says the times are from the booking only when no live fact is kept", async () => {
+    const first = draw({ now: NOW.delayed, status: CASES[2].status }, { online: false });
+    let card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Updated 4 minutes ago");
+    first.unmount();
+    draw({ now: NOW.delayed, status: mk(NOW.delayed, 4, { state: "delayed", dep_estimated: "2025-06-12T10:15", delay_minutes: 35 }) }, { online: false });
+    card = await screen.findByRole("article");
+    expect(flat(card.querySelector("[data-quiet]"))).toBe("Thu Jun 12 · Times from your booking.");
   });
 });
 
@@ -318,18 +421,7 @@ describe("when live updates are paused", () => {
   });
 });
 
-describe("a delay past midnight", () => {
-  it("marks the new departure as a later day and names the day in the eyebrow", async () => {
-    const late = { ...booked, start_local: "2025-06-12T23:40", end_local: "2025-06-13T00:52" };
-    const now = at("2025-06-12T22:00");
-    draw({ segment: late, now, status: status(now, 2, { state: "delayed", dep_scheduled: "2025-06-12T23:40", dep_estimated: "2025-06-13T00:30", arr_scheduled: "2025-06-13T00:52", arr_estimated: "2025-06-13T01:42", delay_minutes: 50 }) });
-    const card = await screen.findByRole("article");
-    expect(times(card)[0]).toBe("Originally 11:40 pm 12:30 am MDT · +1 day, 1 day later on the calendar than departure");
-    await waitFor(() => expect(card.querySelector(".eyebrow")).toHaveTextContent("Departure · Denver · Fri Jun 13"));
-  });
-});
-
-describe("the traveled line", () => {
+describe("the arc", () => {
   it("ends where the plane is, for any progress", async () => {
     for (const progress of [0.55, 1]) {
       const [x, y] = arcTravelled(progress).split(" ").slice(-2).map(Number);
@@ -345,18 +437,29 @@ describe("the traveled line", () => {
     const [x] = (card.querySelector("[data-travelled]")?.getAttribute("d") ?? "").split(" ").slice(-2).map(Number);
     expect(`${x.toFixed(1)}%`).toBe(`${arcPoint(Number(card.getAttribute("data-progress"))).left.toFixed(1)}%`);
   });
-});
 
-describe("the eyebrow and a diversion with no airport", () => {
-  it("says only the side and the city when the flight is today", async () => {
-    draw(CASES[1]);
-    await waitFor(() => expect(screen.getByRole("article").querySelector(".eyebrow")?.textContent?.trim()).toBe("Departure · Denver"));
+  it("draws the travelled part solid blue, the plane blue at the origin and in the air, and white once landed", async () => {
+    const first = draw(CASES[3]);
+    let card = await screen.findByRole("article");
+    expect(card.querySelector("[data-travelled]")).toHaveClass("stroke-primary");
+    expect(card.querySelector("[data-plane]")).toHaveClass("text-primary");
+    first.unmount();
+    const second = draw(CASES[0]);
+    card = await screen.findByRole("article");
+    expect(card.getAttribute("data-progress")).toBe("0");
+    expect(card.querySelector("[data-plane]")).toHaveClass("text-primary");
+    second.unmount();
+    draw(CASES[4]);
+    card = await screen.findByRole("article");
+    expect(card.querySelector("[data-plane]")).toHaveClass("text-foreground");
   });
 
-  it("says where it lands is not known when a diverted status names no other airport", async () => {
-    draw({ now: NOW.diverted, status: mk(NOW.diverted, 3, { state: "diverted", destination: "GJT", dep_actual: "2025-06-12T09:46" }) });
-    const card = await screen.findByRole("article");
-    expect(within(card).getByText("Where it lands isn’t known yet.")).toBeInTheDocument();
+  it("places the plane from how far along the flight is, and leaves it off a cancelled flight", async () => {
+    const progress = async (c: Case) => { const { unmount } = draw(c); const card = await screen.findByRole("article"); const got = [card.getAttribute("data-progress"), card.querySelector("[data-plane]") !== null]; unmount(); return got; };
+    expect(await progress(CASES[0])).toEqual(["0", true]);
+    expect(Number((await progress(CASES[3]))[0])).toBeGreaterThan(0.3);
+    expect(await progress(CASES[4])).toEqual(["1", true]);
+    expect(await progress(CASES[5])).toEqual([null, false]);
   });
 });
 
@@ -374,46 +477,36 @@ describe("boarding", () => {
 });
 
 describe("what a reader and a screen get", () => {
-  it("hides the arc, the plane and the mark tile from assistive technology, and names the card by one phrase", async () => {
+  it("hides the arc and the plane from assistive technology, and names the card by one phrase", async () => {
     draw(CASES[3]);
     const card = await screen.findByRole("article");
     expect(card.querySelector("[data-arc]")).toHaveAttribute("aria-hidden", "true");
     expect(card.querySelector("[data-arc] [data-plane]")).not.toBeNull();
-    expect(card.querySelector("span.bg-avatar-1")).toHaveAttribute("aria-hidden", "true");
-    expect(card.querySelector("span.bg-avatar-1")).toHaveTextContent("EA");
     expect(card).toHaveAccessibleName("EA 214, Denver to Grand Junction, in the air, lands 10:52 am in 38 minutes");
   });
 
-  it("places the plane from how far along the flight is, and leaves it off a cancelled flight", async () => {
-    const progress = async (c: Case) => { const { unmount } = draw(c); const card = await screen.findByRole("article"); const got = [card.getAttribute("data-progress"), card.querySelector("[data-plane]") !== null]; unmount(); return got; };
-    expect(await progress(CASES[0])).toEqual(["0", true]);
-    expect((await progress(CASES[3]))[1]).toBe(true);
-    expect(Number((await progress(CASES[3]))[0])).toBeGreaterThan(0.3);
-    expect(await progress(CASES[4])).toEqual(["1", true]);
-    expect(await progress(CASES[5])).toEqual([null, false]);
-  });
-
-  it("shows the total duration at the top right, from the flight’s actual times once landed, and none for a cancelled flight", async () => {
-    const duration = async (c: Case) => { const { unmount } = draw(c); const card = await screen.findByRole("article"); const got = card.querySelector(".ml-auto")?.textContent?.trim() ?? null; unmount(); return got; };
-    expect(await duration(CASES[0])).toBe("1h 12m");
-    expect(await duration(CASES[4])).toBe("1h 3m");
-    expect(await duration(CASES[5])).toBeNull();
-  });
-
-  it("leads with Waypoint’s own mark and the flight number and carrier, never an airline logo", async () => {
-    draw({ segment: { ...booked, logo: "/api/segments/3/logo" }, now: NOW.none });
+  it("puts the carrier and flight number as plain grey text, never a logo or a mark tile, and leaves the duration off", async () => {
+    draw({ segment: { ...booked, logo: "/api/segments/3/logo" }, now: NOW.scheduled, status: CASES[0].status });
     const card = await screen.findByRole("article");
     expect(card.querySelector("img")).toBeNull();
-    expect(within(card).getByText("EA 214")).toBeInTheDocument();
-    expect(within(card).getByText("Example Air")).toBeInTheDocument();
+    expect(card.querySelector("span.bg-avatar-1")).toBeNull();
+    expect(card.querySelector("[data-carrier]")).toHaveClass("text-muted-foreground");
+    expect(card.textContent).not.toMatch(/\dh \d+m/);
   });
 
-  it("names the airport cities under the codes once they are known, and shows the codes alone until then", async () => {
+  it("opens the booking’s detail from a last row named Confirmation, travellers and price, at least 44 px tall, above the link", async () => {
+    const ondetail = vi.fn();
+    draw(CASES[0], { href: "#trip/7/flight/3", ondetail });
+    const row = await screen.findByRole("button", { name: "Confirmation, travellers and price" });
+    expect(row).toHaveClass("min-h-11", "z-10");
+    row.click();
+    expect(ondetail).toHaveBeenCalledWith(row);
+  });
+
+  it("has no detail row without a handler", async () => {
     draw(CASES[0]);
-    const card = await screen.findByRole("article");
-    expect(card.querySelector("[data-code='origin']")).toHaveTextContent("DEN");
-    await waitFor(() => expect(within(card).getByText("Denver")).toBeInTheDocument());
-    expect(within(card).getByText("Grand Junction")).toBeInTheDocument();
+    await screen.findByRole("article");
+    expect(screen.queryByRole("button", { name: "Confirmation, travellers and price" })).toBeNull();
   });
 
   it("renders what the page puts under the facts", async () => {

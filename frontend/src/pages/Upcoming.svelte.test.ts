@@ -161,10 +161,11 @@ describe("Upcoming", () => {
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(within(card).getByText("Next up")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, scheduled, departs Fri Nov 20 at 7:00 pm" })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
-    expect(within(card).getByText("AA 101")).toBeInTheDocument();
-    expect(within(card).getByText("Fri Nov 20 · Trip to London")).toBeInTheDocument();
-    expect(within(card).getByText("7:00 pm")).toBeInTheDocument();
-    expect(within(card).getByText("Terminal 8")).toBeInTheDocument();
+    expect(card.querySelector("[data-carrier]")).toHaveTextContent(/AA 101$/);
+    expect(card.querySelector(".eyebrow")).toHaveTextContent("Next up · Trip to London");
+    expect(card.querySelector("[data-quiet]")).toHaveTextContent("Fri Nov 20");
+    expect(card.querySelector("[data-when='origin'] time")).toHaveTextContent("7:00 PM");
+    expect(card.querySelector("[data-facts] > div")).toHaveTextContent("Terminal 8");
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
@@ -257,9 +258,10 @@ describe("Upcoming", () => {
     at("2026-11-20T09:00:00-05:00");
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? delayed : { trips: [london] }) as never);
     render(Upcoming);
-    const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(await within(card).findByText("Delayed 50 min")).toBeInTheDocument();
-    expect(within(card).getByText("Terminal 7 · Gate B24")).toBeInTheDocument();
+    await screen.findByRole("heading", { name: "JFK → LHR" });
+    const card = document.querySelector<HTMLElement>("[data-flight-home]")!;
+    expect(await within(card).findByText("Delayed")).toBeInTheDocument();
+    expect(within(card).getByText("B24")).toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm" })).toBeInTheDocument();
   });
 
@@ -427,8 +429,8 @@ describe("Upcoming", () => {
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(within(card).getByText("7:10 am")).toBeInTheDocument();
-    expect(within(card).getByText("7:00 pm")).toBeInTheDocument();
+    expect(card.querySelector("[data-when='destination'] time")).toHaveTextContent("7:10 AM");
+    expect(card.querySelector("[data-when='origin'] time")).toHaveTextContent("7:00 PM");
     expect(card).not.toHaveTextContent("[");
   });
 
@@ -895,7 +897,7 @@ describe("Upcoming side column", () => {
 });
 
 describe("Upcoming flights: the Home card, Flights today and the booking sheet", () => {
-  const card = async () => (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
+  const card = async () => { await screen.findByRole("heading", { name: "JFK → LHR", level: 2 }); return document.querySelector<HTMLElement>("[data-flight-home]")!; };
   const liveList = (extra: Record<string, unknown> = {}) => ({ ...delayed, statuses: [{ ...delayed.statuses[0], ...extra }] });
   const serveLive = (list: unknown, trips: unknown[] = [london]) =>
     vi.mocked(api).mockImplementation(async (path: string) => (path === "/api/flight-status" ? list : { trips }) as never);
@@ -905,23 +907,23 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     serveLive(delayed);
     render(Upcoming);
     const home = await card();
-    expect(await within(home).findByText("Delayed 50 min")).toBeInTheDocument();
-    expect(within(home).getByText("Terminal 7 · Gate B24")).toBeInTheDocument();
-    expect(within(home).getByText("Updated 4 min ago")).toBeInTheDocument();
-    expect(within(home).getByText("7:50 pm").parentElement).toHaveClass("text-signal-ink");
-    expect(within(home).getByText("8:05 am").parentElement).toHaveClass("text-signal-ink");
+    expect(await within(home).findByText("Delayed")).toBeInTheDocument();
+    expect(within(home).getByText("B24")).toBeInTheDocument();
+    expect(home.querySelector("[data-quiet]")).toHaveTextContent("50 min late");
+    expect(home.querySelector("[data-when='origin']")).toHaveClass("text-signal-ink");
+    expect(home.querySelector("[data-when='destination']")).toHaveClass("text-signal-ink");
     expect(within(home).getByRole("link", { name: "AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm" })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
     expect(within(home).getByText("Next up")).toBeInTheDocument();
     expect(within(home).getByRole("link", { name: /^Open trip/ })).toHaveAttribute("href", `#trip/${london.id}?segment=1`);
   });
 
-  it("shows the zone beside a time only where the ends differ from each other or from the viewer", async () => {
+  it("shows the zone under each time, at its own airport, whether or not the ends differ", async () => {
     at("2026-11-20T09:09:00-05:00");
     serve([london]);
     const far = render(Upcoming);
     const home = await card();
-    expect(within(home).getByText("EST")).toBeInTheDocument();
-    expect(within(home).getByText("GMT")).toBeInTheDocument();
+    expect(home.querySelector("[data-zone='origin']")).toHaveTextContent("EST");
+    expect(home.querySelector("[data-zone='destination']")).toHaveTextContent("GMT");
     far.unmount();
     dropEarly();
     const near = trip([segment({ id: 5, origin: "BOS", destination: "JFK", start_local: "2026-11-20T15:00", end_local: "2026-11-20T16:10", end_zone: NY, details: { flight_number: "AA 7" } })]);
@@ -929,20 +931,20 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     const { container } = render(Upcoming);
     await waitFor(() => expect(container.querySelectorAll("[data-flight-home]")).toHaveLength(1));
     const here = container.querySelector<HTMLElement>("[data-flight-home]")!;
-    expect(within(here).getByText("3:00 pm")).toBeInTheDocument();
-    expect(within(here).queryByText("EST")).toBeNull();
+    expect(here.querySelector("[data-when='origin'] time")).toHaveTextContent("3:00 PM");
+    expect(here.querySelector("[data-zone='origin']")).toHaveTextContent("EST");
   });
 
   it("shows a flight in the air with the plane at its progress", async () => {
     at("2026-11-21T02:00:00-05:00");
     serveLive(liveList({ state: "departed", dep_actual: "2026-11-20T19:05", fetched_at: "2026-11-21T06:58:00+00:00" }));
     render(Upcoming);
-    await screen.findAllByText("In the air", { selector: "[data-tone]" });
+    await screen.findAllByText("In the air to", { exact: false });
     const home = document.querySelector<HTMLElement>("[data-flight-home]")!;
-    await waitFor(() => expect(within(home).getByText("In the air", { selector: "[data-tone]" })).toBeInTheDocument());
+    await waitFor(() => expect(within(home).getByText(/^In the air to /)).toBeInTheDocument());
     expect(Number(home.querySelector("article")!.dataset.progress)).toBeGreaterThan(0.8);
     expect(home.querySelector<HTMLElement>("[data-plane]")!.style.left).toMatch(/^8\d(\.\d+)?%$/);
-    expect(within(home).getByText("Updated 2 min ago")).toBeInTheDocument();
+    expect(within(home).getByText("Updated 2 minutes ago")).toBeInTheDocument();
     expect(within(home).getByRole("link", { name: /in the air, lands 8:05 am in 1 hour 5 minutes$/ })).toBeInTheDocument();
   });
 
@@ -951,9 +953,9 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     serve([london]);
     render(Upcoming);
     const home = await card();
-    expect(within(home).getByText("7:00 pm")).toBeInTheDocument();
-    expect(within(home).getByText("7:10 am")).toBeInTheDocument();
-    expect(within(home).getByText("Terminal 8")).toBeInTheDocument();
+    expect(home.querySelector("[data-when='origin'] time")).toHaveTextContent("7:00 PM");
+    expect(home.querySelector("[data-when='destination'] time")).toHaveTextContent("7:10 AM");
+    expect(home.querySelector("[data-facts] > div")).toHaveTextContent("Terminal 8");
     expect(home.querySelector("[data-updated]")).toBeNull();
   });
 
@@ -961,7 +963,8 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     at("2026-11-20T09:00:00-05:00");
     serve([trip([segment({ id: 1, details: { flight_number: "AA 101" } })])]);
     render(Upcoming);
-    expect(within(await card()).getByText("Terminal — · Gate —")).toBeInTheDocument();
+    const dashes = [...(await card()).querySelectorAll("[data-facts] dd")].slice(0, 2);
+    expect(dashes.map((dd) => dd.textContent)).toEqual(["—Not known yet", "—Not known yet"]);
   });
 
   it("keeps the full card until a day before departure, and for a flight that already landed", async () => {
