@@ -245,14 +245,23 @@ describe("Upcoming", () => {
     expect(within(card).getByText("LHR")).toBeInTheDocument();
   });
 
-  it("leaves a booking’s brand logo out of the day-by-day rows, as drawn, and off the flight card", async () => {
+  it("shows a booking’s brand logo in the day-by-day list, and no airline logo on the flight card", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([trip([segment({ id: 1, logo: "/api/segments/1/logo" }), stay, home])]);
     const { container } = render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
     expect(card.querySelector("img")).toBeNull();
-    expect(container.querySelectorAll("img")).toHaveLength(0);
-    expect(screen.getByRole("list", { name: /day by day/ }).querySelector("[data-tile]")).toBeNull();
+    expect([...container.querySelectorAll("img")].map((i) => i.getAttribute("src"))).toEqual(["/api/segments/1/logo"]);
+  });
+
+  it("shows the kind icon on a day row that has no brand logo", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const rows = [...list.querySelectorAll("li.row-tap")];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) expect(r.querySelector("[data-tile]")).not.toBeNull();
   });
 
   it("shows the flight’s live status on the Next up card", async () => {
@@ -710,6 +719,32 @@ describe("Upcoming header, review banner and timeline", () => {
     expect(markers[0].closest("li")).toHaveTextContent("Check-out: Harbour Hotel");
   });
 
+  it("marks tomorrow, not today, when everything today is over and the trip has a booking tomorrow", async () => {
+    at("2026-11-20T21:00:00-05:00");
+    const done = segment({ id: 21, kind: "hotel", origin: "Morning Cafe", destination: null, start_local: "2026-11-20T08:00", end_local: "2026-11-20T09:00", end_zone: NY, details: {} });
+    const later = segment({ id: 22, kind: "hotel", origin: "Evening Inn", destination: null, start_local: "2026-11-21T10:00", end_local: "2026-11-21T11:00", end_zone: NY, details: {} });
+    serve([trip([done, later])]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const markers = within(list).getAllByTestId("next-marker");
+    expect(markers).toHaveLength(1);
+    expect(markers[0].closest("li")).toHaveTextContent("Evening Inn");
+    expect(markers[0].closest("li")).not.toHaveTextContent("Morning Cafe");
+  });
+
+  it("does not mark a day that has only cancelled bookings", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const gone = segment({ id: 23, kind: "hotel", status: "cancelled", origin: "Gone Inn", destination: null, start_local: "2026-11-20T15:00", end_local: "2026-11-20T16:00", end_zone: NY, details: {} });
+    const kept = segment({ id: 24, kind: "hotel", origin: "Kept Inn", destination: null, start_local: "2026-11-21T10:00", end_local: "2026-11-21T11:00", end_zone: NY, details: {} });
+    serve([trip([gone, kept])]);
+    render(Upcoming);
+    const list = await screen.findByRole("list", { name: /day by day/ });
+    const markers = within(list).getAllByTestId("next-marker");
+    expect(markers).toHaveLength(1);
+    expect(markers[0].closest("li")).toHaveTextContent("Kept Inn");
+    expect(markers[0].closest("li")).not.toHaveTextContent("Gone Inn");
+  });
+
   it("shows Show code in place of the chevron only on a booking with a QR code", async () => {
     const lot = segment({ id: 9, kind: "parking", provider: "Example Parking", origin: "Example Airport Long-Term Lot", destination: null, confirmation: "PK30417",
       start_local: "2099-01-09T05:15", start_zone: NY, end_local: "2099-01-13T03:00", end_zone: NY, details: {}, gate_code: { state: "ready", day: "2098-12-20" }, travelers: [] });
@@ -724,9 +759,9 @@ describe("Upcoming header, review banner and timeline", () => {
     const shown = rows.filter((r) => within(r).queryByRole("button", { name: /^Show code/ }));
     expect(shown).toHaveLength(1);
     expect(shown[0]).toHaveTextContent("Example Airport Long-Term Lot");
-    expect(shown[0].querySelector("svg")).toBeNull();
+    expect(shown[0].querySelector(".lucide-chevron-right")).toBeNull();
     expect(within(shown[0]).getByRole("button", { name: "Show code for Example Airport Long-Term Lot" })).toHaveClass("text-primary");
-    for (const r of rows.filter((r) => r !== shown[0])) expect(r.querySelector("svg")).not.toBeNull();
+    for (const r of rows.filter((r) => r !== shown[0])) expect(r.querySelector(".lucide-chevron-right")).not.toBeNull();
   });
 
   it("puts the list beside the hero only for a flight, and leaves a stay’s pass card full width above it", async () => {

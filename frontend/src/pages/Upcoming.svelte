@@ -121,7 +121,8 @@
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
   const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
-  const markedDay = $derived(ahead[0]?.date ?? null);
+  const toCome = (i: DayItem) => i.segment.status !== "cancelled" && (i.role === "end" ? endAt(i.segment) : startAt(i.segment)) > now;
+  const markedDay = $derived(ahead.find((d) => d.items.some(toCome))?.date ?? null);
   const waiting = $derived(app.state?.review_count ?? 0);
   const boxes = $derived(mail?.mailboxes ?? []);
   const scanning = $derived(boxes.some((m) => m.scanning));
@@ -160,6 +161,11 @@
           <p class="mono w-[76px] shrink-0 text-[15px] font-bold">
             <DayTime segment={seg} end={item.role === "end"} />
           </p>
+          {#if seg.logo}
+            <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} />
+          {:else}
+            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative />
+          {/if}
           <div class="min-w-0 flex-1">
             <p class="break-words text-body font-semibold" class:line-through={seg.status === "cancelled"}>
               <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
