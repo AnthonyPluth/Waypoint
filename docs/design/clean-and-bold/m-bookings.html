@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: Bookings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:30px 30px 0 0;padding:8px 20px 28px;max-height:92%;overflow:hidden}
+.grab{width:40px;height:5px;border-radius:99px;background:#3a3940;margin:4px auto 10px}
+.panel{position:absolute;top:0;right:0;bottom:0;width:544px;background:var(--card);padding:24px 28px;overflow:hidden}
+.dh{display:flex;align-items:flex-start;gap:12px}
+.dh .kic{width:28px;height:28px;margin-top:3px}
+.dh .n{flex:1;min-width:0}.dh .n b{display:block;font-size:20px;font-weight:800;letter-spacing:-0.01em}.dh .n span{display:block;font-size:14px;color:var(--secondary)}
+.dh .n .g{color:var(--green);font-weight:600}
+.dh .tools{display:flex;gap:6px;flex:none}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:68px;border-radius:18px;background:#141319;font-size:13px;font-weight:650;color:var(--text)}
+.act .ic{width:20px;height:20px}
+.dl{margin-top:14px}
+.dl>div{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--hair);align-items:flex-start}
+.dl dt{width:104px;flex:none;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding-top:3px}
+.dl dd{flex:1;min-width:0;font-size:15px}
+.dl dd small{display:block;color:var(--secondary);font-size:13px}
+.dl .cc{display:flex;align-items:center;gap:8px}
+.dl .cc .mono{font-size:17px;letter-spacing:.06em;font-weight:600}
+.cbtn{background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;color:var(--secondary);margin:-12px 0}
+.ppl{display:flex;flex-direction:column;gap:8px}
+.ppl span{display:flex;align-items:center;gap:10px}
+.ppl .mono{margin-left:auto;font-weight:600}
+.dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);background:var(--card);border-radius:30px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:14px}
+body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);padding:26px}
+.dlg .qr{padding:14px;background:#fff;border-radius:22px}
+.dlg .cap{text-align:center;color:var(--secondary);font-size:14px}
+.side{position:absolute;top:0;left:0;bottom:0;width:248px;padding:22px 14px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--hair);background:var(--page)}
+.side .wm{font-size:20px;font-weight:800;letter-spacing:-0.02em;padding:0 12px;min-height:44px;display:flex;align-items:center}
+.side nav{display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;color:var(--secondary);font-weight:600;font-size:15px}
+.side a.cur{background:var(--card);color:var(--text)}
+.side a.cur .ic{color:var(--blue)}
+.side .badge{margin-left:auto}
+.side .me{margin-top:auto}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--amber);color:#000;font-size:11px;font-weight:800}
+.main{position:absolute;top:0;left:248px;right:0;bottom:0;padding:40px 48px;overflow:hidden}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;margin-top:28px;align-items:start}
+.tabbar{position:absolute;left:12px;right:12px;bottom:14px;display:flex;gap:4px;padding:4px;border-radius:24px}
+.tabbar.frost{background:rgb(13 12 18 / 75%);backdrop-filter:blur(28px) saturate(2) brightness(1.1);-webkit-backdrop-filter:blur(28px) saturate(2) brightness(1.1);box-shadow:inset 0 1px 0 rgb(255 255 255 / 12%)}
+.tabbar.plain{background:#000;left:0;right:0;bottom:0;border-radius:0;padding:4px 8px 22px;border-top:1px solid var(--hair)}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:18px;font-size:11.5px;font-weight:600;color:var(--label)}
+.tab .ic{width:24px;height:24px}
+.tab.cur{color:var(--text)}
+.tab.cur .ic{color:var(--blue)}
+.tab .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+.moremenu{position:absolute;right:16px;bottom:92px;width:200px;background:#141319;border-radius:20px;padding:6px;display:flex;flex-direction:column}
+.moremenu a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;font-weight:600;color:var(--secondary)}
+.empty{background:var(--card);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.empty h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.empty p{color:var(--secondary)}
+.empty .btns{display:flex;flex-wrap:wrap;gap:8px}
+.empty summary{min-height:44px;display:inline-flex;align-items:center;color:var(--secondary);font-weight:600}
+
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.tp{padding:12px 16px 120px;display:flex;flex-direction:column;gap:14px}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.phead .eyebrow{margin-bottom:6px}
+.btn.round{width:46px;height:46px;border-radius:99px;padding:0}
+.btn.sm{min-height:36px;padding:0 12px;font-size:14px;border-radius:12px}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.field{display:flex;align-items:center;gap:10px;min-height:46px;border-radius:14px;background:var(--card);padding:0 14px;color:var(--label);font-size:15px;flex:1;min-width:0}
+.field .typed{color:var(--text)}
+.fbtn{position:relative;width:46px;height:46px;border-radius:14px;background:var(--card);display:grid;place-items:center;color:var(--text);flex:none}
+.fbtn .fd{position:absolute;top:9px;right:9px;width:8px;height:8px;border-radius:99px;background:var(--blue)}
+.srow{display:flex;gap:8px;align-items:center}
+.fbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px 22px;background:var(--card);border-radius:24px;padding:14px 16px}
+.fbar .field{background:#141319;flex:0 1 360px}
+.fgroup{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;min-height:36px;padding:0 14px;border-radius:99px;background:#1a1920;color:var(--secondary);font-size:14px;font-weight:600}
+.chip.on{background:var(--text);color:#000}
+.avb{width:40px;height:40px;font-size:13px}
+.avb.on{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--blue)}
+.avb.off{opacity:.6}
+button.chip,button.av,.fbtn{border:0;cursor:pointer}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.yh{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 2px}
+.yh h2{font-size:22px;font-weight:800;letter-spacing:-0.02em}
+.yh span{font-size:14px;color:var(--secondary)}
+.kinds{display:inline-flex;gap:8px;align-items:center}
+.kinds .ic{width:20px;height:20px;stroke-width:1.9}
+.tc{display:block;background:var(--card);border-radius:24px;overflow:hidden}
+.tc-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px 12px;border-bottom:1px solid var(--hair)}
+.tc-strip .mono{font-size:13px;font-weight:600;color:var(--secondary);letter-spacing:.04em}
+.tc.feat .tc-strip .mono{color:var(--blue)}
+.cd{font-size:13px;font-weight:700;color:var(--secondary)}
+.cd.blue{color:var(--blue)}
+.tc-body{padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px}
+.tc-body b{font-size:22px;font-weight:800;letter-spacing:-0.02em;line-height:1.15}
+.tc-body .pl{font-size:14px;color:var(--secondary)}
+.tc-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px}
+.tr{display:flex;align-items:center;gap:14px;background:var(--card);border-radius:24px;padding:12px 16px 12px 12px;min-height:78px}
+.tr.cur{box-shadow:inset 0 0 0 2px var(--blue)}
+.db{width:52px;height:54px;border-radius:16px;background:#141319;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;line-height:1.05}
+.db i{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--label)}
+.db b{font-size:20px;font-weight:800}
+.db small{font-size:10.5px;color:var(--label);text-align:center;line-height:1.2}
+.tr.feat .db i{color:var(--blue)}
+.tr .w{flex:1;min-width:0}
+.tr .w b{display:block;font-size:16px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr .w span{display:block;font-size:13.5px;color:var(--secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard{display:flex;background:var(--card);border-radius:24px;overflow:hidden;min-height:132px}
+.tcard .stub{width:92px;flex:none;border-right:1px solid var(--hair);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;line-height:1.05}
+.tcard .stub i{font-style:normal;font-size:12px;font-weight:700;letter-spacing:.09em;color:var(--label)}
+.tcard.feat .stub i{color:var(--blue)}
+.tcard .stub b{font-size:30px;font-weight:800}
+.tcard .stub small{font-size:12px;color:var(--label)}
+.tcard .body{flex:1;min-width:0;padding:16px 18px;display:flex;flex-direction:column;gap:4px}
+.tcard .body .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.tcard .body b{font-size:18px;font-weight:800;letter-spacing:-0.01em}
+.tcard .body .pl{font-size:14px;color:var(--secondary)}
+.tcard .body .tc-foot{margin-top:auto;padding-top:8px}
+.pc{display:block;background:var(--card);border-radius:24px;overflow:hidden}
+.mos{position:relative;display:grid;gap:2px;height:168px;background:#141319}
+.mos.roomy{height:220px}
+.mos.n3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}
+.mos.n3>.ph:first-child{grid-row:1/3}
+.mos.n2{grid-template-columns:2fr 1fr}
+.mos.n1{grid-template-columns:1fr}
+.scrim{position:absolute;top:0;bottom:0;left:0;right:34%;background:linear-gradient(180deg,rgb(0 0 0 / 0) 38%,rgb(0 0 0 / 84%) 100%);pointer-events:none}
+.scrim.whole{right:0}
+.pname{position:absolute;left:16px;bottom:12px;right:37%;display:flex;flex-direction:column;gap:2px}
+.pname.whole{right:16px}
+.pname b{font-size:19px;font-weight:800;letter-spacing:-0.01em;line-height:1.15}
+.mos.roomy .pname b{font-size:21px}
+.pname span{font-size:14px;color:#e6e5ec}
+.ppill{position:absolute;top:10px;left:10px;display:inline-flex;gap:5px;align-items:center;border-radius:99px;background:rgb(0 0 0 / 72%);padding:3px 9px;font-size:12px;font-weight:700}
+.ppill .ic{width:13px;height:13px}
+.pfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px 14px;font-size:14px;color:var(--secondary)}
+.pfoot .st{display:flex;flex-wrap:wrap;gap:2px 10px}
+.pfoot b{color:var(--text);font-weight:700}
+.ph{position:relative;overflow:hidden;min-width:0;min-height:0}
+.s1{background:radial-gradient(circle at 78% 26%,#fff1c9 0 5%,transparent 5.6%),radial-gradient(90% 55% at 18% 110%,#7a3b22 0 58%,transparent 59%),radial-gradient(70% 45% at 88% 114%,#a4502b 0 55%,transparent 56%),linear-gradient(180deg,#f0a56a 0%,#e9845a 45%,#b95c3b 100%)}
+.s2{background:radial-gradient(circle at 70% 38%,#ffe9c2 0 6%,transparent 6.8%),radial-gradient(120% 55% at 30% 112%,#14202e 0 60%,transparent 61%),linear-gradient(180deg,#f4b183 0%,#c0546a 48%,#2a2f55 100%)}
+.s3{background:radial-gradient(100% 60% at 25% 112%,#1c3b32 0 60%,transparent 61%),radial-gradient(80% 50% at 85% 112%,#2a5a49 0 58%,transparent 59%),linear-gradient(180deg,#a9dccf 0%,#58a08a 100%)}
+.s4{background:radial-gradient(60% 70% at 35% 105%,#eef4ff 0 38%,transparent 39%),radial-gradient(50% 60% at 75% 108%,#dfe9fb 0 36%,transparent 37%),radial-gradient(120% 40% at 50% 120%,#1d2b45 0 60%,transparent 61%),linear-gradient(180deg,#bcd8ff 0%,#6d9be0 100%)}
+.s5{background:radial-gradient(circle at 18% 72%,#ffd58a 0 1.4%,transparent 1.9%),radial-gradient(circle at 34% 80%,#ffd58a 0 1.2%,transparent 1.7%),radial-gradient(circle at 58% 70%,#ffe3b3 0 1.4%,transparent 1.9%),radial-gradient(circle at 76% 84%,#ffd58a 0 1.2%,transparent 1.7%),linear-gradient(180deg,#0e1a33 0%,#31407a 70%,#101733 100%)}
+.s6{background:radial-gradient(90% 30% at 40% 78%,#e9fffb 0 46%,transparent 47%),linear-gradient(180deg,#bff3e6 0%,#2aa9a0 55%,#0d4f58 100%)}
+.maptile{position:absolute;inset:0;background:#0b0e15}
+.maptile svg{width:100%;height:100%;display:block}
+.kindtile{position:absolute;inset:0;background:#141319;display:flex;align-items:center;justify-content:center;gap:14px}
+.kindtile .ic{width:28px;height:28px;stroke-width:1.8}
+.quietline{font-size:14px;color:var(--secondary);padding:0 2px}
+.skel{height:160px;border-radius:24px;background:#141319}
+.alertc{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;color:var(--secondary)}
+.menu{position:absolute;width:236px;background:#141319;border-radius:20px;padding:6px;display:flex;flex-direction:column;z-index:3}
+.menu a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;font-weight:600;color:var(--text);font-size:15px}
+.menu a .ic{color:var(--secondary)}
+.menu hr{border:0;height:1px;background:var(--hair);margin:4px 6px}
+.topbar{display:flex;justify-content:space-between;align-items:center;min-height:44px;color:var(--secondary)}
+.topbar .back{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
+.topbar .tools{display:flex;gap:4px}
+.phero{position:relative;height:170px;border-radius:24px;overflow:hidden;display:grid;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr;gap:2px;background:#141319}
+.phero>.ph:first-child{grid-row:1/3}
+.phero.wide{height:260px;grid-template-columns:2fr 1fr 1fr 1fr}
+.phero .scrim{right:34%}
+.phero.wide .scrim{right:60%}
+.phero .pname{left:18px;bottom:16px;right:38%}
+.phero.wide .pname{left:26px;bottom:22px;right:62%}
+.phero .pname h1{font-size:26px;font-weight:800;letter-spacing:-0.025em;line-height:1.05}
+.phero.wide .pname h1{font-size:40px}
+.phero .pname span{font-size:14px;color:#e6e5ec}
+.facts-l{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;font-size:15px;color:var(--secondary)}
+.facts-l b{color:var(--text);font-weight:700}
+.sumrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px}
+.subrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:14px;color:var(--secondary)}
+.subrow b{color:var(--text);font-weight:700}
+.look{display:inline-flex;align-items:center;gap:8px;min-height:44px;color:var(--secondary);font-size:14px;font-weight:600}
+.notes{font-size:15px;color:var(--text)}
+.bkrow{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:24px;padding:12px 16px;min-height:68px}
+.bkrow .kinds .ic{width:22px;height:22px}
+.bkrow .w{flex:1;min-width:0}
+.bkrow .w b{display:block;font-size:16px;font-weight:750}
+.bkrow .w span{display:block;font-size:13.5px;color:var(--secondary)}
+.remind{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;background:var(--card);border-radius:24px;padding:12px 16px;font-size:14px}
+.remind p{flex:1 1 200px;min-width:0}
+.days{display:flex;flex-direction:column;gap:22px}
+.day{position:relative;margin-left:6px;border-left:2px solid var(--hair);padding-left:20px;display:flex;flex-direction:column;gap:10px}
+.day .rd{position:absolute;left:-8px;top:3px;width:14px;height:14px;border-radius:99px;background:var(--label);border:3px solid var(--page)}
+.day h3{font-size:16px;font-weight:700}
+.day .dm{display:block;font-size:13px;color:var(--secondary)}
+.gr{display:grid;gap:3px;border-radius:14px;overflow:hidden}
+.gr.c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.gr.c6{grid-template-columns:repeat(6,minmax(0,1fr))}
+.gr>.ph{aspect-ratio:1}
+.more{position:absolute;inset:0;display:grid;place-items:center;background:rgb(3 4 6 / 60%);font-weight:800;font-size:15px}
+.far{position:absolute;left:5px;top:5px;border-radius:99px;background:var(--amber);color:#000;font-size:10px;font-weight:700;padding:3px 6px;line-height:1}
+.vid{position:absolute;right:5px;bottom:5px;width:18px;height:18px;border-radius:99px;background:rgb(3 4 6 / 70%);display:grid;place-items:center}
+.vid .ic{width:9px;height:9px;fill:#fff;stroke:none}
+.inf{position:absolute;left:5px;bottom:5px;width:16px;height:16px;border-radius:99px;background:rgb(3 4 6 / 70%);display:grid;place-items:center}
+.inf i{width:9px;height:9px;border-radius:99px;border:2px solid #fff}
+.dayd{display:flex;flex-direction:column;gap:6px}
+.dayd .hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 2px}
+.dayd h3{font-size:14px;font-weight:700}
+.dayd span{font-size:13px;color:var(--secondary)}
+.done{background:var(--card);border-radius:24px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;font-size:14px;color:var(--secondary)}
+.mapbox{position:relative;border-radius:24px;overflow:hidden;background:#0b0e15}
+.mapbox>svg{display:block;width:100%;height:auto}
+.mapctl{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card)}
+.mapctl .track{flex:1;height:4px;border-radius:99px;background:#27262c;position:relative}
+.mapctl .track i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--blue);border-radius:99px}
+.mapctl .track b{position:absolute;left:0;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:99px;background:#fff}
+.mapctl .sm{font-size:13px;color:var(--secondary);white-space:nowrap}
+.cols4{display:grid;grid-template-columns:400px minmax(0,1fr);gap:24px;align-items:start;margin-top:20px}
+.colL{display:flex;flex-direction:column;gap:18px}
+.colR{display:flex;flex-direction:column;gap:14px}
+.bl{background:var(--card);border-radius:24px;overflow:hidden}
+.bl>a{display:flex;align-items:center;gap:12px;min-height:62px;padding:10px 16px;border-bottom:1px solid var(--hair)}
+.bl>a:last-child{border-bottom:0}
+.bl>a.sel{background:#141319}
+.bl .kic{width:22px;height:22px;stroke-width:1.9}
+.bl .w{flex:1;min-width:0}
+.bl .w b{display:block;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bl .w span{display:block;font-size:13px;color:var(--secondary)}
+.bl a.gone .w b{color:var(--secondary)}
+.bl a.gone .kic{opacity:.55}
+.st-a{color:var(--amber);font-weight:600;font-size:13px}
+.st-q{color:var(--label);font-weight:600}
+.grp{display:flex;flex-direction:column;gap:6px}
+.grp h3{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding:0 4px;margin-top:10px}
+.sheet.static{position:relative;max-height:none;border-radius:30px 30px 0 0}
+.dev.sheetonly{padding:56px 0 0;background:#050407}
+.shh{display:flex;align-items:flex-start;gap:12px;margin-bottom:6px}
+.shh .n{flex:1;min-width:0}
+.shh h2{font-size:20px;font-weight:800;letter-spacing:-0.01em}
+.shh p{font-size:14px;color:var(--secondary)}
+.dnote{font-size:14px;color:var(--secondary)}
+.dnote.am{color:var(--amber)}
+.stw{font-weight:700}
+.stw.am,.dh .n .stw.am{color:var(--amber)}
+.dl dd s{color:var(--label)}
+.dl dd .q{color:var(--secondary)}
+.itin{margin-top:14px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.itin li{display:flex;gap:12px;color:var(--secondary)}
+.itin li b{color:var(--text);font-weight:600;width:96px;flex:none}
+.radio{display:flex;gap:12px;align-items:flex-start;border-radius:16px;background:#141319;padding:12px;font-size:14px}
+.radio .rb{width:18px;height:18px;border-radius:99px;border:2px solid var(--label);flex:none;margin-top:1px}
+.radio.on{box-shadow:inset 0 0 0 2px var(--text)}
+.radio.on .rb{border:5px solid var(--text)}
+.radio span b{display:block;font-weight:650;color:var(--text)}
+.radio span{color:var(--secondary)}
+.pane{border-radius:0}
+.pane .ghost{background:var(--card);border-radius:24px}
+.dh .n span span,.bl .w span span,.tr .w span span{display:inline}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>Bookings and the booking detail</h1>
+    <p>Item 2 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/879">#879</a>, group A: the Bookings sheet and list (#711) and the booking detail (#712) of a completed trip. Made-up bookings throughout. Replaces the look of frames c and d of <a href="https://github.com/AnthonyPluth/Waypoint/issues/705">#705</a>.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README-group-a.md">README (group A)</a><a href="m-trips.html">m Trips</a><a href="m-past-trip.html">m Completed trip</a><a href="m-bookings.html" aria-current="page">m Bookings and detail</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>The Bookings sheet on phone (b1) and the list in the desktop column with a booking open in the panel (b9).</li><li>The booking detail of a completed trip for a changed stay, a car, a cancelled train, parking, a flight with a cancelled leg, a cruise and a visit after the trip's emails were removed (b2 to b8).</li><li>The detail of a trip still to come, and the shared component, are g-booking-detail.html (#878).</li></ol>
+  </section>
+<section class="sec" id="bookings" aria-labelledby="bookings-h">
+  <div class="sechead"><span class="letter">2a</span><h2 id="bookings-h">The Bookings sheet and list</h2></div>
+  <p class="lede">Replaces the look of <code>PastBookings.svelte</code> and <code>PastBookingsSheet.svelte</code> (#711, wired in #712): the phone sheet titled “Bookings · 7” with the kinds in words, grouped Whole trip, then by day, then Other; the flat dated list in the desktop column. Each row is a button opening the booking detail, with the kind icon, the name, one line of when, a Changed word when changed and a quiet Cancelled when cancelled, and a chevron.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>b1 · Bookings sheet, grouped by day, phone</figcaption><div class="dev sheetonly" style="height:1080px"><div class="sheet static"><div class="grab"></div><div class="shh"><div class="n"><h2>Bookings · 7</h2><p>2 flights · 3 stays · 1 car · 1 parking</p></div><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div><div style="display:flex;flex-direction:column;gap:4px"><div class="grp"><h3>Whole trip</h3><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-car)"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><span class="w"><b>Rota Car Rental</b><span>Sep 4 – 9</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div class="grp"><h3>Thu, Sep 3</h3><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="w"><b>BOS to LIS</b><span><span class="mono">6:10 PM – 6:55 AM</span> +1 day</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Casa do Largo</b><span>Check in · 1 night</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div class="grp"><h3>Fri, Sep 4</h3><div class="bl"><a href="#" class="gone" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-train)"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1M9 15l-1-1M15 15l1-1M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5ZM8 19l-2 3M16 19l2 3"/></svg><span class="w"><b>Lisboa Oriente to Évora</b><span><span class="mono">9:05 AM – 10:40 AM</span> · <span class="st-q">Cancelled</span></span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Herdade das Oliveiras</b><span>Check in · 3 nights</span></span><span class="st-a">Changed</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div class="grp"><h3>Mon, Sep 7</h3><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Quinta da Ribeira</b><span>Check in · 2 nights</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div class="grp"><h3>Thu, Sep 10</h3><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="w"><b>LIS to BOS</b><span><span class="mono">11:40 AM – 2:05 PM</span></span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div class="grp"><h3>Other</h3><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-parking)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg><span class="w"><b>Harborside Park &amp; Fly</b><span>Sep 3 – 10</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div></div></div></div></figure><figure class="fig" data-w="desk"><figcaption>b9 · The desktop list in the 400 px column, with a booking opened in the right panel</figcaption><div class="dev wide" style="height:1000px"><div style="padding:24px 48px;width:1280px" aria-hidden="true"><div class="topbar"><a class="back" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 19-7-7 7-7M19 12H5"/></svg>Past trips</a><span class="tools"><button class="btn icon ghost" type="button" aria-label="Edit trip details"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"/></svg></button><button class="btn icon ghost" type="button" aria-label="Trip options"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button></span></div><div style="margin-top:8px"><div class="phero wide"><span class="ph s2"></span><span class="ph s6"></span><span class="ph s5"></span><span class="ph s1"></span><span class="ph s3"></span><span class="ph s4"></span><span class="ph s6"></span><span class="scrim"></span><div class="pname"><h1>Alentejo by car</h1><span>Sep 3 – 10, 2026</span></div></div></div><div class="cols4"><div class="colL"><dl class="facts-l"><dd><b>8 days</b></dd><dd>7 nights</dd><dd>534 mi</dd><dd>3 places</dd></dl><div class="sec-h"><h2 style="font-size:17px;font-weight:700">Bookings · 7</h2><span style="font-size:13px;color:var(--secondary)">2 flights · 3 stays · 1 car · 1 parking</span></div><div class="bl"><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="w"><b>BOS to LIS</b><span>Thu, Sep 3 · 6:10 PM</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Casa do Largo</b><span>Sep 3 – 4 · 1 night</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-car)"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><span class="w"><b>Rota Car Rental</b><span>Whole trip · Sep 4 – 9</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" class="gone" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-train)"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1M9 15l-1-1M15 15l1-1M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5ZM8 19l-2 3M16 19l2 3"/></svg><span class="w"><b>Lisboa Oriente to Évora</b><span>Fri, Sep 4 · 9:05 AM · <span class="st-q">Cancelled</span></span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" class="sel" aria-current="true" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Herdade das Oliveiras</b><span>Sep 4 – 7 · 3 nights</span></span><span class="st-a">Changed</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><span class="w"><b>Quinta da Ribeira</b><span>Sep 7 – 9 · 2 nights</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><span class="w"><b>LIS to BOS</b><span>Thu, Sep 10 · 11:40 AM</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a><a href="#" aria-haspopup="dialog"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-parking)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg><span class="w"><b>Harborside Park & Fly</b><span>Sep 3 – 10</span></span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></a></div></div><div></div></div></div><div class="dim"></div><div class="panel"><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><div class="n"><b>Herdade das Oliveiras</b><span>Stay · Évora · <span class="stw am">Changed</span></span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Herdade das Oliveiras"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Dates</dt><dd>Fri, Sep 4 – Mon, Sep 7</dd></div><div><dt>Address</dt><dd><span class="cc"><a href="#" style="text-decoration:underline;text-decoration-color:var(--hair);text-underline-offset:3px">Estrada da Serra 4, Évora</a><button class="cbtn" type="button" aria-label="Copy address"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Room</dt><dd>Garden suite</dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">HO-55218</span><button class="cbtn" type="button" aria-label="Copy confirmation code HO-55218"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Travellers</dt><dd><span class="ppl"><span><i class="av">MQ</i>Mara Quill</span><span><i class="av">TR</i>Tomas Reyna</span></span></dd></div><div><dt>Price</dt><dd>€961.20</dd></div></dl></div></div></figure></div></div>
+  <div class="spec"><div><h3>What changes</h3><ul><li>The list is one black card per group with 24 px corners and hairlines between rows (today bordered <code>rounded-[18px]</code> boxes).</li><li>Kind icons are the outlines of #876 with no tile; the cancelled row's icon and name are dimmed, as on the booking cards of #878 (f).</li><li>“Changed” is an <b class="am">amber</b> word, as on the cards of #878 item 5 (today the warn chip); “Cancelled” stays quiet grey in the list.</li><li>Times are in Geist Mono.</li></ul></div><div><h3>What of #705 stays</h3><ul><li>Frame c with the owner's decisions of 2026-11-17 (#711, #808): the groups and their order (Whole trip first, Other last for parking), the flat dated list on desktop, the selected row marked while its detail is open, no confirmation codes on a row.</li></ul></div><div><h3>Kept exactly as today</h3><ul><li>Every row's words come from <code>bookingDetail</code> and <code>bookingName</code> as today; the sheet's title and description from <code>bookingCounts</code>, which leaves cancelled bookings out of the count.</li></ul></div></div>
+</section>
+<section class="sec" id="detail" aria-labelledby="detail-h">
+  <div class="sechead"><span class="letter">2b</span><h2 id="detail-h">The booking detail on a completed trip</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Owner decision on #878, 2026-11-20: <code>BookingDetail.svelte</code> (#712) is restyled once and shared with trips still to come (drawn in <a href="g-booking-detail.html">g-booking-detail.html</a>). These frames draw the kinds and states a completed trip shows, with no action row, as today: email, directions, call and the airline app stay hidden once a trip is over. A bottom sheet on phone, a right panel on desktop (b9).</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>b2 · Stay, changed</figcaption><div class="dev sheetonly" style="height:640px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><div class="n"><b>Herdade das Oliveiras</b><span>Stay · Évora · <span class="stw am">Changed</span></span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Herdade das Oliveiras"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Dates</dt><dd>Fri, Sep 4 – Mon, Sep 7</dd></div><div><dt>Address</dt><dd><span class="cc"><a href="#" style="text-decoration:underline;text-decoration-color:var(--hair);text-underline-offset:3px">Estrada da Serra 4, Évora</a><button class="cbtn" type="button" aria-label="Copy address"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Room</dt><dd>Garden suite</dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">HO-55218</span><button class="cbtn" type="button" aria-label="Copy confirmation code HO-55218"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Travellers</dt><dd><span class="ppl"><span><i class="av">MQ</i>Mara Quill</span><span><i class="av">TR</i>Tomas Reyna</span></span></dd></div><div><dt>Price</dt><dd>€961.20</dd></div></dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>b3 · Car</figcaption><div class="dev sheetonly" style="height:680px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-car)"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg><div class="n"><b>Rota Car Rental</b><span>Car · Rota · Sep 4 – 9</span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Rota Car Rental"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Pick-up</dt><dd>Fri, Sep 4 · <span class="mono">10:00 AM</span><small>Lisbon Airport (LIS)</small></dd></div><div><dt>Drop-off</dt><dd>Wed, Sep 9 · <span class="mono">6:00 PM</span><small>Lisbon Airport (LIS)</small></dd></div><div><dt>Car</dt><dd>Compact, VW Polo or similar</dd></div><div><dt>Pick-up address</dt><dd><span class="cc"><span>Rua C, Lisbon Airport</span><button class="cbtn" type="button" aria-label="Copy address"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">RC-80314</span><button class="cbtn" type="button" aria-label="Copy confirmation code RC-80314"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Travellers</dt><dd><span class="ppl"><span><i class="av">MQ</i>Mara Quill</span></span></dd></div><div><dt>Price</dt><dd>€388.00</dd></div></dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>b4 · Train, cancelled</figcaption><div class="dev sheetonly" style="height:680px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-train)"><path d="M8 3.1V7a4 4 0 0 0 8 0V3.1M9 15l-1-1M15 15l1-1M9 19c-2.8 0-5-2.2-5-5v-4a8 8 0 0 1 16 0v4c0 2.8-2.2 5-5 5ZM8 19l-2 3M16 19l2 3"/></svg><div class="n"><b>Lisboa Oriente to Évora</b><span>Train · CP · Fri, Sep 4 · <span class="stw am">Cancelled</span></span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Lisboa Oriente to Évora"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><p class="dnote" style="margin-top:14px">Cancelled, so not in the trip’s total</p><dl class="dl"><div><dt>Departs</dt><dd><s><span class="mono">9:05 AM</span> · Lisboa Oriente</s></dd></div><div><dt>Arrives</dt><dd><s><span class="mono">10:40 AM</span> · Évora</s></dd></div><div><dt>Seat</dt><dd><span class="mono">4-52, 4-53</span></dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">CP7Q2M</span><button class="cbtn" type="button" aria-label="Copy confirmation code CP7Q2M"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Travellers</dt><dd><span class="ppl"><span><i class="av">MQ</i>Mara Quill</span><span><i class="av">TR</i>Tomas Reyna</span></span></dd></div><div><dt>Price</dt><dd><s>€37.80</s></dd></div></dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>b5 · Parking (the Other group)</figcaption><div class="dev sheetonly" style="height:600px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-parking)"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/></svg><div class="n"><b>Harborside Park &amp; Fly</b><span>Parking · Sep 3 – 10</span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Harborside Park &amp; Fly"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Dates</dt><dd>Thu, Sep 3 – Thu, Sep 10</dd></div><div><dt>Address</dt><dd><span class="cc"><span>12 Wharf Rd, East Boston</span><button class="cbtn" type="button" aria-label="Copy address"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Space</dt><dd>Covered</dd></div><div><dt>Vehicle</dt><dd>Blue hatchback</dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">HP-2291</span><button class="cbtn" type="button" aria-label="Copy confirmation code HP-2291"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Price</dt><dd>$118.00</dd></div></dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>b6 · Flight with a cancelled leg on a combined booking</figcaption><div class="dev sheetonly" style="height:760px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><div class="n"><b>BOS to LIS</b><span>Flight · Aurora Air AU 212 · Thu, Sep 3</span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for BOS to LIS"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Departs</dt><dd><span class="mono">6:10 PM</span> · BOS</dd></div><div><dt>Arrives</dt><dd><span class="mono">6:55 AM</span> +1 day · LIS</dd></div><div><dt>Terminal</dt><dd>E</dd></div><div><dt>Cabin</dt><dd>Economy</dd></div><div><dt>Confirmation</dt><dd><span class="cc"><span class="mono">QK7ZRM</span><button class="cbtn" type="button" aria-label="Copy confirmation code QK7ZRM"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></span></dd></div><div><dt>Travellers</dt><dd><span class="ppl"><span><i class="av">MQ</i>Mara Quill<span class=q>&nbsp;· <span class="mono">14A</span></span></span><span><i class="av">TR</i>Tomas Reyna<span class=q>&nbsp;· <span class="mono">14B</span></span></span><span><i class="av">IV</i>Ines Vale<span class=q>&nbsp;· On cancelled booking RT4WXP</span></span></span></dd></div><div><dt>Status</dt><dd>Cancelled, so not in the trip’s total <span class="mono q">RT4WXP</span></dd></div><div><dt>Price</dt><dd>$1,284.00</dd></div></dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>b7 · Cruise, with its itinerary (another trip)</figcaption><div class="dev sheetonly" style="height:760px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-cruise)"><path d="M12 10.19V14M12 2v3M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6M19.38 20A11.6 11.6 0 0 0 21 14l-8.19-3.64a2 2 0 0 0-1.62 0L3 14a11.6 11.6 0 0 0 2.81 7.76M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg><div class="n"><b>Aurora Spirit</b><span>Cruise · Nordline · Jun 2 – 9</span></div><div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Aurora Spirit"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Embarks</dt><dd>Tue, Jun 2 · <span class="mono">4:00 PM</span><small>Bergen</small></dd></div><div><dt>Disembarks</dt><dd>Tue, Jun 9 · <span class="mono">8:00 AM</span><small>Bergen</small></dd></div><div><dt>Ports</dt><dd>Geiranger, Ålesund, Flåm</dd></div><div><dt>Ship</dt><dd>Aurora Spirit</dd></div><div><dt>Cabin</dt><dd>7114</dd></div><div><dt>Deck</dt><dd>7</dd></div></dl><div style="margin-top:14px"><p class="eyebrow">Itinerary</p><ul class="itin"><li><b>Wed, Jun 3</b>At sea</li><li><b>Thu, Jun 4</b>Geiranger</li><li><b>Fri, Jun 5</b>Ålesund</li><li><b>Sat, Jun 6</b>Flåm</li></ul></div></div></div></figure><figure class="fig" data-w="phone"><figcaption>b8 · Visit, after the trip's emails were removed: no Edit or More</figcaption><div class="dev sheetonly" style="height:420px"><div class="sheet static"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-visit)"><path d="M20 10c0 5-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 15 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><div class="n"><b>Lake Pleasant</b><span>Visit · Sat, Mar 14</span></div><div class="tools"><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div><dl class="dl"><div><dt>Dates</dt><dd>Sat, Mar 14</dd></div><div><dt>Place</dt><dd>Lake Pleasant</dd></div><div><dt>Notes</dt><dd>Picnic on the north shore.</dd></div></dl></div></div></figure></div></div>
+  <div class="spec"><div><h3>What changes</h3><ul><li>The header, rows and Copy buttons of g: kind outline, 20 px heavy name, grey subtitle, 11 px labels over a hairline, Geist Mono for codes, times and seats.</li><li>The status moves into the subtitle as a word: <b class="am">Changed</b> or <b class="am">Cancelled</b> in amber (today a warn chip and a red chip), following #878 item 5; the line “Cancelled, so not in the trip’s total” stays under the header.</li><li>Cancelled values are struck in label grey (b4), as today.</li></ul></div><div><h3>What of #705 stays</h3><ul><li>Frame d and the owner decisions of 2026-11-17 (#712, #808): the rows each kind has, Edit always visible with More (Move, Remove) beside it, the cancelled state, the Changed state, the Status row and the traveller notes of a combined booking with a cancelled leg, a seat shown once beside its traveller.</li><li>No check-in or check-out times for a stay or parking on a finished trip (<code>withTimes</code> off).</li></ul></div><div><h3>Kept exactly as today</h3><ul><li>Edit and More only while the trip's emails are kept (b8: after “Done”, only Close).</li><li>Travellers only where the app shows them; Price only when costs are shown; the cruise itinerary under the rows.</li><li>Made-up bookings, codes and prices throughout.</li></ul></div></div>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>
