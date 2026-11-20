@@ -306,8 +306,7 @@
       "handler": "waypoint/server/api/trips.py:api_trip_places",
       "web": [
         "frontend/src/lib/components/RouteReplay.svelte",
-        "frontend/src/lib/components/RouteTile.svelte",
-        "frontend/src/pages/Upcoming.svelte"
+        "frontend/src/lib/components/RouteTile.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",

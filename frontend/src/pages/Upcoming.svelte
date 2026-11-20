@@ -2,7 +2,7 @@
   import { act, errMsg } from "$lib/act";
   import { app, refreshState } from "$lib/app.svelte";
   import { apiCall } from "$lib/contract";
-  import type { MailboxList, Person, Segment, Trip, TripPlaces } from "$lib/api-types";
+  import type { MailboxList, Person, Segment, Trip } from "$lib/api-types";
   import { Alert, AlertDescription } from "$lib/components/ui/alert";
   import { Button } from "$lib/components/ui/button";
   import { Badge } from "$lib/components/ui/badge";
@@ -24,17 +24,17 @@
   import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
-  import { dateTile, usablePlaces, laterLine, laterTrips, startsIn, tripTotals } from "$lib/side-column";
-  import { type Day, type DayItem, appWord, bookingTravellers, vendorLink, dayIn, dayLabel, dayParts, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { dateTile, laterLine, laterTrips, startsIn } from "$lib/side-column";
+  import { showsCode } from "$lib/gate-code";
+  import RowShowCode from "$lib/components/RowShowCode.svelte";
+  import { type Day, type DayItem, appWord, bookingTravellers, vendorLink, dayIn, dayLabel, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
-  import Inbox from "@lucide/svelte/icons/inbox";
   import Plus from "@lucide/svelte/icons/plus";
-  import PlaneTakeoff from "@lucide/svelte/icons/plane-takeoff";
   import { toast } from "svelte-sonner";
 
   let trips = $state<Trip[] | null>(null);
@@ -110,23 +110,7 @@
   const next = $derived(trips ? nextUp(trips, now) : null);
   const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
   const days = $derived(featured ? tripDays(featured) : []);
-  const featuredId = $derived(featured?.id ?? null);
   const later = $derived(trips && featured ? laterTrips(trips, featured, today) : []);
-  let places = $state<TripPlaces | null>(null);
-  const totals = $derived(featured ? tripTotals(featured, places) : null);
-  let placesRequest = 0;
-  let placesFor: number | null = null;
-  $effect(() => {
-    const mine = ++placesRequest;
-    const id = featuredId;
-    if (id !== placesFor) places = null;
-    placesFor = id;
-    if (id === null || viewport.phone) return;
-    apiCall<"GET /api/trips/{id}/places">(`/api/trips/${id}/places`).then(
-      (found) => { if (mine === placesRequest && usablePlaces(found)) places = found; },
-      () => { if (mine === placesRequest) places = null; },
-    );
-  });
   const liveOn = $derived(flightStatus.list?.enabled === true);
   const online = $derived(typeof navigator === "undefined" || navigator.onLine !== false);
   const compactFlight = (s: Segment) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s);
@@ -136,9 +120,9 @@
   const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
   const earlier = $derived(firstAhead < 0 ? days : days.slice(0, firstAhead));
-  const earlierDates = $derived(new Set(earlier.map((d) => d.date)));
   const ahead = $derived(firstAhead < 0 ? [] : days.slice(firstAhead));
-  const nextId = $derived(next?.segment.id ?? null);
+  const toCome = (i: DayItem) => i.segment.status !== "cancelled" && (i.role === "end" ? endAt(i.segment) : startAt(i.segment)) > now;
+  const markedDay = $derived(ahead.find((d) => d.items.some(toCome))?.date ?? null);
   const waiting = $derived(app.state?.review_count ?? 0);
   const boxes = $derived(mail?.mailboxes ?? []);
   const scanning = $derived(boxes.some((m) => m.scanning));
@@ -164,42 +148,37 @@
 {/snippet}
 
 {#snippet dayBlock(day: Day)}
-  {@const parts = dayParts(day.date)}
   {@const isToday = day.date === today}
-  <li class="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-4 phone:block">
-    <h3 class="eyebrow mb-2 sr-only phone:not-sr-only">{dayLabel(`${day.date}T00:00`)}{isToday ? " · Today" : ""}</h3>
-    <div class="flex flex-col items-center pt-3 text-center phone:hidden" aria-hidden="true">
-      <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{parts.weekday}</span>
-      <span class="text-3xl font-bold leading-none" class:text-primary={isToday}>{parts.day}</span>
-      <span class="text-xs text-muted-foreground">{parts.month}</span>
-      {#if isToday}<span class="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">Today</span>{/if}
+  <li>
+    <div class="flex items-center gap-2 pb-1.5 pt-5">
+      <h3 class="eyebrow">{dayLabel(`${day.date}T00:00`)}{isToday ? " · Today" : ""}</h3>
+      {#if day.date === markedDay}<i class="size-2 rounded-full bg-primary shadow-[0_0_0_4px_color-mix(in_srgb,var(--primary)_25%,transparent)]" aria-hidden="true"></i><span class="eyebrow text-primary" data-testid="next-marker">Next</span>{/if}
     </div>
-    <ul class="divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1">
+    <ul>
       {#each day.items as item (`${item.segment.id}-${item.role}`)}
         {@const seg = item.segment}
-        {@const startCollapsed = earlierDates.has(seg.start_local.slice(0, 10))}
-        {@const isNext = seg.id === nextId && (item.role === "start" ? !startCollapsed : startCollapsed)}
-        <li class={`row-tap flex items-center gap-3 px-4 py-3 phone:items-start ${isNext ? "bg-primary/10" : ""}`} class:opacity-60={seg.status === "cancelled"} data-next={isNext ? "true" : undefined}>
-          <p class="mono w-[72px] shrink-0 text-sm font-medium order-first phone:order-last phone:w-auto phone:pt-0.5 phone:text-right">
+        <li class="row-tap flex min-h-14 items-center gap-3.5 border-b border-border py-2" class:opacity-60={seg.status === "cancelled"}>
+          <p class="mono w-[76px] shrink-0 text-[15px] font-bold">
             <DayTime segment={seg} end={item.role === "end"} />
           </p>
-          {#if seg.logo}
-            <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} class="mt-0.5" />
-          {:else}
-            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative />
-          {/if}
+          <span class="flex w-9 shrink-0 justify-center">
+            {#if seg.logo}
+              <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} />
+            {:else}
+              <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative outline />
+            {/if}
+          </span>
           <div class="min-w-0 flex-1">
-            <p class="break-words text-body font-medium" class:line-through={seg.status === "cancelled"}>
+            <p class="break-words text-body font-semibold" class:line-through={seg.status === "cancelled"}>
               <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
               title={upcomingTitle(seg) === headline(seg) ? undefined : headline(seg)} onclick={(e) => openDetail(e, seg, item.bookings)}>{item.role === "end" ? `${END_WORD[seg.kind]}: ${upcomingTitle(seg)}` : upcomingTitle(seg)}</a></p>
             {#if item.role === "start" && subline(seg, true)}<p class="break-words text-caption text-muted-foreground">{subline(seg, true)}</p>{/if}
             {#if item.role === "start" && item.bookings.length > 1}<p class="text-caption text-muted-foreground">{item.bookings.length} bookings{timesDiffer(item.bookings) ? " · times differ between bookings" : ""}</p>{/if}
-            {#if isNext && viewport.phone}<span class="mt-1 inline-block rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground" data-testid="next-up-pill">Next up</span>{/if}
           </div>
-          {#if isNext && !viewport.phone}
-            <span class="shrink-0 self-center rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground" data-testid="next-up-pill">Next up</span>
-          {:else if !isNext}
-            <ChevronRight class="size-4 shrink-0 self-center text-muted-foreground phone:hidden" aria-hidden="true" />
+          {#if item.role === "start" && showsCode(seg, endAt(seg), now)}
+            <RowShowCode segment={seg} {now} />
+          {:else}
+            <ChevronRight class="size-4 shrink-0 text-label" aria-hidden="true" />
           {/if}
         </li>
       {/each}
@@ -210,12 +189,12 @@
 <div class="mb-4 flex items-end justify-between gap-3 md:mb-6">
   <div class="min-w-0">
     <p class="eyebrow mb-1" data-testid="today-eyebrow">{todayLabel(now, viewerZone(), viewport.phone)}</p>
-    <h1 class="text-title md:text-display">Upcoming</h1>
+    <h1 class="text-display md:text-display-lg">Upcoming</h1>
   </div>
   {#if trips && trips.length > 0}
     <div class="flex shrink-0 items-center gap-2">
       <OfflineStatus pill open={offlineOpen} ontoggle={() => (offlineOpen = !offlineOpen)} />
-      <Button href="#trips?add=booking" class="phone:size-11 phone:p-0"><Plus aria-hidden="true" /><span class="phone:sr-only">Add a booking</span></Button>
+      <Button href="#trips?add=booking" variant="secondary" class="phone:size-11 phone:p-0"><Plus aria-hidden="true" /><span class="phone:sr-only">Add a booking</span></Button>
     </div>
   {/if}
 </div>
@@ -248,21 +227,20 @@
       </div>
     </section>
   {/if}
-  <section class="pass" aria-labelledby="empty-title">
-    <div class="flex flex-col items-start gap-4 p-6 md:p-8">
-      <span class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><PlaneTakeoff class="size-6" aria-hidden="true" /></span>
+  <section class="rounded-booking bg-card" aria-labelledby="empty-title">
+    <div class="flex flex-col items-start gap-3.5 p-6">
       <div class="space-y-1.5">
         <p class="eyebrow">Get started</p>
-        <h2 id="empty-title" class="text-title" data-state={setup.id}>{setup.title}</h2>
+        <h2 id="empty-title" class="text-title font-extrabold" data-state={setup.id}>{setup.title}</h2>
         <p class="max-w-prose text-body text-muted-foreground">{setup.text}</p>
       </div>
       <div class="flex flex-wrap gap-2">
         {#if setup.id === "review"}<Button href="#review">Review {waiting === 1 ? "the email" : `${waiting} emails`}</Button>{/if}
         {#if setup.id === "connect" || setup.id === "reconnect"}<Button disabled={connecting} onclick={connect}>{connecting ? "Opening Google…" : setup.id === "reconnect" ? "Reconnect Gmail" : "Connect Gmail"}</Button>{/if}
-        <Button href="#trips?add=booking" variant={setup.id === "manual" ? "default" : "outline"}>Add a booking</Button>
+        <Button href="#trips?add=booking" variant={setup.id === "manual" ? "default" : "secondary"}>Add a booking</Button>
       </div>
       <details class="w-full text-body">
-        <summary class="inline-flex min-h-11 cursor-pointer items-center font-medium underline-offset-2 hover:underline">Setup checklist (optional)</summary>
+        <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-muted-foreground underline-offset-2 hover:underline">Setup checklist (optional)</summary>
         <ul class="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted-foreground" aria-label="Setup checklist">
           <li><a class="underline underline-offset-2" href="#people">Add the people who travel with you</a></li>
           <li><a class="underline underline-offset-2" href="#trips?add=booking">Add your first booking</a></li>
@@ -273,20 +251,15 @@
   </section>
 {:else}
   {#if waiting > 0}
-    {#if viewport.phone}
-      <a href="#review" class="mb-4 flex min-h-[52px] items-center gap-3 rounded-2xl border border-signal/22 bg-signal-soft px-4 text-sm" data-testid="review-banner">
-        <Inbox class="size-5 shrink-0 text-signal" aria-hidden="true" />
-        <span class="min-w-0 flex-1 font-semibold">{waiting} {waiting === 1 ? "email" : "emails"} to review</span>
-        <span class="flex items-center gap-1 font-semibold text-signal-ink">Review<ChevronRight class="size-4" aria-hidden="true" /></span>
-      </a>
-    {:else}
-      <section class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-signal/22 bg-signal-soft px-4 py-3 text-sm" aria-label="Emails to review" data-testid="review-banner">
-        <Inbox class="size-5 shrink-0 text-signal" aria-hidden="true" />
-        <p class="min-w-0 flex-1"><strong class="font-semibold">{waiting} {waiting === 1 ? "email" : "emails"} to review.</strong> Waypoint found what look like bookings and needs you to check them.</p>
-        <Button href="#review" class="bg-signal text-signal-foreground hover:bg-signal/90">Review emails</Button>
-      </section>
-    {/if}
+    <a href="#review" class="mb-4 flex min-h-11 items-center gap-2.5 text-[15px] text-muted-foreground" data-testid="review-line">
+      <i class="size-2 shrink-0 rounded-full bg-signal" aria-hidden="true"></i>
+      <span class="min-w-0 flex-1">{waiting} {waiting === 1 ? "email" : "emails"} to review</span>
+      <ChevronRight class="size-4 shrink-0 text-label" aria-hidden="true" />
+    </a>
   {/if}
+  <div class="@container">
+  <div class={`grid gap-x-8 gap-y-2 ${homeFlight ? "@[900px]:grid-cols-2 @[900px]:items-start" : ""}`} data-columns={homeFlight ? "two" : "one"}>
+  <div class="min-w-0">
   {#if !offlineWorking() || offlineOpen}<div class="-mt-1 mb-6"><OfflineStatus /></div>{/if}
   {#if next}
     {@const s = next.segment}
@@ -325,7 +298,7 @@
     {#if next.alongside.length}
       <section class="-mt-2 mb-6" aria-label="Also under way">
         <p class="eyebrow mb-2">Also under way</p>
-        <ul class="divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1">
+        <ul class="divide-y divide-border overflow-hidden rounded-booking bg-card">
           {#each next.alongside as item (item.segment.id)}
             {@const seg = item.segment}
             <li class="row-tap flex items-center gap-3 px-4 py-3 phone:items-start">
@@ -340,92 +313,83 @@
       </section>
     {/if}
   {:else}
-    <p class="mb-8 text-muted-foreground">Nothing coming up: every trip you can see is over. <a class="underline" href="#trips">See your trips</a>.</p>
+    <div class="mb-6 flex flex-col items-start gap-3">
+      <p class="text-[17px] text-muted-foreground">Nothing coming up: every trip you can see is over.</p>
+      <Button href="#trips" variant="secondary">See your trips</Button>
+    </div>
   {/if}
 
   {#if todays.length}
-    <ul class="mb-6 divide-y divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1" aria-label="Flights today">
+    <ul class="mb-6 divide-y divide-border overflow-hidden rounded-booking bg-card" aria-label="Flights today">
       {#each todays as f (f.id)}<FlightRow segment={f} status={liveOn ? statusFor(f.id) : undefined} {liveOn} {now} {online} />{/each}
     </ul>
   {/if}
 
+  </div>
+
   {#if featured}
-    <div class="@container">
-      <div class="grid gap-6 @[900px]:grid-cols-[minmax(0,1fr)_340px] @[900px]:items-start">
-        <div class="min-w-0">
-        <div class="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 class="text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
-          {#if featured.start_date && featured.end_date}<p class="text-caption text-muted-foreground">{rangeLabel(featured.start_date, featured.end_date)}{nightsLabel(featured.start_date, featured.end_date) ? ` · ${nightsLabel(featured.start_date, featured.end_date)}` : ""}</p>{/if}
-        </div>
-        <ol class="flex flex-col gap-6" aria-label={`${featured.name}, day by day`}>
-          {#if earlier.length}
-            <li>
-              <details class="group">
-                <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium text-muted-foreground underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Earlier in this trip · {earlier.length} {earlier.length === 1 ? "day" : "days"}</summary>
-                <ol class="mt-3 flex flex-col gap-6" aria-label={`${featured.name}, earlier days`}>
-                  {#each earlier as day (day.date)}
-                    {@render dayBlock(day)}
-                  {/each}
-                </ol>
-              </details>
-            </li>
-          {/if}
-          {#each ahead as day (day.date)}
-            {@render dayBlock(day)}
-          {/each}
-        </ol>
-        </div>
-        <aside class="flex min-w-0 flex-col gap-4" aria-label="Trip summary" data-testid="side-column">
-          {#if !viewport.phone}
-            {#if totals}
-              <dl class="grid grid-cols-3 divide-x divide-border overflow-hidden rounded-[18px] border border-border bg-surface-1 text-center" data-testid="trip-totals">
-                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.nights === 1 ? "Night" : "Nights"}</dt><dd class="text-title">{totals.nights}</dd></div>
-                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.bookings === 1 ? "Booking" : "Bookings"}</dt><dd class="text-title">{totals.bookings}</dd></div>
-                <div class="flex flex-col-reverse px-2 py-3"><dt class="eyebrow">{totals.cities === 1 ? "City" : "Cities"}</dt><dd class="text-title">{totals.cities}</dd></div>
-              </dl>
-            {/if}
-          {/if}
-          {#if later.length}
-            {#if viewport.phone}
-              <section aria-label="Later">
-                <h2 class="eyebrow mb-2">Later</h2>
-                <ul class="grid grid-cols-2 gap-3">
-                  {#each later as t (t.id)}
-                    {@const tile = dateTile(t)}
-                    <li class="row-tap rounded-[18px] border border-border bg-surface-1 p-3">
-                      <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-signal">{tile.month} {tile.day}</p>
-                      <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
-                      <p class="text-caption text-muted-foreground">{startsIn(t, today)}</p>
-                    </li>
-                  {/each}
-                </ul>
-              </section>
-            {:else}
-              <section class="overflow-hidden rounded-[18px] border border-border bg-surface-1" aria-label="Later">
-                <h2 class="eyebrow px-4 pt-3">Later</h2>
-                <ul class="divide-y divide-border">
-                  {#each later as t (t.id)}
-                    {@const tile = dateTile(t)}
-                    <li class="row-tap flex items-center gap-3 px-4 py-3">
-                      <span class="flex size-12 shrink-0 flex-col items-center justify-center rounded-xl bg-muted" aria-hidden="true">
-                        <span class="text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-signal">{tile.month}</span>
-                        <span class="text-xl font-bold leading-tight">{tile.day}</span>
-                      </span>
-                      <div class="min-w-0 flex-1">
-                        <p class="break-words text-body font-medium"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
-                        <p class="text-caption text-muted-foreground">{laterLine(t, today)}</p>
-                      </div>
-                    </li>
-                  {/each}
-                </ul>
-                <a class="flex min-h-11 items-center justify-between border-t border-border px-4 text-sm font-medium underline-offset-2 hover:underline" href="#trips">All trips<ChevronRight class="size-4 text-muted-foreground" aria-hidden="true" /></a>
-              </section>
-            {/if}
-          {/if}
-        </aside>
+    <div class="min-w-0">
+      {#if homeFlight}<p class="eyebrow mb-1 hidden @[900px]:block">Coming up</p>{/if}
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 class="text-title"><a class="inline-flex items-center phone:min-h-11 underline-offset-2 hover:underline" href={`#trip/${featured.id}`}>{featured.name}</a></h2>
+        {#if featured.start_date && featured.end_date}<p class="text-caption text-muted-foreground">{rangeLabel(featured.start_date, featured.end_date)}{nightsLabel(featured.start_date, featured.end_date) ? ` · ${nightsLabel(featured.start_date, featured.end_date)}` : ""}</p>{/if}
       </div>
+      <ol class="flex flex-col" aria-label={`${featured.name}, day by day`}>
+        {#if earlier.length}
+          <li class="pt-3">
+            <details class="group">
+              <summary class="inline-flex min-h-11 cursor-pointer items-center rounded-md font-semibold text-muted-foreground underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Earlier in this trip · {earlier.length} {earlier.length === 1 ? "day" : "days"}</summary>
+              <ol class="flex flex-col" aria-label={`${featured.name}, earlier days`}>
+                {#each earlier as day (day.date)}
+                  {@render dayBlock(day)}
+                {/each}
+              </ol>
+            </details>
+          </li>
+        {/if}
+        {#each ahead as day (day.date)}
+          {@render dayBlock(day)}
+        {/each}
+      </ol>
+      {#if later.length}
+        {#if viewport.phone}
+          <section class="mt-8" aria-label="Later">
+            <h2 class="eyebrow mb-2">Later</h2>
+            <ul class="grid grid-cols-2 gap-3">
+              {#each later as t (t.id)}
+                {@const tile = dateTile(t)}
+                <li class="row-tap rounded-booking bg-card p-4">
+                  <p class="eyebrow">{tile.month} {tile.day}</p>
+                  <p class="break-words text-body font-semibold"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
+                  <p class="text-caption text-muted-foreground">{startsIn(t, today)}</p>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {:else}
+          <section class="mt-8" aria-label="Later">
+            <h2 class="eyebrow mb-1">Later</h2>
+            <ul>
+              {#each later as t (t.id)}
+                {@const tile = dateTile(t)}
+                <li class="row-tap flex min-h-14 items-center gap-3.5 border-b border-border py-2">
+                  <p class="eyebrow w-[76px] shrink-0">{tile.month} {tile.day}</p>
+                  <div class="min-w-0 flex-1">
+                    <p class="break-words text-body font-semibold"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
+                    <p class="text-caption text-muted-foreground">{laterLine(t, today)}</p>
+                  </div>
+                  <ChevronRight class="size-4 shrink-0 text-label" aria-hidden="true" />
+                </li>
+              {/each}
+            </ul>
+            <a class="flex min-h-11 items-center justify-between text-sm font-semibold text-muted-foreground underline-offset-2 hover:underline" href="#trips">All trips<ChevronRight class="size-4 text-label" aria-hidden="true" /></a>
+          </section>
+        {/if}
+      {/if}
     </div>
   {/if}
+  </div>
+  </div>
 {/if}
 
 <Sheet bind:open={() => detail !== null, (v) => { if (!v) detail = null; }} title={detail ? headline(detail.segment) : "Booking"}>
