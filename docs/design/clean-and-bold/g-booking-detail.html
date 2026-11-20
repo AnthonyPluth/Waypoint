@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean and bold: Opened booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&family=Geist+Mono:wght@400..700&display=swap">
+<style>
+[hidden]{display:none!important}
+:root{
+  color-scheme:dark;
+  --page:#0d0c12;--card:#000000;--text:#ffffff;--secondary:#a9a8b2;--label:#8f8e98;--hair:#27262c;
+  --blue:#3d8ef7;--green:#4cc38a;--amber:#eba43b;
+  --k-flight:#4f9dff;--k-stay:#38c6d9;--k-car:#f4d35e;--k-train:#c79bff;--k-cruise:#ff8fab;
+  --k-parking:#d9d8e0;--k-visit:#8f8e98;
+  --doc-bg:#070609;--doc-line:#1d1c22;--doc-ink:#cfcdd8;
+  --sans:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--doc-bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3,h4,p,ul,ol,dl,dd,figure{margin:0}
+ul,ol{padding:0;list-style:none}
+:focus-visible{outline:3px solid color-mix(in srgb,var(--blue) 60%,transparent);outline-offset:2px}
+.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums slashed-zero}
+
+.doc{max-width:1360px;margin:0 auto;padding:28px 16px 120px;display:flex;flex-direction:column;gap:56px}
+.dochead{display:flex;flex-direction:column;gap:14px;max-width:76ch}
+.dochead h1{font-size:2.5rem;line-height:1.05;letter-spacing:-0.03em;font-weight:800}
+.dochead p{color:var(--secondary)}
+.dochead a,.lede a,.spec a{color:#8fc2ff}
+.bar{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 12px;background:color-mix(in srgb,var(--doc-bg) 88%,transparent);backdrop-filter:blur(16px);border:1px solid var(--doc-line);border-radius:16px}
+.segc{display:inline-flex;padding:3px;gap:3px;border-radius:12px;background:#141319;border:1px solid var(--doc-line)}
+.segc button{border:0;background:transparent;border-radius:9px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;color:var(--secondary);min-height:40px}
+.segc button[aria-pressed="true"]{background:var(--text);color:#000}
+.bar .toc{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:13px}
+.bar .toc a{color:var(--secondary);padding:4px 0}
+.bar .toc a[aria-current]{color:var(--text)}
+.checks{border:1px solid var(--doc-line);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.checks h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
+.checks ol{list-style:decimal;padding-left:1.3em;display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--doc-ink)}
+.sec{display:flex;flex-direction:column;gap:18px;scroll-margin-top:90px}
+.sechead{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;border-top:1px solid var(--doc-line);padding-top:22px}
+.sechead .letter{font-family:var(--mono);font-size:13px;color:#000;background:var(--text);border-radius:8px;padding:2px 8px}
+.sechead h2{font-size:1.5rem;line-height:1.2;letter-spacing:-0.02em;font-weight:750}
+.sechead .open{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);border-radius:99px;padding:2px 9px}
+.sec>p.lede{color:var(--secondary);max-width:80ch}
+.lede code,.spec code,.checks code,.dochead code{font-family:var(--mono);font-size:12.5px;color:#8fc2ff}
+.stage{overflow-x:auto;padding-bottom:6px}
+.frames{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start}
+body.desk [data-w="phone"]{display:none!important}
+body:not(.desk) [data-w="desk"]{display:none!important}
+.fig{display:flex;flex-direction:column;gap:8px}
+.fig>figcaption{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:16px}
+.spec>div{border:1px solid var(--doc-line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spec h3{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--secondary)}
+.spec ul{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:var(--doc-ink)}
+.spec li{overflow-wrap:anywhere}
+.spec b.bl{color:var(--blue)}.spec b.gr{color:var(--green)}.spec b.am{color:var(--amber)}
+table.grid{border-collapse:collapse;font-size:13.5px;color:var(--doc-ink);min-width:760px}
+table.grid th,table.grid td{border-bottom:1px solid var(--doc-line);padding:8px 12px;text-align:left;vertical-align:top}
+table.grid th{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--secondary)}
+
+.dev{position:relative;width:390px;flex:none;overflow:hidden;background:var(--page);border:1px solid var(--doc-line);border-radius:34px;padding:16px}
+body.desk .dev{width:608px;border-radius:16px;padding:16px}
+body.desk .dev.wide{width:1280px;padding:0}
+.dev.page{padding:0}
+.dev.wide{padding:0}
+
+.hero{background:var(--card);border-radius:30px;padding:20px 20px 18px;display:flex;flex-direction:column;gap:0}
+body.desk .hero{padding:28px 30px 24px}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;font-size:14px}
+.h-eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);margin-bottom:6px}
+.carrier{color:var(--secondary);font-weight:600}
+.m-blue{color:var(--blue);font-weight:700;display:inline-flex;align-items:center;gap:6px}
+.m-green{color:var(--green);font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px}
+.pill.amber{color:#000;background:var(--amber)}
+.dot{font-style:normal}
+.dot{width:8px;height:8px;border-radius:99px;display:inline-block;flex:none}
+.dot.blue{background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 25%,transparent)}
+.dot.amber{background:var(--amber)}
+.dot.green{background:var(--green)}
+.sent{margin-top:16px;font-size:17px;font-weight:600;color:var(--secondary)}
+body.desk .sent{font-size:19px}
+.big{font-size:34px;line-height:1.08;font-weight:800;letter-spacing:-0.025em;margin-top:2px}
+body.desk .big{font-size:44px}
+.big .mono{font-weight:700;letter-spacing:-0.04em}
+.quiet{margin-top:8px;font-size:14px;color:var(--secondary)}
+body.desk .quiet{font-size:15px}
+.quiet .g{color:var(--green);font-weight:600}.quiet .a{color:var(--amber);font-weight:600}
+.quiet s{color:var(--label)}
+.route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:start;margin-top:20px}
+.ap{display:flex;flex-direction:column;gap:3px;min-width:74px}
+.ap.r{align-items:flex-end;text-align:right}
+.code{font-size:36px;line-height:1;font-weight:800;letter-spacing:-0.02em}
+body.desk .code{font-size:44px}
+.code.gone{color:var(--label)}
+.code-was{font-size:12px;color:var(--label);text-decoration:line-through;font-weight:600}
+.tm{font-family:var(--mono);font-size:15px;font-weight:600;white-space:nowrap;margin-top:6px}
+body.desk .tm{font-size:17px}
+.tm.am{color:var(--amber)}
+.tm.gone{color:var(--label);text-decoration:line-through;font-weight:500}
+.tm s{display:block;font-size:12px;color:var(--label);font-weight:500;line-height:1.2}
+.tz{font-family:var(--mono);font-size:11px;color:var(--label);letter-spacing:.04em}
+.arcbox{position:relative;padding-top:4px}
+.arcbox svg{display:block;width:100%;height:auto}
+.arcnote{text-align:center;font-size:12px;color:var(--secondary);margin-top:2px}
+.hair{height:1px;background:var(--hair);margin:18px 0 16px}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.facts dt{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);white-space:nowrap}
+.facts dd{font-size:22px;font-weight:750;letter-spacing:-0.01em;margin-top:3px;white-space:nowrap}
+body.desk .hero .facts dd{font-size:26px}
+.facts dd.na{color:var(--label);font-weight:500}
+.facts dd.am{color:var(--amber)}
+.facts .am{color:var(--amber)}
+.facts .st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts dd.st{color:var(--label);text-decoration:line-through;font-weight:500}
+.facts .c2{text-align:center}.facts .c3{text-align:right}
+.openrow{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin-top:12px;border-top:1px solid var(--hair);padding-top:10px;color:var(--secondary);font-size:14px;font-weight:600}
+.then{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;display:flex;flex-direction:column;gap:4px}
+.then .lbl{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.then .ln{font-size:14px;color:var(--secondary)}
+.then .ln b{color:var(--text);font-weight:700}
+.seats{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:14px}
+.seat{display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--secondary)}
+.seat .mono{color:var(--text);font-weight:600;font-size:15px}
+.av{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:99px;background:#2a2930;color:#e6e5ec;font-size:11px;font-weight:700;font-style:normal;flex:none}
+.avs{display:inline-flex}.avs .av{border:2px solid var(--page);margin-left:-8px}.avs .av:first-child{margin-left:0}
+
+.bk{background:var(--card);border-radius:24px;padding:4px 18px 16px}
+.bk-h{display:flex;align-items:center;gap:12px;min-height:64px}
+.bk-h .kic{width:26px;height:26px;stroke-width:1.9}
+.bk-n{flex:1;min-width:0}
+.bk-n b{display:block;font-size:17px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bk-n span{display:block;font-size:14px;color:var(--secondary)}
+.bk-n .g{color:var(--green);font-weight:600}.bk-n .a{color:var(--amber);font-weight:600}.bk-n .q{color:var(--label);font-weight:600}
+.chev{color:var(--label)}
+.bk .facts dd{font-size:17px}
+.bk .hair{margin:4px 0 12px}
+.bk.gone .bk-n b{color:var(--secondary)}
+.bk.gone .kic{opacity:.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-size:15px;font-weight:700;min-height:44px;padding:0 16px;border:0;background:#1a1920;color:var(--text)}
+.btn.blue{background:var(--blue);color:#fff}
+.btn.ghost{background:transparent;color:var(--secondary)}
+.btn.icon{width:44px;padding:0}
+.btn.wide{width:100%}
+.bk .btn.blue{margin-top:14px;width:100%}
+
+.tpage{padding:12px 16px 24px;display:flex;flex-direction:column;gap:12px}
+.title{font-size:40px;line-height:1.02;font-weight:800;letter-spacing:-0.035em}
+body.desk .title{font-size:64px}
+.sub{color:var(--secondary);font-size:15px}
+.lbl-s{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+.daylist{display:flex;flex-direction:column}
+.dayl{display:flex;align-items:center;gap:8px;padding:18px 0 6px}
+.row{display:flex;align-items:center;gap:14px;min-height:56px;border-bottom:1px solid var(--hair);padding:8px 0}
+.row .t{font-family:var(--mono);font-weight:700;font-size:15px;width:76px;flex:none}
+.row .w{flex:1;min-width:0}.row .w b{display:block;font-weight:650}.row .w span{display:block;color:var(--secondary);font-size:13.5px}
+.row .sc{color:var(--blue);font-weight:700;font-size:14px;min-height:44px;display:inline-flex;align-items:center}
+.revline{display:flex;align-items:center;gap:10px;min-height:44px;color:var(--secondary);font-size:15px}
+.revline .chev{margin-left:auto}
+.dim{position:absolute;inset:0;background:rgb(0 0 0 / 62%)}
+
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:30px 30px 0 0;padding:8px 20px 28px;max-height:92%;overflow:hidden}
+.grab{width:40px;height:5px;border-radius:99px;background:#3a3940;margin:4px auto 10px}
+.panel{position:absolute;top:0;right:0;bottom:0;width:544px;background:var(--card);padding:24px 28px;overflow:hidden}
+.dh{display:flex;align-items:flex-start;gap:12px}
+.dh .kic{width:28px;height:28px;margin-top:3px}
+.dh .n{flex:1;min-width:0}.dh .n b{display:block;font-size:20px;font-weight:800;letter-spacing:-0.01em}.dh .n span{display:block;font-size:14px;color:var(--secondary)}
+.dh .n .g{color:var(--green);font-weight:600}
+.dh .tools{display:flex;gap:6px;flex:none}
+.acts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+.act{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:68px;border-radius:18px;background:#141319;font-size:13px;font-weight:650;color:var(--text)}
+.act .ic{width:20px;height:20px}
+.dl{margin-top:14px}
+.dl>div{display:flex;gap:16px;padding:12px 0;border-bottom:1px solid var(--hair);align-items:flex-start}
+.dl dt{width:104px;flex:none;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--label);padding-top:3px}
+.dl dd{flex:1;min-width:0;font-size:15px}
+.dl dd small{display:block;color:var(--secondary);font-size:13px}
+.dl .cc{display:flex;align-items:center;gap:8px}
+.dl .cc .mono{font-size:17px;letter-spacing:.06em;font-weight:600}
+.cbtn{background:none;border:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;color:var(--secondary);margin:-12px 0}
+.ppl{display:flex;flex-direction:column;gap:8px}
+.ppl span{display:flex;align-items:center;gap:10px}
+.ppl .mono{margin-left:auto;font-weight:600}
+.dlg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);background:var(--card);border-radius:30px;padding:20px 20px 16px;display:flex;flex-direction:column;gap:14px}
+body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);padding:26px}
+.dlg .qr{padding:14px;background:#fff;border-radius:22px}
+.dlg .cap{text-align:center;color:var(--secondary);font-size:14px}
+.side{position:absolute;top:0;left:0;bottom:0;width:248px;padding:22px 14px;display:flex;flex-direction:column;gap:18px;border-right:1px solid var(--hair);background:var(--page)}
+.side .wm{font-size:20px;font-weight:800;letter-spacing:-0.02em;padding:0 12px;min-height:44px;display:flex;align-items:center}
+.side nav{display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;color:var(--secondary);font-weight:600;font-size:15px}
+.side a.cur{background:var(--card);color:var(--text)}
+.side a.cur .ic{color:var(--blue)}
+.side .badge{margin-left:auto}
+.side .me{margin-top:auto}
+.badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--amber);color:#000;font-size:11px;font-weight:800}
+.main{position:absolute;top:0;left:248px;right:0;bottom:0;padding:40px 48px;overflow:hidden}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:32px;margin-top:28px;align-items:start}
+.tabbar{position:absolute;left:12px;right:12px;bottom:14px;display:flex;gap:4px;padding:4px;border-radius:24px}
+.tabbar.frost{background:rgb(13 12 18 / 75%);backdrop-filter:blur(28px) saturate(2) brightness(1.1);-webkit-backdrop-filter:blur(28px) saturate(2) brightness(1.1);box-shadow:inset 0 1px 0 rgb(255 255 255 / 12%)}
+.tabbar.plain{background:#000;left:0;right:0;bottom:0;border-radius:0;padding:4px 8px 22px;border-top:1px solid var(--hair)}
+.tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:18px;font-size:11.5px;font-weight:600;color:var(--label)}
+.tab .ic{width:24px;height:24px}
+.tab.cur{color:var(--text)}
+.tab.cur .ic{color:var(--blue)}
+.tab .badge{position:absolute;top:4px;left:calc(50% + 6px)}
+.moremenu{position:absolute;right:16px;bottom:92px;width:200px;background:#141319;border-radius:20px;padding:6px;display:flex;flex-direction:column}
+.moremenu a{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:14px;font-weight:600;color:var(--secondary)}
+.empty{background:var(--card);border-radius:24px;padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.empty h2{font-size:26px;font-weight:800;letter-spacing:-0.02em}
+.empty p{color:var(--secondary)}
+.empty .btns{display:flex;flex-wrap:wrap;gap:8px}
+.empty summary{min-height:44px;display:inline-flex;align-items:center;color:var(--secondary);font-weight:600}
+</style>
+</head>
+<body>
+<main class="doc">
+  <header class="dochead">
+    <h1>The opened booking</h1>
+    <p>Item 6 of <a href="https://github.com/AnthonyPluth/Waypoint/issues/878">#878</a>. Made-up bookings throughout.</p>
+  </header>
+  <div class="bar">
+    <div class="segc" role="group" aria-label="Mockup width">
+      <button type="button" id="w-phone" aria-pressed="true">Phone · 390</button>
+      <button type="button" id="w-desk" aria-pressed="false">Desktop · 1280</button>
+    </div>
+    <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="e-flight-states.html">e Flight states</a><a href="f-booking-kinds.html">f Booking kinds</a><a href="g-booking-detail.html" aria-current="page">g Opened booking</a><a href="h-show-code.html">h Show code</a><a href="i-upcoming.html">i Upcoming</a><a href="j-navigation.html">j Navigation</a><a href="k-travellers-connection.html">k Travellers and connection</a></nav>
+  </div>
+  <section class="checks" aria-labelledby="shows-title">
+    <h2 id="shows-title">What this shows</h2>
+    <ol><li>The opened booking for a flight and a stay on a trip still to come, phone sheet and desktop panel (item 6).</li><li>The same component on a completed trip, with no action row.</li></ol>
+  </section>
+<section class="sec" id="detail" aria-labelledby="detail-h">
+  <div class="sechead"><span class="letter">6</span><h2 id="detail-h">The opened state behind a card's tap</h2><span class="open">Open for the owner</span></div>
+  <p class="lede">Owner decision, 2026-11-20: this is <code>BookingDetail.svelte</code> (#712) restyled, one component for completed and upcoming trips. It keeps its placement (a bottom sheet on phone, a right panel up to 34 rem on desktop), its header (kind icon, name, subtitle, an always-visible Edit, More with Move and Remove, Close) and its rows, which come from <code>Segment.details</code> as today. What a trip not yet over adds is the action row the old booking card had: email, directions, call and the airline app, each shown only when the booking has it, as today. A completed trip shows no action row (g3), as today.</p>
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>g1 · Flight, trip still to come</figcaption><div class="dev page" style="height:860px"><div class="tpage" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;min-height:44px;color:var(--secondary)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span style="display:flex;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span></div>
+  <h1 class="title">Lisbon in spring</h1><p class="sub">Mar 9 – 20 · 11 nights</p>
+  <div style="height:220px;background:var(--card);border-radius:30px;margin-top:8px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+</div><div class="dim"></div><div class="sheet"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><div class="n"><b>AU 212 · Boston to Lisbon</b><span>Flight · Tue, Mar 9 · <span class="g">Confirmed</span></span></div>
+  <div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for AU 212"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+  <div class="acts"><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Email</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Aurora Air app</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a></div>
+  <dl class="dl">
+    <div><dt>Departs</dt><dd>Tue, Mar 9, <span class="mono">6:10 AM</span> <span class="tz">EST</span><small>Boston Logan (BOS)</small></dd></div>
+    <div><dt>Arrives</dt><dd>Tue, Mar 9, <span class="mono">5:55 PM</span> <span class="tz">WET</span><small>Lisbon (LIS)</small></dd></div>
+    <div><dt>Terminal</dt><dd>E</dd></div>
+    <div><dt>Cabin</dt><dd>Economy</dd></div>
+    <div><dt>Confirmation</dt><dd class="cc"><span class="mono">QK7ZRM</span><button class="cbtn" type="button" aria-label="Copy confirmation code QK7ZRM"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></dd></div>
+    <div><dt>Travellers</dt><dd class="ppl"><span><i class="av">MQ</i>Mara Quill<span class="mono">14A</span></span><span><i class="av">TR</i>Tomas Reyna<span class="mono">14B</span></span></dd></div>
+    <div><dt>Price</dt><dd>$1,284.00</dd></div>
+  </dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>g2 · Stay, trip still to come</figcaption><div class="dev page" style="height:860px"><div class="tpage" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;min-height:44px;color:var(--secondary)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span style="display:flex;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span></div>
+  <h1 class="title">Lisbon in spring</h1><p class="sub">Mar 9 – 20 · 11 nights</p>
+  <div style="height:220px;background:var(--card);border-radius:30px;margin-top:8px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+</div><div class="dim"></div><div class="sheet"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-stay)"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></svg><div class="n"><b>Casa do Largo</b><span>Stay · Alfama · <span class="g">Confirmed</span></span></div>
+  <div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for Casa do Largo"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+  <div class="acts"><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Email</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 22 2l-9 19-2-8z"/></svg>Directions</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a></div>
+  <dl class="dl">
+    <div><dt>Dates</dt><dd>Tue, Mar 9 – Sun, Mar 14<small>5 nights</small></dd></div>
+    <div><dt>Address</dt><dd class="cc"><span>Rua do Vento 12, Lisbon</span><button class="cbtn" type="button" aria-label="Copy address"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></dd></div>
+    <div><dt>Room</dt><dd>Courtyard double</dd></div>
+    <div><dt>Confirmation</dt><dd class="cc"><span class="mono">CL-40917</span><button class="cbtn" type="button" aria-label="Copy confirmation code CL-40917"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></dd></div>
+    <div><dt>Travellers</dt><dd class="ppl"><span><i class="av">MQ</i>Mara Quill</span><span><i class="av">TR</i>Tomas Reyna</span></dd></div>
+    <div><dt>Price</dt><dd>€742.50</dd></div>
+  </dl></div></div></figure><figure class="fig" data-w="phone"><figcaption>g3 · The same flight on a completed trip</figcaption><div class="dev page" style="height:860px"><div class="tpage" aria-hidden="true">
+  <div style="display:flex;justify-content:space-between;align-items:center;min-height:44px;color:var(--secondary)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span style="display:flex;gap:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5zM15 5l4 4"/></svg><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></span></div>
+  <h1 class="title">Lisbon in spring</h1><p class="sub">Mar 9 – 20 · 11 nights</p>
+  <div style="height:220px;background:var(--card);border-radius:30px;margin-top:8px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+  <div style="height:150px;background:var(--card);border-radius:24px"></div>
+</div><div class="dim"></div><div class="sheet"><div class="grab"></div><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><div class="n"><b>AU 212 · Boston to Lisbon</b><span>Flight · Tue, Mar 9 · <span class="g">Confirmed</span></span></div>
+  <div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for AU 212"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+  
+  <dl class="dl">
+    <div><dt>Departs</dt><dd>Tue, Mar 9, <span class="mono">6:10 AM</span> <span class="tz">EST</span><small>Boston Logan (BOS)</small></dd></div>
+    <div><dt>Arrives</dt><dd>Tue, Mar 9, <span class="mono">5:55 PM</span> <span class="tz">WET</span><small>Lisbon (LIS)</small></dd></div>
+    <div><dt>Terminal</dt><dd>E</dd></div>
+    <div><dt>Cabin</dt><dd>Economy</dd></div>
+    <div><dt>Confirmation</dt><dd class="cc"><span class="mono">QK7ZRM</span><button class="cbtn" type="button" aria-label="Copy confirmation code QK7ZRM"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></dd></div>
+    <div><dt>Travellers</dt><dd class="ppl"><span><i class="av">MQ</i>Mara Quill<span class="mono">14A</span></span><span><i class="av">TR</i>Tomas Reyna<span class="mono">14B</span></span></dd></div>
+    <div><dt>Price</dt><dd>$1,284.00</dd></div>
+  </dl></div></div></figure><figure class="fig" data-w="desk"><figcaption>g4 · Desktop panel, trip still to come</figcaption><div class="dev wide" style="height:820px"><div style="padding:32px 48px;width:736px" aria-hidden="true"><h1 class="title">Lisbon in spring</h1><p class="sub">Mar 9 – 20 · 11 nights</p><div style="height:360px;background:var(--card);border-radius:30px;margin-top:24px"></div></div><div class="dim"></div><div class="panel"><div class="dh"><svg class="ic kic" viewBox="0 0 24 24" aria-hidden="true" style="color:var(--k-flight)"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg><div class="n"><b>AU 212 · Boston to Lisbon</b><span>Flight · Tue, Mar 9 · <span class="g">Confirmed</span></span></div>
+  <div class="tools"><button class="btn" type="button">Edit</button><button class="btn icon" type="button" aria-label="More options for AU 212"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button><button class="btn icon ghost" type="button" aria-label="Close"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+  <div class="acts"><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>Email</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>Aurora Air app</a><a class="act" href="#"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Call</a></div>
+  <dl class="dl">
+    <div><dt>Departs</dt><dd>Tue, Mar 9, <span class="mono">6:10 AM</span> <span class="tz">EST</span><small>Boston Logan (BOS)</small></dd></div>
+    <div><dt>Arrives</dt><dd>Tue, Mar 9, <span class="mono">5:55 PM</span> <span class="tz">WET</span><small>Lisbon (LIS)</small></dd></div>
+    <div><dt>Terminal</dt><dd>E</dd></div>
+    <div><dt>Cabin</dt><dd>Economy</dd></div>
+    <div><dt>Confirmation</dt><dd class="cc"><span class="mono">QK7ZRM</span><button class="cbtn" type="button" aria-label="Copy confirmation code QK7ZRM"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button></dd></div>
+    <div><dt>Travellers</dt><dd class="ppl"><span><i class="av">MQ</i>Mara Quill<span class="mono">14A</span></span><span><i class="av">TR</i>Tomas Reyna<span class="mono">14B</span></span></dd></div>
+    <div><dt>Price</dt><dd>$1,284.00</dd></div>
+  </dl></div></div></figure></div></div>
+  <div class="spec"><div><h3>What is new in the restyle</h3><ul><li>The sheet and panel are true black on the dimmed page, 30 px corners on the sheet's top.</li><li>Labels 11 px uppercase grey over a hairline per row; values white, 15 px.</li><li>The confirmation code in Geist Mono with Copy, as a 44 px button.</li><li>The status in the subtitle follows the colour rules: green Confirmed, amber Changed or Cancelled.</li><li>The action row: up to three tiles across, a second row when a booking has more; none is blue (the one blue action on a trip page is “Show code”).</li></ul></div><div><h3>Kept exactly as today</h3><ul><li>Which rows each kind has, the Seat-once rule (a seat beside its traveller), the cancelled-leg notes, the email-update notes.</li><li>Travellers only where the app shows them today; Price only when costs are shown.</li><li>Edit, Move and Remove with today's labels and confirmation.</li><li>Open for the owner: whether the action row sits above the rows (drawn) or at the bottom of the sheet.</li></ul></div></div>
+</section>
+</main>
+
+<script>
+(function () {
+  var bP = document.getElementById("w-phone"), bD = document.getElementById("w-desk");
+  if (!bP || !bD) return;
+  function setWidth(desk) {
+    document.body.classList.toggle("desk", desk);
+    bP.setAttribute("aria-pressed", String(!desk));
+    bD.setAttribute("aria-pressed", String(desk));
+    try { localStorage.setItem("mock-width", desk ? "desk" : "phone"); } catch (e) {}
+  }
+  bP.addEventListener("click", function () { setWidth(false); });
+  bD.addEventListener("click", function () { setWidth(true); });
+  var start = false;
+  try { start = localStorage.getItem("mock-width") === "desk"; } catch (e) {}
+  setWidth(start);
+})();
+</script>
+
+</body>
+</html>
