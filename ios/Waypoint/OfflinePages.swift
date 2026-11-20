@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 enum OfflinePageFiles {
     static let index = "/"
     static let shell = ["/logo.svg", "/fonts/Inter-latin-Variable.woff2", "/fonts/Inter-latin-ext-Variable.woff2",
-                        "/fonts/Geist-Variable.woff2", "/fonts/GeistMono-Variable.woff2", "/manifest.webmanifest"]
+                        "/fonts/Inter-Variable.woff2", "/fonts/GeistMono-Variable.woff2", "/manifest.webmanifest"]
     static let maxAssets = 300
     static let maxFileBytes = 10_000_000
 

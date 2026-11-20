@@ -139,7 +139,7 @@ final class OfflinePagesTests: XCTestCase {
         XCTAssertEqual(OfflinePageFiles.mimeType(for: "/"), "text/html; charset=utf-8")
         XCTAssertEqual(OfflinePageFiles.mimeType(for: "/assets/a.js"), "text/javascript; charset=utf-8")
         XCTAssertEqual(OfflinePageFiles.mimeType(for: "/assets/a.css"), "text/css; charset=utf-8")
-        XCTAssertEqual(OfflinePageFiles.mimeType(for: "/fonts/Geist-Variable.woff2"), "font/woff2")
+        XCTAssertEqual(OfflinePageFiles.mimeType(for: "/fonts/Inter-Variable.woff2"), "font/woff2")
         XCTAssertEqual(OfflinePageFiles.mimeType(for: "/logo.svg"), "image/svg+xml")
         XCTAssertEqual(OfflinePageFiles.mimeType(for: "/manifest.webmanifest"), "application/manifest+json")
     }

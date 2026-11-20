@@ -71,13 +71,18 @@
     { when: "After arrival", progress: 1 },
   ];
   const type = [
-    { name: "Display", cls: "text-display", sample: "K7Q2ZM" },
+    { name: "Display", cls: "text-display desktop:text-display-lg", sample: "Upcoming" },
+    { name: "Hero fact", cls: "text-hero-fact desktop:text-hero-fact-lg", sample: "in 3 h 20 m" },
+    { name: "Airport", cls: "text-airport desktop:text-airport-lg", sample: "MSP" },
+    { name: "Fact", cls: "text-fact desktop:text-fact-lg", sample: "7:05 AM" },
+    { name: "Card fact", cls: "text-fact-card", sample: "Gate B12" },
+    { name: "Code", cls: "text-display", sample: "K7Q2ZM" },
     { name: "Title", cls: "text-title", sample: "Upcoming" },
     { name: "Heading", cls: "text-heading", sample: "Check-in is open" },
     { name: "Body", cls: "text-body", sample: "Departs at 7:05 AM from Terminal 1." },
     { name: "Caption", cls: "text-caption text-muted-foreground", sample: "As of 6:42 AM" },
     { name: "Mono", cls: "mono text-heading", sample: "07:05 MSP K7Q2ZM 14C 0123" },
-    { name: "Eyebrow", cls: "text-eyebrow uppercase text-muted-foreground", sample: "Next up" },
+    { name: "Eyebrow", cls: "text-eyebrow uppercase text-label", sample: "Next up" },
   ];
   const surfaces = [
     { name: "Surface 1", cls: "bg-surface-1 shadow-elevation-1" },
@@ -154,6 +159,15 @@
   <section class="flex flex-col gap-3" aria-labelledby="design-type">
     <h2 id="design-type" class="text-heading">Type</h2>
     <div class="rows">{#each type as t (t.name)}<div class="row"><span class="w-20 text-caption text-muted-foreground">{t.name}</span><span class={`min-w-0 flex-1 break-words ${t.cls}`}>{t.sample}</span></div>{/each}</div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-colour">
+    <h2 id="design-colour" class="text-heading">Colour rules</h2>
+    <div class="rows">
+      <div class="row"><span class="w-28 text-caption text-muted-foreground">Blue</span><span class="flex min-w-0 flex-1 items-center gap-2 text-primary"><span class="size-2.5 rounded-full bg-primary"></span>Live, now, the one primary action</span></div>
+      <div class="row"><span class="w-28 text-caption text-muted-foreground">Green</span><span class="flex min-w-0 flex-1 items-center gap-2 text-success"><span class="size-2.5 rounded-full bg-success"></span>Confirmed, on time, good news</span></div>
+      <div class="row"><span class="w-28 text-caption text-muted-foreground">Amber</span><span class="flex min-w-0 flex-1 items-center gap-2 text-signal"><span class="size-2.5 rounded-full bg-signal"></span>Changed, needs attention</span></div>
+    </div>
   </section>
 
   <section class="flex flex-col gap-3" aria-labelledby="design-surfaces">

@@ -35,7 +35,7 @@ function startWorker(cached: Record<string, Response> = {}, fetcher: (url: strin
 describe("loadedAssetPaths", () => {
   it("keeps this origin's built files, once each, and nothing else", () => {
     const names = [`${ORIGIN}/assets/index-abc.js`, `${ORIGIN}/assets/index-abc.js`, `${ORIGIN}/assets/index-abc.css`, `${ORIGIN}/api/trips`,
-      `${ORIGIN}/fonts/Geist-Variable.woff2`, "https://elsewhere.example.test/assets/x.js", "not a url"];
+      `${ORIGIN}/fonts/Inter-Variable.woff2`, "https://elsewhere.example.test/assets/x.js", "not a url"];
     expect(loadedAssetPaths(names.map((name) => ({ name })), ORIGIN)).toEqual(["/assets/index-abc.js", "/assets/index-abc.css"]);
   });
 });

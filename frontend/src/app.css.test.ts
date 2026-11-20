@@ -28,7 +28,7 @@ const contrast = (a: string, b: string) => {
 describe("the dark palette", () => {
   it("is the only palette", () => {
     expect(css).not.toContain("prefers-color-scheme");
-    expect(tokens.get("background")).toBe("#07090e");
+    expect(tokens.get("background")).toBe("#0d0c12");
     expect(root).toContain("color-scheme: dark");
   });
   it.each(["ok", "warn", "bad", "info", "quiet"])("keeps %s chip text at WCAG AA contrast on its own background and on the surfaces", (tone) => {
@@ -42,6 +42,23 @@ describe("the dark palette", () => {
       expect(contrast(resolve("foreground"), resolve(surface))).toBeGreaterThanOrEqual(7);
       expect(contrast(resolve("muted-foreground"), resolve(surface))).toBeGreaterThanOrEqual(4.5);
     }
+  });
+  it.each(["label", "muted-foreground"])("keeps the %s grey at 4.5:1 on the page and the card", (grey) => {
+    expect(contrast(resolve(grey), resolve("background"))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(resolve(grey), resolve("card"))).toBeGreaterThanOrEqual(4.5);
+  });
+  it.each(["flight", "stay", "car", "train", "cruise", "parking"])("draws the %s kind colour at 3:1 on the card", (kind) => {
+    expect(contrast(resolve(`kind-${kind}`), resolve("card"))).toBeGreaterThanOrEqual(3);
+  });
+  it.each(["car", "stay"])("keeps the %s kind colour apart from every status colour", (kind) => {
+    const own = resolve(`kind-${kind}`).toLowerCase();
+    for (const status of ["primary", "success", "signal", "destructive"]) {
+      expect(own).not.toBe(resolve(status).toLowerCase());
+    }
+  });
+  it("gives the flight and car kinds values of their own", () => {
+    expect(tokens.get("kind-flight")).toMatch(/^#[0-9a-f]{6}$/i);
+    expect(tokens.get("kind-car")).toMatch(/^#[0-9a-f]{6}$/i);
   });
   it.each(["chart-1", "chart-2", "chart-3", "chart-4"])("draws %s legibly on the card and the page", (series) => {
     expect(contrast(resolve(series), resolve("card"))).toBeGreaterThanOrEqual(3);

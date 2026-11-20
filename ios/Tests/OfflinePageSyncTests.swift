@@ -69,7 +69,7 @@ final class OfflinePageSyncTests: XCTestCase {
         XCTAssertEqual(pages.file("/assets/index-1.js", for: home), Data("one".utf8))
         XCTAssertEqual(pages.file("/assets/chunk-1.js", for: home), Data("chunk".utf8))
         XCTAssertEqual(pages.file("/logo.svg", for: home), Data("<svg/>".utf8))
-        XCTAssertNil(pages.file("/fonts/Geist-Variable.woff2", for: home), "a shell file the server does not have is skipped, not fatal")
+        XCTAssertNil(pages.file("/fonts/Inter-Variable.woff2", for: home), "a shell file the server does not have is skipped, not fatal")
     }
 
     func testNothingIsFetchedWhileSavingIsOff() async {
