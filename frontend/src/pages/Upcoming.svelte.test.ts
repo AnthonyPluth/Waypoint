@@ -912,6 +912,24 @@ describe("Upcoming side column", () => {
     outside.mockRestore();
   });
 
+  it("draws the date of each Later trip in the amber signal colour, on a computer and on a phone", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serveWith([london, lisbon, porto], withPlaces);
+    const wide = render(Upcoming);
+    const list = await screen.findByRole("region", { name: "Later" });
+    const dates = [...list.querySelectorAll("[data-later-date]")];
+    expect(dates.map((d) => d.textContent)).toEqual(["Dec 30", "Feb 10"]);
+    for (const d of dates) expect(d).toHaveClass("text-signal");
+    wide.unmount();
+    viewport.phone = true;
+    render(Upcoming);
+    const tiles = await screen.findByRole("region", { name: "Later" });
+    const small = [...tiles.querySelectorAll("[data-later-date]")];
+    expect(small.map((d) => d.textContent)).toEqual(["Dec 30", "Feb 10"]);
+    for (const d of small) expect(d).toHaveClass("text-signal");
+    viewport.phone = false;
+  });
+
   it("shows only the Later tiles on a phone, with no totals and no places request", async () => {
     viewport.phone = true;
     at("2026-11-20T09:00:00-05:00");

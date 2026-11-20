@@ -359,7 +359,7 @@
               {#each later as t (t.id)}
                 {@const tile = dateTile(t)}
                 <li class="row-tap rounded-booking bg-card p-4">
-                  <p class="eyebrow">{tile.month} {tile.day}</p>
+                  <p class="eyebrow text-signal" data-later-date>{tile.month} {tile.day}</p>
                   <p class="break-words text-body font-semibold"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
                   <p class="text-caption text-muted-foreground">{startsIn(t, today)}</p>
                 </li>
@@ -373,7 +373,7 @@
               {#each later as t (t.id)}
                 {@const tile = dateTile(t)}
                 <li class="row-tap flex min-h-14 items-center gap-3.5 border-b border-border py-2">
-                  <p class="eyebrow w-[76px] shrink-0">{tile.month} {tile.day}</p>
+                  <p class="eyebrow w-[76px] shrink-0 text-signal" data-later-date>{tile.month} {tile.day}</p>
                   <div class="min-w-0 flex-1">
                     <p class="break-words text-body font-semibold"><a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${t.id}`}>{t.name}</a></p>
                     <p class="text-caption text-muted-foreground">{laterLine(t, today)}</p>
