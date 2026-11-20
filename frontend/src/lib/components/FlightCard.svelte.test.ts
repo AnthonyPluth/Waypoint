@@ -284,6 +284,37 @@ describe("the three facts", () => {
   });
 });
 
+describe("the traveller rows keep the two notes the footer had", () => {
+  const aa = { ...booked, provider: "American Airlines" };
+
+  it("says a traveller is not matched to a person in People, with a link, even when they are the only one", async () => {
+    draw({ segment: { ...aa, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12B" }] }, now: NOW.none }, { travellers: true });
+    const note = await waitFor(() => { const el = document.querySelector("[data-unmatched]"); expect(el).not.toBeNull(); return el as HTMLElement; });
+    expect(note).toHaveTextContent("Not matched to a person in People");
+    expect(note.querySelector("a")).toHaveAttribute("href", "#people");
+  });
+
+  it("says nothing for a traveller who is matched, or when the page does not show travellers", async () => {
+    const first = draw({ segment: { ...aa, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: "12B" }, { id: 2, person_id: 2, name: "Sam Doe", seat: "12A" }] }, now: NOW.none }, { travellers: true });
+    await screen.findByRole("article");
+    expect(first.container.querySelector("[data-unmatched]")).toBeNull();
+    first.unmount();
+    const hidden = draw({ segment: { ...aa, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: null }] }, now: NOW.none });
+    await screen.findByRole("article");
+    expect(hidden.container.querySelector("[data-unmatched]")).toBeNull();
+  });
+
+  it("says nobody is listed on a booking with no travellers, only where travellers are shown", async () => {
+    const none = { ...aa, travelers: [] };
+    const shown = draw({ segment: none, now: NOW.none }, { travellers: true });
+    expect(await screen.findByText("Nobody is listed on this booking.")).toBeInTheDocument();
+    shown.unmount();
+    const hidden = draw({ segment: none, now: NOW.none });
+    await screen.findByRole("article");
+    expect(hidden.container.querySelector("[data-nobody]")).toBeNull();
+  });
+});
+
 describe("what the card says without live data", () => {
   it("has no Updated line and no green on time, and names the window as a constant", async () => {
     expect(LIVE_STATUS_STARTS_DAYS).toBe(1);

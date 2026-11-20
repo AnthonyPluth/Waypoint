@@ -988,7 +988,7 @@ describe("Trip", () => {
       const who = within(document.querySelector("[data-seats]") as HTMLElement);
       expect(who.getByText("Jane Doe").closest("li")).toHaveTextContent("Jane Doe31A");
       expect(who.getByText("Sam Doe").closest("li")).toHaveTextContent("Sam Doe31B");
-      expect(who.getByText("DOE/MIA MISS").closest("li")).toHaveTextContent(/^DMDOE\/MIA MISS$/);
+      expect(who.getByText("DOE/MIA MISS").closest("li")).toHaveTextContent(/^DMDOE\/MIA MISSNot matched to a person in People$/);
     });
 
     it("has a seat field for each ticked traveller, and sends them", async () => {

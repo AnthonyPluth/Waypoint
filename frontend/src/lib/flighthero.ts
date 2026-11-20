@@ -1,11 +1,11 @@
 import type { Segment } from "./api-types";
 import { LIVE_STATUS_STARTS_DAYS, minutesBetween, shortDay, type FlightCardView } from "./flightcard";
-import { instant } from "./trips";
+import { instant, membershipFor } from "./trips";
 
 export type HeroTone = "primary" | "success" | "signal";
 export type HeroTop = { text: string; tone: HeroTone; pill: boolean; plane: boolean; dot: boolean };
 export type HeroFact = { label: string; value: string | null; mono: boolean };
-export type HeroSeat = { name: string; initials: string; seat: string | null };
+export type HeroSeat = { name: string; initials: string; seat: string | null; unmatched: boolean };
 export type HeroQuiet = { late: string; struck: string | null; text: string; onTime: boolean };
 export type HeroView = {
   carrierLine: string;
@@ -16,6 +16,7 @@ export type HeroView = {
   quiet: HeroQuiet;
   facts: HeroFact[];
   seats: HeroSeat[];
+  nobody: boolean;
   landed: boolean;
   cancelled: boolean;
   was: string | null;
@@ -127,8 +128,8 @@ export function heroView(v: FlightCardView, segment: Segment, city: (code: strin
     ? { label: f.label, value: seatList.length ? seatsValue(seatList) : null, mono: true }
     : { label: names[i] ?? f.label, value: f.value, mono: false }));
 
-  const seats: HeroSeat[] = travellers ? segment.travelers.map((t) => ({ name: t.name, initials: initialsOf(t.name), seat: t.seat })) : [];
+  const seats: HeroSeat[] = travellers ? segment.travelers.map((t) => ({ name: t.name, initials: initialsOf(t.name), seat: t.seat, unmatched: membershipFor(segment, t, [])?.state === "unmatched" })) : [];
 
   const was = v.divertedTo ? segment.destination ?? null : null;
-  return { carrierLine, top, sentence, big, bigTime, quiet, facts, seats: seats.length > 1 ? seats : [], landed: arrived, cancelled: v.state === "cancelled", was };
+  return { carrierLine, top, sentence, big, bigTime, quiet, facts, seats, nobody: travellers && segment.travelers.length === 0, landed: arrived, cancelled: v.state === "cancelled", was };
 }

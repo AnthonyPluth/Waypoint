@@ -76,10 +76,11 @@
     {/each}
   </dl>
 
-  {#if hero.seats.length}
+  {#if hero.nobody}<p class="mt-3.5 text-sm text-muted-foreground" data-nobody>Nobody is listed on this booking.</p>{/if}
+  {#if hero.seats.length > 1 || hero.seats.some((s) => s.unmatched)}
     <ul class="mt-3.5 flex flex-wrap gap-x-4 gap-y-2" data-seats>
       {#each hero.seats as s, i (i)}
-        <li class="inline-flex items-center gap-2 text-sm text-muted-foreground"><i class="grid size-6 place-items-center rounded-full bg-secondary text-[10px] font-bold not-italic text-secondary-foreground" aria-hidden="true">{s.initials}</i>{s.name}{#if s.seat}<span class="font-mono text-[15px] font-semibold text-foreground">{s.seat}</span>{/if}</li>
+        <li class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"><i class="grid size-6 place-items-center rounded-full bg-secondary text-[10px] font-bold not-italic text-secondary-foreground" aria-hidden="true">{s.initials}</i>{s.name}{#if s.seat}<span class="font-mono text-[15px] font-semibold text-foreground">{s.seat}</span>{/if}{#if s.unmatched}<span class="basis-full pl-8 text-xs text-muted-foreground" data-unmatched>Not matched to a person in <a class="relative z-10 underline" href="#people">People</a></span>{/if}</li>
       {/each}
     </ul>
   {/if}
