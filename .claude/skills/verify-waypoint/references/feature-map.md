@@ -425,6 +425,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Expects to see:** `Trips`, `MW5T9Z`.
 - **Drive it:** `tools/control flow split-flight`; or `poetry run python run.py verify --flow split-flight`.
 
+#### `trip-booking-detail`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Bookings`.
+- **Expects to see:** `Trips`.
+- **Drive it:** `tools/control flow trip-booking-detail`; or `poetry run python run.py verify --flow trip-booking-detail`.
+
 #### `trip-delete`
 
 - **Starts at:** `#trips`.
