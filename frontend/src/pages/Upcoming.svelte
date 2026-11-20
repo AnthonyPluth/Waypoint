@@ -161,11 +161,13 @@
           <p class="mono w-[76px] shrink-0 text-[15px] font-bold">
             <DayTime segment={seg} end={item.role === "end"} />
           </p>
-          {#if seg.logo}
-            <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} />
-          {:else}
-            <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative outline />
-          {/if}
+          <span class="flex w-9 shrink-0 justify-center">
+            {#if seg.logo}
+              <BrandLogo src={seg.logo} label={seg.logo_label} size={viewport.phone ? 34 : 36} />
+            {:else}
+              <KindTile kind={seg.kind} size={viewport.phone ? 34 : 36} decorative outline />
+            {/if}
+          </span>
           <div class="min-w-0 flex-1">
             <p class="break-words text-body font-semibold" class:line-through={seg.status === "cancelled"}>
               <a class="row-tap-link underline-offset-2 hover:underline focus-visible:underline" href={`#trip/${seg.trip_id}?segment=${seg.id}`}
