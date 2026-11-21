@@ -192,6 +192,21 @@ class NothingGivesItBack(Removal):
         self.assertEqual(self.excluded(mine["trip_id"]), set())
         self.assertIsNotNone(trips.get(self.c, self.sam, mine["trip_id"]))
 
+    def test_merging_in_a_trip_they_see_only_by_mailbox_gives_them_the_merged_trip_they_were_asked_about(self):
+        mine = self.shared_with_sam()
+        self.take_off(self.jane, mine["trip_id"], self.sid)
+        self.email(self.jane, self.jid, fields=FAR_FLIGHT)
+        self.email(self.sam, self.jid, fields=FAR_FLIGHT)
+        other_id = self.c.orm.scalars(select(Segment.id).where(Segment.id != mine["id"])).one()
+        other_trip = self.c.orm.get(Segment, other_id).trip_id
+        self.assertIsNotNone(trips.get(self.c, self.sam, other_trip))
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.merge(self.c, self.jane, mine["trip_id"], other_trip)
+        self.assertEqual([p["id"] for p in asked.exception.see_booking], [self.sid])
+        trips.merge(self.c, self.jane, mine["trip_id"], other_trip, True)
+        self.assertEqual(self.excluded(mine["trip_id"]), set())
+        self.assertIsNotNone(trips.get(self.c, self.sam, mine["trip_id"]))
+
     def test_splitting_a_booking_off_carries_the_exclusion_and_leaves_someone_named_on_it_off_the_new_trip(self):
         self.email(self.jane, self.jid)
         flight_id = self.c.orm.scalars(select(Segment.id)).one()

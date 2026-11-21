@@ -1628,6 +1628,7 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
     carried = trippeople.excluded(conn, other.id) - _seeing(conn, trip) - set(joined)
+    trippeople.restore(conn, trip.id, _seeing(conn, other))
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))
                                 .order_by(Segment.id)).all():
         if set(aboard[seg.trip_id]) != set(joined):

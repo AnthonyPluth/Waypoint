@@ -26,10 +26,15 @@ def exclude(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> Non
         db.insert_ignore(conn, TripExclusion, {"trip_id": trip_id, "person_id": person_id}, key=["trip_id", "person_id"])
 
 
-def add(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
+def restore(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
     wanted = list(dict.fromkeys(person_ids))
     if wanted:
         conn.execute(delete(TripExclusion).where(TripExclusion.trip_id == trip_id, TripExclusion.person_id.in_(wanted)))
+
+
+def add(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
+    wanted = list(dict.fromkeys(person_ids))
+    restore(conn, trip_id, wanted)
     have = set(of(conn, [trip_id])[trip_id])
     for person_id in wanted:
         if person_id not in have:
