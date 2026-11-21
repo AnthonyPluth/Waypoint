@@ -1514,6 +1514,15 @@ def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | N
         .order_by(Segment.id)).first()
 
 
+def _cut_ties(conn: db.Connection, segment_ids: Sequence[int], from_trip_id: int) -> None:
+    out = list(trippeople.excluded(conn, from_trip_id))
+    if out and segment_ids:
+        conn.execute(update(Segment).where(Segment.id.in_(list(segment_ids)), Segment.booked_by.in_(out)).values(booked_by=None))
+        conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(list(segment_ids)), SegmentRecipient.person_id.in_(out)))
+        conn.orm.flush()
+        conn.orm.expire_all()
+
+
 def _refuse_excluded(conn: db.Connection, trip: Trip, person_ids: Iterable[int]) -> None:
     barred = set(person_ids) & trippeople.excluded(conn, trip.id)
     if barred:
@@ -1633,6 +1642,7 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
     carried = trippeople.excluded(conn, other.id) - _seeing(conn, trip) - set(joined)
+    _cut_ties(conn, list(conn.orm.scalars(select(Segment.id).where(Segment.trip_id == other.id)).all()), other.id)
     trippeople.restore(conn, trip.id, _seeing(conn, other))
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))
                                 .order_by(Segment.id)).all():
@@ -1646,7 +1656,8 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     if other.destination_manual and not trip.destination_manual:
         trip.destination, trip.destination_manual = other.destination, True
     trip.notes = trip.notes or other.notes
-    trip.booked_by = trip.booked_by if trip.booked_by is not None else other.booked_by
+    trip.booked_by = trip.booked_by if trip.booked_by is not None else (
+        other.booked_by if other.booked_by not in trippeople.excluded(conn, other.id) else None)
     conn.orm.flush()
     refresh(conn, trip)
     photogrants.merged(conn, trip.id, other.id)
@@ -1741,6 +1752,7 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         _refuse_excluded(conn, target, {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None})
         if not viewer.household and not confirmed:
             _needs_confirmation(conn, seg, target)
+        _cut_ties(conn, [seg.id], seg.trip_id)
         target.auto = False
     if seg.travelers_from_trip:
         aboard = trippeople.of(conn, [seg.trip_id, target.id])

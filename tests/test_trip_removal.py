@@ -396,3 +396,64 @@ class OtherTripsAndOtherViewers(Removal):
             self.assertFalse(trips.delete_trip(self.c, self.sam, trip_id))
         self.assertEqual(self.aboard(trip_id), [self.jid, who])
         self.assertEqual(self.c.orm.scalars(select(SegmentTraveler.person_id).where(SegmentTraveler.person_id == self.sid)).all(), [])
+
+
+class NoAccessTravelsWithABooking(Removal):
+    def apart(self):
+        self.email(self.jane, self.jid)
+        flight_id = self.c.orm.scalars(select(Segment.id)).one()
+        source = self.c.orm.get(Segment, flight_id).trip_id
+        self.email(self.sam, self.jid)
+        self.put_on(self.jane, source, self.sid)
+        stay = self.add(self.sam, HOTEL, source)
+        self.assertEqual(self.c.orm.get(Segment, stay["id"]).booked_by, self.sid)
+        self.take_off(self.jane, source, self.sid)
+        there = self.add(self.jane, FAR, None, self.on(self.jid))
+        return flight_id, stay["id"], source, there["trip_id"]
+
+    def assertNoTrace(self, segment_ids):
+        self.assertEqual(visibility.visible_trips(self.c, self.sam), [])
+        for segment_id in segment_ids:
+            self.assertIsNone(trips.get_segment(self.c, self.sam, segment_id))
+            self.assertIsNone(trips.emails_of(self.c, self.sam, segment_id))
+            self.assertIsNone(visibility.visible_segment(self.c, self.sam, segment_id))
+        self.assertEqual(visibility.visible_segments(self.c, self.sam), [])
+
+    def test_moving_each_booking_into_another_trip(self):
+        flight_id, stay_id, _source, there = self.apart()
+        with no_leaks(self, CODE, CANARY):
+            for segment_id in (flight_id, stay_id):
+                trips.move_segment(self.c, self.jane, segment_id, there, True)
+        self.assertNoTrace([flight_id, stay_id])
+
+    def test_moving_each_booking_into_a_trip_of_its_own(self):
+        flight_id, stay_id, _source, _there = self.apart()
+        with no_leaks(self, CODE, CANARY):
+            trips.move_segment(self.c, self.jane, flight_id, None)
+            trips.move_segment(self.c, self.jane, stay_id, None)
+        self.assertNoTrace([flight_id, stay_id])
+
+    def test_merging_the_trip_into_another(self):
+        flight_id, stay_id, source, there = self.apart()
+        with no_leaks(self, CODE, CANARY):
+            trips.merge(self.c, self.jane, there, source, True)
+        self.assertNoTrace([flight_id, stay_id])
+
+    def test_merging_another_trip_into_it(self):
+        flight_id, stay_id, source, there = self.apart()
+        with no_leaks(self, CODE, CANARY):
+            trips.merge(self.c, self.jane, source, there, True)
+        self.assertNoTrace([flight_id, stay_id])
+
+    def test_splitting_a_booking_off(self):
+        flight_id, stay_id, source, _there = self.apart()
+        with no_leaks(self, CODE, CANARY):
+            trips.split(self.c, self.jane, source, [flight_id])
+        self.assertNoTrace([flight_id, stay_id])
+
+    def test_moving_a_booking_into_a_trip_they_see_still_names_them(self):
+        _flight_id, stay_id, _source, there = self.apart()
+        trips.edit_trip(self.c, self.jane, there, {"people": [self.jid, self.sid]}, True)
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, stay_id, there)
+        self.assertEqual([p["id"] for p in asked.exception.see_booking], [self.sid])
