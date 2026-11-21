@@ -426,6 +426,18 @@ class CreateTests(ReviewTools):
         with db.session() as conn:
             self.assertEqual(len(stored_mail.for_segment(conn, first["id"])), 2)
 
+    def test_creating_a_booking_that_is_already_there_never_adds_someone_who_cannot_see_the_trip(self):
+        same = {**FLIGHT, "details": {"flight_number": "BA112"}}
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-same", kept(), 5.0)
+            item = self.item(conn, self.jane_box, "m-same", "match", "2026-10-20", [(same, [])])
+        fields = {"travelers": [{"person_id": self.sam.person_id, "name": None}]}
+        self.assertIn("in the app", self.refused(WRITE, "create_segment_from_review_item", {"item_id": item, "fields": fields}))
+        self.assertIn(item, self.left())
+        with db.session() as conn:
+            self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
+            self.assertEqual(trips.get(conn, self.jane, self.jane_trip["id"])["people"], [self.jane.person_id])
+
     def test_a_read_booking_becomes_a_segment_in_the_trip_it_falls_into(self):
         got = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.flight_item, "fields": {"details": {"seat": "22A"}}})
         self.assertEqual((got["kind"], got["confirmation"], got["source"]), ("flight", "ZQ4PXD", "email"))
