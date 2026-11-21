@@ -42,6 +42,9 @@ class HangUpLateTests(unittest.TestCase):
         self.addCleanup(httpd.server_close)
         return httpd
 
+    def hang_ups(self):
+        return {t for t in threading.enumerate() if t.name == "hang-up-late"}
+
     def test_it_never_waits_on_an_event_with_a_timeout_which_returns_at_once_under_the_frozen_clock(self):
         timed_waits = []
         real_wait = threading.Event.wait
@@ -75,17 +78,19 @@ class HangUpLateTests(unittest.TestCase):
         httpd.set_deadline(late, None)
 
     def test_a_failed_bind_raises_the_bind_error_and_leaves_no_thread_behind(self):
+        before = self.hang_ups()
         taken = self.serve()
-        hang_ups = lambda: sum(t.name == "hang-up-late" for t in threading.enumerate())
-        threads_before = hang_ups()
+        ours = self.hang_ups() - before
+        self.assertEqual(len(ours), 1)
         with self.assertRaises(OSError) as raised:
             handler.Server(taken.server_address, handler.Handler)
         self.assertNotIsInstance(raised.exception, AttributeError)
-        self.assertEqual(hang_ups(), threads_before)
+        self.assertEqual(self.hang_ups() - before, ours)
 
     def test_closing_the_server_stops_the_thread_at_once_and_closing_twice_is_fine(self):
+        before = self.hang_ups()
         httpd = self.serve()
-        thread = next(t for t in threading.enumerate() if t.name == "hang-up-late")
+        [thread] = self.hang_ups() - before
         httpd.server_close()
         thread.join(2)
         self.assertFalse(thread.is_alive())

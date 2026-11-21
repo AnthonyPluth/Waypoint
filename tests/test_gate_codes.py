@@ -1031,14 +1031,23 @@ class ReviewPathTests(ScanAiCase, Kept):
             self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, self.fresh(held=[(self.SUGGESTION, [self.segment])]))
         self.assertEqual([c.args[2] for c in picked.call_args_list], [gatecode.REVIEW_CAP])
         item = self.fresh(held=[(self.SUGGESTION, [self.segment])])
-        self.fake.on_request = lambda n: time.sleep(1.5)
-        began = time.monotonic()
-        with mock.patch.object(gatecode, "REVIEW_CAP", 0.2):
+        entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+
+        def hold(n):
+            entered.set()
+            release.wait(30)
+            finished.set()
+        self.fake.on_request = hold
+        with mock.patch.object(gatecode, "REVIEW_CAP", 0.2), mock.patch.object(ai.tls, "urlopen", wraps=ai.tls.urlopen) as opened:
             self.act(review_api.api_review_match, {}, {"entry": 1, "segment_id": self.segment}, item)
-        self.assertLess(time.monotonic() - began, 1.2)
+        self.assertTrue(entered.is_set())
+        self.assertFalse(release.is_set())
+        self.assertFalse(finished.is_set())
+        self.assertEqual([c.args[1] for c in opened.call_args_list if self.fake.url in c.args[0].full_url], [ai._wait(0.2)])
+        release.set()
+        self.assertTrue(finished.wait(30))
         self.assertEqual((self.state(), self.image()), (("choose", "2026-10-16"), None))
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(ReviewItem)).scalar()), 0)
-        time.sleep(1.5)
 
     def test_with_no_ollama_address_saved_nothing_is_sent_whatever_the_review_path(self):
         self.turn_off()
