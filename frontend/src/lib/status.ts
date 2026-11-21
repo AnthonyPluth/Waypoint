@@ -29,6 +29,6 @@ export function segmentChips(
   status: Segment["status"],
   flight: Pick<FlightStatus, "state" | "delay_minutes"> | null | undefined,
   liveOn: boolean,
-): { booking: Chip; live: Chip | null } {
-  return { booking: bookingChip(status), live: liveOn && flight ? liveChip(flight) : null };
+): { booking: Chip | null; live: Chip | null } {
+  return { booking: status === "confirmed" ? null : bookingChip(status), live: liveOn && flight ? liveChip(flight) : null };
 }

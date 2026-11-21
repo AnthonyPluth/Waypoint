@@ -28,12 +28,12 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 
 | Source | States | Tone |
 | --- | --- | --- |
-| Booking (always shown) | Confirmed / Changed / Cancelled | ok / warn / bad |
+| Booking (only for an exception) | Changed / Cancelled | warn / bad |
 | Live (only when live flight status is on) | On time / Delayed N min / Departed | info / warn / info |
 | | Landed | quiet |
 | | Cancelled / Diverted | bad |
 
-`bookingChip(status)` always returns a chip. `segmentChips(status, flight, liveOn)` returns both, with `live` null when live status is off or there is no flight status. The booking chip leads; the live chip is the smaller one.
+`bookingChip(status)` always returns a chip, and the Design page lists all three. `segmentChips(status, flight, liveOn)` returns both, with `booking` null for a confirmed booking (a confirmed booking is the expected state, so `PassCard` shows no chip for it and leaves no gap) and `live` null when live status is off or there is no flight status. The booking chip leads; the live chip is the smaller one.
 
 ## Airport code
 
@@ -68,7 +68,7 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - the confirmation code as the largest element (the first focusable control, tap to copy);
 - the flight, its date and departure time, and the booking link;
 - the airport codes with the route line and the times at each airport;
-- below the tear line, the terminal, gate, seat and cabin, the booking chip and, when live flight status is on, the live chip and a quiet line.
+- below the tear line, the terminal, gate, seat and cabin, the booking chip (only when the booking is changed or cancelled) and, when live flight status is on, the live chip and a quiet line.
 
 The headline, the plane and the Next up card follow set rules:
 
