@@ -463,10 +463,11 @@ class StewardTests(AccessCase):
         self.in_library(1, "2028-01-02T03:00:00.000Z")
 
         clock = FakeClock()
+        steward_share_ends = clock.now + 6
 
         def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
             if taken_after.isoformat().startswith("2027-0"):
-                clock.advance_to(clock.now + (seconds or 0))
+                clock.advance_to(steward_share_ends)
                 raise immich.Unavailable(immich.TOO_SLOW)
             return self.search(source, taken_after, taken_before, page=page)
         immich.search.side_effect = search
