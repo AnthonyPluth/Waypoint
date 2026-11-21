@@ -21,6 +21,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import Pencil from "@lucide/svelte/icons/pencil";
+  import Share2 from "@lucide/svelte/icons/share-2";
   import Play from "@lucide/svelte/icons/play";
 
   type Props = {
@@ -39,8 +40,9 @@
   let gallery = $state<{ viewFirst: () => void; headingElement: () => HTMLElement | null } | null>(null);
   let facts = $state<{ headingElement: () => HTMLElement | null } | null>(null);
   let acting = $state<PersonSharing[]>([]);
-  let settled = $state(false);
   let sharingOpen = $state(false);
+  let sharing = $state<{ show: () => Promise<void> } | null>(null);
+  let optionsButton = $state<HTMLButtonElement | null>(null);
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let lost = $state<Set<number>>(new Set());
@@ -59,8 +61,7 @@
   const noPhotos = $derived(signedIn && status === "ready" && found !== null && found.photos.length === 0);
   const viewDrawn = $derived(!wide && heroKind === "photos" && found !== null && found.photos.length === heroIds.length);
   const hasControl = $derived(acting.some((a) => a.mode === "card"));
-  const holdSlot = $derived(signedIn && !settled);
-  const controlRow = $derived(viewDrawn || hasControl || holdSlot);
+  const menuItems = $derived<OptionsMenuItem[]>(hasControl ? [{ label: "Sharing", icon: Share2, onselect: () => void sharing?.show() }, ...options] : options);
   const caption = $derived(heroCaption(trip, dates));
   const avatars = $derived(tripPeople(trip));
   const names = $derived(avatars.map((p) => p.name).join(", "));
@@ -71,7 +72,6 @@
   $effect(() => {
     void trip.id;
     replaying = false;
-    settled = false;
     sharingOpen = false;
     lost = new Set();
   });
@@ -92,8 +92,9 @@
     {/if}
     <div class="flex items-center">
       {#if !editing}<Button bind:ref={editButton} variant="ghost" size="icon" aria-label="Edit trip details" onclick={() => void details?.open()}><Pencil /></Button>{/if}
-      {#if options.length}<OptionsMenu popup iconOnly variant="ghost" label="Trip options" text="Trip options" icon={Ellipsis} items={options} />{/if}
+      {#if menuItems.length}<OptionsMenu popup iconOnly variant="ghost" label="Trip options" text="Trip options" icon={Ellipsis} items={menuItems} bind:button={optionsButton} />{/if}
     </div>
+    <TripPhotoSharingMenu bind:this={sharing} trigger={false} button={optionsButton} {acting} tripName={trip.name} align="end" bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
   </div>
 
   <TripDetails bind:this={details} bind:editing {trip} {dates} {onsaved} bare returnFocus={() => editButton} />
@@ -195,21 +196,12 @@
 </div>
 
 {#snippet controls()}
-  {#if !wide && controlRow}
+  {#if viewDrawn}
     <div class="flex flex-wrap items-center gap-2">
-      {#if viewDrawn}<Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button>{/if}
-      {@render sharingButton()}
+      <Button variant="outline" size="sm" onclick={() => gallery?.viewFirst()}>View photos</Button>
     </div>
   {/if}
   {#if !wide}{@render reminders()}{/if}
-{/snippet}
-
-{#snippet sharingButton()}
-  {#if hasControl}
-    <TripPhotoSharingMenu {acting} tripName={trip.name} align={wide ? "end" : "start"} bind:open={sharingOpen} fallback={() => gallery?.headingElement()} />
-  {:else if holdSlot}
-    <span class="inline-block h-8 w-[84px] phone:h-11" aria-hidden="true" data-testid="sharing-slot"></span>
-  {/if}
 {/snippet}
 
 {#snippet reminders()}
@@ -219,7 +211,7 @@
 {/snippet}
 
 {#snippet photos()}
-  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next, done) => { acting = next; settled = done; }} headerEnd={wide && (hasControl || holdSlot) ? sharingButton : null} belowHeader={wide ? reminders : null} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
+  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next) => (acting = next)} belowHeader={wide ? reminders : null} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
 {/snippet}
 
 {#snippet total()}

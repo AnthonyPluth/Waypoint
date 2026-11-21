@@ -5,7 +5,7 @@
   "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
   "steps": [
     {"goto": "#trip/7"},
-    {"wait_for": "role=button[name='Sharing']"},
+    {"wait_for": "[data-testid=photo-days] button[data-photo]"},
     {"click": "[data-testid=photo-days] button[data-photo] >> nth=0"},
     {"wait_for": "[data-testid='photo-viewer'] img"},
     {"expect_text": {"selector": "[data-testid='photo-viewer']", "text": "Remove from this trip"}},
@@ -13,7 +13,9 @@
     {"click": "[data-testid='photo-viewer'] >> role=button[name='Remove from this trip']"},
     {"expect_text": {"selector": "[data-testid='photo-viewer']", "text": "of 12"}},
     {"click": "[data-testid='photo-viewer'] >> role=button[name='Close']"},
-    {"click": "role=button[name='Sharing']"},
+    {"click": "button[aria-label='Trip options']"},
+    {"wait_for": "role=menuitem[name='Sharing']"},
+    {"click": "role=menuitem[name='Sharing']"},
     {"expect_text": {"selector": "[data-testid=your-photos]", "text": "12 photos from your library"}},
     {"click": "role=button[name^='Removed from this trip (']"},
     {"wait_for": "[data-testid=your-photos] ul img"},
@@ -25,6 +27,6 @@
     {"expect_text": {"selector": "[data-testid=your-photos]", "text": "Removed from this trip (1)"}},
     {"expect_text": {"selector": "[data-testid=past-trip] >> text=/^13 photos$/", "text": "13 photos"}},
     {"click": "role=button[name='Close']"},
-    {"wait_for": "role=button[name='Sharing'][expanded=false]"}
+    {"wait_for": "role=button[name='Trip options'][expanded=false]"}
   ]
 }

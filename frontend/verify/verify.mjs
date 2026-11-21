@@ -20,7 +20,7 @@ export const FROZEN_NOW = "2026-06-15T12:00:00Z";
 export const PAGES = ["upcoming", "trips", "trip", "flight", "stats", "people", "review", "settings", "design", "oauth-approve"];
 export const OWN_PAGES = ["oauth-approve"];
 export const SIGNED_PAGES = ["trip"];
-export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='trip-hero'] img", "[data-testid='trip-summary']", "[data-testid='photo-days'] [data-photo] img", "role=button[name='Sharing']"] },
+export const OPENED_PAGES = { trip: { from: "trips", open: "a[href^='#trip/']:has-text('Denver') >> visible=true", ready: ["[data-testid='trip-hero'] img", "[data-testid='trip-summary']", "[data-testid='photo-days'] [data-photo] img"] },
   flight: { from: "trips", open: "a[href^='#trip/']:has-text('London') >> visible=true", follow: "article[data-kind='flight'] a[data-live-link]", ready: ["[data-testid='flight-live']", "[aria-label='Flight timeline'] li", "[role='progressbar'][aria-label='Flight progress']"] } };
 
 export function findChromium(env = process.env, exists = existsSync, list = readdirSync) {
