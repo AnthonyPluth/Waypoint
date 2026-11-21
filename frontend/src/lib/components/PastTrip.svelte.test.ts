@@ -609,12 +609,13 @@ describe("PastTrip Sharing", () => {
     best = [1, 2, 3];
     const next = trip([stay], { id: 8, name: "Autumn loop", destination: "Utah", start_date: "2026-03-01", end_date: "2026-03-08" });
     stub(() => sharing());
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
     const view = show();
     await settled();
-    await userEvent.click(await sharingItem());
+    await user.click(await sharingItem(user));
     await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
     await view.rerender({ trip: next } as never);
-    await sharingItem();
+    await sharingItem(user);
     expect(screen.queryByRole("dialog", { name: "Photo sharing for this trip" })).toBeNull();
   });
 
