@@ -91,7 +91,7 @@
 
 <svelte:element this={tag} {id} class={`pass scroll-mt-20 ${cls}`} class:ring-2={highlight} class:ring-ring={highlight} class:opacity-80={cancelled} aria-label={label ?? (tag === "section" ? headline(s) : undefined)} data-kind={s.kind} data-progress={flight ? progress : undefined}>
 {#if boarding}
-  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border px-5 py-3 md:px-6">
+  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-card-header px-5 py-3 md:px-6">
     <p class="flex min-w-0 items-center gap-2 text-sm">
       {#if eyebrow}
         <span class={`size-2 shrink-0 rounded-full bg-primary ${pulse ? "animate-pulse motion-reduce:animate-none" : ""}`} aria-hidden="true" data-dot></span>

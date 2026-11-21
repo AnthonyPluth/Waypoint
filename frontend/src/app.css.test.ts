@@ -31,6 +31,21 @@ describe("the dark palette", () => {
     expect(tokens.get("background")).toBe("#0d0c12");
     expect(root).toContain("color-scheme: dark");
   });
+  it("is the raised slate: a card, hairline, header strip and secondary fill lighter than the page", () => {
+    expect(tokens.get("card")).toBe("#1a1922");
+    expect(tokens.get("border")).toBe("#2e2d38");
+    expect(tokens.get("card-header")).toBe("#201f2a");
+    for (const fill of ["secondary", "muted", "accent", "surface-3"]) expect(tokens.get(fill)).toBe("#262531");
+    expect(contrast(resolve("card"), resolve("background"))).toBeGreaterThanOrEqual(1.1);
+    expect(contrast(resolve("card-header"), resolve("card"))).toBeGreaterThanOrEqual(1.03);
+    expect(contrast(resolve("secondary"), resolve("card"))).toBeGreaterThanOrEqual(1.1);
+    expect(contrast(resolve("border"), resolve("card"))).toBeGreaterThanOrEqual(1.1);
+  });
+  it.each(["foreground", "muted-foreground", "label"])("keeps %s at WCAG AA on the card, its header strip and the secondary fill", (text) => {
+    for (const surface of ["card", "card-header", "secondary"]) {
+      expect(contrast(resolve(text), resolve(surface))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
   it.each(["ok", "warn", "bad", "info", "quiet"])("keeps %s chip text at WCAG AA contrast on its own background and on the surfaces", (tone) => {
     const ink = resolve(`status-${tone}-ink`);
     expect(contrast(ink, resolve(`status-${tone}-soft`))).toBeGreaterThanOrEqual(4.5);
@@ -38,7 +53,7 @@ describe("the dark palette", () => {
     expect(contrast(ink, resolve("background"))).toBeGreaterThanOrEqual(4.5);
   });
   it("keeps body and muted text readable on the surfaces", () => {
-    for (const surface of ["background", "card", "surface-3"]) {
+    for (const surface of ["background", "card", "card-header", "surface-3"]) {
       expect(contrast(resolve("foreground"), resolve(surface))).toBeGreaterThanOrEqual(7);
       expect(contrast(resolve("muted-foreground"), resolve(surface))).toBeGreaterThanOrEqual(4.5);
     }
