@@ -33,6 +33,10 @@ const box = (over: Record<string, unknown> = {}) => ({ id: 1, address: "me@examp
 const serve = (trips: unknown[], guests: unknown[] = [], mail: unknown = { configured: true, mailboxes: [] }) =>
   vi.mocked(api).mockImplementation(async (path) => (path === "/api/people/claim-suggestions" ? { guests } : path === "/api/mailboxes" ? mail : path === "/api/state" ? { review_count: 0 } : path === "/api/mailboxes/connect" ? { url: "#upcoming" } : { trips }));
 const at = (iso: string) => vi.setSystemTime(new Date(iso));
+const openBooking = async (card: HTMLElement) => {
+  await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Confirmation, travellers and price" }));
+  return await screen.findByRole("dialog");
+};
 
 describe("Upcoming", () => {
   it("says there are no trips yet, without making any up", async () => {
@@ -154,7 +158,7 @@ describe("Upcoming", () => {
     expect(screen.queryByRole("heading", { name: "Are you one of these?" })).toBeNull();
   });
 
-  it("leads with the next segment within a day of departure: the flight, its time at its airport, the terminal, and a code to tap and copy", async () => {
+  it("leads with the next segment within a day of departure: the flight, its time at its airport, the terminal, and its code to copy in the opened booking", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
     render(Upcoming);
@@ -166,7 +170,9 @@ describe("Upcoming", () => {
     expect(card.querySelector("[data-quiet]")).toHaveTextContent("Fri Nov 20");
     expect(card.querySelector("[data-when='origin'] time")).toHaveTextContent("7:00 PM");
     expect(card.querySelector("[data-facts] > div")).toHaveTextContent("Terminal 8");
-    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
+    expect(within(card).queryByRole("button", { name: /Copy confirmation code/ })).toBeNull();
+    const booking = await openBooking(card);
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(within(booking).getByRole("button", { name: "Copy confirmation code KQ7M2X" }));
     expect(await navigator.clipboard.readText()).toBe("KQ7M2X");
   });
 
@@ -235,12 +241,13 @@ describe("Upcoming", () => {
     expect(within(card).getByRole("link", { name: "AA 101, JFK to LHR, in the air, lands 7:10 am in 3 hours 35 minutes" })).toBeInTheDocument();
   });
 
-  it("leads with the card’s code first, then the route and the times at each airport", async () => {
+  it("leads with the route and the times at each airport, and keeps the code behind the tap", async () => {
     at("2026-11-20T09:00:00-05:00");
     serve([london]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR" })).closest("section")!;
-    expect(within(card).getAllByRole("button")[0]).toHaveAccessibleName("Copy confirmation code KQ7M2X");
+    expect(within(card).getAllByRole("button")[0]).toHaveAccessibleName("Confirmation, travellers and price");
+    expect(within(card).queryByText("KQ7M2X")).toBeNull();
     expect(within(card).getByText("JFK")).toBeInTheDocument();
     expect(within(card).getByText("LHR")).toBeInTheDocument();
   });
@@ -431,7 +438,9 @@ describe("Upcoming", () => {
     expect(within(days).getByRole("link", { name: "Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "Check-out: Harbour Hotel" })).toHaveAttribute("href", "#trip/1?segment=2");
     expect(within(days).getByRole("link", { name: "JFK → LHR" })).toHaveAttribute("href", "#trip/1?segment=1");
-    expect(screen.getByRole("link", { name: "Open trip: Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
+    expect(screen.queryByRole("link", { name: "Open trip: Trip to London" })).toBeNull();
+    const booking = await openBooking(document.querySelector<HTMLElement>("[data-flight-home]")!);
+    expect(within(booking).getByRole("link", { name: "Open trip: Trip to London" })).toHaveAttribute("href", "#trip/1?segment=1");
   });
 
   it("shows a time at its place and never a second time in your zone", async () => {
@@ -478,14 +487,16 @@ describe("Upcoming", () => {
     await waitFor(() => expect(screen.queryByText("Waypoint is unreachable")).toBeNull());
   });
 
-  it("shows a flight on two bookings once, with each booking’s code to copy", async () => {
+  it("shows a flight on two bookings once, with each booking’s code to copy in the opened booking", async () => {
     at("2026-11-20T09:00:00-05:00");
     const second = segment({ id: 10, confirmation: "BBBBBB", details: { flight_number: "AA0101" }, travelers: [{ id: 9, person_id: 2, name: "Sam Doe", seat: null }] });
     serve([trip([outbound, second, stay, home])]);
     render(Upcoming);
     const card = (await screen.findByRole("heading", { name: "JFK → LHR", level: 2 })).closest("section")!;
-    expect(within(card).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
-    expect(within(card).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /Copy confirmation code/ })).toBeNull();
+    const booking = await openBooking(card);
+    expect(within(booking).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+    expect(within(booking).getByRole("button", { name: "Copy confirmation code BBBBBB" })).toBeInTheDocument();
     expect(within(card).queryByText("Times differ between bookings")).toBeNull();
     const days = screen.getByRole("list", { name: "Trip to London, day by day" });
     expect(within(days).getAllByText("JFK → LHR")).toHaveLength(1);
@@ -966,7 +977,8 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     expect(home.querySelector("[data-when='destination']")).toHaveClass("text-signal-ink");
     expect(within(home).getByRole("link", { name: "AA 101, JFK to LHR, delayed 50 minutes, now departs 7:50 pm" })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
     expect(within(home).getByText("Next up")).toBeInTheDocument();
-    expect(within(home).getByRole("link", { name: /^Open trip/ })).toHaveAttribute("href", `#trip/${london.id}?segment=1`);
+    expect(within(home).queryByRole("link", { name: /^Open trip/ })).toBeNull();
+    expect(within(await openBooking(home)).getByRole("link", { name: /^Open trip/ })).toHaveAttribute("href", `#trip/${london.id}?segment=1`);
   });
 
   it("shows the zone under each time, at its own airport, whether or not the ends differ", async () => {
@@ -1161,14 +1173,18 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     expect(within(await card()).getByRole("link", { name: "Check in" })).toBeInTheDocument();
   });
 
-  it("keeps the travellers and the cost on the Next up card", async () => {
+  it("moves the travellers and the cost of the Next up card into the opened booking", async () => {
     at("2026-11-20T09:00:00-05:00");
     const priced = segment({ id: 1, price: { amount_minor: 45000, currency: "USD", source: "email" } as never, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }, { id: 2, person_id: 2, name: "Sam Doe", seat: null }] });
     serve([trip([priced, stay, home])]);
     render(Upcoming);
     const mini = await card();
-    expect(within(mini).getByText("Jane & Sam")).toBeInTheDocument();
-    expect(within(mini).getByText("$450.00")).toBeInTheDocument();
+    expect(within(mini).queryByText("Jane & Sam")).toBeNull();
+    expect(within(mini).queryByText("$450.00")).toBeNull();
+    expect(mini.querySelector("[data-cost]")).toBeNull();
+    const booking = await openBooking(mini);
+    expect(within(booking).getByText("Jane Doe, Sam Doe")).toBeInTheDocument();
+    expect(within(booking).getByText("$450.00")).toBeInTheDocument();
   });
 
   it("keeps Directions and Call on the Next up card when the booking has them", async () => {
@@ -1179,6 +1195,58 @@ describe("Upcoming flights: the Home card, Flights today and the booking sheet",
     const mini = await card();
     expect(within(mini).getByRole("link", { name: "Directions" })).toHaveAttribute("href", "https://maps.example/jfk");
     expect(within(mini).getByRole("link", { name: "Call" })).toHaveAttribute("href", "tel:+18005551234");
+  });
+
+  it("keeps only the airline action, Directions and Call in the Next up card's footer, and every other action in the opened booking", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const rich = segment({ id: 1, price: { amount_minor: 45000, currency: "USD", source: "email" } as never, links: { app: null, open: null, open_kind: null, directions: "https://maps.example/jfk", call: "tel:+18005551234" }, travelers: [{ id: 1, person_id: 1, name: "Jane Doe", seat: null }] });
+    serve([trip([rich, stay, home])]);
+    render(Upcoming);
+    const mini = await card();
+    expect(within(mini).getByRole("link", { name: "Directions" })).toBeInTheDocument();
+    expect(within(mini).getByRole("link", { name: "Call" })).toBeInTheDocument();
+    for (const gone of [/Copy confirmation code/, /QR code/]) expect(within(mini).queryByRole("button", { name: gone })).toBeNull();
+    expect(within(mini).queryByRole("link", { name: /^Open trip/ })).toBeNull();
+    expect(within(mini).queryByText("Jane")).toBeNull();
+    expect(within(mini).getByRole("link", { name: /open live status|AA 101/ })).toHaveAttribute("href", `#trip/${london.id}/flight/1`);
+    const booking = await openBooking(mini);
+    expect(within(booking).getByRole("button", { name: "Copy confirmation code KQ7M2X" })).toBeInTheDocument();
+    expect(within(booking).getByRole("link", { name: /^Open trip/ })).toHaveAttribute("href", `#trip/${london.id}?segment=1`);
+    expect(within(booking).getByText("Jane Doe")).toBeInTheDocument();
+    expect(within(booking).getByText("$450.00")).toBeInTheDocument();
+  });
+
+  it("draws no empty footer under the Next up card when nothing but the moved items was in it", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const mini = await card();
+    expect(mini.querySelector("article > div.border-t")).toBeNull();
+    expect(mini.querySelector("[data-detail]")).not.toBeNull();
+  });
+
+  it("returns focus to the detail row when the opened booking is closed with Escape", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    serve([london]);
+    render(Upcoming);
+    const mini = await card();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const row = within(mini).getByRole("button", { name: "Confirmation, travellers and price" });
+    await openBooking(mini);
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(row).toHaveFocus());
+  });
+
+  it("shows no price in the opened booking when the household has turned costs off", async () => {
+    at("2026-11-20T09:00:00-05:00");
+    const priced = segment({ id: 1, price: { amount_minor: 45000, currency: "USD", source: "email" } as never });
+    app.state = { show_costs: false } as never;
+    serve([trip([priced, stay, home])]);
+    render(Upcoming);
+    const booking = await openBooking(await card());
+    expect(within(booking).queryByText("$450.00")).toBeNull();
+    app.state = null;
   });
 
   it("hides the cost on the Next up card when the household has turned costs off", async () => {

@@ -125,3 +125,5 @@ Departures found in the build that #876 does not list, drawn as built:
 - The rows still marked "recorded in the build, not separately confirmed" (departures 1, 2 and 3a, the action blue, the amber ink, Upcoming's header extras and the trip total): the owner's "Signed off" on #876 accepts them as built, or names the ones to change.
 - The four owner decisions of 2026-11-21 are drawn as decided; until their follow-up pull requests merge, the app differs from frames a to d in those four points.
 - The typeface is decided (#877). Screens not drawn in a to d (the other pages, the states of #878) are in e to k and in their own sub-issues of #875.
+
+Trips and the completed-trip page in this look (#879, group A): see [README-group-a.md](README-group-a.md).
