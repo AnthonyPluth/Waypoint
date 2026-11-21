@@ -49,7 +49,7 @@
     });
   });
 
-  const outside = (target: EventTarget | null) => !panel?.contains(target as Node) && !button?.contains(target as Node);
+  const outside = (target: EventTarget | null) => !panel?.contains(target as Node) && !(trigger && button?.contains(target as Node));
 
   function keydown(e: KeyboardEvent) {
     if (!open || viewport.phone || asking || e.key !== "Escape" || e.defaultPrevented) return;

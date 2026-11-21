@@ -657,6 +657,21 @@ describe("PastTrip Sharing", () => {
     viewport.phone = false;
   });
 
+  it("closes the popover when Trip options is opened again on desktop, so the two never overlap", async () => {
+    viewport.phone = false;
+    photos = many(6);
+    best = [1, 2, 3];
+    sharingReply = async () => sharing();
+    show();
+    await settled();
+    const user = userEvent.setup();
+    await user.click(await sharingItem(user));
+    await screen.findByRole("dialog", { name: "Photo sharing for this trip" });
+    await user.click(optionsButton());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Photo sharing for this trip" })).toBeNull());
+    expect(await screen.findByRole("menu", { name: "Trip options" })).toBeTruthy();
+  });
+
   it("closes the popover with Escape and returns focus to Trip options on desktop", async () => {
     viewport.phone = false;
     photos = many(6);
