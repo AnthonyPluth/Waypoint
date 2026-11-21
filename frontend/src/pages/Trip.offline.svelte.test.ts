@@ -56,7 +56,6 @@ describe("Trip: the saved offline copy", () => {
     Object.assign(offline, { checked: true, setUp: true, hasCopy: true, trips: [{ id: 9, name: "Next cruise" }] });
     render(TripPage);
     await screen.findByRole("heading", { name: "Past journey" });
-    expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Keep this trip available offline" })).not.toBeInTheDocument();
     expect(device.writes).toEqual([]);
   });
@@ -94,31 +93,6 @@ describe("Trip: the saved offline copy", () => {
     expect(device.calls).toEqual(before);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(device.appears("Springfield")).toBe(false);
-  });
-
-  it("says in the header that this trip is saved on the device, and when", async () => {
-    await setUp();
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText(/updated just now/)).toBeInTheDocument();
-    expect(screen.getByTestId("offline-status-line")).toHaveTextContent("Saved on this device · updated just now");
-  });
-
-  it("says in the header when the save failed", async () => {
-    await setUp();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(api).mockImplementation(async (path) => {
-      if (path === "/api/people") return { people: [] };
-      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
-    if (path === "/api/distance-unit") return { distance_unit: "mi" };
-    if (String(path).endsWith("/summary")) throw new Error("no summary");
-      if (path === "/api/offline") throw new Error("Server error");
-      return held;
-    });
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText("Couldn’t save the trips on this device.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("neither asks nor saves on a device that can't do it", async () => {
@@ -206,20 +180,6 @@ describe("Trip: the saved offline copy", () => {
     expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
   });
 
-  it("shows which trips are saved, in the header, when several are", async () => {
-    await setUp();
-    vi.mocked(api).mockImplementation(async (path) => {
-      if (path === "/api/people") return { people: [] };
-      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
-    if (path === "/api/distance-unit") return { distance_unit: "mi" };
-    if (String(path).endsWith("/summary")) throw new Error("no summary");
-      if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }, { trip: { ...held, id: 2, name: "Trip to Paris" }, messages: [] }] };
-      return held;
-    });
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText(/also saved: “Trip to Paris”/)).toBeInTheDocument();
-  });
 });
 
 describe("Trip: a warm iPhone app that lost its connection", () => {
@@ -236,7 +196,7 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
     arrival.target = { segmentId: 5, tripId: 1, at: Date.now() };
     vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
     render(TripPage);
-    expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
     expect(screen.queryByText("Failed to fetch")).not.toBeInTheDocument();
     expect(await screen.findByRole("dialog", { name: "QR code" })).toBeInTheDocument();
     expect(arrival.target).toBeNull();
@@ -257,30 +217,30 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
 
     it("clears it at the deadline, without any other event", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       await vi.advanceTimersByTimeAsync(deadline - Date.now() + 1);
-      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      await vi.waitFor(() => expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument());
       expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
       expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
     });
 
     it("clears it when the app comes back to the front after the deadline", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       vi.setSystemTime(deadline + 60_000);
       document.dispatchEvent(new Event("visibilitychange"));
-      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      await vi.waitFor(() => expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument());
       expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
     });
 
     it("keeps it while it is still within its retention", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       vi.setSystemTime(deadline - 60_000);
       window.dispatchEvent(new Event("focus"));
       await vi.advanceTimersByTimeAsync(1_000);
-      expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
     });
 
     it("does not show a copy the phone handed over after its deadline", async () => {
@@ -290,7 +250,7 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
       vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
       render(TripPage);
       expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
-      expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
     });
   });
 

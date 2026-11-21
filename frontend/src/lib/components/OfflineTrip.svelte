@@ -9,9 +9,8 @@
   import PlaceTime from "$lib/components/PlaceTime.svelte";
   import { Button } from "$lib/components/ui/button";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
-  import { ago, type SavedCopy } from "$lib/offline";
+  import type { SavedCopy } from "$lib/offline";
   import { bookingCards, dateLabel, dayLabel, headline, showBookingTravellers, showTripTravellers, tripTravellers } from "$lib/trips";
-  import WifiOff from "@lucide/svelte/icons/wifi-off";
 
   let { copy }: { copy: SavedCopy } = $props();
 
@@ -31,14 +30,6 @@
   const emailsOf = (s: Segment) => copy.messages.find((m) => m.segment_id === s.id)?.emails ?? [];
   const kindName = (s: Segment) => ({ flight: "Flight", hotel: "Hotel", car: "Car", train: "Train", cruise: "Cruise", parking: "Parking", visit: "Past trip" })[s.kind];
 </script>
-
-<div class="mb-4 flex items-start gap-3 rounded-2xl border border-border bg-card p-4 text-sm" role="status" data-testid="offline-banner">
-  <WifiOff class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-  <div class="min-w-0">
-    <p class="font-medium">Offline. Saved {ago(copy.savedAt, now)}.</p>
-    <p class="text-muted-foreground">This is the copy saved on this device. Editing and adding need a connection.</p>
-  </div>
-</div>
 
 <ArrivalOpen tripId={trip.id} segments={trip.segments} {now} />
 

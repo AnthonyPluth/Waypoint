@@ -27,7 +27,7 @@ To open with no connection, the app also keeps a copy of your server’s public 
 
 ### With no connection, in the app
 
-When the app is already showing Waypoint’s pages and then can’t reach your server (no connection, airplane mode, no signal or data, a DNS failure, a timeout or a dropped connection) and a trip and the app files are saved, it shows the saved copy instead of an error. There is nothing to unlock. Under a banner with the age of the copy, every saved trip opens as in a browser: editing and adding are off, every other page says it needs a connection, and live flight status is not shown. While it shows the copy, the app checks whether your server answers again (at most every 5 seconds, when the page tries to reach it, and so when you choose **Try again**) and goes back to the live pages as soon as it does. A certificate error or an error answered by the server never shows the saved copy, and with no trip saved nothing is served from the phone at all. Starting the app with no connection is different today: on a server that needs sign-in, the app first asks the server for its web session, and when that fails it shows an error and not the saved trips. That works only when the app is already running, or when that step can finish. On a Waypoint with no sign-in of its own there is no such step. This is tracked in #786. The no-connection copy has been tried against a server that can’t be reached, in the app’s tests, and not yet in airplane mode on a phone, and an airplane-mode launch is not promised.
+When the app is already showing Waypoint’s pages and then can’t reach your server (no connection, airplane mode, no signal or data, a DNS failure, a timeout or a dropped connection) and a trip and the app files are saved, it shows the saved copy instead of an error. There is nothing to unlock. Every saved trip opens as in a browser: editing and adding are off, every other page says it needs a connection, and live flight status is not shown. While it shows the copy, the app checks whether your server answers again (at most every 5 seconds, when the page tries to reach it, and so when you choose **Try again**) and goes back to the live pages as soon as it does. A certificate error or an error answered by the server never shows the saved copy, and with no trip saved nothing is served from the phone at all. Starting the app with no connection is different today: on a server that needs sign-in, the app first asks the server for its web session, and when that fails it shows an error and not the saved trips. That works only when the app is already running, or when that step can finish. On a Waypoint with no sign-in of its own there is no such step. This is tracked in #786. The no-connection copy has been tried against a server that can’t be reached, in the app’s tests, and not yet in airplane mode on a phone, and an airplane-mode launch is not promised.
 
 ### Starting with no connection
 
@@ -63,11 +63,11 @@ The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in toke
 
 ## Checking before you travel
 
-Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again** in a browser. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
+Upcoming shows a green **Saved for offline** button at the top right while saving is set up and working on this device; it opens **Settings → Offline & notifications**, which says what is saved and when, whether saving is on, and what is missing when it isn’t. Neither Upcoming nor a trip’s page shows a status card. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
 
 ## Using it with no connection, in a browser
 
-Open Waypoint offline and it shows **Saved trip is locked**. Unlock it once, with the device’s check, and every saved trip opens, read-only, under a banner with the age of the copy.
+Open Waypoint offline and it shows **Saved trip is locked**. Unlock it once, with the device’s check, and every saved trip opens, read-only.
 
 - Editing and adding are off, and every other page says it needs a connection.
 - Live flight status is not shown; the check-in countdown and the plane on the route line keep working from the booked times and the device’s clock.

@@ -126,4 +126,3 @@ export function savedList(trips: { name: string }[]): string {
 }
 
 export const WHEN_SAVED = "Your trips under way or starting within a week, and your next upcoming trip, are saved when you open Waypoint online.";
-export const ONLY_THESE = "Only trips under way or starting within a week, and your next upcoming trip, are saved.";

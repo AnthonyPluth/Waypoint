@@ -6,15 +6,14 @@
     { "fake_shell": "saved" },
     { "reload": true },
     { "wait_for": "[data-testid='offline-pill']" },
-    { "click": "[data-testid='offline-pill']" },
-    { "wait_for": "[data-testid='offline-status-line']:has-text('updated')" },
     { "screenshot": "upcoming-saved" },
-    { "click": "a[href^='#trip/'] >> visible=true" },
-    { "wait_for": "[data-testid='offline-status-line']" },
-    { "screenshot": "trip-not-saved" },
+    { "click": "[data-testid='offline-pill']" },
+    { "wait_for": "h1:has-text('Offline & notifications')" },
     { "fake_shell": "off" },
     { "reload": true },
-    { "wait_for": "[data-testid='offline-status-line']:has-text('is off')" },
-    { "screenshot": "trip-saving-off" }
+    { "goto": "#upcoming" },
+    { "wait_for": "main h1" },
+    { "expect_absent": "[data-testid='offline-pill']" },
+    { "screenshot": "upcoming-saving-off" }
   ]
 }

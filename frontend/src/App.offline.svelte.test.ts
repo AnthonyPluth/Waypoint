@@ -66,13 +66,11 @@ describe("opening the app with no connection", () => {
     expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
   });
 
-  it("then shows the saved trip, read-only, under the offline banner", async () => {
+  it("then shows the saved trip, read-only", async () => {
     await saveCopy();
     render(App);
     await userEvent.setup().click(await screen.findByRole("button", { name: "Unlock" }));
     expect(await screen.findByRole("heading", { name: "Trip to London" })).toBeInTheDocument();
-    expect(screen.getByTestId("offline-banner")).toHaveTextContent("Offline. Saved 2 h ago.");
-    expect(screen.getByTestId("offline-banner")).toHaveTextContent("Editing and adding need a connection");
     expect(screen.getAllByText("QX7R2M").length).toBeGreaterThan(0);
     expect(screen.getByText("H77231")).toBeInTheDocument();
     expect(screen.getByText(/14C/)).toBeInTheDocument();
