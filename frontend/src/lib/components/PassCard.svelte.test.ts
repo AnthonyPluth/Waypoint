@@ -54,7 +54,7 @@ describe("a flight pass", () => {
     expect(screen.getByText("JFK")).toBeInTheDocument();
     expect(screen.getByText("LHR")).toBeInTheDocument();
   });
-  it("shows terminal, seat and cabin under the tear, and no chip for a confirmed booking", () => {
+  it("shows terminal, seat and cabin under the tear, and the booking chip", () => {
     render(PassCard, goes());
     for (const text of ["Terminal", "8", "Seat", "14C", "Cabin", "Economy"]) expect(screen.getByText(text)).toBeInTheDocument();
     expect(screen.queryByText("Confirmed")).toBeNull();
