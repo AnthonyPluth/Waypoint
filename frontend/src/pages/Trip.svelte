@@ -281,11 +281,13 @@
 
   async function peopleChanged(changed: Trip) {
     let next = changed;
+    const at = id;
     const me = app.state?.person_id;
     if (me != null && !next.people.includes(me)) {
       try {
         next = await apiCall<"GET /api/trips/{id}">(`/api/trips/${next.id}`);
       } catch (e) {
+        if (id !== at) return;
         peopleOpen = false;
         if ((e as { status?: number }).status !== 404) { loadError = errMsg(e); return; }
         toast.success("You no longer see this trip");
@@ -294,6 +296,7 @@
         return;
       }
     }
+    if (id !== at) return;
     replace(next);
     onchanged?.();
   }

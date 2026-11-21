@@ -257,8 +257,38 @@ describe("Trip", () => {
       const retry = await screen.findByRole("button", { name: "Try again" });
       expect(onchanged).not.toHaveBeenCalled();
       expect(toast.success).not.toHaveBeenCalledWith("You no longer see this trip");
+      document.body.style.pointerEvents = "";
       await u.click(retry);
       expect(await screen.findByTestId("trip-bookings")).toBeInTheDocument();
+    });
+
+    it.each([["succeeds", false], ["finds no trip", true]])("ignores the access check when it %s after the page moved to another trip", async (_name, refused) => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      let settle: (v: unknown) => void = () => {};
+      let saved = false;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { saved = true; return { ...held, people: [2], segments: [] } as never; }
+        if (path === "/api/trips/1" && saved) { saved = false; return new Promise((resolve, reject) => { settle = refused ? () => reject(Object.assign(new Error("No such trip"), { status: 404 })) : resolve; }) as never; }
+        return answer(path, opts) as never;
+      });
+      const onchanged = vi.fn();
+      const view = render(TripPage, { tripId: 1, onchanged });
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Remove Jane Doe from this trip?" })).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(saved).toBe(false));
+      await view.rerender({ tripId: 2, onchanged });
+      await screen.findByTestId("trip-bookings");
+      settle({ ...held, id: 1, name: "Stale trip A" });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByText("Stale trip A")).toBeNull();
+      expect(onchanged).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalledWith("You no longer see this trip");
+      expect(location.hash).toBe("#trip/1");
     });
 
     it("keeps a flight's travellers and seats", async () => {
