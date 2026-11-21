@@ -54,14 +54,15 @@ describe("BookingCard facts", () => {
     expect(onopen).toHaveBeenCalledOnce();
   });
 
-  it("names the booking, its kind and place, and that it is confirmed", () => {
+  it("names the booking, its kind and place, with no status word when it is confirmed", () => {
     show(stay);
     const header = screen.getByRole("button", { name: /Hotel Example/ });
-    expect(header).toHaveTextContent("Stay · Lisbon · Confirmed");
+    expect(header).toHaveTextContent("Stay · Lisbon");
+    expect(header).not.toHaveTextContent("Confirmed");
     expect(header).toHaveAttribute("aria-haspopup", "dialog");
   });
 
-  it("says Changed in place of Confirmed, and keeps a cancelled booking greyed with struck facts", () => {
+  it("says Changed for a changed booking, and keeps a cancelled booking greyed with struck facts", () => {
     const changed = render(BookingCard, { card: cardOf({ ...stay, status: "changed" }), now: NOW, onopen: vi.fn() });
     expect(changed.container.textContent).toContain("Changed");
     expect(changed.container.textContent).not.toContain("Confirmed");
