@@ -12,7 +12,7 @@ from ..common import ApiError, own_session, row_id
 from ..contract import (AssistantCreateBody, AssistantDismissBody, AssistantDismissed, AssistantEmail, AssistantItemDetail,
                         AssistantItems, AssistantMatchBody, AssistantMatched, AssistantSegmentEmails, Segment)
 from .mailboxes import owner
-from .trips import NO_SEGMENT, NO_TRIP, segment_fields, viewer
+from .trips import NO_SEGMENT, NO_TRIP, _needs_the_person, segment_fields, viewer
 
 NO_ITEM = "No such item"
 NOTHING_TO_MATCH = ("This item has no booking Waypoint read to match. Use create_segment_from_review_item to add one, or "
@@ -108,7 +108,9 @@ def _match(conn, body: AssistantMatchBody, item_id: str) -> tuple[gatecode.Linke
     if trip is not None and visibility.visible_trip(conn, who, trip) is None:
         raise ApiError(NO_TRIP, 404)
     try:
-        done = review.settle(conn, owner(), who, item, entry, segment, trip, any_visible=True)
+        done = review.settle(conn, owner(), who, item, entry, segment, trip, any_visible=True, assistant=True)
+    except trips.NeedsConfirmation as e:
+        raise _needs_the_person(e, True) from None
     except trips.Invalid as e:
         raise ApiError(str(e)) from None
     if done is None:
@@ -124,7 +126,10 @@ def api_assistant_review_create(_conn, _q, body: AssistantCreateBody, item_id: s
     with db.session() as conn:
         who, item = viewer(conn), row_id(item_id, NO_ITEM)
         try:
-            added = assist.create(conn, owner(), who, item, _whole(body, "entry", "entry must be a number from get_review_item"), fields)
+            added = assist.create(conn, owner(), who, item, _whole(body, "entry", "entry must be a number from get_review_item"), fields,
+                                  assistant=True)
+        except trips.NeedsConfirmation as e:
+            raise _needs_the_person(e, True) from None
         except trips.Invalid as e:
             raise ApiError(str(e)) from None
         if added is None:

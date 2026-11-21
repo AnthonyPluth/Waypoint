@@ -44,7 +44,7 @@ With the optional [AI fallback](/Waypoint/start/ai/) on, a sparkle button beside
 
 ## Who sees a trip
 
-You see a trip when you are on it (its people list, which always includes everyone named on any of its bookings), when you booked it or any of its bookings, or when the confirmation for one of its bookings came to your own connected mailbox. Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s; a trip you book for a child or a grandparent is yours because you booked it. Adding someone to a trip, or as a traveller on a booking, shares the whole trip with them, and their access ends only when they are taken off the trip’s people. Without sign-in, everyone is the one local household and sees every trip.
+You see a trip when you are on it (its people list, which always includes everyone named on any of its bookings), when you booked it or any of its bookings, or when the confirmation for one of its bookings came to your own connected mailbox. Nobody else sees it, however they ask: its address answers “not found”, the same as a trip that doesn’t exist. A solo work trip stays its traveller’s; a trip you book for a child or a grandparent is yours because you booked it. Adding someone to a trip, or as a traveller on a booking, shares the whole trip with them, and their access ends when they are taken off the trip’s people, unless they also booked the trip or one of its bookings or its confirmation came to their own mailbox, which keeps it theirs. Without sign-in, everyone is the one local household and sees every trip.
 
 ## Segments
 

@@ -1005,7 +1005,7 @@ def _needs_person(viewer: Viewer) -> None:
 
 
 def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id: int | None = None,
-                source: Literal["manual", "email", "import"] = "manual") -> SegmentOut | None:
+                source: Literal["manual", "email", "import"] = "manual", assistant: bool = False) -> SegmentOut | None:
     _needs_person(viewer)
     values = check(conn, fields)
     cost = email_price(fields.get("price")) if source == "email" else check_price(fields.get("price"))
@@ -1018,6 +1018,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
         trip = visibility.visible_trip(conn, viewer, trip_id)
         if trip is None:
             return None
+        _refuse_newcomers(conn, viewer, trip, travelers, assistant)
         photogrants.lock_trips(conn, [trip.id])
         windows = _before(conn, [trip.id])
     else:
@@ -1068,7 +1069,7 @@ def _stale_position(old: Mapping[str, str], new: dict[str, str], seats_changed: 
     return new
 
 
-def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: SegmentIn) -> SegmentOut | None:
+def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: SegmentIn, assistant: bool = False) -> SegmentOut | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
     if seg is None:
         return None
@@ -1106,6 +1107,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         changed.append("travelers")
     if ports != ports_before:
         changed.append("itinerary")
+    if owner is not None and not becomes_shared and "travelers" in changed:
+        _refuse_newcomers(conn, viewer, owner, travelers, assistant)
     for k, v in {**values, **located(values)}.items():
         setattr(seg, k, v)
     if "itinerary" in changed:
@@ -1287,7 +1290,8 @@ def attach_to_same_booking(conn: db.Connection, viewer: Viewer, fields: SegmentI
 
 def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, again: bool = False,
                         touched: list[int] | None = None, fill_only: bool = False, candidates: list[int] | None = None,
-                        into: int | None = None, news: EmailNews | None = None) -> Literal["added", "updated", "unchanged", "ambiguous"]:
+                        into: int | None = None, news: EmailNews | None = None,
+                        assistant: bool = False) -> Literal["added", "updated", "unchanged", "ambiguous"]:
     values = check(conn, fields)
     day = (values["start_local"] or "")[:10]
     if into is not None:
@@ -1318,6 +1322,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             touched.append(added["id"])
         return "added"
     seg = found[0]
+    if assistant and (owning := conn.orm.get(Trip, seg.trip_id)) is not None:
+        _refuse_newcomers(conn, viewer, owning, fields.get("travelers") or [], True)
     photogrants.lock_trips(conn, [seg.trip_id])
     windows = _before(conn, [seg.trip_id])
     if touched is not None:
@@ -1487,6 +1493,11 @@ def _confirm_adding(conn: db.Connection, viewer: Viewer, newly: set[int], confir
     see_trip = _named(conn, newly)
     raise NeedsConfirmation("Adding people changes who sees what. Could newly see this trip: "
                             + ", ".join(p["name"] for p in see_trip) + ". Confirm to add them anyway.", [], see_trip)
+
+
+def _refuse_newcomers(conn: db.Connection, viewer: Viewer, trip: Trip, travelers: Sequence[TravelerIn], assistant: bool) -> None:
+    if assistant:
+        _confirm_adding(conn, viewer, {p for t in travelers if (p := t.get("person_id")) is not None} - _seeing(conn, trip), False)
 
 
 def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | None:

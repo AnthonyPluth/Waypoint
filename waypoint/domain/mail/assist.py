@@ -340,7 +340,7 @@ def _from_suggestion(suggestion: Mapping[str, Any]) -> trips.SegmentIn:
 
 
 def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int | None,
-           overrides: trips.SegmentIn) -> tuple[trips.SegmentOut, Linked] | None:
+           overrides: trips.SegmentIn, assistant: bool = False) -> tuple[trips.SegmentOut, Linked] | None:
     review.lock(conn, item_id)
     row = review.visible(conn, owner, item_id)
     if row is None:
@@ -369,7 +369,7 @@ def create(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
         fields["details"] = {**(base.get("details") or {}), **overrides["details"]}
     same = trips.find_same_reservation(conn, viewer, fields, sure=True)
     if same is not None:
-        trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=same.id)
+        trips.merge_email_segment(conn, viewer, fields, fill_only=True, into=same.id, assistant=assistant)
         target = int(same.id)
     else:
         added = trips.add_segment(conn, viewer, fields, source="email" if entry is not None else "manual")
