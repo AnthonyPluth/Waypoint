@@ -440,7 +440,7 @@
         <ul class="flex flex-col gap-3" aria-label="Next up">
           {#if s.kind === "flight"}
             <li id={`segment-${heroCard.lead.id}`} class="scroll-mt-20" data-flight-card>
-              <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} ondetail={(from) => openDetail(s, from)} />
+              <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} tripSegments={t.segments} statusOf={statusFor} ondetail={(from) => openDetail(s, from)} />
             </li>
           {:else}
             <BookingCard card={heroCard} {now} id={`segment-${heroCard.lead.id}`} highlight={wanted === String(heroCard.lead.id)} onopen={openDetail} />

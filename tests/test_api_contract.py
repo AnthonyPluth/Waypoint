@@ -477,6 +477,23 @@ class Replies(DbCase):
         self.check("GET /api/airports/{id}", trips_api.api_airport(self.c, {}, {}, "AKL"))
         self.check("GET /api/airports", trips_api.api_airport_search(self.c, {"q": ["auckland"]}, {}))
 
+    def test_a_connection_is_in_the_trip_and_segment_replies(self):
+        _current.user = {"name": None, "email": None, "local": True}
+        leg = {"kind": "flight", "provider": "Aurora Air", "confirmation": "QZXW74", "start_zone": None}
+        first = trips_api.api_segment_add(self.c, {}, {**leg, "origin": "BOS", "destination": "JFK", "start_local": "2026-03-09T06:10",
+                                                       "end_local": "2026-03-09T07:28", "details": {"flight_number": "AU1402"}}, )
+        second = trips_api.api_segment_add(self.c, {}, {**leg, "origin": "JFK", "destination": "LIS", "start_local": "2026-03-09T09:40",
+                                                        "end_local": "2026-03-09T21:15", "details": {"flight_number": "AU212"},
+                                                        "trip_id": first["trip_id"]})
+        want = {"lead": first["id"], "leg": 2, "legs": 2, "previous": first["id"], "next": None}
+        self.check("GET /api/segments/{id}", trips_api.api_segment(self.c, {}, {}, str(second["id"])))
+        self.assertEqual(trips_api.api_segment(self.c, {}, {}, str(second["id"]))["journey"], want)
+        trip = trips_api.api_trip(self.c, {}, {}, str(first["trip_id"]))
+        self.check("GET /api/trips/{id}", trip)
+        self.assertEqual([s["journey"] for s in trip["segments"]][1], want)
+        self.assertIn("journey", OPENAPI["components"]["schemas"]["Segment"]["properties"])
+        self.assertNotIn("journey", OPENAPI["components"]["schemas"]["Segment"]["required"])
+
     def test_photos(self):
         _current.user = {"sub": "u7", "name": "Ana Example", "email": "ana7@example.com"}
         oidc.remember_user(self.c, "u7", "ana7@example.com", "Ana Example")

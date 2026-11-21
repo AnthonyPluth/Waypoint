@@ -145,6 +145,40 @@ class PagesTests(Assistants):
         self.assertEqual(got["trips"], [])
 
 
+class JourneyTests(Assistants):
+
+    def setUp(self):
+        super().setUp()
+        legs = ({**OUT, "origin": "BOS", "destination": "JFK", "start_local": "2026-10-20T06:10", "end_local": "2026-10-20T07:28", "confirmation": "QZXW74",
+                 "details": {"flight_number": "AU1402"}},
+                {**OUT, "origin": "JFK", "destination": "LIS", "start_local": "2026-10-20T09:40", "end_local": "2026-10-20T21:15", "confirmation": "QZXW74",
+                 "details": {"flight_number": "AU212"}})
+        with db.session() as conn:
+            first = trips.add_segment(conn, self.jane, {**legs[0], "travelers": [{"person_id": self.jane.person_id, "name": None}]}, None)
+            assert first is not None
+            second = trips.add_segment(conn, self.jane, {**legs[1], "travelers": [{"person_id": self.jane.person_id, "name": None}]}, first["trip_id"])
+            assert second is not None
+        self.trip, self.ids = first["trip_id"], (first["id"], second["id"])
+        self.addCleanup(self.drop)
+
+    def drop(self):
+        with db.session() as conn:
+            trips.delete_trip(conn, self.jane, self.trip)
+
+    def test_an_assistant_reads_the_journey_of_a_trip_it_can_see_and_nothing_private_with_it(self):
+        got = self.tool(READ, "get_trip", {"trip_id": self.trip})
+        first, second = got["segments"]
+        self.assertEqual(second["journey"], {"lead": self.ids[0], "leg": 2, "legs": 2, "previous": self.ids[0], "next": None})
+        self.assertEqual(set(first["journey"]), {"lead", "leg", "legs", "previous", "next"})
+        text = json.dumps(got)
+        self.assertNotIn(JANE_NUMBER, text)
+        self.assertEqual(text.count("QZXW74"), 2)
+
+    def test_another_member_s_assistant_gets_no_trip_and_so_no_journey(self):
+        self.assertEqual(self.refused(READ, "get_trip", {"trip_id": self.trip}, sub="u-sam"), "No such trip")
+        self.assertNotIn(self.trip, [t["id"] for t in self.tool(READ, "list_trips", {}, sub="u-sam")["trips"]])
+
+
 class VisibilityTests(Assistants):
 
     def setUp(self):

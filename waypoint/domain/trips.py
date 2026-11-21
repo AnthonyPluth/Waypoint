@@ -44,6 +44,7 @@ TIME_FIELDS = ("start_local", "start_zone", "end_local", "end_zone")
 NewsField = Literal["start_local", "start_zone", "end_local", "end_zone", "origin", "destination"]
 EMAIL_NEWS_FIELDS: tuple[NewsField, ...] = ("start_local", "start_zone", "end_local", "end_zone", "origin", "destination")
 GAP_DAYS = 2
+CONNECTION_LIMIT = timedelta(hours=24)
 AWAY_DAYS = 60
 FLIGHT_NUMBER = re.compile(r"([A-Z0-9]{2,3}?)0*(\d{1,4}[A-Z]?)")
 COMPANY_SUFFIXES = frozenset({"inc", "incorporated", "ltd", "limited", "llc", "plc", "corp", "corporation", "co", "company",
@@ -170,6 +171,14 @@ class EmailNews(TypedDict):
     disagreed: list[NewsField]
 
 
+class JourneyOut(TypedDict):
+    lead: int
+    leg: int
+    legs: int
+    previous: int | None
+    next: int | None
+
+
 class SegmentOut(TypedDict):
     id: int
     trip_id: int
@@ -200,6 +209,7 @@ class SegmentOut(TypedDict):
     gate_code: GateCodeOut | None
     price: PriceOut | None
     links: links.Links
+    journey: JourneyOut | None
 
 
 class TripOut(TypedDict):
@@ -265,6 +275,59 @@ def flight_groups(segs: Sequence[SegmentOut]) -> list[list[SegmentOut]]:
 
 def instant(local: str, zone: str) -> datetime:
     return datetime.fromisoformat(local).replace(tzinfo=ZoneInfo(zone))
+
+
+def _booked_as(seg: SegmentOut) -> str | None:
+    code = _code_key(seg["confirmation"])
+    return f"{provider_key(seg['provider'])}|{code}" if code else None
+
+
+def _connects(first: Sequence[SegmentOut], then: Sequence[SegmentOut]) -> bool:
+    before, after = first[0], then[0]
+    lands = (before["destination"] or "").upper()
+    if not lands or lands != (after["origin"] or "").upper():
+        return False
+    gap = timedelta(seconds=instant(after["start_local"], after["start_zone"]).timestamp() - instant(before["end_local"], before["end_zone"]).timestamp())
+    if not timedelta(0) <= gap < CONNECTION_LIMIT:
+        return False
+    booked = {_booked_as(seg) for seg in first}
+    return None not in booked and booked == {_booked_as(seg) for seg in then}
+
+
+def _returns(run: Sequence[Sequence[SegmentOut]], card: Sequence[SegmentOut]) -> bool:
+    start = (run[0][0]["origin"] or "").upper()
+    return (card[0]["destination"] or "").upper() == start
+
+
+def link_journeys(segs: Sequence[SegmentOut]) -> dict[int, JourneyOut]:
+    flights = [s for s in segs if s["kind"] == "flight" and s["status"] != "cancelled" and not untimed(s["details"])]
+    cards = sorted(flight_groups(flights), key=lambda card: (instant(card[0]["start_local"], card[0]["start_zone"]), card[0]["id"]))
+    runs: list[list[list[SegmentOut]]] = []
+    for card in cards:
+        if runs and _connects(runs[-1][-1], card) and not _returns(runs[-1], card):
+            runs[-1].append(card)
+        else:
+            runs.append([card])
+    found: dict[int, JourneyOut] = {}
+    for run in (r for r in runs if len(r) > 1):
+        for n, card in enumerate(run, 1):
+            leg: JourneyOut = {"lead": run[0][0]["id"], "leg": n, "legs": len(run), "previous": run[n - 2][0]["id"] if n > 1 else None,
+                               "next": run[n][0]["id"] if n < len(run) else None}
+            found.update({seg["id"]: leg for seg in card})
+    return found
+
+
+def _link(outs: Sequence[SegmentOut]) -> None:
+    found = link_journeys(outs)
+    for out in outs:
+        out["journey"] = found.get(out["id"])
+
+
+def _journeyed(conn: db.Connection, viewer: Viewer, out: SegmentOut) -> SegmentOut:
+    if out["kind"] == "flight":
+        flights = [s for s in visibility.visible_segments(conn, viewer, [out["trip_id"]]) if s.kind == "flight"]
+        out["journey"] = link_journeys(_segment_outs(conn, flights, [], viewer)).get(out["id"])
+    return out
 
 
 def _zone(value: str | None, label: str) -> str:
@@ -662,7 +725,8 @@ def _segment_outs(conn: db.Connection, segs: Sequence[Segment], travs: Sequence[
          "email_update": email_update_of(s),
          "gate_code": {"state": codes[s.id][0], "day": codes[s.id][1]} if s.id in codes else None,
          "price": priced(s),
-         "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin)}
+         "links": links.segment_links(s.kind, s.provider, s.confirmation, last_name(s), s.manage_url, details, s.origin),
+         "journey": None}
         for s, details, brand in zip(segs, decoded, brands, strict=True)]
     return sorted(out, key=lambda s: (instant(s["start_local"], s["start_zone"]), s["id"]))
 
@@ -677,6 +741,8 @@ def _trip_outs(conn: db.Connection, viewer: Viewer, trips: Sequence[Trip], today
     for s in segs:
         by_trip[s.trip_id].append(s.id)
     removable = stored_mail.deletable_by_group(conn, by_trip)
+    for trip_id in by_trip:
+        _link([s for s in outs if s["trip_id"] == trip_id])
     def emails_of_trip(trip: Trip) -> int:
         return len(removable[trip.id])
     return [{"id": t.id, "name": t.name, "start_date": t.start_date, "end_date": t.end_date,
@@ -700,13 +766,13 @@ def get(conn: db.Connection, viewer: Viewer, trip_id: int) -> TripOut | None:
 
 def get_segment(conn: db.Connection, viewer: Viewer, segment_id: int) -> SegmentOut | None:
     seg = visibility.visible_segment(conn, viewer, segment_id)
-    return _segment_outs(conn, [seg], visibility.visible_travelers(conn, viewer, [seg.id]), viewer)[0] if seg else None
+    return _journeyed(conn, viewer, _segment_outs(conn, [seg], visibility.visible_travelers(conn, viewer, [seg.id]), viewer)[0]) if seg else None
 
 
 def _after_change(conn: db.Connection, seg: Segment, viewer: Viewer) -> SegmentOut:
     travs = list(conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id == seg.id)
                                   .order_by(SegmentTraveler.id)).all())
-    return _segment_outs(conn, [seg], travs, viewer)[0]
+    return _journeyed(conn, viewer, _segment_outs(conn, [seg], travs, viewer)[0])
 
 
 @dataclass(frozen=True)
