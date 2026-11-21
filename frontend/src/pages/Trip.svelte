@@ -207,7 +207,7 @@
     const key = `${id}:${wanted}`;
     if (openedWanted === key) return;
     openedWanted = key;
-    tick().then(() => document.getElementById(`segment-${found.lead.id}`)?.scrollIntoView({ block: "start" }));
+    tick().then(() => document.getElementById(`segment-${found.lead.id}`)?.scrollIntoView?.({ block: "start" }));
     expandedId = found.lead.id;
     if (completedPage && viewport.phone) bookingsOpen = true;
   });
