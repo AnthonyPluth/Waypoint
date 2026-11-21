@@ -8,14 +8,13 @@
   import { Button } from "$lib/components/ui/button";
   import { cn } from "$lib/utils";
 
-  let { label, text, items, size = "default", align = "right", up = false, icon: Icon = Ellipsis, iconOnly = false, variant = "outline", popup = false }: {
+  let { label, text, items, size = "default", align = "right", up = false, icon: Icon = Ellipsis, iconOnly = false, variant = "outline", popup = false, button = $bindable(null) }: {
     label: string; text: string; items: OptionsMenuItem[]; size?: "default" | "sm"; align?: "left" | "right"; up?: boolean;
-    icon?: Component; iconOnly?: boolean; variant?: "outline" | "default" | "ghost"; popup?: boolean;
+    icon?: Component; iconOnly?: boolean; variant?: "outline" | "default" | "ghost"; popup?: boolean; button?: HTMLButtonElement | null;
   } = $props();
 
   const id = $props.id();
   let open = $state(false);
-  let button = $state<HTMLButtonElement | null>(null);
   let menu = $state<HTMLElement>();
 
   function onKeydown(e: KeyboardEvent) {
