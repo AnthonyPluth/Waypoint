@@ -329,10 +329,11 @@ rules:
 
   - id: waypoint-booking-changes-trip
     message: >-
-      A booking changes trip only through _relocate in waypoint/domain/trips.py, which takes the exclusions of the trip it
-      leaves (trip_exclusions) into a trip the people taken off don't already see and otherwise drops their booker, mailbox
-      and traveller ties, so moving, merging or splitting never gives someone back a trip or booking they were taken off
-      (AGENTS.md, "You see the trips you're on"). Call _relocate instead of setting a segment's trip_id.
+      A booking changes trip only through _relocate in waypoint/domain/trips.py, which keeps the people taken off the trip it
+      leaves (trip_exclusions) off the booking itself (segment_exclusions) in a trip they don't already see and otherwise
+      drops their booker, mailbox and traveller ties, so moving, merging or splitting never gives someone back a trip or
+      booking they were taken off (AGENTS.md, "You see the trips you're on"). Call _relocate instead of setting a segment's
+      trip_id.
     severity: ERROR
     languages: [python]
     pattern-either:

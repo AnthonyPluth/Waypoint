@@ -18,7 +18,9 @@ from waypoint.storage import backup, db, secretbox
 from waypoint import server
 from waypoint.storage import settings_keys as sk
 from waypoint.storage.models import (AuthSession, LoyaltyId, Mailbox, Person, Photo, PhotoExclusion, PhotoGrant, PhotoSharingPrefs, PhotoSource, PhotoTripSync, ReviewItem,
-                                     Segment, SegmentTraveler, Setting, Trip, TripPerson, User)
+                                     Segment, SegmentExclusion, SegmentTraveler, Setting, Trip, TripExclusion, TripPerson, User)
+from waypoint.domain import visibility
+from waypoint.domain.visibility import Viewer
 from tests.shared import add_database, fetch, own_database, serve
 
 db_session = db.session
@@ -124,6 +126,28 @@ class BackupTests(unittest.TestCase):
         backup.restore(dst, backup.load(backup.dump(src)))
         dst.commit()
         self.assertEqual(sorted((t.trip_id, t.person_id) for t in dst.orm.scalars(select(TripPerson))), [(5, 11), (5, 12)])
+        src.close(); dst.close()
+
+    def test_who_was_taken_off_a_trip_or_its_bookings_comes_back_with_it_and_still_sees_nothing(self):
+        src = db.connect(self.a)
+        self.trip_with_people(src)
+        src.execute(insert(TripPerson), [{"trip_id": 5, "person_id": 11}])
+        src.execute(update(Segment).where(Segment.id == 9).values(travelers_from_trip=False, booked_by=12))
+        src.execute(insert(Trip).values(id=6, name="Other", auto=False))
+        src.execute(insert(Segment).values(id=10, trip_id=6, kind="hotel", status="confirmed", start_local="2026-12-01T15:00", start_zone="Europe/London",
+                                           end_local="2026-12-02T10:00", end_zone="Europe/London", source="manual", booked_by=12))
+        src.execute(insert(TripExclusion).values(trip_id=5, person_id=12))
+        src.execute(insert(SegmentExclusion).values(segment_id=10, person_id=12))
+        src.commit()
+        dst = db.connect(self.b)
+        backup.restore(dst, backup.load(backup.dump(src)))
+        dst.commit()
+        self.assertEqual([(r.trip_id, r.person_id) for r in dst.orm.scalars(select(TripExclusion))], [(5, 12)])
+        self.assertEqual([(r.segment_id, r.person_id) for r in dst.orm.scalars(select(SegmentExclusion))], [(10, 12)])
+        self.assertIsNone(visibility.visible_trip(dst, Viewer(12), 5))
+        self.assertIsNone(visibility.visible_trip(dst, Viewer(12), 6))
+        self.assertEqual(visibility.visible_segments(dst, Viewer(12)), [])
+        self.assertIsNotNone(visibility.visible_trip(dst, Viewer(11), 5))
         src.close(); dst.close()
 
     def test_a_trips_costs_come_back_with_it(self):

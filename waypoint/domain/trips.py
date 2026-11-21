@@ -829,12 +829,13 @@ def _involved(conn: db.Connection, trip_ids: Sequence[int]) -> tuple[list[Segmen
     segs = list(conn.orm.scalars(select(Segment).where(Segment.trip_id.in_(list(trip_ids))).order_by(Segment.id)).all())
     who: dict[int, set[int]] = {i: set() for i in trip_ids}
     by_id = {s.id: s for s in segs}
+    cuts = trippeople.cuts_on(conn, by_id)
     for s in segs:
-        if s.booked_by is not None:
+        if s.booked_by is not None and (s.id, s.booked_by) not in cuts:
             who[s.trip_id].add(s.booked_by)
     for t in conn.orm.scalars(select(SegmentTraveler).where(SegmentTraveler.segment_id.in_(list(by_id)),
                                                             SegmentTraveler.person_id.is_not(None))).all():
-        if t.person_id is not None:
+        if t.person_id is not None and (t.segment_id, t.person_id) not in cuts:
             who[by_id[t.segment_id].trip_id].add(t.person_id)
     for trip_id, aboard in trippeople.of(conn, trip_ids).items():
         who[trip_id].update(aboard)
@@ -966,14 +967,14 @@ def refresh(conn: db.Connection, trip: Trip) -> None:
     conn.orm.flush()
 
 
-def _unbarred(conn: db.Connection, trip_id: int, travelers: Sequence[TravelerIn]) -> list[TravelerIn]:
-    out = trippeople.excluded(conn, trip_id)
+def _unbarred(conn: db.Connection, trip_id: int, travelers: Sequence[TravelerIn], segment_id: int | None = None) -> list[TravelerIn]:
+    out = trippeople.excluded(conn, trip_id) | {p for _, p in trippeople.cuts_on(conn, [] if segment_id is None else [segment_id])}
     return [t for t in travelers if t["person_id"] is None or t["person_id"] not in out]
 
 
 def _set_travelers(conn: db.Connection, segment_id: int, travelers: Sequence[TravelerIn]) -> None:
     seg = conn.orm.get(Segment, segment_id)
-    kept = _unbarred(conn, seg.trip_id, travelers) if seg is not None else list(travelers)
+    kept = _unbarred(conn, seg.trip_id, travelers, segment_id) if seg is not None else list(travelers)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id == segment_id))
     for t in kept:
         conn.orm.add(SegmentTraveler(segment_id=segment_id, person_id=t["person_id"], name=t["name"], seat=t.get("seat")))
@@ -1128,6 +1129,8 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
     if "itinerary" in changed:
         _set_ports(conn, seg.id, ports)
     if "travelers" in changed or becomes_shared:
+        trippeople.uncut(conn, [seg.id], {t["person_id"] for t in travelers if t["person_id"] is not None}
+                         - {t["person_id"] for t in old if t["person_id"] is not None})
         _set_travelers(conn, seg.id, [] if becomes_shared else travelers)
         seg.travelers_from_trip = becomes_shared
         trippeople.keep_lists_inside(conn, seg.trip_id)
@@ -1315,8 +1318,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         found, seen = [target], {target.id}
     else:
         wrote = fields.get("details") or {}
-        barred = visibility.barred_trips(conn, viewer)
-        household = [s for s in visibility.household_segments(conn, values["kind"] or "") if s.trip_id not in barred]
+        barred, cut = visibility.barred_trips(conn, viewer), visibility.cut_segments(conn, viewer)
+        household = [s for s in visibility.household_segments(conn, values["kind"] or "") if s.trip_id not in barred and s.id not in cut]
         verdicts = {s.id: reservation(s, values, wrote) for s in household if s.confirmation}
         coded = [s for s in household if verdicts.get(s.id) == "same"]
         uncoded = [s for s in household if not s.confirmation and _same_uncoded(s, values, wrote)]
@@ -1399,7 +1402,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         changed.append("check_times")
     if "travelers" not in locked:
         have = {_who(t) for t in old}
-        extra = [t for t in _unbarred(conn, seg.trip_id, _travelers(conn, fields.get("travelers") or [])) if _who(t) not in have
+        extra = [t for t in _unbarred(conn, seg.trip_id, _travelers(conn, fields.get("travelers") or []), seg.id) if _who(t) not in have
                  and not (t["person_id"] is None and any(o["person_id"] is None and (o["name"] or "").casefold() == (t["name"] or "").casefold()
                                                          for o in old))]
         if extra:
@@ -1485,22 +1488,27 @@ def _known_people(conn: db.Connection, given: Sequence[int]) -> list[int]:
     return wanted
 
 
+def _received(conn: db.Connection, trip_id: int) -> set[int]:
+    rows = conn.orm.scalars(select(SegmentRecipient).join(Segment, Segment.id == SegmentRecipient.segment_id)
+                            .where(Segment.trip_id == trip_id)).all()
+    cuts = trippeople.cuts_on(conn, {r.segment_id for r in rows})
+    return {r.person_id for r in rows if (r.segment_id, r.person_id) not in cuts}
+
+
 def _seen_by_bookings(conn: db.Connection, trip: Trip, apart_from: int | None = None) -> set[int]:
-    own = select(Segment.id).where(Segment.trip_id == trip.id, Segment.id != (apart_from or 0))
-    listed = set(conn.orm.scalars(select(SegmentTraveler.person_id).where(SegmentTraveler.segment_id.in_(own),
-                                                                          SegmentTraveler.person_id.is_not(None))).all())
-    booked = {p for p in conn.orm.scalars(select(Segment.booked_by).where(Segment.trip_id == trip.id)).all() if p is not None}
-    received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
-                                .where(Segment.trip_id == trip.id)).all()
-    seen = {p for p in listed if p is not None} | booked | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())
+    own = list(conn.orm.scalars(select(Segment).where(Segment.trip_id == trip.id)).all())
+    cuts = trippeople.cuts_on(conn, [s.id for s in own])
+    listed = {t.person_id for t in conn.orm.scalars(select(SegmentTraveler).where(
+        SegmentTraveler.segment_id.in_([s.id for s in own if s.id != apart_from]), SegmentTraveler.person_id.is_not(None))).all()
+        if t.person_id is not None and (t.segment_id, t.person_id) not in cuts}
+    booked = {s.booked_by for s in own if s.booked_by is not None and (s.id, s.booked_by) not in cuts}
+    seen = listed | booked | _received(conn, trip.id) | ({trip.booked_by} if trip.booked_by is not None else set())
     return seen - trippeople.excluded(conn, trip.id)
 
 
 def _seeing(conn: db.Connection, trip: Trip) -> set[int]:
     _, who = _involved(conn, [trip.id])
-    received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
-                                .where(Segment.trip_id == trip.id)).all()
-    return (who[trip.id] | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())) - trippeople.excluded(conn, trip.id)
+    return (who[trip.id] | _received(conn, trip.id) | ({trip.booked_by} if trip.booked_by is not None else set())) - trippeople.excluded(conn, trip.id)
 
 
 def _confirm_adding(conn: db.Connection, viewer: Viewer, newly: set[int], confirmed: bool) -> None:
@@ -1527,13 +1535,15 @@ def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | N
 def _relocate(conn: db.Connection, segment_ids: Sequence[int], source_id: int, target: Trip) -> None:
     ids = list(dict.fromkeys(segment_ids))
     target_id = target.id
-    out = trippeople.excluded(conn, source_id)
-    trippeople.exclude(conn, target_id, out - _seeing(conn, target))
-    seen = list(out - trippeople.excluded(conn, target_id))
+    sees = _seeing(conn, target)
+    out = trippeople.excluded(conn, source_id) - trippeople.excluded(conn, target_id)
+    seen = list((out | {p for _, p in trippeople.cuts_on(conn, ids)}) & sees)
     if ids and seen:
         conn.execute(update(Segment).where(Segment.id.in_(ids), Segment.booked_by.in_(seen)).values(booked_by=None))
         conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(ids), SegmentRecipient.person_id.in_(seen)))
         conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id.in_(ids), SegmentTraveler.person_id.in_(seen)))
+        trippeople.uncut(conn, ids, seen)
+    trippeople.cut(conn, ids, out - sees)
     if ids:
         conn.execute(update(Segment).where(Segment.id.in_(ids)).values(trip_id=target_id))
     conn.orm.flush()
@@ -1544,14 +1554,14 @@ def _tied(conn: db.Connection, seg: Segment) -> set[int]:
     received = conn.orm.scalars(select(SegmentRecipient.person_id).where(SegmentRecipient.segment_id == seg.id)).all()
     tied = {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None} \
         | ({seg.booked_by} if seg.booked_by is not None else set()) | set(received)
-    return tied - trippeople.excluded(conn, seg.trip_id)
+    return tied - trippeople.excluded(conn, seg.trip_id) - {p for _, p in trippeople.cuts_on(conn, [seg.id])}
 
 
 def _refuse_excluded(conn: db.Connection, trip: Trip, person_ids: Iterable[int]) -> None:
     barred = set(person_ids) & trippeople.excluded(conn, trip.id)
     if barred:
         names = ", ".join(p["name"] for p in _named(conn, barred))
-        raise Invalid(f"{names} was taken off this trip, or off a trip its bookings came from. Add them to the trip’s people first.")
+        raise Invalid(f"{names} was taken off this trip. Add them to the trip’s people first.")
 
 
 def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence[int], confirmed: bool) -> None:
@@ -1560,6 +1570,8 @@ def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence
     leaving = [p for p in have if p not in wanted]
     if leaving and not wanted and not viewer.household:
         raise Invalid("A trip needs someone on it. Delete the trip instead, or leave one person on it.")
+    if leaving and not viewer.household and not people.signing_in(conn, (_seeing(conn, trip) | set(wanted)) - set(leaving)):
+        raise Invalid("A trip needs someone on it who signs in. Delete the trip instead, or leave one of them on it.")
     for person in leaving:
         flight = _flight_of(conn, trip.id, person)
         if flight is not None:

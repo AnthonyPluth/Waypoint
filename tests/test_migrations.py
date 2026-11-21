@@ -581,27 +581,36 @@ class MigrationTests(unittest.TestCase):
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(airport_indexes(), {"ix_airports_city_lower"})
 
-    def test_0051_adds_the_trip_exclusions_and_downgrading_drops_them_with_the_trips_and_people_untouched(self):
+    def test_0051_adds_the_trip_and_booking_exclusions_and_downgrading_drops_them_with_the_trips_and_people_untouched(self):
         from alembic import command
         with db.engine(self.path).begin() as c:
             command.upgrade(db.alembic_config(c), "0050")
         self.assertNotIn("trip_exclusions", shape(self.path))
+        self.assertNotIn("segment_exclusions", shape(self.path))
         with db.engine(self.path).begin() as c:
             command.upgrade(db.alembic_config(c), "head")
         self.assertEqual(drift(self.path), [])
         self.assertEqual([col[0] for col in shape(self.path)["trip_exclusions"]["columns"]], ["id", "trip_id", "person_id"])
+        self.assertEqual([col[0] for col in shape(self.path)["segment_exclusions"]["columns"]], ["id", "segment_id", "person_id"])
         with db.engine(self.path).begin() as c:
             c.execute(insert(schema.people).values(id=1, display_name="One"))
             c.execute(insert(schema.trips).values(id=1, name="Trip", auto=True))
+            c.execute(insert(schema.segments).values(id=1, trip_id=1, kind="parking", status="confirmed", origin="Lot", start_local="2026-12-01T05:15",
+                                                     end_local="2026-12-04T03:00", start_zone="America/New_York", end_zone="America/New_York", source="manual"))
             c.execute(insert(schema.trip_exclusions).values(trip_id=1, person_id=1))
+            c.execute(insert(schema.segment_exclusions).values(segment_id=1, person_id=1))
         with self.assertRaises(sa.exc.IntegrityError), db.engine(self.path).begin() as c:
             c.execute(insert(schema.trip_exclusions).values(trip_id=1, person_id=1))
+        with self.assertRaises(sa.exc.IntegrityError), db.engine(self.path).begin() as c:
+            c.execute(insert(schema.segment_exclusions).values(segment_id=1, person_id=1))
         with db.engine(self.path).begin() as c:
             c.execute(delete(schema.trips).where(schema.trips.c.id == 1))
         self.assertEqual(rows_of(self.path, "trip_exclusions"), [])
+        self.assertEqual(rows_of(self.path, "segment_exclusions"), [])
         with db.engine(self.path).begin() as c:
             command.downgrade(db.alembic_config(c), "0050")
         self.assertNotIn("trip_exclusions", shape(self.path))
+        self.assertNotIn("segment_exclusions", shape(self.path))
         self.assertEqual([r[:2] for r in rows_of(self.path, "people")], [(1, "One")])
 
     def test_a_photo_source_takes_its_photos_and_syncs_with_it_and_a_trip_only_unmatches_its_photos(self):
