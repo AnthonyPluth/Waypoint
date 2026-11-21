@@ -129,3 +129,5 @@ Departures found in the build that #876 does not list, drawn as built:
 Trips and the completed-trip page in this look (#879, group A): see [README-group-a.md](README-group-a.md).
 
 People, Settings with the design specimen, and the shared pieces in this look (#879, group C): see [README-group-c.md](README-group-c.md).
+
+The live flight status view, Review and Stats in this look (#879, group B): see [README-group-b.md](README-group-b.md).
