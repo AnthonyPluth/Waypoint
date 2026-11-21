@@ -285,8 +285,9 @@
     if (me != null && !next.people.includes(me)) {
       try {
         next = await apiCall<"GET /api/trips/{id}">(`/api/trips/${next.id}`);
-      } catch {
+      } catch (e) {
         peopleOpen = false;
+        if ((e as { status?: number }).status !== 404) { loadError = errMsg(e); return; }
         toast.success("You no longer see this trip");
         dropDrafts();
         if (onchanged) onchanged(); else location.hash = "#trips";
