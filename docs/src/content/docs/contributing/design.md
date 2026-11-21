@@ -28,12 +28,12 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 
 | Source | States | Tone |
 | --- | --- | --- |
-| Booking (always shown) | Confirmed / Changed / Cancelled | ok / warn / bad |
+| Booking (only for an exception) | Changed / Cancelled | warn / bad |
 | Live (only when live flight status is on) | On time / Delayed N min / Departed | info / warn / info |
 | | Landed | quiet |
 | | Cancelled / Diverted | bad |
 
-`bookingChip(status)` always returns a chip. `segmentChips(status, flight, liveOn)` returns both, with `live` null when live status is off or there is no flight status. The booking chip leads; the live chip is the smaller one.
+`bookingChip(status)` always returns a chip, and the Design page lists all three. `segmentChips(status, flight, liveOn)` returns both, with `booking` null for a confirmed booking (a confirmed booking is the expected state, so `PassCard` shows no chip for it and leaves no gap) and `live` null when live status is off or there is no flight status. The booking chip leads; the live chip is the smaller one.
 
 ## Airport code
 
@@ -53,7 +53,7 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 `BookingCard.svelte` is the card for a stay, car, train, cruise, parking booking or past visit on a trip that is not over (`pages/Trip.svelte`). The design is `docs/design/clean-and-bold/` (#876, #878); the card is built in #882.
 
 - A raised slate card (`bg-card`) with 24 px corners and no border or shadow. The header row is the tap target (at least 64 px) and opens the booking’s detail, `BookingDetail.svelte`, the same component a completed trip uses.
-- The header: the kind icon as a coloured outline with no chip (`KindTile` with `outline`), the name in bold, a grey line such as “Stay · Alfama” or “Train · Sat, Mar 13” ending in the status word (a green “Confirmed”, an amber “Changed” or “Cancelled”), and a chevron.
+- The header: the kind icon as a coloured outline with no chip (`KindTile` with `outline`), the name in bold, a grey line such as “Stay · Alfama” or “Train · Sat, Mar 13” ending in an amber “Changed” or “Cancelled” only when the booking is one of those (a confirmed booking shows no status word), and a chevron.
 - Three label-over-value facts from `cardFacts` in `frontend/src/lib/trips.ts`: stay Check-in, Nights, Check-out; car Pick-up, Days, Return; train Departs, From, Arrives; cruise Embarks, Nights, Disembarks; parking Entry, Days, Exit; visit From, Days, To. The mockup words Nights, Days, Return and From sit beside today’s `START_WORD` and `END_WORD`. Times are in Geist Mono.
 - “Show code” is the one blue button, on a parking booking that has a QR code and has not ended (`showsCode` in `gate-code.ts`, the rule `GateCode` uses), and nowhere else.
 - No confirmation code, cost, address, traveller or loyalty number is on the card. They are in the detail, with the actions (booking link, directions, call, the email, Edit, Move, Remove), which `Trip.svelte` passes to `BookingDetail` as its `above` and `below` snippets while the trip is not over.
@@ -68,7 +68,7 @@ Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page
 - the confirmation code as the largest element (the first focusable control, tap to copy);
 - the flight, its date and departure time, and the booking link;
 - the airport codes with the route line and the times at each airport;
-- below the tear line, the terminal, gate, seat and cabin, the booking chip and, when live flight status is on, the live chip and a quiet line.
+- below the tear line, the terminal, gate, seat and cabin, the booking chip (only when the booking is changed or cancelled) and, when live flight status is on, the live chip and a quiet line.
 
 The headline, the plane and the Next up card follow set rules:
 

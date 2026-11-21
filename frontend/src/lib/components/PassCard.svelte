@@ -100,7 +100,7 @@
       {#if tripName}<span class="min-w-0 truncate text-muted-foreground">{eyebrow ? "· " : ""}{tripName}</span>{/if}
     </p>
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-      <StatusChip chip={chips.booking} small />
+      {#if chips.booking}<StatusChip chip={chips.booking} small />{/if}
       {#if !liveArea && chips.live}<StatusChip chip={chips.live} small />{/if}
       {#if showCountdown}
         {#key headlineText}<p class="text-sm" class:text-destructive={bad} data-countdown>
@@ -311,11 +311,13 @@
         {/each}
       </dl>
     {/if}
-    <div class="flex flex-wrap items-center gap-2">
-      <StatusChip chip={chips.booking} />
-      {#if !liveArea && chips.live}<StatusChip chip={chips.live} small />{/if}
-      {#if compact && footer}<div class="contents">{@render footer()}</div>{/if}
-    </div>
+    {#if chips.booking || (!liveArea && chips.live) || (compact && footer)}
+      <div class="flex flex-wrap items-center gap-2">
+        {#if chips.booking}<StatusChip chip={chips.booking} />{/if}
+        {#if !liveArea && chips.live}<StatusChip chip={chips.live} small />{/if}
+        {#if compact && footer}<div class="contents">{@render footer()}</div>{/if}
+      </div>
+    {/if}
     {#if liveArea}{@render liveArea()}{:else if status && chips.live}<p class="text-sm text-muted-foreground" data-live-line>{quiet}</p>{/if}
     {#if footer && !compact}<div>{@render footer()}</div>{/if}
   </div>

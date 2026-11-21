@@ -30,7 +30,7 @@
       }
     },
     {
-      "click": "button[data-booking]:has-text('Camden Guesthouse'):has-text('Stay · Confirmed')"
+      "click": "button[data-booking]:has-text('Camden Guesthouse'):has-text('Stay ·')"
     },
     {
       "wait_for": "text=Add address"
