@@ -20,6 +20,8 @@ function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(hex.slice(i, i + 2), 16) / 255));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
+const over = (fg: string, bg: string, alpha: number) =>
+  "#" + [1, 3, 5].map((i) => Math.round(alpha * parseInt(fg.slice(i, i + 2), 16) + (1 - alpha) * parseInt(bg.slice(i, i + 2), 16)).toString(16).padStart(2, "0")).join("");
 const contrast = (a: string, b: string) => {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (hi + 0.05) / (lo + 0.05);
@@ -51,6 +53,20 @@ describe("the dark palette", () => {
     expect(contrast(ink, resolve(`status-${tone}-soft`))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(ink, resolve("card"))).toBeGreaterThanOrEqual(4.5);
     expect(contrast(ink, resolve("background"))).toBeGreaterThanOrEqual(4.5);
+  });
+  it.each(["card", "card-header", "popover"])("keeps the featured trip pill's ink at WCAG AA on primary/15 over %s, with or without the stub's primary/8 under it", (surface) => {
+    const base = resolve(surface);
+    for (const under of [base, over(resolve("primary"), base, 0.08)]) {
+      expect(contrast(resolve("primary-ink"), over(resolve("primary"), under, 0.15))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it("keeps the secondary trip pill's grey at WCAG AA on the secondary fill", () => {
+    expect(contrast(resolve("muted-foreground"), resolve("secondary"))).toBeGreaterThanOrEqual(4.5);
+  });
+  it("keeps white text at WCAG AA on the destructive badge over the card and the page", () => {
+    for (const surface of ["card", "background"]) {
+      expect(contrast("#ffffff", over(resolve("destructive"), resolve(surface), 0.6))).toBeGreaterThanOrEqual(4.5);
+    }
   });
   it("keeps body and muted text readable on the surfaces", () => {
     for (const surface of ["background", "card", "card-header", "surface-3"]) {

@@ -20,6 +20,8 @@ Tokens live in `frontend/src/app.css`: one `:root`, then `@theme inline` to expo
 - **Radius**: `rounded-hero` (30 px) for the flight hero card and `rounded-booking` (24 px) for booking cards. `--radius` is unchanged for everything else.
 - **Type scale**: `text-display` (40 px, weight 800; `text-display-lg` is 64 px on desktop), `text-hero-fact` (34 px; `-lg` 44 px), `text-airport` (36 px; `-lg` 44 px), `text-fact` (22 px; `-lg` 26 px), `text-fact-card` (17 px), `text-title`, `text-heading`, `text-body`, `text-caption` and `text-eyebrow` (11 px, weight 600, uppercase, 0.09em). Each sets size, line height, letter spacing and weight.
 
+The featured trip pill (Upcoming and Trips) is text on a `primary/15` tint, so it uses `text-primary-ink` (`--primary-ink`, `#6fb0ff`), the lighter blue, rather than `--primary`, which falls just under 4.5:1 there; `--primary` stays for icons, borders and fills.
+
 Every status ink meets WCAG AA (4.5:1) on its soft colour, the card and the page background; the white text and the secondary and label greys meet 4.5:1 on the page, the card, its header strip and the secondary fill, and every kind colour 3:1 on the card. `src/app.css.test.ts` parses the tokens and fails if a change breaks that.
 
 ## Status chips

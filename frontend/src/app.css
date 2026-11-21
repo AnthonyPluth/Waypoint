@@ -20,6 +20,7 @@
   --popover-foreground: #f3f5f9;
   --primary: #3d8ef7;
   --primary-foreground: #04101f;
+  --primary-ink: #6fb0ff;
   --action: #3563e0;
   --action-foreground: #ffffff;
   --secondary: #262531;
@@ -123,6 +124,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
   --color-action: var(--action);
   --color-action-foreground: var(--action-foreground);
   --color-secondary: var(--secondary);
