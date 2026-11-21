@@ -216,6 +216,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
 .hero.lg{padding:28px 28px 24px}
 .hero.lg .sent{font-size:20px}.hero.lg .big{font-size:44px}.hero.lg .code{font-size:44px}.hero.lg .tm{font-size:17px}.hero.lg .quiet{font-size:15px}.hero.lg .facts dd{font-size:26px}
 .tm.am,.quiet .a{color:#ffd58a}
+.hero .code{font-family:var(--mono);font-weight:700;letter-spacing:-0.03em}
 .hero.edge{box-shadow:0 0 0 1px var(--hair),0 14px 32px -16px rgb(0 0 0 / 70%)}
 .recon{border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);border-radius:16px;padding:16px 20px;display:flex;flex-direction:column;gap:8px;max-width:980px;font-size:14px;color:var(--doc-ink)}
 .recon h2{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--amber)}
@@ -301,7 +302,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
     <nav class="toc" aria-label="Screens"><a href="README.md">README</a><a href="a-trip-detail.html">a Trip detail</a><a href="b-upcoming.html">b Upcoming</a><a href="c-cards.html" aria-current="page">c Cards</a><a href="d-colour-rules.html">d Colour rules</a><a href="e-flight-states.html">e Flight states</a><a href="f-booking-kinds.html">f Booking kinds</a><a href="g-booking-detail.html">g Opened booking</a><a href="h-show-code.html">h Show code</a><a href="i-upcoming.html">i Upcoming</a><a href="j-navigation.html">j Navigation</a><a href="k-travellers-connection.html">k Travellers and connection</a></nav>
   </div>
   <section class="recon" aria-labelledby="recon-h"><h2 id="recon-h">Reconstructed, not the original canvas</h2>
-<p>#876 asked for the owner's approved mockups to be put here, but they live only on the owner's private design canvas, which the agents working on this repository cannot open. This file is a <b>reconstruction</b>: drawn from the decisions written in <a href="https://github.com/AnthonyPluth/Waypoint/issues/876">#876</a> and <a href="https://github.com/AnthonyPluth/Waypoint/issues/875">#875</a>, the tokens of <a href="https://github.com/AnthonyPluth/Waypoint/issues/880">#880</a>, and the components as built in #899, #902, #904, #905 and #906, so it shows what the app now shows. Where the build departs from a written decision it is drawn as built and listed in the README. Every name, place, flight, seat, code, price and date is made up.</p></section>
+<p>#876 asked for the owner's approved mockups to be put here, but they live only on the owner's private design canvas, which the agents working on this repository cannot open. This file is a <b>reconstruction</b>: drawn from the decisions written in <a href="https://github.com/AnthonyPluth/Waypoint/issues/876">#876</a> and <a href="https://github.com/AnthonyPluth/Waypoint/issues/875">#875</a>, the tokens of <a href="https://github.com/AnthonyPluth/Waypoint/issues/880">#880</a>, and the components as built in #899, #902, #904, #905 and #906. Where the build departs from a written decision it is drawn as built and listed in the README, except four points the owner decided on 2026-11-21 (Geist Mono codes on the hero, no edge or shadow on the hero, the code, travellers and cost behind a tap on Upcoming, a bed for a stay): those are drawn as decided, and the app changes to match in follow-up pull requests. Every name, place, flight, seat, code, price and date is made up.</p></section>
   <section class="checks" aria-labelledby="shows-title">
     <h2 id="shows-title">What this shows</h2>
     <ol><li>The flight hero card in its four drawn states.</li><li>The stay, car and train cards, and the compact card of a flight that is not the hero.</li></ol>
@@ -309,7 +310,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
 <section class="sec" id="hero" aria-labelledby="hero-h">
   <div class="sechead"><span class="letter">c1–4</span><h2 id="hero-h">The flight hero card in four states</h2></div>
   <p class="lede"><code>FlightHero.svelte</code> (#902) for on time, delayed, in the air and landed: the carrier line with one marker at the top right, a plain sentence over one big fact, the two airport codes on a dotted arc with the plane, each time with its zone under it, the hairline, then three label-over-value facts. The other four states (boarding, cancelled, diverted, no live data) are in frame e. The card's type grows from a card width of 512 px: the desktop toggle shows it in a 576 px column.</p>
-  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>c1 · On time</figcaption><div class="dev "><article class="hero edge">
+  <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>c1 · On time</figcaption><div class="dev "><article class="hero">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue">In 14 hours</span></div>
   <p class="sent">Your flight to Lisbon</p>
   <p class="big">Departs <span class="mono">6:10 AM</span></p>
@@ -321,7 +322,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Terminal</dt><dd><span class="">E</span></dd></div><div class="c2"><dt>Gate</dt><dd><span class="">B14</span></dd></div><div class="c3"><dt>Seats</dt><dd><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="desk"><figcaption>c1 · On time, 576 px column</figcaption><div class="dev "><article class="hero lg edge">
+</article></div></figure><figure class="fig" data-w="desk"><figcaption>c1 · On time, 576 px column</figcaption><div class="dev "><article class="hero lg">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue">In 14 hours</span></div>
   <p class="sent">Your flight to Lisbon</p>
   <p class="big">Departs <span class="mono">6:10 AM</span></p>
@@ -333,7 +334,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Terminal</dt><dd><span class="">E</span></dd></div><div class="c2"><dt>Gate</dt><dd><span class="">B14</span></dd></div><div class="c3"><dt>Seats</dt><dd><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="phone"><figcaption>c2 · Delayed</figcaption><div class="dev "><article class="hero edge">
+</article></div></figure><figure class="fig" data-w="phone"><figcaption>c2 · Delayed</figcaption><div class="dev "><article class="hero">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="pill amber">Delayed</span></div>
   <p class="sent">Your flight to Lisbon</p>
   <p class="big">Departs <span class="mono">6:55 AM</span></p>
@@ -345,7 +346,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Terminal</dt><dd><span class="">E</span></dd></div><div class="c2"><dt>Gate</dt><dd><span class="">B14</span></dd></div><div class="c3"><dt>Seats</dt><dd><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="desk"><figcaption>c2 · Delayed, 576 px column</figcaption><div class="dev "><article class="hero lg edge">
+</article></div></figure><figure class="fig" data-w="desk"><figcaption>c2 · Delayed, 576 px column</figcaption><div class="dev "><article class="hero lg">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="pill amber">Delayed</span></div>
   <p class="sent">Your flight to Lisbon</p>
   <p class="big">Departs <span class="mono">6:55 AM</span></p>
@@ -357,7 +358,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Terminal</dt><dd><span class="">E</span></dd></div><div class="c2"><dt>Gate</dt><dd><span class="">B14</span></dd></div><div class="c3"><dt>Seats</dt><dd><span class="mono">14A, 14B</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="phone"><figcaption>c3 · In the air</figcaption><div class="dev "><article class="hero edge">
+</article></div></figure><figure class="fig" data-w="phone"><figcaption>c3 · In the air</figcaption><div class="dev "><article class="hero">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>2 h 05 m left</span></div>
   <p class="sent">In the air to Lisbon</p>
   <p class="big">Lands <span class="mono">5:55 PM</span></p>
@@ -369,7 +370,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd><span class="">1</span></dd></div><div class="c2"><dt>Arrival gate</dt><dd><span class="">14</span></dd></div><div class="c3"><dt>Bag claim</dt><dd class="na">—</dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="desk"><figcaption>c3 · In the air, 576 px column</figcaption><div class="dev "><article class="hero lg edge">
+</article></div></figure><figure class="fig" data-w="desk"><figcaption>c3 · In the air, 576 px column</figcaption><div class="dev "><article class="hero lg">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-blue"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/></svg>2 h 05 m left</span></div>
   <p class="sent">In the air to Lisbon</p>
   <p class="big">Lands <span class="mono">5:55 PM</span></p>
@@ -381,7 +382,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd><span class="">1</span></dd></div><div class="c2"><dt>Arrival gate</dt><dd><span class="">14</span></dd></div><div class="c3"><dt>Bag claim</dt><dd class="na">—</dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="phone"><figcaption>c4 · Landed</figcaption><div class="dev "><article class="hero edge">
+</article></div></figure><figure class="fig" data-w="phone"><figcaption>c4 · Landed</figcaption><div class="dev "><article class="hero">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-green">7 min early</span></div>
   <p class="sent">You are in Lisbon</p>
   <p class="big">Landed <span class="mono">5:48 PM</span></p>
@@ -393,7 +394,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   </div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd><span class="">1</span></dd></div><div class="c2"><dt>Arrival gate</dt><dd><span class="">14</span></dd></div><div class="c3"><dt>Bag claim</dt><dd><span class="">7</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
-</article></div></figure><figure class="fig" data-w="desk"><figcaption>c4 · Landed, 576 px column</figcaption><div class="dev "><article class="hero lg edge">
+</article></div></figure><figure class="fig" data-w="desk"><figcaption>c4 · Landed, 576 px column</figcaption><div class="dev "><article class="hero lg">
   <div class="h-top"><span class="carrier">Aurora Air AU 212</span><span class="m-green">7 min early</span></div>
   <p class="sent">You are in Lisbon</p>
   <p class="big">Landed <span class="mono">5:48 PM</span></p>
@@ -406,17 +407,17 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Arrival term</dt><dd><span class="">1</span></dd></div><div class="c2"><dt>Arrival gate</dt><dd><span class="">14</span></dd></div><div class="c3"><dt>Bag claim</dt><dd><span class="">7</span></dd></div></dl><div class="openrow"><span>Confirmation, travellers and price</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
 </article></div></figure></div></div>
-  <div class="spec"><div><h3>Type</h3><ul><li>Codes 36 px (44 px wide), weight 800, Inter with tabular figures.</li><li>Times in Geist Mono: 15 px under the codes (17 px wide) and in the big fact, 34 px (44 px wide).</li><li>Facts 22 px (26 px wide), weight 700; labels 11 px, weight 600, uppercase, 0.09em, <code>#8f8e98</code>.</li></ul></div><div><h3>As built</h3><ul><li>The card keeps a 1 px <code>#27262c</code> edge and the card shadow (<code>border border-border shadow-card</code>); decision 1 says no borders or shadows. Drawn as built; see the README.</li><li>A late time is drawn in the light amber ink <code>#ffd58a</code> (<code>--signal-ink</code>) for contrast; the pill is <code>#eba43b</code>.</li></ul></div></div>
+  <div class="spec"><div><h3>Type</h3><ul><li>Airport codes 36 px (44 px wide) in Geist Mono, weight 700. Owner decision 2026-11-21 (#876): the app changes to match, in follow-up pull requests. (The build of #902 sets them in Inter.)</li><li>Times in Geist Mono: 15 px under the codes (17 px wide) and in the big fact, 34 px (44 px wide).</li><li>Facts 22 px (26 px wide), weight 700; labels 11 px, weight 600, uppercase, 0.09em, <code>#8f8e98</code>.</li></ul></div><div><h3>Edge and amber</h3><ul><li>No edge and no shadow, like the booking cards (decision 1). Owner decision 2026-11-21 (#876): the app changes to match, in follow-up pull requests. (The build of #902 still draws a 1 px edge and the card shadow.)</li><li>A late time is drawn in the light amber ink <code>#ffd58a</code> (<code>--signal-ink</code>) for contrast; the pill is <code>#eba43b</code>.</li></ul></div></div>
 </section>
 <section class="sec" id="cards" aria-labelledby="cards-h">
   <div class="sechead"><span class="letter">c5–8</span><h2 id="cards-h">Stay, car and train cards</h2></div>
   <p class="lede"><code>BookingCard.svelte</code> (#904): a black 24 px card, the kind icon as a coloured outline with no chip, the name, a grey line ending in the status, one hairline and three facts. A stay keeps its brand logo at the right (owner's wish, #904). A tap opens the booking (frame g); a booking with a ready QR code adds a blue “Show code” button (frame f). The compact flight card is drawn too, because the trip page uses it for every flight that is not the hero.</p>
   <div class="stage"><div class="frames"><figure class="fig" data-w="phone"><figcaption>c5 · Stay</figcaption><div class="dev "><article class="bk">
-  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" role="img" aria-label="stay" style="color:var(--k-stay)"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg><span class="bk-n"><b>Alfama Courtyard Hotel</b><span>Stay · Alfama, Lisbon · <span class="g">Confirmed</span></span></span><span class="blogo" aria-hidden="true">AC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" role="img" aria-label="stay" style="color:var(--k-stay)"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M12 4v6"/><path d="M2 18h20"/></svg><span class="bk-n"><b>Alfama Courtyard Hotel</b><span>Stay · Alfama, Lisbon · <span class="g">Confirmed</span></span></span><span class="blogo" aria-hidden="true">AC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Check-in</dt><dd><span class="">Mar 9</span></dd></div><div class="c2"><dt>Nights</dt><dd><span class="">7</span></dd></div><div class="c3"><dt>Check-out</dt><dd><span class="">Mar 16</span></dd></div></dl>
 </article></div></figure><figure class="fig" data-w="desk"><figcaption>c5 · Stay</figcaption><div class="dev "><article class="bk">
-  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" role="img" aria-label="stay" style="color:var(--k-stay)"><rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg><span class="bk-n"><b>Alfama Courtyard Hotel</b><span>Stay · Alfama, Lisbon · <span class="g">Confirmed</span></span></span><span class="blogo" aria-hidden="true">AC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
+  <div class="bk-h"><svg class="ic kic" viewBox="0 0 24 24" role="img" aria-label="stay" style="color:var(--k-stay)"><path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M12 4v6"/><path d="M2 18h20"/></svg><span class="bk-n"><b>Alfama Courtyard Hotel</b><span>Stay · Alfama, Lisbon · <span class="g">Confirmed</span></span></span><span class="blogo" aria-hidden="true">AC</span><svg class="ic chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></div>
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Check-in</dt><dd><span class="">Mar 9</span></dd></div><div class="c2"><dt>Nights</dt><dd><span class="">7</span></dd></div><div class="c3"><dt>Check-out</dt><dd><span class="">Mar 16</span></dd></div></dl>
 </article></div></figure><figure class="fig" data-w="phone"><figcaption>c6 · Car</figcaption><div class="dev "><article class="bk">
@@ -444,7 +445,7 @@ body.desk .dlg{left:50%;right:auto;width:460px;transform:translate(-50%,-50%);pa
   <div class="hair"></div>
   <dl class="facts"><div class="c1"><dt>Departs</dt><dd><span class="mono">11:40 AM</span></dd></div><div class="c2"><dt>Flight</dt><dd><span class="">AU 213</span></dd></div><div class="c3"><dt>Arrives</dt><dd><span class="mono">2:25 PM</span></dd></div></dl>
 </article></div></figure></div></div>
-  <div class="spec"><div><h3>Facts</h3><ul><li>Stay: Check-in, Nights, Check-out (dates; the times are in the opened booking).</li><li>Car: Pick-up, Days, Return. Train: Departs, From (the origin station), Arrives.</li><li>Flight (not the hero): Departs, Flight, Arrives; an arrival on another day carries “+1 day”.</li></ul></div><div><h3>Colour</h3><ul><li>Icon strokes: stay <code>#38c6d9</code>, car <code>#f4d35e</code>, train <code>#c79bff</code>, flight <code>#4f9dff</code>.</li><li><b class="gr">Green</b> “Confirmed”; “Changed” and “Cancelled” in amber (frame f).</li><li>The stay icon is the building the app uses; see the README for the bed.</li></ul></div></div>
+  <div class="spec"><div><h3>Facts</h3><ul><li>Stay: Check-in, Nights, Check-out (dates; the times are in the opened booking).</li><li>Car: Pick-up, Days, Return. Train: Departs, From (the origin station), Arrives.</li><li>Flight (not the hero): Departs, Flight, Arrives; an arrival on another day carries “+1 day”.</li></ul></div><div><h3>Colour</h3><ul><li>Icon strokes: stay <code>#38c6d9</code>, car <code>#f4d35e</code>, train <code>#c79bff</code>, flight <code>#4f9dff</code>.</li><li><b class="gr">Green</b> “Confirmed”; “Changed” and “Cancelled” in amber (frame f).</li><li>The stay icon is a bed. Owner decision 2026-11-21 (#876): the app changes to match, in follow-up pull requests. (The app still draws a building.)</li></ul></div></div>
 </section>
 </main>
 
