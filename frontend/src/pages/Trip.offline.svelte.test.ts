@@ -196,7 +196,7 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
     arrival.target = { segmentId: 5, tripId: 1, at: Date.now() };
     vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
     render(TripPage);
-    expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
     expect(screen.queryByText("Failed to fetch")).not.toBeInTheDocument();
     expect(await screen.findByRole("dialog", { name: "QR code" })).toBeInTheDocument();
     expect(arrival.target).toBeNull();
@@ -217,30 +217,30 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
 
     it("clears it at the deadline, without any other event", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       await vi.advanceTimersByTimeAsync(deadline - Date.now() + 1);
-      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      await vi.waitFor(() => expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument());
       expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
       expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
     });
 
     it("clears it when the app comes back to the front after the deadline", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       vi.setSystemTime(deadline + 60_000);
       document.dispatchEvent(new Event("visibilitychange"));
-      await vi.waitFor(() => expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument());
+      await vi.waitFor(() => expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument());
       expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
     });
 
     it("keeps it while it is still within its retention", async () => {
       open();
-      expect(await screen.findByTestId("offline-banner")).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
       vi.setSystemTime(deadline - 60_000);
       window.dispatchEvent(new Event("focus"));
       await vi.advanceTimersByTimeAsync(1_000);
-      expect(screen.getByTestId("offline-banner")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Trip to Denver" })).toBeInTheDocument();
     });
 
     it("does not show a copy the phone handed over after its deadline", async () => {
@@ -250,7 +250,7 @@ describe("Trip: a warm iPhone app that lost its connection", () => {
       vi.mocked(api).mockRejectedValue(new TypeError("Failed to fetch"));
       render(TripPage);
       expect(await screen.findByText("Failed to fetch")).toBeInTheDocument();
-      expect(screen.queryByTestId("offline-banner")).not.toBeInTheDocument();
+      expect(screen.queryByRole("heading", { name: "Trip to Denver" })).not.toBeInTheDocument();
     });
   });
 

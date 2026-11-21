@@ -113,7 +113,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Widths:** phone, desktop.
 - **Host:** `localhost` (a passkey needs a host name, not an IP address).
 - **Touches:** `Set up offline access`, `Turn on with`, `Unlock`, `Trip to London`.
-- **Expects to see:** `Trip to San Francisco`, `Offline. Saved`, `Harbour Hotel`, `This page needs a connection`.
+- **Expects to see:** `Trip to San Francisco`, `Harbour Hotel`, `This page needs a connection`.
 - **Console errors it expects:** `ERR_INTERNET_DISCONNECTED`, `Failed to load resource`, `Can’t reach Waypoint`.
 - **Drive it:** `tools/control flow offline-trip`; or `poetry run python run.py verify --flow offline-trip`.
 - **What usually breaks:**
