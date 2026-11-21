@@ -51,6 +51,17 @@ describe("Design", () => {
     expect(within(people).getAllByTestId("avatar-stack").map((s) => s.getAttribute("aria-label")?.split(", ").length)).toEqual([1, 3, 6]);
     expect(within(people).getByText("+2")).toBeTruthy();
   });
+  it("sets the airport and time specimens in Geist Mono, and draws the flight cards with no edge or shadow", () => {
+    render(Design);
+    const type = screen.getByRole("heading", { name: "Type" }).closest("section") as HTMLElement;
+    expect(within(type).getByText("MSP").className).toContain("font-mono");
+    expect(within(type).getByText("7:05 AM").className).toContain("font-mono");
+    const card = screen.getByRole("heading", { name: "Flight card" }).closest("section") as HTMLElement;
+    const heroes = card.querySelectorAll("[data-hero]");
+    expect(heroes.length).toBeGreaterThan(0);
+    for (const hero of heroes) expect(hero.className).not.toMatch(/(^|\s)(border|shadow)(-|\s|$)/);
+    for (const code of card.querySelectorAll("[data-code]")) expect(code.className).toContain("font-mono");
+  });
   it("is reachable at #design, under Settings in the navigation", () => {
     expect(pageFor("design")).toBe("design");
     expect(navFor("design")).toBe("settings");

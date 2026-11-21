@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -281,6 +281,52 @@ describe("the three facts", () => {
     const alone = draw({ now: NOW.none }, { travellers: true });
     await screen.findByRole("article");
     expect(alone.container.querySelector("[data-seats]")).toBeNull();
+  });
+});
+
+describe("the type of the hero card", () => {
+  it("sets the airport codes, the times and the seat values in Geist Mono (font-mono), the big fact's time included", async () => {
+    draw(CASES[0]);
+    const card = await screen.findByRole("article");
+    for (const side of ["origin", "destination"]) {
+      expect(card.querySelector(`[data-code='${side}']`)).toHaveClass("font-mono");
+      expect(card.querySelector(`[data-when='${side}']`)).toHaveClass("font-mono");
+    }
+    expect(card.querySelector("[data-big] .font-mono")).toHaveTextContent("9:40 AM");
+    expect(card.querySelector("[data-facts] > div:last-child dd")).toHaveClass("font-mono");
+  });
+
+  it("sets the booked airport struck above a diverted flight's new one, and the struck old departure, in the mono face too", async () => {
+    draw(CASES[6]);
+    const diverted = await screen.findByRole("article");
+    expect(diverted.querySelector("[data-was]")).toHaveClass("font-mono");
+    expect(diverted.querySelector("[data-code='destination']")).toHaveClass("font-mono");
+    cleanup();
+    draw(CASES[2]);
+    const delayed = await screen.findByRole("article");
+    expect(delayed.querySelector("[data-quiet] s")).toHaveClass("font-mono");
+  });
+
+  it("sets each traveller's seat in the mono face", async () => {
+    const two = { ...booked, travelers: [{ id: 1, person_id: null, name: "Jane Doe", seat: "12B" }, { id: 2, person_id: null, name: "Sam Doe", seat: "12A" }] };
+    draw({ segment: two, now: NOW.none }, { travellers: true });
+    const list = await waitFor(() => { const el = document.querySelector("[data-seats]"); expect(el).not.toBeNull(); return el as HTMLElement; });
+    expect([...list.querySelectorAll("li > span.font-mono")].map(flat)).toEqual(["12B", "12A"]);
+  });
+
+  it("has no edge and no shadow, like the booking cards, whatever its state", async () => {
+    for (const c of CASES) {
+      const { unmount } = draw(c);
+      const card = await screen.findByRole("article");
+      expect(card).toHaveClass("bg-card", "rounded-hero");
+      expect(card.className).not.toMatch(/(^|\s)(border|shadow)(-|\s|$)/);
+      unmount();
+    }
+  });
+
+  it("keeps the focus ring of a highlighted card", async () => {
+    draw(CASES[0], { highlight: true });
+    expect(await screen.findByRole("article")).toHaveClass("ring-2", "ring-ring");
   });
 });
 

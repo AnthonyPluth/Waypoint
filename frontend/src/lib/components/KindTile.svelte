@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Building from "@lucide/svelte/icons/building";
+  import Bed from "@lucide/svelte/icons/bed";
   import Car from "@lucide/svelte/icons/car";
   import History from "@lucide/svelte/icons/history";
   import ParkingSquare from "@lucide/svelte/icons/square-parking";
@@ -11,7 +11,7 @@
 
   let { kind, size = 28, decorative = false, outline = false }: { kind: TileKind; size?: 28 | 34 | 36 | 40 | 44; decorative?: boolean; outline?: boolean } = $props();
 
-  const ICONS = { flight: Plane, hotel: Building, car: Car, train: TrainFront, cruise: Ship, parking: ParkingSquare, visit: History } as const;
+  const ICONS = { flight: Plane, hotel: Bed, car: Car, train: TrainFront, cruise: Ship, parking: ParkingSquare, visit: History } as const;
   const NAMES = { flight: "flight", hotel: "stay", car: "rental car", train: "train", cruise: "cruise", parking: "parking", visit: "past visit" } as const;
   const TONES = {
     flight: "bg-kind-flight-soft text-kind-flight",
