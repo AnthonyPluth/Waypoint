@@ -159,6 +159,37 @@ describe("TripPeopleSheet", () => {
     expect(screen.getByLabelText("Someone new")).toHaveValue("");
   });
 
+  it("does not add a guest to another trip when the page moved to it while the guest was being made", async () => {
+    let finish: (guest: unknown) => void = () => {};
+    vi.mocked(api).mockImplementation(async (path, opts) => {
+      if (path === "/api/people") return new Promise((resolve) => { finish = resolve; }) as never;
+      return trip([stay], { id: 9, people: (opts?.body as { people: number[] }).people }) as never;
+    });
+    const view = render(TripPeopleSheet, { props: { open: true, trip: shared(), people: household, me: 1, onsaved, onguest } });
+    const u = userEvent.setup();
+    await u.type(await screen.findByLabelText("Someone new"), "Zed Guest");
+    await u.click(screen.getByRole("button", { name: "Add guest" }));
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/api/people", expect.anything()));
+    await view.rerender({ open: true, trip: trip([stay], { id: 9, people: [3] }), people: household, me: 1, onsaved, onguest });
+    finish(person(5, "Zed Guest", false));
+    await waitFor(() => expect(onguest).toHaveBeenCalledOnce());
+    expect(posts()).toHaveLength(1);
+    expect(onsaved).not.toHaveBeenCalled();
+  });
+
+  it("closes when the page moves to another trip, and ignores an answer that arrives for the old one", async () => {
+    let finish: (next: unknown) => void = () => {};
+    vi.mocked(api).mockImplementation(() => new Promise((resolve) => { finish = resolve; }) as never);
+    const view = render(TripPeopleSheet, { props: { open: true, trip: shared(), people: household, me: 1, onsaved, onguest } });
+    const u = userEvent.setup();
+    await u.click(await screen.findByRole("button", { name: "Add Mia Doe to this trip" }));
+    await waitFor(() => expect(api).toHaveBeenCalledOnce());
+    await view.rerender({ open: true, trip: trip([stay], { id: 9, people: [3] }), people: household, me: 1, onsaved, onguest });
+    finish(trip([flight, stay], { people: [1, 2, 3] }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "People on this trip" })).toBeNull());
+    expect(onsaved).not.toHaveBeenCalled();
+  });
+
   it("shows what the server says when a change is refused, and leaves the page’s trip alone", async () => {
     vi.mocked(api).mockImplementation(async () => { throw Object.assign(new Error("Add at most 40 people"), { status: 400 }); });
     const u = show();

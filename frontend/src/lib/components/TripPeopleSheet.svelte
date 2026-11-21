@@ -19,7 +19,7 @@
   let guestName = $state("");
   let removing = $state<Person | null>(null);
   let removeOpen = $state(false);
-  let adding = $state<{ ids: number[]; names: string[] } | null>(null);
+  let adding = $state<{ tripId: number; ids: number[]; names: string[] } | null>(null);
   let shareOpen = $state(false);
 
   const named = (id: number) => people.find((p) => p.id === id);
@@ -30,19 +30,28 @@
   $effect(() => {
     if (!open) { error = ""; guestName = ""; }
   });
+  let seen = trip.id;
+  $effect(() => {
+    const id = trip.id;
+    if (id === seen) return;
+    seen = id;
+    open = false; removeOpen = false; shareOpen = false; adding = null; removing = null;
+  });
 
   type Refusal = { status?: number; data?: { see_trip?: unknown } };
 
-  async function change(ids: number[], confirm = false): Promise<boolean> {
+  async function change(tripId: number, ids: number[], confirm = false): Promise<boolean> {
     const result = await actGet(async (): Promise<"saved" | "asked"> => {
       const body = { people: ids, ...(confirm ? { confirm: true } : {}) };
       try {
-        onsaved(await apiCall<"POST /api/trips/{id}">(`/api/trips/${trip.id}`, { method: "POST", body }));
+        const next = await apiCall<"POST /api/trips/{id}">(`/api/trips/${tripId}`, { method: "POST", body });
+        if (trip.id === tripId) onsaved(next);
         return "saved";
       } catch (e) {
         const said = e as Refusal;
         if (said.status === 409 && Array.isArray(said.data?.see_trip)) {
-          adding = { ids, names: said.data.see_trip.map((p) => String((p as { name?: unknown }).name ?? "")).filter(Boolean) };
+          if (trip.id !== tripId) return "asked";
+          adding = { tripId, ids, names: said.data.see_trip.map((p) => String((p as { name?: unknown }).name ?? "")).filter(Boolean) };
           shareOpen = true;
           return "asked";
         }
@@ -54,13 +63,13 @@
   }
 
   const add = async (p: Person) => {
-    if (await change([...trip.people, p.id])) toast.success(`${p.display_name} added`);
+    if (await change(trip.id, [...trip.people, p.id])) toast.success(`${p.display_name} added`);
   };
 
   const confirmShare = async () => {
     const pending = adding;
     if (!pending) return true;
-    if (await change(pending.ids, true)) toast.success("Added");
+    if (await change(pending.tripId, pending.ids, true)) toast.success("Added");
     return true;
   };
 
@@ -68,19 +77,22 @@
     e.preventDefault();
     const display_name = guestName.trim();
     if (!display_name || busy) return;
+    const tripId = trip.id;
+    const before = trip.people;
     const created = await actGet(() => apiCall<"POST /api/people">("/api/people", { method: "POST", body: { display_name } }),
       { busy: (on) => (busy = on), onError: (m) => (error = m) });
     if (!created) return;
     onguest(created);
+    if (trip.id !== tripId) return;
     guestName = "";
-    if (await change([...trip.people, created.id])) toast.success(`${created.display_name} added`);
+    if (await change(tripId, [...before, created.id])) toast.success(`${created.display_name} added`);
   }
 
   const askRemove = (p: Person) => { removing = p; removeOpen = true; };
   const remove = async () => {
     const p = removing;
     if (!p) return true;
-    if (await change(trip.people.filter((id) => id !== p.id))) toast.success(`${p.display_name} removed`);
+    if (await change(trip.id, trip.people.filter((id) => id !== p.id))) toast.success(`${p.display_name} removed`);
     return true;
   };
 </script>

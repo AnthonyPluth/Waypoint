@@ -279,6 +279,24 @@
     if (onchanged) onchanged(); else location.hash = "#trips";
   });
 
+  async function peopleChanged(changed: Trip) {
+    let next = changed;
+    const me = app.state?.person_id;
+    if (me != null && !next.people.includes(me)) {
+      try {
+        next = await apiCall<"GET /api/trips/{id}">(`/api/trips/${next.id}`);
+      } catch {
+        peopleOpen = false;
+        toast.success("You no longer see this trip");
+        dropDrafts();
+        if (onchanged) onchanged(); else location.hash = "#trips";
+        return;
+      }
+    }
+    replace(next);
+    onchanged?.();
+  }
+
   const loadOthers = () => act(async () => {
     others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1))
       .sort((a, b) => (b.start_date ?? "").localeCompare(a.start_date ?? ""));
@@ -481,7 +499,7 @@
 </div>
 
 {#if trip}
-  <TripPeopleSheet bind:open={peopleOpen} {trip} {people} me={app.state?.person_id ?? null} onsaved={(next) => { replace(next); onchanged?.(); }} onguest={(guest) => (people = [...people, guest])} />
+  <TripPeopleSheet bind:open={peopleOpen} {trip} {people} me={app.state?.person_id ?? null} onsaved={peopleChanged} onguest={(guest) => (people = [...people, guest])} />
 {/if}
 
 <PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} expanded={expandedId} ontoggle={toggleCard}>

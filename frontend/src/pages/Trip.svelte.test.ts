@@ -8,6 +8,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
+import { toast } from "svelte-sonner";
 import type { LoyaltyEntry, Person, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
 import { app, layout, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
@@ -212,6 +213,28 @@ describe("Trip", () => {
       await u.click(within(confirm).getByRole("button", { name: "Remove" }));
       await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { people: [1] } }));
       expect(await within(sheet).findByRole("button", { name: "Add Sam Doe to this trip" })).toBeEnabled();
+    });
+
+    it("leaves the trip and says so when the viewer takes themselves off and can no longer see it", async () => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      let gone = false;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { gone = true; return { ...held, people: [2], segments: [] } as never; }
+        if (path === "/api/trips/1" && gone) throw Object.assign(new Error("No such trip"), { status: 404 });
+        return answer(path, opts) as never;
+      });
+      const onchanged = vi.fn();
+      render(TripPage, { tripId: 1, onchanged });
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Remove Jane Doe from this trip?" })).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(onchanged).toHaveBeenCalled());
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "People on this trip" })).toBeNull());
+      expect(toast.success).toHaveBeenCalledWith("You no longer see this trip");
     });
 
     it("keeps a flight's travellers and seats", async () => {
