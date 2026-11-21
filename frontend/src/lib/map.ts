@@ -240,9 +240,93 @@ export async function loadStates(): Promise<Country[]> {
 
 export const US_ID = "840";
 
+const POLE = 89.99;
+const SLIVER = 1e-9;
+
+const atPole = (p: LonLat) => Math.abs(p[1]) >= POLE;
+const area = (ring: LonLat[]) => {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    sum += a[0] * b[1] - b[0] * a[1];
+  }
+  return Math.abs(sum) / 2;
+};
+
+function clipLon(points: LonLat[], bound: number, keepGreater: boolean): LonLat[] {
+  const inside = (p: LonLat) => (keepGreater ? p[0] >= bound : p[0] <= bound);
+  const out: LonLat[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const cur = points[i]!;
+    const prev = points[(i + points.length - 1) % points.length]!;
+    const cross = (): LonLat => {
+      const t = (bound - prev[0]) / (cur[0] - prev[0]);
+      return [bound, prev[1] + t * (cur[1] - prev[1])];
+    };
+    if (inside(cur)) {
+      if (!inside(prev)) out.push(cross());
+      out.push(cur);
+    } else if (inside(prev)) out.push(cross());
+  }
+  return out;
+}
+
+export function splitAtAntimeridian(ring: LonLat[]): LonLat[][] {
+  const open: LonLat[] = [];
+  for (const p of ring) {
+    const last = open[open.length - 1];
+    if (!last || last[0] !== p[0] || last[1] !== p[1]) open.push([p[0], p[1]]);
+  }
+  const first = open[0];
+  const end = open[open.length - 1];
+  if (first && end && open.length > 1 && first[0] === end[0] && first[1] === end[1]) open.pop();
+  if (open.length < 3) return [];
+
+  if (open.some(atPole) && open.every((p) => p[0] >= -180 && p[0] <= 180)) {
+    return area(open) > SLIVER ? [[...open, open[0]!]] : [];
+  }
+
+  const unwound: LonLat[] = [];
+  let shift = 0;
+  let wrapped = false;
+  for (const p of open) {
+    const last = unwound[unwound.length - 1];
+    if (last && !atPole(p) && !atPole(open[unwound.length - 1]!)) {
+      const raw = p[0] + shift;
+      if (raw - last[0] > 180) { shift -= 360; wrapped = true; }
+      else if (last[0] - raw > 180) { shift += 360; wrapped = true; }
+    }
+    unwound.push([p[0] + shift, p[1]]);
+  }
+
+  const turns = Math.round((unwound[0]![0] - unwound[unwound.length - 1]![0]) / 360);
+  const lons = unwound.map((p) => p[0]);
+  if (!wrapped && turns === 0 && Math.min(...lons) >= -180 && Math.max(...lons) <= 180) {
+    return area(unwound) > SLIVER ? [[...unwound, unwound[0]!]] : [];
+  }
+
+  if (turns !== 0) {
+    const mean = unwound.reduce((sum, p) => sum + p[1], 0) / unwound.length;
+    const pole = mean >= 0 ? 90 : -90;
+    unwound.push([unwound[unwound.length - 1]![0], pole], [unwound[0]![0], pole]);
+  }
+
+  const pieces: LonLat[][] = [];
+  const low = Math.floor((Math.min(...unwound.map((p) => p[0])) + 180) / 360);
+  const high = Math.floor((Math.max(...unwound.map((p) => p[0])) + 180) / 360);
+  for (let slot = low; slot <= high; slot++) {
+    const lo = -180 + 360 * slot;
+    const hi = 180 + 360 * slot;
+    const kept = clipLon(clipLon(unwound, lo, true), hi, false).map((p): LonLat => [p[0] - 360 * slot, p[1]]);
+    if (kept.length >= 3 && area(kept) > SLIVER) pieces.push([...kept, kept[0]!]);
+  }
+  return pieces;
+}
+
 export function toOverlays(feature: Feature<Geometry>): LonLat[][] {
   const g = feature.geometry;
-  if (g.type === "Polygon") return g.coordinates.map((ring) => ring.map((p) => [p[0], p[1]] as LonLat));
-  if (g.type === "MultiPolygon") return g.coordinates.flatMap((poly) => poly.map((ring) => ring.map((p) => [p[0], p[1]] as LonLat)));
+  if (g.type === "Polygon") return g.coordinates.flatMap((ring) => splitAtAntimeridian(ring.map((p) => [p[0], p[1]] as LonLat)));
+  if (g.type === "MultiPolygon") return g.coordinates.flatMap((poly) => poly.flatMap((ring) => splitAtAntimeridian(ring.map((p) => [p[0], p[1]] as LonLat))));
   return [];
 }
