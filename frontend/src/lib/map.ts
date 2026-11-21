@@ -283,6 +283,10 @@ export function splitAtAntimeridian(ring: LonLat[]): LonLat[][] {
   if (first && end && open.length > 1 && first[0] === end[0] && first[1] === end[1]) open.pop();
   if (open.length < 3) return [];
 
+  if (open.some(atPole) && open.every((p) => p[0] >= -180 && p[0] <= 180)) {
+    return area(open) > SLIVER ? [[...open, open[0]!]] : [];
+  }
+
   const unwound: LonLat[] = [];
   let shift = 0;
   let wrapped = false;

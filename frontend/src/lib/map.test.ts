@@ -296,14 +296,23 @@ describe("what the map hands MapKit", () => {
   it("keeps a ring that runs along the pole, as Antarctica does, in one piece", () => {
     const ring: [number, number][] = [[-180, -85], [0, -80], [180, -85], [180, -90], [-180, -90], [-180, -85]];
     expect(splitAtAntimeridian(ring)).toEqual([ring]);
+    const flat: [number, number][] = [[-180, -85], [180, -85], [180, -90], [-180, -90], [-180, -85]];
+    expect(splitAtAntimeridian(flat)).toEqual([flat]);
   });
 
   it("gives MapKit no full-width ring for the countries that cross 180 degrees", async () => {
     const countries = await loadDetailedCountries();
-    for (const name of ["Russia", "Fiji"]) {
+    for (const name of ["Russia", "Fiji", "Antarctica"]) {
       const found = countries.find((c) => c.properties?.name === name)!;
-      for (const ring of toOverlays(found)) {
-        for (let i = 1; i < ring.length; i++) expect(Math.abs(ring[i]![0] - ring[i - 1]![0])).toBeLessThan(180);
+      const rings = toOverlays(found);
+      expect(rings.length).toBeGreaterThan(0);
+      for (const ring of rings) {
+        for (let i = 1; i < ring.length; i++) {
+          const a = ring[i - 1]!;
+          const b = ring[i]!;
+          if (Math.abs(a[1]) >= 89.99 && Math.abs(b[1]) >= 89.99) continue;
+          expect(Math.abs(b[0] - a[0])).toBeLessThan(180);
+        }
       }
     }
   });
