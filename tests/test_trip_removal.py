@@ -615,6 +615,40 @@ class ClaimingAGuest(Removal):
         with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip"):
             trips.name_traveler(self.c, self.jane, next(t["id"] for t in travellers if t["person_id"] is None), self.sid)
 
+    def moved_out(self, who):
+        self.email(self.jane, self.jid)
+        flight_id = self.c.orm.scalars(select(Segment.id).where(Segment.confirmation == CODE)).one()
+        source = self.c.orm.get(Segment, flight_id).trip_id
+        self.add(self.jane, HOTEL, source)
+        self.put_on(self.jane, source, who)
+        self.take_off(self.jane, source, who)
+        there = self.add(self.jane, FAR, None, self.on(self.jid))["trip_id"]
+        trips.move_segment(self.c, self.jane, flight_id, there, True)
+        self.assertEqual(self.cut_from(flight_id), {who})
+        return flight_id, source, there
+
+    def test_a_guests_cut_from_a_booking_that_left_the_trip_carries_over_to_the_member(self):
+        flight_id, source, there = self.moved_out(self.mia)
+        people.claim_guest(self.c, self.sid, self.mia, "2026-10-05")
+        self.assertEqual(self.cut_from(flight_id), {self.sid})
+        self.assertEqual(self.excluded(source), {self.sid})
+        with no_leaks(self, CODE, CANARY):
+            self.email(self.sam, self.jid)
+        self.assertIsNone(trips.get_segment(self.c, self.sam, flight_id))
+        self.assertIsNone(trips.get(self.c, self.sam, there))
+        self.assertIsNone(trips.get(self.c, self.sam, source))
+        self.assertEqual(self.c.orm.scalars(select(SegmentRecipient.id).where(SegmentRecipient.segment_id == flight_id)).all(), [])
+
+    def test_claiming_a_guest_on_the_trip_a_booking_moved_into_shares_that_trip_as_any_claim_does(self):
+        flight_id, source, there = self.moved_out(self.sid)
+        self.put_on(self.jane, there, self.mia)
+        people.claim_guest(self.c, self.sid, self.mia, "2026-10-05")
+        self.assertEqual(self.cut_from(flight_id), set())
+        self.assertEqual(self.aboard(there), [self.jid, self.sid])
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, flight_id))
+        self.assertIsNone(trips.get(self.c, self.sam, source))
+        self.assertEqual(self.excluded(source), {self.sid})
+
 
 class TheirOwnMailboxAfterwards(ScanCase):
     def test_their_copy_of_the_confirmation_is_kept_with_a_booking_of_their_own_never_with_the_one_they_were_taken_off(self):
