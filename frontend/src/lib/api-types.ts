@@ -447,6 +447,14 @@ export interface Imported {
   existing: number;
 }
 
+export interface Journey {
+  lead: number;
+  leg: number;
+  legs: number;
+  previous: number | null;
+  next: number | null;
+}
+
 export interface LabelsBody {
   labels: string[];
 }
@@ -1039,6 +1047,7 @@ export interface Segment {
   gate_code: GateCode | null;
   price: Price | null;
   links: SegmentLinks;
+  journey?: Journey | null;
 }
 
 export interface SegmentBody {

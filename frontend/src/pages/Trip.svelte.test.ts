@@ -2107,6 +2107,42 @@ describe("Trip layout", () => {
     expect(document.querySelectorAll("[data-hero]")).toHaveLength(1);
   });
 
+  const linked = (leg: 1 | 2) => ({ lead: 1, leg, legs: 2, previous: leg === 2 ? 1 : null, next: leg === 1 ? 6 : null });
+  const first = { ...flight, journey: linked(1) };
+  const onward = segment({ id: 6, origin: "LHR", destination: "DUB", start_local: "2026-11-21T09:00", start_zone: "Europe/London", end_local: "2026-11-21T10:20", end_zone: "Europe/Dublin",
+    details: { flight_number: "AA 9", terminal: "5" }, journey: linked(2) });
+
+  it("draws the next flight as a connection before the first leg, with the stop on the arc and a Then line", async () => {
+    held = trip([first, onward, stay]);
+    render(TripPage);
+    const hero = await screen.findByRole("article", { name: /AA 101/ });
+    expect(hero).toHaveAttribute("data-connection", "before");
+    expect(hero.querySelector("[data-code='destination']")).toHaveTextContent("DUB");
+    expect(hero.querySelector("[data-arc-note]")).toHaveTextContent("1 stop, LHR");
+    expect(hero.querySelector("[data-then]")).toHaveTextContent("Then, at LHR");
+    expect(hero.querySelector("[data-then]")).toHaveTextContent("AA 9 departs 9:00 AM");
+    expect(document.querySelectorAll("[data-hero]")).toHaveLength(1);
+  });
+
+  it("draws the connection as Earlier and Leg 2 of 2 once the first leg has landed", async () => {
+    vi.setSystemTime(Date.UTC(2026, 10, 21, 7, 30));
+    held = trip([first, onward, stay]);
+    render(TripPage);
+    const hero = await screen.findByRole("article", { name: /AA 9/ });
+    expect(hero).toHaveAttribute("data-connection", "during");
+    expect(hero.querySelector("[data-code='origin']")).toHaveTextContent("JFK");
+    expect(hero.querySelector("[data-quiet]")).toHaveTextContent("Leg 2 of 2");
+    expect(hero.querySelector("[data-then]")).toHaveTextContent("Earlier");
+  });
+
+  it("keeps the hero of one flight when the trip's flights carry no journey", async () => {
+    held = trip([flight, { ...onward, journey: undefined }, stay]);
+    render(TripPage);
+    const hero = await screen.findByRole("article", { name: /AA 101/ });
+    expect(hero).not.toHaveAttribute("data-connection");
+    expect(hero.querySelector("[data-then]")).toBeNull();
+  });
+
   it("shows a later flight, a cancelled one and an untimed one as compact booking cards that open their booking", async () => {
     held = trip([flight, later, { ...later, id: 5, status: "cancelled", confirmation: "CNL555", details: { flight_number: "AA 103" } }, stay]);
     render(TripPage);

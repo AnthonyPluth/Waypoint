@@ -2,6 +2,7 @@
   import AvatarStack from "$lib/components/AvatarStack.svelte";
   import AirportCode from "$lib/components/AirportCode.svelte";
   import FlightCard from "$lib/components/FlightCard.svelte";
+  import FlightHome from "$lib/components/FlightHome.svelte";
   import KindTile from "$lib/components/KindTile.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import RouteLine from "$lib/components/RouteLine.svelte";
@@ -53,6 +54,33 @@
     { name: "Scheduled, no live status", now: cardNow.none, segment: flightEA },
     { name: "Scheduled, Premium Economy", now: cardNow.scheduled, status: status(cardNow.scheduled, 4, { dep_terminal: "B" }), segment: { ...flightEA, details: { ...flightEA.details, cabin: "Premium Economy" } } },
   ];
+
+  const NEW_YORK = "America/New_York";
+  const LISBON = "Europe/Lisbon";
+  const crewSeats = (a: string, b: string, c: string) => [
+    { id: 1, person_id: null, name: "Mara Quist", seat: a }, { id: 2, person_id: null, name: "Tomas Reyes", seat: b }, { id: 3, person_id: null, name: "Ines Vale", seat: c },
+  ];
+  const connectionLegs: Segment[] = [
+    {
+      ...flight, id: 11, confirmation: "QZXW74", provider: "Aurora Air", origin: "BOS", destination: "JFK", start_local: "2026-03-09T06:10", start_zone: NEW_YORK,
+      end_local: "2026-03-09T07:28", end_zone: NEW_YORK, details: { flight_number: "AU1402", terminal: "B" }, travelers: crewSeats("14A", "14B", "22C"),
+      journey: { lead: 11, leg: 1, legs: 2, previous: null, next: 12 },
+    },
+    {
+      ...flight, id: 12, confirmation: "QZXW74", provider: "Aurora Air", origin: "JFK", destination: "LIS", start_local: "2026-03-09T09:40", start_zone: NEW_YORK,
+      end_local: "2026-03-09T21:15", end_zone: LISBON, details: { flight_number: "AU212", terminal: "4" }, travelers: crewSeats("31A", "31B", "31C"),
+      journey: { lead: 11, leg: 2, legs: 2, previous: 11, next: null },
+    },
+  ];
+  const connectionNow = { before: instant("2026-03-07T05:00", NEW_YORK), at: instant("2026-03-09T07:50", NEW_YORK) };
+  const connectionStatus = (leg: Segment, now: number, extra: Partial<FlightStatus>): FlightStatus => ({
+    segment_id: leg.id, state: "scheduled", origin: leg.origin ?? "", destination: leg.destination ?? "", dep_scheduled: leg.start_local, dep_estimated: null, dep_actual: null, dep_zone: leg.start_zone,
+    dep_terminal: null, dep_gate: null, arr_scheduled: leg.end_local, arr_estimated: null, arr_actual: null, arr_zone: leg.end_zone, arr_terminal: null, arr_gate: null,
+    delay_minutes: null, fetched_at: minutesBefore(now, 3), ...extra,
+  });
+  const beforeFirst = connectionStatus(connectionLegs[0], connectionNow.before, { dep_terminal: "B", dep_gate: "B9" });
+  const earlierLeg = connectionStatus(connectionLegs[0], connectionNow.at, { state: "landed", dep_actual: "2026-03-09T06:14", arr_actual: "2026-03-09T07:28" });
+  const atStop = connectionStatus(connectionLegs[1], connectionNow.at, { dep_terminal: "4", dep_gate: "B22" });
 
   const tileKinds = ["flight", "hotel", "train", "car", "cruise", "parking", "visit"] as const;
   const crew = ["Jane Doe", "Mia Doe", "Sam Roe", "Lee Poe", "Ann Coe", "Bob Foe"].map((name, i) => ({ id: i + 1, name }));
@@ -141,6 +169,15 @@
       {#each flightCards as c (c.name)}
         <FlightCard segment={c.segment} status={c.status} liveOn now={c.now} />
       {/each}
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-3" aria-labelledby="design-connection">
+    <h2 id="design-connection" class="text-heading">Flight card: a connection</h2>
+    <p class="text-caption text-muted-foreground">Two flights on one booking that follow each other: the whole journey on the arc with the stop, the leg you are on, a Then line before the first leg and an Earlier line during the connection.</p>
+    <div class="grid gap-4 lg:grid-cols-2">
+      <FlightHome segment={connectionLegs[0]} status={beforeFirst} liveOn now={connectionNow.before} eyebrow="Next up" tripName="Trip to Lisbon" tripSegments={connectionLegs} />
+      <FlightHome segment={connectionLegs[1]} status={atStop} liveOn now={connectionNow.at} eyebrow="Next up" tripName="Trip to Lisbon" tripSegments={connectionLegs} statusOf={(id) => (id === 11 ? earlierLeg : undefined)} />
     </div>
   </section>
 

@@ -2,8 +2,8 @@
   import type { Snippet } from "svelte";
   import { arcHeading, arcPoint, arcTravelled } from "$lib/flightcard";
 
-  type Props = { progress: number | null; box?: number; pixels?: number; plane?: number; class?: string; hero?: boolean; landed?: boolean; children?: Snippet };
-  let { progress, box = 60, pixels = 46, plane = 20, class: cls = "", hero = false, landed = false, children }: Props = $props();
+  type Props = { progress: number | null; box?: number; pixels?: number; plane?: number; class?: string; hero?: boolean; landed?: boolean; stops?: number[]; children?: Snippet };
+  let { progress, box = 60, pixels = 46, plane = 20, class: cls = "", hero = false, landed = false, stops = [], children }: Props = $props();
 
   const PLANE = "M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z";
   let width = $state(0);
@@ -18,6 +18,10 @@
       <path d={arcTravelled(progress ?? 0)} fill="none" class={hero ? "stroke-primary" : "stroke-map-route"} stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke" data-travelled />
     {/if}
   </svg>
+  {#each stops as stop (stop)}
+    {@const at = arcPoint(stop, pixels)}
+    <span class="absolute size-2.5 rounded-full bg-card ring-2 ring-muted-foreground" style={`left: ${at.left}%; top: ${at.top}px; transform: translate(-50%, -50%)`} data-stop></span>
+  {/each}
   {#if point}
     <span class={`absolute grid place-items-center ${hero ? (landed ? "text-foreground" : "text-primary") : "text-map-route"}`} style={`width: ${plane + 2}px; height: ${plane + 2}px; left: ${point.left}%; top: ${point.top}px; transform: translate(-50%, -50%) rotate(${90 + heading}deg)`} data-plane><svg style={`width: ${plane}px; height: ${plane}px`} aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d={PLANE} /></svg></span>
   {/if}

@@ -474,6 +474,14 @@ class GateCodeBody(TypedDict):
     image: int
 
 
+class Journey(TypedDict):
+    lead: int
+    leg: int
+    legs: int
+    previous: int | None
+    next: int | None
+
+
 class Segment(TypedDict):
     id: int
     trip_id: int
@@ -504,6 +512,7 @@ class Segment(TypedDict):
     gate_code: GateCode | None
     price: Price | None
     links: SegmentLinks
+    journey: NotRequired[Journey | None]
 
 
 class Trip(TypedDict):
