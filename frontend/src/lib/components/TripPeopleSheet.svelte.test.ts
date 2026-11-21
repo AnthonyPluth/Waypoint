@@ -190,6 +190,21 @@ describe("TripPeopleSheet", () => {
     expect(onsaved).not.toHaveBeenCalled();
   });
 
+  it("keeps the sheet busy until the page has taken the saved trip, so a second change never sends a stale list", async () => {
+    let release: () => void = () => {};
+    onsaved.mockImplementation(() => new Promise<void>((resolve) => { release = resolve; }));
+    const u = show();
+    await u.click(await screen.findByRole("button", { name: "Add Mia Doe to this trip" }));
+    await waitFor(() => expect(onsaved).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "Add Joan Roe to this trip" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Remove Sam Doe from this trip" })).toBeDisabled();
+    expect(toast.success).not.toHaveBeenCalled();
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Add Joan Roe to this trip" })).toBeEnabled());
+    expect(toast.success).toHaveBeenCalledWith("Mia Doe added");
+    expect(posts()).toHaveLength(1);
+  });
+
   it("shows what the server says when a change is refused, and leaves the page’s trip alone", async () => {
     vi.mocked(api).mockImplementation(async () => { throw Object.assign(new Error("Add at most 40 people"), { status: 400 }); });
     const u = show();

@@ -11,7 +11,7 @@
   import { toast } from "svelte-sonner";
 
   let { open = $bindable(false), trip, people, me = null, onsaved, onguest }: {
-    open?: boolean; trip: Trip; people: Person[]; me?: number | null; onsaved: (next: Trip) => void; onguest: (guest: Person) => void;
+    open?: boolean; trip: Trip; people: Person[]; me?: number | null; onsaved: (next: Trip) => void | Promise<void>; onguest: (guest: Person) => void;
   } = $props();
 
   let busy = $state(false);
@@ -45,7 +45,7 @@
       const body = { people: ids, ...(confirm ? { confirm: true } : {}) };
       try {
         const next = await apiCall<"POST /api/trips/{id}">(`/api/trips/${tripId}`, { method: "POST", body });
-        if (trip.id === tripId) onsaved(next);
+        if (trip.id === tripId) await onsaved(next);
         return "saved";
       } catch (e) {
         const said = e as Refusal;
