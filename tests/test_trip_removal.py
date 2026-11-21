@@ -183,6 +183,23 @@ class NothingGivesItBack(Removal):
             trips.edit_segment(self.c, self.jane, flight["id"], {"travelers": self.on(self.jid, self.sid)})
         self.assertEqual(self.aboard(trip_id), [self.jid])
 
+    def test_a_booking_moved_out_to_a_trip_of_its_own_keeps_them_off_it(self):
+        self.email(self.jane, self.jid)
+        flight_id = self.c.orm.scalars(select(Segment.id)).one()
+        trip_id = self.c.orm.get(Segment, flight_id).trip_id
+        self.email(self.sam, self.jid)
+        stay = self.add(self.jane, HOTEL, trip_id)
+        self.put_on(self.jane, trip_id, self.sid)
+        self.take_off(self.jane, trip_id, self.sid)
+        with no_leaks(self, CODE, CANARY):
+            new = trips.move_segment(self.c, self.jane, flight_id, None)
+        self.assertEqual(self.excluded(new["id"]), {self.sid})
+        self.assertIsNone(trips.get(self.c, self.sam, new["id"]))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, flight_id))
+        self.assertIsNone(trips.get(self.c, self.sam, trip_id))
+        self.assertEqual(visibility.visible_trips(self.c, self.sam), [])
+        self.assertIsNotNone(trips.get_segment(self.c, self.jane, stay["id"]))
+
     def test_merging_another_trip_into_it_carries_the_exclusion_on_the_trip_they_were_taken_off(self):
         mine = self.add(self.jane, OUT, None, self.on(self.jid))
         self.email(self.jane, self.jid, fields=FAR_FLIGHT)

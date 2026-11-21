@@ -1732,6 +1732,7 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         target = Trip(name=_name_for(place, seg.start_local), destination=place, auto=True, booked_by=viewer.person_id)
         conn.orm.add(target)
         conn.orm.flush()
+        trippeople.exclude(conn, target.id, trippeople.excluded(conn, seg.trip_id))
     else:
         target = visibility.visible_trip(conn, viewer, trip_id)
         if target is None:
