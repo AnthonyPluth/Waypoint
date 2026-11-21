@@ -81,6 +81,18 @@ class Journeys(Household):
         self.assertEqual((got[c["id"]]["previous"], got[c["id"]]["lead"], got[d["id"]]["leg"]), (None, c["id"], 2))
         self.assertEqual({got[i]["legs"] for i in got}, {2})
 
+    def test_a_same_day_round_trip_on_one_code_is_two_journeys(self):
+        out = leg("BOS", "JFK", "2026-03-09T07:00", "2026-03-09T08:20", "AU1402")
+        home = leg("JFK", "BOS", "2026-03-09T18:00", "2026-03-09T19:20", "AU1403")
+        a, b = self.trip(out, home)
+        self.assertEqual(self.journeys(a["trip_id"]), {a["id"]: None, b["id"]: None})
+
+    def test_a_connection_before_a_same_day_return_stays_linked(self):
+        home = leg("LIS", "BOS", "2026-03-09T23:00", "2026-03-10T05:00", "AU214")
+        a, b, c = self.trip(FIRST, SECOND, home)
+        got = self.journeys(a["trip_id"])
+        self.assertEqual((got[a["id"]]["next"], got[b["id"]]["next"], got[c["id"]]), (b["id"], None, None))
+
     def test_a_cancelled_leg_never_links(self):
         a, b = self.trip(FIRST, {**SECOND, "status": "cancelled"})
         self.assertEqual(self.journeys(a["trip_id"]), {a["id"]: None, b["id"]: None})

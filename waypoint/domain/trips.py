@@ -294,12 +294,17 @@ def _connects(first: Sequence[SegmentOut], then: Sequence[SegmentOut]) -> bool:
     return None not in booked and booked == {_booked_as(seg) for seg in then}
 
 
+def _returns(run: Sequence[Sequence[SegmentOut]], card: Sequence[SegmentOut]) -> bool:
+    start = (run[0][0]["origin"] or "").upper()
+    return (card[0]["destination"] or "").upper() == start
+
+
 def link_journeys(segs: Sequence[SegmentOut]) -> dict[int, JourneyOut]:
     flights = [s for s in segs if s["kind"] == "flight" and s["status"] != "cancelled" and not untimed(s["details"])]
     cards = sorted(flight_groups(flights), key=lambda card: (instant(card[0]["start_local"], card[0]["start_zone"]), card[0]["id"]))
     runs: list[list[list[SegmentOut]]] = []
     for card in cards:
-        if runs and _connects(runs[-1][-1], card):
+        if runs and _connects(runs[-1][-1], card) and not _returns(runs[-1], card):
             runs[-1].append(card)
         else:
             runs.append([card])
