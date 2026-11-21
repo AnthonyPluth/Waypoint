@@ -17,9 +17,8 @@
   import ArrivalCard from "$lib/components/ArrivalCard.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
   import { takeEarlyTrips } from "$lib/early";
-  import AvatarStack from "$lib/components/AvatarStack.svelte";
+  import BookingDetail from "$lib/components/BookingDetail.svelte";
   import { flightCardView, flightsToday, nextFlightShown } from "$lib/flightcard";
-  import { formatMoney } from "$lib/money";
   import { isMobile } from "$lib/platform";
   import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
   import OfflineStatus from "$lib/components/OfflineStatus.svelte";
@@ -27,7 +26,7 @@
   import { dateTile, laterLine, laterTrips, startsIn } from "$lib/side-column";
   import { showsCode } from "$lib/gate-code";
   import RowShowCode from "$lib/components/RowShowCode.svelte";
-  import { type Day, type DayItem, appWord, bookingTravellers, vendorLink, dayIn, dayLabel, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
+  import { type Day, type DayItem, appWord, bookingCards, tripTravellers, vendorLink, dayIn, dayLabel, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
   import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
@@ -47,6 +46,15 @@
   let connecting = $state(false);
   let offlineOpen = $state(false);
   let detail = $state<{ segment: Segment; bookings: Segment[] } | null>(null);
+  let heroDetailOpen = $state(false);
+  let heroOpener: HTMLElement | null = null;
+  const openHeroDetail = (from: HTMLElement) => { heroOpener = from; heroDetailOpen = true; };
+  const afterHeroDetail = (e: Event) => {
+    const back = heroOpener;
+    heroOpener = null;
+    if (back?.isConnected) { e.preventDefault(); back.focus(); }
+  };
+  const nothing = () => {};
 
   function openDetail(e: MouseEvent, segment: Segment, bookings: Segment[]) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
@@ -116,6 +124,14 @@
   const compactFlight = (s: Segment) => s.kind === "flight" && s.status !== "cancelled" && !untimed(s);
   const homeFlight = $derived(next !== null && compactFlight(next.segment)
     && nextFlightShown(flightCardView({ segment: next.segment, status: liveOn ? statusFor(next.segment.id) : undefined, liveOn, now, online, city: (code) => code }), startAt(next.segment), now));
+  const heroCard = $derived(next ? (bookingCards(next.trip.segments).find((c) => c.segments.some((b) => b.id === next.segment.id)) ?? null) : null);
+  const heroEveryone = $derived(next ? tripTravellers(next.trip.segments) : []);
+  const heroFooter = $derived.by(() => {
+    if (!next) return false;
+    const s = next.segment;
+    const linked = !!(s.links.directions || s.links.call);
+    return (next.bookings.length > 1 && timesDiffer(next.bookings)) || (!linked && !!(s.links.app ?? s.manage_url ?? vendorLink(s, isMobile()))) || linked;
+  });
   const todays = $derived(trips ? flightsToday(trips, now, viewerZone()) : []);
   const happened = (i: DayItem) => dayIn(i.role === "end" ? endAt(i.segment) : startAt(i.segment), viewerZone()) < today;
   const firstAhead = $derived(days.findIndex((d) => !d.items.every(happened)));
@@ -143,6 +159,31 @@
       {#each bookings as b (b.id)}
         <span>{b.confirmation ? `${b.confirmation}: ` : ""}{START_WORD[b.kind].toLowerCase()} {dayLabel(b.start_local)}, <PlaceTime local={b.start_local} />, {END_WORD[b.kind].toLowerCase()} {dayLabel(b.end_local)}, <PlaceTime local={b.end_local} /></span>
       {/each}
+    </div>
+  {/if}
+{/snippet}
+
+{#snippet heroFooterContent()}
+  {#if next}
+    {@const s = next.segment}
+    {@render differing(next.bookings)}
+    {@const manage = s.links.app ?? s.manage_url}
+    {@const vendor = vendorLink(s, isMobile())}
+    {#if !(s.links.directions || s.links.call) && manage}
+      <Button variant="action" href={manage} target="_blank" rel="noopener noreferrer" size="sm" class="phone:flex-1">{appWord(s, now, isMobile())}</Button>
+    {:else if !(s.links.directions || s.links.call) && vendor}
+      <Button variant="action" href={vendor.href} size="sm" class="phone:flex-1">{vendor.label}</Button>
+    {/if}
+    {#if s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
+    {#if s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
+  {/if}
+{/snippet}
+
+{#snippet heroDetailActions()}
+  {#if next}
+    {@const s = next.segment}
+    <div class="flex flex-wrap gap-2" role="group" aria-label={`Actions for ${headline(s)}`}>
+      <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" onclick={() => (heroDetailOpen = false)}>Open trip<span class="sr-only">: {next.trip.name}</span></Button>
     </div>
   {/if}
 {/snippet}
@@ -267,25 +308,7 @@
     {@const grounded = proof === "landed" || proof === "cancelled" || proof === "diverted"}
     {@const eyebrow = next.state !== "now" ? "Next up" : s.kind !== "flight" ? "Under way" : grounded ? "Latest flight" : proof === "departed" ? "In the air" : proof === "delayed" ? "Delayed" : "Under way"}
     {#if homeFlight}
-      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} class="mb-6">
-        {#snippet footer()}
-          {@render differing(next.bookings)}
-          {@const manage = s.links.app ?? s.manage_url}
-          {@const vendor = vendorLink(s, isMobile())}
-          {#if !(s.links.directions || s.links.call) && manage}
-            <Button variant="action" href={manage} target="_blank" rel="noopener noreferrer" size="sm" class="phone:flex-1">{appWord(s, now, isMobile())}</Button>
-          {:else if !(s.links.directions || s.links.call) && vendor}
-            <Button variant="action" href={vendor.href} size="sm" class="phone:flex-1">{vendor.label}</Button>
-          {/if}
-          {#each next.bookings.filter((b) => b.confirmation) as b (b.id)}<CopyCode code={b.confirmation ?? ""} class="mono min-h-11 max-w-full break-all text-left font-semibold" />{/each}
-          {#if s.links.directions}<Button href={s.links.directions} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" class="phone:hidden">Directions</Button>{/if}
-          {#if s.links.call}<Button href={s.links.call} variant="outline" size="sm" class="phone:hidden">Call</Button>{/if}
-          <GateCode segment={s} {now} onchanged={load} /><Button href={`#trip/${s.trip_id}?segment=${s.id}`} variant="outline" size="sm" class="phone:flex-1">Open trip<span class="sr-only">: {next.trip.name}</span></Button>
-          {@const travellers = bookingTravellers(next.bookings)}
-          {#if travellers.people.length}<div class="flex w-full items-center gap-2.5"><AvatarStack people={travellers.people} /><span class="min-w-0 truncate text-sm font-medium">{travellers.names}</span></div>{/if}
-          {#if next.bookings.length === 1 && s.price && app.state?.show_costs !== false}<p class="w-full text-sm"><span class="eyebrow">Cost</span> <span class="font-medium" data-cost>{formatMoney(s.price.amount_minor, s.price.currency)}</span></p>{/if}
-        {/snippet}
-      </FlightHome>
+      <FlightHome segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} {online} {eyebrow} tripName={next.trip.name} paused={liveOn ? flightStatus.list?.paused : null} ondetail={openHeroDetail} footer={heroFooter ? heroFooterContent : undefined} class="mb-6" />
     {:else}
       <PassCard segment={s} bookings={next.bookings} {now} level={2} class="mb-6" condensed boarding tripName={next.trip.name} showApp={!(s.links.directions || s.links.call)} {eyebrow} pulse={next.state === "now" && !grounded}>
         {#snippet live()}{#if s.kind === "flight" && s.status !== "cancelled" && !untimed(s)}<FlightStatus segment={s} />{/if}{/snippet}
@@ -390,6 +413,10 @@
   {/if}
   </div>
   </div>
+{/if}
+
+{#if heroDetailOpen && heroCard}
+  <BookingDetail card={heroCard} everyone={heroEveryone} canChange={false} onclose={() => (heroDetailOpen = false)} onedit={nothing} onmove={nothing} onremove={nothing} onCloseAutoFocus={afterHeroDetail} above={heroDetailActions} />
 {/if}
 
 <Sheet bind:open={() => detail !== null, (v) => { if (!v) detail = null; }} title={detail ? headline(detail.segment) : "Booking"}>
