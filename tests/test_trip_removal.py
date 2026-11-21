@@ -171,7 +171,8 @@ class NothingGivesItBack(Removal):
                 trips.move_segment(self.c, self.jane, elsewhere["id"], trip_id, confirmed)
         self.assertEqual(self.c.orm.get(Segment, elsewhere["id"]).trip_id, elsewhere["trip_id"])
         self.assertEqual(self.aboard(trip_id), [self.jid])
-        self.assertSeesNothing(self.sam, trip_id, [flight["id"]])
+        self.assertIsNone(trips.get(self.c, self.sam, trip_id))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, flight["id"]))
 
     def test_naming_them_on_a_booking_of_the_trip_by_hand_is_refused_and_says_why(self):
         flight = self.shared_with_sam()

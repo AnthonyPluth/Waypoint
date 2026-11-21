@@ -72,7 +72,7 @@ class StoringAndReadingTests(RouteCacheCase):
 
     def test_a_second_member_of_the_trip_gets_the_stored_path(self):
         trip, drive = self.trip_with_a_drive()
-        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
+        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ana"], self.person["ben"]], "confirm": True})
         self.assertEqual(self.put("ana", trip, drive)[0], 200)
         status, got = self.look_up("ben", trip, drive)
         self.assertEqual((status, len(got["routes"])), (200, 1))
@@ -340,7 +340,7 @@ class BatchedLookupTests(RouteCacheCase):
         trip, drive = self.trip_with_a_drive()
         self.put("ana", trip, drive)
         self.assertEqual(self.batch("ben", trip), (200, {"trips": []}))
-        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
+        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ana"], self.person["ben"]], "confirm": True})
         self.assertEqual(len(self.batch("ben", trip)[1]["trips"]), 1)
 
     def test_an_old_route_is_still_returned_and_a_long_path_is_thinned_keeping_both_ends(self):
@@ -361,7 +361,7 @@ class BatchedLookupTests(RouteCacheCase):
         second = self.book("ana", SALT_LAKE, trip_id=first["trip_id"])
         trip = first["trip_id"]
         drive = drive_of(self.ok("ana", "GET", f"/api/trips/{trip}/places"))
-        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ben"]], "confirm": True})
+        self.ok("ana", "POST", f"/api/trips/{trip}", {"people": [self.person["ana"], self.person["ben"]], "confirm": True})
         self.assertEqual(self.put("ana", trip, drive)[0], 200)
         self.assertEqual(len(self.batch("ben", trip)[1]["trips"]), 1)
         return trip, drive, first, second
