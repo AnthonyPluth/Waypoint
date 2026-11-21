@@ -13,7 +13,8 @@
   --radius: 1.25rem;
   --background: #0d0c12;
   --foreground: #ffffff;
-  --card: #000000;
+  --card: #1a1922;
+  --card-header: #201f2a;
   --card-foreground: #f3f5f9;
   --popover: #181c26;
   --popover-foreground: #f3f5f9;
@@ -21,15 +22,15 @@
   --primary-foreground: #04101f;
   --action: #3563e0;
   --action-foreground: #ffffff;
-  --secondary: #1a1e29;
+  --secondary: #262531;
   --secondary-foreground: #f3f5f9;
-  --muted: #1a1e29;
+  --muted: #262531;
   --muted-foreground: #a9a8b2;
   --label: #8f8e98;
-  --accent: #1a1e29;
+  --accent: #262531;
   --accent-foreground: #f3f5f9;
   --destructive: #ff7b72;
-  --border: #27262c;
+  --border: #2e2d38;
   --input: #2c3243;
   --ring: #3d8ef7;
   --signal: #eba43b;
@@ -55,7 +56,7 @@
   --status-quiet-ink: var(--muted-foreground);
   --surface-1: var(--card);
   --surface-2: var(--popover);
-  --surface-3: #1f2433;
+  --surface-3: #262531;
   --chart-1: #4f9dff;
   --chart-2: #f6b73c;
   --chart-3: #4fd1b0;
@@ -116,6 +117,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-card-header: var(--card-header);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);

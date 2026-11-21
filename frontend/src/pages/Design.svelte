@@ -164,7 +164,7 @@
 
   <section class="flex flex-col gap-3" aria-labelledby="design-flight-card">
     <h2 id="design-flight-card" class="text-heading">Flight card</h2>
-    <p class="text-caption text-muted-foreground">The flight on the trip page, in its eight states: a black card with no edge or shadow, its airport codes, times and seats in Geist Mono. A fact is marked as from live status (a filled dot) or from the booking (a ring), and a dash is a fact not known yet.</p>
+    <p class="text-caption text-muted-foreground">The flight on the trip page, in its eight states: a raised slate card with no edge or shadow, its airport codes, times and seats in Geist Mono. A fact is marked as from live status (a filled dot) or from the booking (a ring), and a dash is a fact not known yet.</p>
     <div class="grid gap-4 lg:grid-cols-2">
       {#each flightCards as c (c.name)}
         <FlightCard segment={c.segment} status={c.status} liveOn now={c.now} />

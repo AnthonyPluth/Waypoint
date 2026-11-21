@@ -214,7 +214,7 @@
   <h1 class="text-4xl font-bold tracking-tight">Stats</h1>
 </div>
 
-<div class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-black/25 p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="group" aria-label="Choose whose stats and when">
+<div class="mb-6 flex flex-col gap-3 rounded-[18px] border border-border bg-background p-3 md:flex-row md:flex-wrap md:items-center md:gap-x-5 md:gap-y-3 md:p-4" role="group" aria-label="Choose whose stats and when">
   {#if viewport.phone}
     <div class="flex items-center justify-between gap-3">
       <span class="min-w-0 truncate text-sm font-medium">{selectionLabel}</span>

@@ -237,7 +237,7 @@
   <div class="h-40 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" role="progressbar" aria-busy="true" aria-label="Loading"></div>
 {:else}
   {#if trips && trips.length > 0}
-    <form class="mb-6 flex flex-col gap-3 desktop:flex-row desktop:flex-wrap desktop:items-center desktop:gap-x-5 desktop:gap-y-3 desktop:rounded-[18px] desktop:border desktop:border-border desktop:bg-black/25 desktop:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
+    <form class="mb-6 flex flex-col gap-3 desktop:flex-row desktop:flex-wrap desktop:items-center desktop:gap-x-5 desktop:gap-y-3 desktop:rounded-[18px] desktop:border desktop:border-border desktop:bg-background desktop:p-4" role="search" aria-label="Find a trip" onsubmit={(e) => e.preventDefault()}>
       <div class="flex items-center gap-2 desktop:contents">
         <div class="relative min-w-0 flex-1 desktop:max-w-sm desktop:min-w-56">
           <label for="trip-search" class="sr-only">Search trips</label>

@@ -4,8 +4,8 @@ This folder holds the designs of the clean and bold redesign ([#875](https://git
 
 Screens e to k were drawn before a to d were in the repository, from the tokens in [#880](https://github.com/AnthonyPluth/Waypoint/issues/880); a to d use the same tokens and add none:
 
-- Page `#0d0c12`, cards `#000000` with no border, gradient or shadow; corners 30 px on the flight hero card and 24 px on booking cards.
-- Text `#ffffff`, secondary `#a9a8b2`, small uppercase labels `#8f8e98` (11 px, weight 600, 0.09em), one hairline `#27262c` per card.
+- Page `#0d0c12`, cards `#1a1922` (raised slate, [owner decision 2026-11-21](#owner-decision-2026-11-21-option-a-raised-slate); first drawn `#000000`) with no border, gradient or shadow; corners 30 px on the flight hero card and 24 px on booking cards.
+- Text `#ffffff`, secondary `#a9a8b2`, small uppercase labels `#8f8e98` (11 px, weight 600, 0.09em), one hairline `#2e2d38` per card (first drawn `#27262c`).
 - Blue `#3d8ef7` is live, now or the one primary action; green `#4cc38a` is confirmed, on time or good news; amber `#eba43b` is changed or needs attention. Nothing else is coloured.
 - Kind icons are coloured outlines with no chip: flight `#4f9dff`, stay `#38c6d9`, car `#f4d35e`, train `#c79bff`, cruise `#ff8fab`; parking and visit are proposed here (item 4).
 - Type: Inter for everything, with Geist Mono kept for confirmation codes, times and seats, as `docs/src/content/docs/contributing/design.md` documents; the owner chose this on [#877](https://github.com/AnthonyPluth/Waypoint/issues/877) on 2026-11-20.
@@ -25,6 +25,20 @@ Each file is a self-contained HTML page (vector only, no raster images, dark onl
 | #878 8 | [i-upcoming.html](i-upcoming.html) | Upcoming at desktop width; the empty states (no trips, with and without Gmail to connect; nothing next) at phone and desktop |
 | #878 9 | [j-navigation.html](j-navigation.html) | The phone tab bar, frosted (recommended) and plain black, More opened; the side navigation from `lg` |
 | #878 10 | [k-travellers-connection.html](k-travellers-connection.html) | The hero with three travellers' seats, and a connection before the first leg and at the stop |
+
+## Owner decision 2026-11-21: option A, raised slate
+
+The black cards faded into the near-black page, so the owner chose "Option A, Raised slate" for the surface colours on 2026-11-21 (design sign-off given in chat; the options were shown on an artifact page; [#919](https://github.com/AnthonyPluth/Waypoint/issues/919)). It replaces the card and hairline values the files here were first drawn with; text, accents and kind colours do not change.
+
+| Token | Was | Now |
+| --- | --- | --- |
+| Page (`--background`) | `#0d0c12` | `#0d0c12` (unchanged) |
+| Card (`--card`) | `#000000` | `#1a1922` |
+| Hairline and edge (`--border`) | `#27262c` | `#2e2d38` |
+| Card header strip (`--card-header`, the "Next up" band of the pass card) | none | `#201f2a` |
+| Secondary buttons and fills inside cards (`--secondary`, `--muted`, `--accent`, `--surface-3`) | `#1a1e29`, `#1f2433` | `#262531` |
+
+Text `#ffffff`, secondary `#a9a8b2` and labels `#8f8e98` keep at least 4.5:1 on the card (17.4, 7.4 and 5.4), the header strip and the secondary fill. [d-colour-rules.html](d-colour-rules.html) draws the new values. The other files in this folder keep the pixels they were drawn with, which show the first black card; the app and `design.md` follow this decision.
 
 ## Owner decisions on #878 (2026-11-20)
 
@@ -82,8 +96,8 @@ Drawn as the recommendation. Answered on 2026-11-20: the owner's sign-off accept
 
 As approved by the owner in the design session, and as drawn in a to d:
 
-1. Page `#0d0c12`, true-black `#000000` cards, no borders, gradients or shadows; corners 30 px (flight card) and 24 px (booking cards).
-2. Big heavy white type for codes, times and facts; grey `#a9a8b2` for secondary text and `#8f8e98` for small uppercase labels; one hairline `#27262c` per card.
+1. Page `#0d0c12`, true-black `#000000` cards (now `#1a1922`, see "Owner decision 2026-11-21: option A, raised slate"), no borders, gradients or shadows; corners 30 px (flight card) and 24 px (booking cards).
+2. Big heavy white type for codes, times and facts; grey `#a9a8b2` for secondary text and `#8f8e98` for small uppercase labels; one hairline per card (`#27262c`, now `#2e2d38`).
 3. Blue `#3d8ef7` is live, now, or the one primary action; green `#4cc38a` is confirmed, on time, or good news; amber `#eba43b` is changed or needs attention. Nothing else is coloured.
 4. Booking-type icons are coloured outlines with no tinted chip: flight `#4f9dff`, stay `#38c6d9`, car `#f4d35e`, train `#c79bff`, cruise `#ff8fab`.
 5. Confirmation code, cost, address and travellers are behind a tap; "Show code" stays visible on a booking with a QR code.
