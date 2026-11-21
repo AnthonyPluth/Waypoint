@@ -73,8 +73,8 @@
   const type = [
     { name: "Display", cls: "text-display desktop:text-display-lg", sample: "Upcoming" },
     { name: "Hero fact", cls: "text-hero-fact desktop:text-hero-fact-lg", sample: "in 3 h 20 m" },
-    { name: "Airport", cls: "text-airport desktop:text-airport-lg", sample: "MSP" },
-    { name: "Fact", cls: "text-fact desktop:text-fact-lg", sample: "7:05 AM" },
+    { name: "Airport", cls: "font-mono text-airport desktop:text-airport-lg", sample: "MSP" },
+    { name: "Fact", cls: "font-mono text-fact desktop:text-fact-lg", sample: "7:05 AM" },
     { name: "Card fact", cls: "text-fact-card", sample: "Gate B12" },
     { name: "Code", cls: "text-display", sample: "K7Q2ZM" },
     { name: "Title", cls: "text-title", sample: "Upcoming" },
@@ -136,7 +136,7 @@
 
   <section class="flex flex-col gap-3" aria-labelledby="design-flight-card">
     <h2 id="design-flight-card" class="text-heading">Flight card</h2>
-    <p class="text-caption text-muted-foreground">The flight on the trip page, in its eight states. A fact is marked as from live status (a filled dot) or from the booking (a ring), and a dash is a fact not known yet.</p>
+    <p class="text-caption text-muted-foreground">The flight on the trip page, in its eight states: a black card with no edge or shadow, its airport codes, times and seats in Geist Mono. A fact is marked as from live status (a filled dot) or from the booking (a ring), and a dash is a fact not known yet.</p>
     <div class="grid gap-4 lg:grid-cols-2">
       {#each flightCards as c (c.name)}
         <FlightCard segment={c.segment} status={c.status} liveOn now={c.now} />

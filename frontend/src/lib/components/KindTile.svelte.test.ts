@@ -60,4 +60,21 @@ describe("KindTile", () => {
     expect(tile.className).toContain("text-kind-stay");
     expect(tile.className).not.toMatch(/bg-kind|rounded/);
   });
+  it("draws a stay as a bed, in the tinted and the outline form, with its name unchanged", () => {
+    for (const outline of [false, true]) {
+      const { container, unmount } = render(KindTile, { kind: "hotel", outline });
+      const icon = container.querySelector("[data-tile] svg")!;
+      expect(icon.classList.contains("lucide-bed")).toBe(true);
+      expect(icon.classList.contains("lucide-building")).toBe(false);
+      expect(screen.getByRole("img", { name: "stay" })).toBe(container.querySelector("[data-tile]"));
+      unmount();
+    }
+  });
+  it("draws no other kind as a bed", () => {
+    for (const kind of ["flight", "car", "train", "cruise", "parking", "visit"] as const) {
+      const { container, unmount } = render(KindTile, { kind });
+      expect(container.querySelector("[data-tile] svg")!.classList.contains("lucide-bed")).toBe(false);
+      unmount();
+    }
+  });
 });
