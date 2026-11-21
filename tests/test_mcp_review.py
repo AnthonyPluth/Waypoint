@@ -364,6 +364,25 @@ class MatchTests(ReviewTools):
             self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
             self.assertEqual(len(trips.get(conn, self.jane, self.stay["id"])["segments"]), 1)
 
+    def test_a_booking_that_names_a_stranger_attaches_when_the_travellers_are_locked_and_adds_nobody(self):
+        with db.session() as conn:
+            was = conn.execute(select(Segment.locked_fields).where(Segment.id == self.jane_trip["segment"])).scalar()
+            conn.execute(update(Segment).where(Segment.id == self.jane_trip["segment"]).values(locked_fields=json.dumps(["travelers"])))
+            stored_mail.put(conn, self.jane_box, "m-locked", kept(), 5.0)
+            item = self.item(conn, self.jane_box, "m-locked", "match", "2026-10-20",
+                             [({**FLIGHT, "confirmation": "LOCKED1", "travelers": [{"person_id": self.sam.person_id, "name": None}]}, [])])
+        self.addCleanup(self.unlock, self.jane_trip["segment"], was)
+        got = self.tool(WRITE, "match_review_item", {"item_id": item, "segment_id": self.jane_trip["segment"]})
+        self.assertTrue(got["ok"])
+        self.assertNotIn(item, self.left())
+        with db.session() as conn:
+            self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
+            self.assertEqual(trips.get(conn, self.jane, self.jane_trip["id"])["people"], [self.jane.person_id])
+
+    def unlock(self, segment_id: int, was: str | None) -> None:
+        with db.session() as conn:
+            conn.execute(update(Segment).where(Segment.id == segment_id).values(locked_fields=was))
+
     def test_one_of_several_bookings_is_chosen_by_entry_and_the_others_stay(self):
         self.assertIn("say which one", self.refused(WRITE, "match_review_item", {"item_id": self.two_item, "segment_id": self.jane_trip["segment"]}))
         got = self.tool(WRITE, "match_review_item", {"item_id": self.two_item, "entry": 1, "segment_id": self.jane_trip["segment"]})

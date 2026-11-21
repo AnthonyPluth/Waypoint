@@ -1322,7 +1322,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             touched.append(added["id"])
         return "added"
     seg = found[0]
-    if assistant and (owning := conn.orm.get(Trip, seg.trip_id)) is not None:
+    if assistant and "travelers" not in decode_locked(seg.locked_fields) and (owning := conn.orm.get(Trip, seg.trip_id)) is not None:
         _refuse_newcomers(conn, viewer, owning, fields.get("travelers") or [], True)
     photogrants.lock_trips(conn, [seg.trip_id])
     windows = _before(conn, [seg.trip_id])
