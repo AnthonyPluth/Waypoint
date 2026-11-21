@@ -475,6 +475,31 @@ describe("Upcoming", () => {
     expect(await screen.findByText(/Nothing coming up/)).toBeInTheDocument();
   });
 
+  describe("the trip in progress", () => {
+    const staying = trip([segment({ id: 50, trip_id: 5, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-20T15:00", start_zone: NY,
+      end_local: "2026-11-27T11:00", end_zone: NY, details: {} })], { id: 5, name: "Beach stay", start_date: "2026-11-20", end_date: "2026-11-27" });
+    const quick = trip([segment({ id: 60, trip_id: 6, start_local: "2026-11-22T09:00", end_local: "2026-11-22T12:00", end_zone: NY })], { id: 6, name: "Quick flight", start_date: "2026-11-22", end_date: "2026-11-22" });
+
+    it("stays first, with the later trip under Later, although the later trip has a booking sooner", async () => {
+      at("2026-11-21T10:00:00-05:00");
+      serve([quick, staying]);
+      render(Upcoming);
+      expect(await screen.findByRole("heading", { name: "Beach stay", level: 2 })).toBeInTheDocument();
+      expect(screen.getByRole("list", { name: "Beach stay, day by day" })).toBeInTheDocument();
+      expect(within(screen.getByRole("region", { name: "Later" })).getByRole("link", { name: "Quick flight" })).toHaveAttribute("href", "#trip/6");
+    });
+
+    it("stays listed with its day by day when no booking has a time, and does not say nothing is coming up", async () => {
+      at("2026-11-21T10:00:00-05:00");
+      const unknown = trip([segment({ id: 70, trip_id: 7, kind: "hotel", provider: "Marriott", origin: "Harbour Hotel", destination: null, start_local: "2026-11-20T00:00", start_zone: NY,
+        end_local: "2026-11-23T00:00", end_zone: NY, details: { time_unknown: "yes" } })], { id: 7, name: "Cabin", start_date: "2026-11-20", end_date: "2026-11-23" });
+      serve([unknown]);
+      render(Upcoming);
+      expect(await screen.findByRole("heading", { name: "Cabin", level: 2 })).toBeInTheDocument();
+      expect(screen.queryByText(/Nothing coming up/)).toBeNull();
+    });
+  });
+
   it("doesn't leave stale trips looking current when a reload fails, and loads again on Try again", async () => {
     at("2026-11-20T09:00:00-05:00");
     vi.mocked(api).mockRejectedValueOnce(new Error("Waypoint is unreachable"));
