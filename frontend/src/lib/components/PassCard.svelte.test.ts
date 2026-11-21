@@ -56,7 +56,8 @@ describe("a flight pass", () => {
   });
   it("shows terminal, seat and cabin under the tear, and the booking chip", () => {
     render(PassCard, goes());
-    for (const text of ["Terminal", "8", "Seat", "14C", "Cabin", "Economy", "Confirmed"]) expect(screen.getByText(text)).toBeInTheDocument();
+    for (const text of ["Terminal", "8", "Seat", "14C", "Cabin", "Economy"]) expect(screen.getByText(text)).toBeInTheDocument();
+    expect(screen.queryByText("Confirmed")).toBeNull();
     expect(screen.queryByText("Gate")).toBeNull();
   });
   it("lists the travellers' seats in order", () => {
@@ -67,7 +68,7 @@ describe("a flight pass", () => {
   it("leaves out a terminal or a seat it doesn’t have", () => {
     render(PassCard, goes({ details: { flight_number: "AA 101" }, travelers: [] }));
     for (const text of ["Terminal", "Seat", "Cabin", "Gate"]) expect(screen.queryByText(text)).toBeNull();
-    expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("Confirmed")).toBeNull();
   });
   it("shows the times exactly as stored, never converted", () => {
     const { container } = render(PassCard, goes());
@@ -163,7 +164,7 @@ describe("live status on a pass", () => {
     flightStatus.list = list({ enabled: false });
     render(PassCard, goes());
     expect(screen.queryByText("Delayed 50 min")).toBeNull();
-    expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("Confirmed")).toBeNull();
   });
 });
 
@@ -459,11 +460,17 @@ describe("airports and days on a flight pass", () => {
 describe("the boarding-pass variant", () => {
   const board = (extra: Record<string, unknown> = {}, seg: object = {}) => ({ segment: { ...flight, ...seg }, now: dep - 3 * HOUR, boarding: true, tripName: "Trip to London", eyebrow: "Next up", ...extra });
 
+  it("shows a changed or cancelled booking chip in the header, readable by screen readers", () => {
+    render(PassCard, board({}, { status: "changed" }));
+    expect(screen.getByText("Changed")).toBeInTheDocument();
+    expect(screen.getByText("Changed")).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
+  });
   it("shows the eyebrow, the trip name, the chips and the countdown in the header", () => {
     render(PassCard, board());
     expect(screen.getByText("Next up")).toBeInTheDocument();
     expect(screen.getByText(/Trip to London/)).toBeInTheDocument();
-    expect(screen.getByText("Confirmed")).toBeInTheDocument();
+    expect(screen.queryByText("Confirmed")).toBeNull();
     expect(screen.getByText("Check-in is open, departs in 3 h")).toBeInTheDocument();
     expect(document.querySelector("[data-countdown] strong")).toHaveTextContent("3 h");
   });

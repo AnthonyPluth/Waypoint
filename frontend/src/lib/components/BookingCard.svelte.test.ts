@@ -57,7 +57,8 @@ describe("BookingCard facts", () => {
   it("names the booking, its kind and place, and that it is confirmed", () => {
     show(stay);
     const header = screen.getByRole("button", { name: /Hotel Example/ });
-    expect(header).toHaveTextContent("Stay · Lisbon · Confirmed");
+    expect(header).toHaveTextContent("Stay · Lisbon");
+    expect(header).not.toHaveTextContent("Confirmed");
     expect(header).toHaveAttribute("aria-haspopup", "dialog");
   });
 

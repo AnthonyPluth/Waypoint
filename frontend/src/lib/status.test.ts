@@ -30,10 +30,14 @@ describe("liveChip", () => {
 describe("segmentChips", () => {
   const flight = { state: "delayed", delay_minutes: 25 } as const;
   it("shows the live chip after the booking chip when live status is on", () => {
-    expect(segmentChips("confirmed", flight, true)).toEqual({
-      booking: { label: "Confirmed", tone: "ok" },
+    expect(segmentChips("changed", flight, true)).toEqual({
+      booking: { label: "Changed", tone: "warn" },
       live: { label: "Delayed 25 min", tone: "warn" },
     });
+  });
+  it("has no booking chip for a confirmed booking", () => {
+    expect(segmentChips("confirmed", null, false).booking).toBeNull();
+    expect(segmentChips("confirmed", flight, true).live).toEqual({ label: "Delayed 25 min", tone: "warn" });
   });
   it("has no live chip when live status is off, whatever the flight says", () => {
     expect(segmentChips("confirmed", flight, false).live).toBeNull();

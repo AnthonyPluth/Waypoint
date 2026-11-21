@@ -16,7 +16,7 @@
   const name = $derived(s.kind === "train" ? bookingName(s) : headline(s));
   const where = $derived(s.kind === "hotel" ? placeOf(s.details.address) || s.destination : dayLabel(s.start_local));
   const subtitle = $derived([KIND_WORD[s.kind], where].filter(Boolean).join(" · "));
-  const status = $derived(card.cancelled ? { word: "Cancelled", tone: "text-signal" } : card.changed ? { word: "Changed", tone: "text-signal" } : s.kind === "visit" ? null : { word: "Confirmed", tone: "text-success" });
+  const status = $derived(card.cancelled ? { word: "Cancelled", tone: "text-signal" } : card.changed ? { word: "Changed", tone: "text-signal" } : null);
   const facts = $derived(cardFacts(s));
   const struck = $derived(card.cancelled);
   const code = $derived(!card.cancelled && showsCode(s, endAt(s), now));
