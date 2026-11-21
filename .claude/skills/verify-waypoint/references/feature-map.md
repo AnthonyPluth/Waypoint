@@ -373,6 +373,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/7`.
 - **Widths:** phone, desktop.
+- **Touches:** `Trip options`.
 - **Expects to see:** `Remove from this trip`, `of 12`, `12 photos from your library`, `13 photos from your library`, `Removed from this trip (1)`, `13 photos`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-remove`; or `poetry run python run.py verify --flow photos-remove`.
@@ -389,6 +390,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/5`, `#trip/7`.
 - **Widths:** desktop.
+- **Touches:** `Trip options`.
 - **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `aren’t on it. Only you see this.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `Denver`, `13 photos from your library`, `Everyone on this trip`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-trip-sharing-desktop`; or `poetry run python run.py verify --flow photos-trip-sharing-desktop`.
@@ -397,6 +399,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/2`, `#trip/7`.
 - **Widths:** phone.
+- **Touches:** `Trip options`.
 - **Expects to see:** `Only you see this. Nothing from your library is on the trip until you share it.`, `aren’t on it. Only you see this.`, `right away, for everyone: the gallery, the map, the replay and the trip’s counts.`, `Denver`, `13 photos from your library`, `Everyone on this trip`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow photos-trip-sharing`; or `poetry run python run.py verify --flow photos-trip-sharing`.
