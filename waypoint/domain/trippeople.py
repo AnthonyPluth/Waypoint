@@ -17,8 +17,17 @@ def of(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, list[int]]:
     return out
 
 
+def excluded_from(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, set[int]]:
+    ids = list(dict.fromkeys(trip_ids))
+    out: dict[int, set[int]] = {i: set() for i in ids}
+    if ids:
+        for row in conn.orm.scalars(select(TripExclusion).where(TripExclusion.trip_id.in_(ids))).all():
+            out[row.trip_id].add(row.person_id)
+    return out
+
+
 def excluded(conn: db.Connection, trip_id: int) -> set[int]:
-    return set(conn.orm.scalars(select(TripExclusion.person_id).where(TripExclusion.trip_id == trip_id)).all())
+    return excluded_from(conn, [trip_id])[trip_id]
 
 
 def exclude(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
@@ -33,14 +42,19 @@ def restore(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> Non
 
 
 def add(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
-    wanted = list(dict.fromkeys(person_ids))
-    restore(conn, trip_id, wanted)
+    out = excluded(conn, trip_id)
     have = set(of(conn, [trip_id])[trip_id])
-    for person_id in wanted:
-        if person_id not in have:
+    for person_id in dict.fromkeys(person_ids):
+        if person_id not in have and person_id not in out:
             conn.orm.add(TripPerson(trip_id=trip_id, person_id=person_id))
             have.add(person_id)
     conn.orm.flush()
+
+
+def put_back(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
+    wanted = list(dict.fromkeys(person_ids))
+    restore(conn, trip_id, wanted)
+    add(conn, trip_id, wanted)
 
 
 def remove(conn: db.Connection, trip_id: int, person_ids: Sequence[int]) -> None:
@@ -63,5 +77,4 @@ def on_lists(conn: db.Connection, trip_id: int) -> list[int]:
 
 
 def keep_lists_inside(conn: db.Connection, trip_id: int) -> None:
-    out = excluded(conn, trip_id)
-    add(conn, trip_id, [p for p in on_lists(conn, trip_id) if p not in out])
+    add(conn, trip_id, on_lists(conn, trip_id))

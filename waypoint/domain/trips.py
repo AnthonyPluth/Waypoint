@@ -844,11 +844,12 @@ def _involved(conn: db.Connection, trip_ids: Sequence[int]) -> tuple[list[Segmen
 def _candidates(conn: db.Connection, viewer: Viewer) -> list[Candidate]:
     trips = [t for t in visibility.visible_trips(conn, viewer) if t.auto and t.start_date and t.end_date]
     segs, who = _involved(conn, [t.id for t in trips])
+    out = trippeople.excluded_from(conn, [t.id for t in trips])
     found = []
     for t in trips:
         legs = sorted((s for s in segs if s.trip_id == t.id and s.kind in ("flight", "train") and s.status != "cancelled"),
                       key=lambda s: instant(s.start_local, s.start_zone))
-        people_on = set(who[t.id]) | ({t.booked_by} if t.booked_by is not None else set())
+        people_on = (set(who[t.id]) | ({t.booked_by} if t.booked_by is not None else set())) - out[t.id]
         found.append(Candidate(t.id, Facts(date.fromisoformat(t.start_date or ""), date.fromisoformat(t.end_date or ""),
                                            frozenset(people_on)), tuple((s.origin, s.destination) for s in legs)))
     return found
@@ -965,9 +966,16 @@ def refresh(conn: db.Connection, trip: Trip) -> None:
     conn.orm.flush()
 
 
+def _unbarred(conn: db.Connection, trip_id: int, travelers: Sequence[TravelerIn]) -> list[TravelerIn]:
+    out = trippeople.excluded(conn, trip_id)
+    return [t for t in travelers if t["person_id"] is None or t["person_id"] not in out]
+
+
 def _set_travelers(conn: db.Connection, segment_id: int, travelers: Sequence[TravelerIn]) -> None:
+    seg = conn.orm.get(Segment, segment_id)
+    kept = _unbarred(conn, seg.trip_id, travelers) if seg is not None else list(travelers)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id == segment_id))
-    for t in travelers:
+    for t in kept:
         conn.orm.add(SegmentTraveler(segment_id=segment_id, person_id=t["person_id"], name=t["name"], seat=t.get("seat")))
     seg = conn.orm.get(Segment, segment_id)
     if seg is not None:
@@ -1037,6 +1045,7 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
             conn.orm.flush()
     if source != "email":
         _refuse_excluded(conn, trip, (t["person_id"] for t in travelers if t["person_id"] is not None))
+    travelers = _unbarred(conn, trip.id, travelers)
     before = _auto_name(conn, trip) if values["kind"] == "visit" else None
     named = [t["person_id"] for t in travelers if t["person_id"] is not None]
     for_everyone = (values["kind"] in SHARED_KINDS
@@ -1390,7 +1399,7 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         changed.append("check_times")
     if "travelers" not in locked:
         have = {_who(t) for t in old}
-        extra = [t for t in _travelers(conn, fields.get("travelers") or []) if _who(t) not in have
+        extra = [t for t in _unbarred(conn, seg.trip_id, _travelers(conn, fields.get("travelers") or [])) if _who(t) not in have
                  and not (t["person_id"] is None and any(o["person_id"] is None and (o["name"] or "").casefold() == (t["name"] or "").casefold()
                                                          for o in old))]
         if extra:
@@ -1504,7 +1513,8 @@ def _confirm_adding(conn: db.Connection, viewer: Viewer, newly: set[int], confir
 
 def _refuse_newcomers(conn: db.Connection, viewer: Viewer, trip: Trip, travelers: Sequence[TravelerIn], assistant: bool) -> None:
     if assistant:
-        _confirm_adding(conn, viewer, {p for t in travelers if (p := t.get("person_id")) is not None} - _seeing(conn, trip), False)
+        named = {p for t in travelers if (p := t.get("person_id")) is not None}
+        _confirm_adding(conn, viewer, named - _seeing(conn, trip) - trippeople.excluded(conn, trip.id), False)
 
 
 def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | None:
@@ -1514,20 +1524,34 @@ def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | N
         .order_by(Segment.id)).first()
 
 
-def _cut_ties(conn: db.Connection, segment_ids: Sequence[int], from_trip_id: int) -> None:
-    out = list(trippeople.excluded(conn, from_trip_id))
-    if out and segment_ids:
-        conn.execute(update(Segment).where(Segment.id.in_(list(segment_ids)), Segment.booked_by.in_(out)).values(booked_by=None))
-        conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(list(segment_ids)), SegmentRecipient.person_id.in_(out)))
-        conn.orm.flush()
-        conn.orm.expire_all()
+def _relocate(conn: db.Connection, segment_ids: Sequence[int], source_id: int, target: Trip) -> None:
+    ids = list(dict.fromkeys(segment_ids))
+    target_id = target.id
+    out = trippeople.excluded(conn, source_id)
+    trippeople.exclude(conn, target_id, out - _seeing(conn, target))
+    seen = list(out - trippeople.excluded(conn, target_id))
+    if ids and seen:
+        conn.execute(update(Segment).where(Segment.id.in_(ids), Segment.booked_by.in_(seen)).values(booked_by=None))
+        conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(ids), SegmentRecipient.person_id.in_(seen)))
+        conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id.in_(ids), SegmentTraveler.person_id.in_(seen)))
+    if ids:
+        conn.execute(update(Segment).where(Segment.id.in_(ids)).values(trip_id=target_id))
+    conn.orm.flush()
+    conn.orm.expire_all()
+
+
+def _tied(conn: db.Connection, seg: Segment) -> set[int]:
+    received = conn.orm.scalars(select(SegmentRecipient.person_id).where(SegmentRecipient.segment_id == seg.id)).all()
+    tied = {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None} \
+        | ({seg.booked_by} if seg.booked_by is not None else set()) | set(received)
+    return tied - trippeople.excluded(conn, seg.trip_id)
 
 
 def _refuse_excluded(conn: db.Connection, trip: Trip, person_ids: Iterable[int]) -> None:
     barred = set(person_ids) & trippeople.excluded(conn, trip.id)
     if barred:
         names = ", ".join(p["name"] for p in _named(conn, barred))
-        raise Invalid(f"{names} was taken off this trip. Add them to the trip’s people first.")
+        raise Invalid(f"{names} was taken off this trip, or off a trip its bookings came from. Add them to the trip’s people first.")
 
 
 def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence[int], confirmed: bool) -> None:
@@ -1548,7 +1572,7 @@ def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence
         conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id.in_(leaving), SegmentTraveler.segment_id.in_(own)))
         trippeople.remove(conn, trip.id, leaving)
         trippeople.exclude(conn, trip.id, leaving)
-    trippeople.add(conn, trip.id, wanted)
+    trippeople.put_back(conn, trip.id, wanted)
 
 
 def create_trip(conn: db.Connection, viewer: Viewer, fields: TripIn, confirmed: bool = False) -> TripOut:
@@ -1641,23 +1665,21 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     windows = _before(conn, [trip.id])
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
-    carried = trippeople.excluded(conn, other.id) - _seeing(conn, trip) - set(joined)
-    _cut_ties(conn, list(conn.orm.scalars(select(Segment.id).where(Segment.trip_id == other.id)).all()), other.id)
     trippeople.restore(conn, trip.id, _seeing(conn, other))
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))
                                 .order_by(Segment.id)).all():
         if set(aboard[seg.trip_id]) != set(joined):
             _freeze(conn, seg, aboard[seg.trip_id])
-    conn.execute(update(Segment).where(Segment.trip_id == other.id).values(trip_id=trip.id))
+    _relocate(conn, list(conn.orm.scalars(select(Segment.id).where(Segment.trip_id == other.id)).all()), other.id, trip)
     trippeople.add(conn, trip.id, joined)
-    trippeople.exclude(conn, trip.id, carried)
     trippeople.clear(conn, other.id)
+    left_behind = trippeople.excluded(conn, other.id) - trippeople.excluded(conn, trip.id)
     trip.auto = False
     if other.destination_manual and not trip.destination_manual:
         trip.destination, trip.destination_manual = other.destination, True
     trip.notes = trip.notes or other.notes
     trip.booked_by = trip.booked_by if trip.booked_by is not None else (
-        other.booked_by if other.booked_by not in trippeople.excluded(conn, other.id) else None)
+        other.booked_by if other.booked_by not in left_behind else None)
     conn.orm.flush()
     refresh(conn, trip)
     photogrants.merged(conn, trip.id, other.id)
@@ -1685,12 +1707,9 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     leaving = list(conn.orm.scalars(select(Segment).where(Segment.id.in_(list(moving))).order_by(Segment.id)).all())
     before = trippeople.of(conn, [trip.id])[trip.id]
     listed = [t["person_id"] for s in leaving if not s.travelers_from_trip for t in effective_travelers(conn, s) if t["person_id"] is not None]
-    out = trippeople.excluded(conn, trip.id)
-    joined = [p for p in (before if any(s.travelers_from_trip for s in leaving) else listed) if p not in out]
+    joined = before if any(s.travelers_from_trip for s in leaving) else listed
+    _relocate(conn, sorted(moving), trip.id, new)
     trippeople.add(conn, new.id, joined)
-    trippeople.exclude(conn, new.id, out)
-    conn.execute(update(Segment).where(Segment.id.in_(list(moving))).values(trip_id=new.id))
-    conn.orm.flush()
     if not conn.orm.scalars(select(Segment.id).where(Segment.trip_id == trip.id, Segment.travelers_from_trip.is_(True))).first():
         trippeople.remove(conn, trip.id, [p for p in before if p not in trippeople.on_lists(conn, trip.id)])
     trip.auto = False
@@ -1709,10 +1728,7 @@ def _named(conn: db.Connection, ids: set[int]) -> list[NamedPerson]:
 
 
 def _needs_confirmation(conn: db.Connection, seg: Segment, target: Trip) -> None:
-    received = conn.orm.scalars(select(SegmentRecipient.person_id).where(SegmentRecipient.segment_id == seg.id)).all()
-    moving = {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None} \
-        | ({seg.booked_by} if seg.booked_by is not None else set()) | set(received)
-    moving -= trippeople.excluded(conn, seg.trip_id)
+    moving = _tied(conn, seg)
     there = _seeing(conn, target)
     see_booking, see_trip = _named(conn, there - moving), _named(conn, moving - there)
     if not see_booking and not see_trip:
@@ -1744,23 +1760,20 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         target = Trip(name=_name_for(place, seg.start_local), destination=place, auto=True, booked_by=viewer.person_id)
         conn.orm.add(target)
         conn.orm.flush()
-        trippeople.exclude(conn, target.id, trippeople.excluded(conn, seg.trip_id))
     else:
         target = visibility.visible_trip(conn, viewer, trip_id)
         if target is None:
             return None
-        _refuse_excluded(conn, target, {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None})
+        _refuse_excluded(conn, target, _tied(conn, seg))
         if not viewer.household and not confirmed:
             _needs_confirmation(conn, seg, target)
-        _cut_ties(conn, [seg.id], seg.trip_id)
         target.auto = False
+    from_id = seg.trip_id
     if seg.travelers_from_trip:
-        aboard = trippeople.of(conn, [seg.trip_id, target.id])
-        if set(aboard[seg.trip_id]) != set(aboard[target.id]):
-            _freeze(conn, seg, aboard[seg.trip_id])
-    conn.execute(update(Segment).where(Segment.id == seg.id).values(trip_id=target.id))
-    conn.orm.flush()
-    conn.orm.expire_all()
+        aboard = trippeople.of(conn, [from_id, target.id])
+        if set(aboard[from_id]) != set(aboard[target.id]):
+            _freeze(conn, seg, aboard[from_id])
+    _relocate(conn, [seg.id], from_id, target)
     trippeople.keep_lists_inside(conn, target.id)
     refresh(conn, target)
     photogrants.trips_changed(conn, [target.id], windows)

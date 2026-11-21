@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, TypedDict
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 
 from ..storage import db, photo_sources
 from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripExclusion, TripPerson
@@ -197,6 +197,11 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
         raise NotAGuest()
     if decode_links(me.links):
         raise AlreadyClaimed()
+    barred = select(TripExclusion.trip_id).where(TripExclusion.person_id == member_id)
+    conn.execute(delete(TripPerson).where(TripPerson.person_id == guest_id, TripPerson.trip_id.in_(barred)))
+    conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id,
+                                               SegmentTraveler.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(barred))))
+                 .values(person_id=None, name=func.coalesce(SegmentTraveler.name, guest.display_name)))
     mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
     conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))

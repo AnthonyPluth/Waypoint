@@ -327,6 +327,32 @@ rules:
     paths:
       include: ["/waypoint/server/"]
 
+  - id: waypoint-booking-changes-trip
+    message: >-
+      A booking changes trip only through _relocate in waypoint/domain/trips.py, which takes the exclusions of the trip it
+      leaves (trip_exclusions) into a trip the people taken off don't already see and otherwise drops their booker, mailbox
+      and traveller ties, so moving, merging or splitting never gives someone back a trip or booking they were taken off
+      (AGENTS.md, "You see the trips you're on"). Call _relocate instead of setting a segment's trip_id.
+    severity: ERROR
+    languages: [python]
+    pattern-either:
+      - patterns:
+          - pattern: $Q.values(..., trip_id=$V, ...)
+          - metavariable-regex:
+              metavariable: $Q
+              regex: (?s)^(update\(\s*Segment\b|Segment\.__table__\.update\(|schema\.segments\.update\()
+          - pattern-not-inside: |
+              def _relocate(...):
+                  ...
+      - patterns:
+          - pattern: $SEG.trip_id = $V
+          - pattern-not-inside: |
+              def _relocate(...):
+                  ...
+    paths:
+      include: ["/waypoint/"]
+      exclude: ["/waypoint/storage/", "/waypoint/domain/photos.py"]
+
   - id: waypoint-photo-access
     message: >-
       A photo is read for a request only through the one access predicate in waypoint/domain/photos.py (visible, and
