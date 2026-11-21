@@ -86,7 +86,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#upcoming`.
 - **Widths:** phone, desktop.
 - **Touches:** `LHR → JFK`.
-- **Expects to see:** `Upcoming`, `IN THE AIR`, `Landing in`, `Departed`.
+- **Expects to see:** `Upcoming`, `IN THE AIR`, `CONFIRMATION`, `Landing in`, `Departed`.
 - **Fakes (the demo server can't):** `fake_flight_status`.
 - **Drive it:** `tools/control flow flight-rows`; or `poetry run python run.py verify --flow flight-rows`.
 
