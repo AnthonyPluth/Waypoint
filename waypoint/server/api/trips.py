@@ -284,7 +284,11 @@ def api_segment_add(conn, _q, body: SegmentBody) -> Segment:
     trip_id = body.get("trip_id")
     into = None if trip_id is None else row_id(trip_id, NO_TRIP)
     fields = segment_fields(body)
-    return Segment(**_run(lambda: trips.add_segment(conn, who, fields, into), NO_TRIP))
+    assistant = _assistant()
+    try:
+        return Segment(**_run(lambda: trips.add_segment(conn, who, fields, into, assistant=assistant), NO_TRIP))
+    except trips.NeedsConfirmation as e:
+        raise _needs_the_person(e, assistant) from None
 
 
 def api_segment(conn, _q, _b, segment_id) -> Segment:
@@ -321,8 +325,11 @@ def api_segment_code_choose(conn, _q, body: GateCodeBody, segment_id) -> Segment
 
 
 def api_segment_edit(conn, _q, body: SegmentEdit, segment_id) -> Segment:
-    who, fields = viewer(conn), segment_fields(body)
-    return Segment(**_run(lambda: trips.edit_segment(conn, who, row_id(segment_id, NO_SEGMENT), fields), NO_SEGMENT))
+    who, fields, assistant = viewer(conn), segment_fields(body), _assistant()
+    try:
+        return Segment(**_run(lambda: trips.edit_segment(conn, who, row_id(segment_id, NO_SEGMENT), fields, assistant), NO_SEGMENT))
+    except trips.NeedsConfirmation as e:
+        raise _needs_the_person(e, assistant) from None
 
 
 def api_segment_remove(conn, _q, _b, segment_id) -> Ok:

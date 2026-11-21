@@ -350,6 +350,39 @@ class MatchTests(ReviewTools):
         with db.session() as conn:
             self.assertEqual(len(trips.get(conn, self.jane, self.stay["id"])["segments"]), 2)
 
+    def test_a_booking_that_names_someone_who_cannot_see_the_trip_is_never_added_or_attached_by_an_assistant(self):
+        named = {**FLIGHT, "confirmation": "NAMEDS1", "travelers": [{"person_id": self.sam.person_id, "name": None}]}
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-named", kept(), 5.0)
+            item = self.item(conn, self.jane_box, "m-named", "match", "2026-10-20", [(named, [])])
+        for args in ({"trip_id": self.stay["id"]}, {"segment_id": self.jane_trip["segment"]}):
+            with self.subTest(args=args):
+                self.assertIn("in the app", self.refused(WRITE, "match_review_item", {"item_id": item, **args}))
+        self.assertIn(item, self.left())
+        with db.session() as conn:
+            self.assertIsNone(trips.get(conn, self.sam, self.stay["id"]))
+            self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
+            self.assertEqual(len(trips.get(conn, self.jane, self.stay["id"])["segments"]), 1)
+
+    def test_a_booking_that_names_a_stranger_attaches_when_the_travellers_are_locked_and_adds_nobody(self):
+        with db.session() as conn:
+            was = conn.execute(select(Segment.locked_fields).where(Segment.id == self.jane_trip["segment"])).scalar()
+            conn.execute(update(Segment).where(Segment.id == self.jane_trip["segment"]).values(locked_fields=json.dumps(["travelers"])))
+            stored_mail.put(conn, self.jane_box, "m-locked", kept(), 5.0)
+            item = self.item(conn, self.jane_box, "m-locked", "match", "2026-10-20",
+                             [({**FLIGHT, "confirmation": "LOCKED1", "travelers": [{"person_id": self.sam.person_id, "name": None}]}, [])])
+        self.addCleanup(self.unlock, self.jane_trip["segment"], was)
+        got = self.tool(WRITE, "match_review_item", {"item_id": item, "segment_id": self.jane_trip["segment"]})
+        self.assertTrue(got["ok"])
+        self.assertNotIn(item, self.left())
+        with db.session() as conn:
+            self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
+            self.assertEqual(trips.get(conn, self.jane, self.jane_trip["id"])["people"], [self.jane.person_id])
+
+    def unlock(self, segment_id: int, was: str | None) -> None:
+        with db.session() as conn:
+            conn.execute(update(Segment).where(Segment.id == segment_id).values(locked_fields=was))
+
     def test_one_of_several_bookings_is_chosen_by_entry_and_the_others_stay(self):
         self.assertIn("say which one", self.refused(WRITE, "match_review_item", {"item_id": self.two_item, "segment_id": self.jane_trip["segment"]}))
         got = self.tool(WRITE, "match_review_item", {"item_id": self.two_item, "entry": 1, "segment_id": self.jane_trip["segment"]})
@@ -411,6 +444,18 @@ class CreateTests(ReviewTools):
         self.assertNotIn(self.unread_item, self.left())
         with db.session() as conn:
             self.assertEqual(len(stored_mail.for_segment(conn, first["id"])), 2)
+
+    def test_creating_a_booking_that_is_already_there_never_adds_someone_who_cannot_see_the_trip(self):
+        same = {**FLIGHT, "details": {"flight_number": "BA112"}}
+        with db.session() as conn:
+            stored_mail.put(conn, self.jane_box, "m-same", kept(), 5.0)
+            item = self.item(conn, self.jane_box, "m-same", "match", "2026-10-20", [(same, [])])
+        fields = {"travelers": [{"person_id": self.sam.person_id, "name": None}]}
+        self.assertIn("in the app", self.refused(WRITE, "create_segment_from_review_item", {"item_id": item, "fields": fields}))
+        self.assertIn(item, self.left())
+        with db.session() as conn:
+            self.assertIsNone(trips.get(conn, self.sam, self.jane_trip["id"]))
+            self.assertEqual(trips.get(conn, self.jane, self.jane_trip["id"])["people"], [self.jane.person_id])
 
     def test_a_read_booking_becomes_a_segment_in_the_trip_it_falls_into(self):
         got = self.tool(WRITE, "create_segment_from_review_item", {"item_id": self.flight_item, "fields": {"details": {"seat": "22A"}}})

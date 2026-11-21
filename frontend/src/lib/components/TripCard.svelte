@@ -15,7 +15,7 @@
   const rowLine = $derived([nights, pill.toLowerCase()].filter(Boolean).join(" · "));
   const border = $derived(current ? "border-primary bg-surface-2" : featured ? "border-primary/35" : "border-border");
   const monthTone = $derived(featured ? "text-primary" : "text-signal");
-  const pillTone = $derived(featured ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground");
+  const pillTone = $derived(featured ? "bg-primary/15 text-primary-ink" : "bg-secondary text-muted-foreground");
   const link = "block h-full overflow-hidden rounded-2xl border bg-card shadow-card transition-colors hover:bg-surface-3 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
 </script>
 

@@ -114,7 +114,7 @@
 
   const today = $derived(dayIn(now, viewerZone()));
   const next = $derived(trips ? nextUp(trips, now) : null);
-  const featured = $derived(trips ? featuredTrip(trips, next, today) : null);
+  const featured = $derived(trips ? featuredTrip(trips, next, today, now) : null);
   const days = $derived(featured ? tripDays(featured) : []);
   const later = $derived(trips && featured ? laterTrips(trips, featured, today) : []);
   const liveOn = $derived(flightStatus.list?.enabled === true);
@@ -332,7 +332,7 @@
         </ul>
       </section>
     {/if}
-  {:else}
+  {:else if !featured}
     <div class="mb-6 flex flex-col items-start gap-3">
       <p class="text-[17px] text-muted-foreground">Nothing coming up: every trip you can see is over.</p>
       <Button href="#trips" variant="secondary">See your trips</Button>

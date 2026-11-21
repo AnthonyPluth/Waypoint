@@ -446,7 +446,7 @@ def finish_entry(conn: db.Connection, row: Any, entry_id: int, segment_id: int) 
 
 
 def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_id: int, segment_id: int | None,
-           trip_id: int | None = None, any_visible: bool = False) -> Linked | None:
+           trip_id: int | None = None, any_visible: bool = False, assistant: bool = False) -> Linked | None:
     row = _held(conn, owner, item_id)
     if row is None:
         return None
@@ -455,14 +455,14 @@ def settle(conn: db.Connection, owner: str, viewer: Viewer, item_id: int, entry_
     if entry is None:
         return None
     if segment_id is None:
-        added = trips.add_segment(conn, viewer, entry["booking"], trip_id, source="email")
+        added = trips.add_segment(conn, viewer, entry["booking"], trip_id, source="email", assistant=assistant)
         if added is None:
             raise trips.Invalid("The booking couldn’t be added")
         target = added["id"]
     else:
         if not any_visible and segment_id not in entry["candidates"]:
             raise trips.Invalid("That isn’t one of the bookings it could be")
-        trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id)
+        trips.merge_email_segment(conn, viewer, entry["booking"], into=segment_id, assistant=assistant)
         target = segment_id
     fresh = unlinked(conn, [int(target)], int(row["mailbox_id"]), str(row["message_id"]))
     stored_mail.link(conn, target, int(row["mailbox_id"]), str(row["message_id"]))
