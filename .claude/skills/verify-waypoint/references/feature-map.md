@@ -248,7 +248,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`, `Harbour Hotel`, `Camden Guesthouse`, `Stay ·`, `Add address`.
+- **Touches:** `London`, `Harbour Hotel`, `Camden Guesthouse`, `Camden, London`, `Add address`.
 - **Expects to see:** `Trips`, `1 Quay Street`.
 - **Drive it:** `tools/control flow hotel-address`; or `poetry run python run.py verify --flow hotel-address`.
 
@@ -590,7 +590,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
-- **Touches:** `London`, `Camden Guesthouse`, `Stay ·`, `Add address`, `Time zone`.
+- **Touches:** `London`, `Camden Guesthouse`, `Camden, London`, `Add address`, `Time zone`.
 - **Expects to see:** `Trips`.
 - **Drive it:** `tools/control flow zone-search-trip`; or `poetry run python run.py verify --flow zone-search-trip`.
 

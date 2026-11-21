@@ -65,6 +65,11 @@ class Selection(DbCase):
         ends = self.trip(days(-3), TODAY)
         self.assertEqual(sorted(self.ids()), sorted([starts, ends]))
 
+    def test_a_trip_that_starts_and_ends_today_is_saved_and_one_that_ended_yesterday_is_not(self):
+        single = self.trip(TODAY, TODAY)
+        self.trip(days(-4), days(-1))
+        self.assertEqual(self.ids(), [single])
+
     def test_every_trip_starting_within_seven_days_is_saved_nearest_first(self):
         edge = self.trip(days(7), days(9))
         near = self.trip(days(3), days(4))

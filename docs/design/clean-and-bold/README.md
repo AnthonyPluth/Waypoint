@@ -38,7 +38,7 @@ The black cards faded into the near-black page, so the owner chose "Option A, Ra
 | Card header strip (`--card-header`, the "Next up" band of the pass card) | none | `#201f2a` |
 | Secondary buttons and fills inside cards (`--secondary`, `--muted`, `--accent`, `--surface-3`) | `#1a1e29`, `#1f2433` | `#262531` |
 
-Text `#ffffff`, secondary `#a9a8b2` and labels `#8f8e98` keep at least 4.5:1 on the card (17.4, 7.4 and 5.4), the header strip and the secondary fill. [d-colour-rules.html](d-colour-rules.html) draws the new values. The other files in this folder keep the pixels they were drawn with, which show the first black card; the app and `design.md` follow this decision.
+Text `#ffffff`, secondary `#a9a8b2` and labels `#8f8e98` keep at least 4.5:1 on the card (17.4, 7.4 and 5.4), the header strip and the secondary fill. [d-colour-rules.html](d-colour-rules.html) draws the new values. The other files in this folder keep the pixels they were drawn with, which show the first black card; the app and `design.md` follow this decision (shipped in #920).
 
 ## Owner decisions on #878 (2026-11-20)
 
@@ -75,7 +75,7 @@ Drawn as the recommendation. Answered on 2026-11-20: the owner's sign-off accept
 9. **Several travellers** (item 10): the per-traveller seat row on the hero (drawn) or seats only in the opened booking; "14A +2" or "3 seats".
 10. **A connection** (item 10): whole-journey codes (drawn) or the current leg's; the amber short-connection hint under 45 minutes is a suggestion (the app has no such rule).
 11. **Not drawn here**, though #883 and #884 name #878 for them: the hero when the next booking is not a flight, "Also under way", the arrival card and the offline status on Upcoming. They keep today's rendering on the new tokens until the owner says whether this issue or a follow-up draws them.
-12. Still open on #876 and followed here as the mockups draw them: the bed icon for a stay (the app uses a building) and neutral grey avatars (not the six avatar tones). The owner decided the bed on #876 on 2026-11-21; see "Screens a to d: reconstructed".
+12. Still open on #876 and followed here as the mockups draw them: neutral grey avatars (not the six avatar tones). The bed icon for a stay was decided on 2026-11-21 and shipped in #913 (the app draws a bed); see "Screens a to d: reconstructed".
 
 ## Screens a to d: reconstructed
 
@@ -112,10 +112,10 @@ The six #876 lists:
 | 1 | `docs/design/trips/README.md` (#712, decision 2): a trip still to come keeps its cards; the new trip detail replaces them (frame a). | Drawn in the mockups the owner approved and signed off in chat on 2026-11-20; built in #906. No answer to this point on its own was found: recorded in the build, not separately confirmed. |
 | 2 | `docs/design/flights/README.md` (#666): pill in every state, four facts, live or booked marks, mark tile. The new hero has three facts, no marks, no mark tile, a pill only when delayed, cancelled or diverted (frames c and e). | Item 2 of #878 (the fourth fact moves to the opened booking, one quiet line replaces the marks) was signed off on #878 on 2026-11-20; built in #902. The removal itself has no separate answer: recorded in the build, not separately confirmed. |
 | 3a | `design.md`: kind icons "on its tint". The cards use the outline (frames a to c). | Recorded in the build (#904: outline on the cards and the opened booking, tinted tiles elsewhere until #879), not separately confirmed. |
-| 3b | `design.md`: times, codes and seats in Geist Mono; the mockups set them in the sans face. | Confirmed on #877, 2026-11-20: Inter for the sans face, Geist Mono kept as documented for times, airport codes, confirmation codes and seats. The build of #902 set the hero's airport codes in Inter at weight 800; for the hero's airport codes, times and seat values in Geist Mono: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): the app changes to match, in follow-up pull requests. Frames a to c draw the codes in Geist Mono. |
+| 3b | `design.md`: times, codes and seats in Geist Mono; the mockups set them in the sans face. | Confirmed on #877, 2026-11-20: Inter for the sans face, Geist Mono kept as documented for times, airport codes, confirmation codes and seats. The build of #902 set the hero's airport codes in Inter at weight 800. **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)) puts the hero's airport codes, times and seats in Geist Mono: shipped in #913. Frames a to c draw the codes in Geist Mono. |
 | 3c | `design.md`: the frosted tab bar; the mockup draws a plain black bar. | Confirmed: frosted, point 7 of #878 accepted as drawn on 2026-11-20 (frames a and b draw it frosted). |
 | 4 | Times in the mockups show no zone. | Confirmed: point 2 of #878 accepted as drawn, the zone abbreviation under each time on the hero; the big fact and lists carry none (frames b and c). |
-| 5 | The stay icon in the mockups is a bed; the app uses a building. | A bed, everywhere `KindTile` shows a stay: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): the app changes to match, in follow-up pull requests. The build of #904 kept the building. Frames a to d draw the bed. |
+| 5 | The stay icon in the mockups is a bed; the app uses a building. | A bed, everywhere `KindTile` shows a stay: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): shipped in #913. The build of #904 kept the building. Frames a to d draw the bed. |
 | 6 | Traveller avatars are neutral grey, not the six avatar tones. | Confirmed: point 12 of #878 accepted; built in #906 (`AvatarStack` `neutral`). |
 
 Departures found in the build that #876 does not list, drawn as built:
@@ -127,8 +127,8 @@ Departures found in the build that #876 does not list, drawn as built:
 | When the next booking is not a flight, Upcoming and the trip page keep today's card on the new tokens, and Also under way, the arrival card and the offline status are unchanged. Not drawn here. | Confirmed: point 11 of #878. |
 | Connections (frame k) are not built. | Deferred by the owner to #903. |
 | The Later dates on Upcoming are amber, though amber otherwise means changed (frame b). | Owner decision, #907. |
-| The flight hero as built in #902 keeps a 1 px `#27262c` edge and the card shadow (`border border-border shadow-card`), against decision 1. | No edge and no shadow, like the booking cards: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): the app changes to match, in follow-up pull requests. Frames a to d draw the hero without them. |
-| On Upcoming the flight hero as built in #905 keeps the confirmation code, the travellers and the cost in its footer, against decision 5. | They move behind a tap (the opened booking), as on the trip page: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): the app changes to match, in follow-up pull requests. Frame b draws the hero with the “Confirmation, travellers and price” row and only the airline action and Open trip below it. |
+| The flight hero as built in #902 keeps a 1 px `#27262c` edge and the card shadow (`border border-border shadow-card`), against decision 1. | No edge and no shadow, like the booking cards: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): shipped in #913. Frames a to d draw the hero without them. |
+| On Upcoming the flight hero as built in #905 keeps the confirmation code, the travellers and the cost in its footer, against decision 5. | They move behind a tap (the opened booking), as on the trip page: **Owner decision 2026-11-21** ([#876](https://github.com/AnthonyPluth/Waypoint/issues/876#issuecomment-7053836714)): shipped in #914. Frame b draws the hero with the “Confirmation, travellers and price” row and only the airline action and Open trip below it. |
 | The airline action ("Check in", "Open in app") is the existing action blue `#3563e0` (`--action`), not the status blue (frame b). | Recorded in the build, not separately confirmed. |
 | Amber text (a late time, "45 min late") uses the light ink `#ffd58a` (`--signal-ink`) for contrast; pills and dots use `#eba43b` (frames c and d). | Recorded in the build, not separately confirmed. |
 | Upcoming keeps the small date over the title, the green saved-for-offline status and Add a booking in the header (frame b). | Recorded in the build (#905), not separately confirmed. |
@@ -137,7 +137,7 @@ Departures found in the build that #876 does not list, drawn as built:
 ### Open questions
 
 - The rows still marked "recorded in the build, not separately confirmed" (departures 1, 2 and 3a, the action blue, the amber ink, Upcoming's header extras and the trip total): the owner's "Signed off" on #876 accepts them as built, or names the ones to change.
-- The four owner decisions of 2026-11-21 are drawn as decided; until their follow-up pull requests merge, the app differs from frames a to d in those four points.
+- The four owner decisions of 2026-11-21 are drawn as decided and shipped (#913 for the hero's type, edge and shadow and the bed; #914 for Upcoming's tap); the app matches frames a to d in those four points.
 - The typeface is decided (#877). Screens not drawn in a to d (the other pages, the states of #878) are in e to k and in their own sub-issues of #875.
 
 Trips and the completed-trip page in this look (#879, group A): see [README-group-a.md](README-group-a.md).
