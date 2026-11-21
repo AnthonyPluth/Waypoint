@@ -300,12 +300,12 @@ export function splitAtAntimeridian(ring: LonLat[]): LonLat[][] {
     unwound.push([p[0] + shift, p[1]]);
   }
 
+  const turns = Math.round((unwound[0]![0] - unwound[unwound.length - 1]![0]) / 360);
   const lons = unwound.map((p) => p[0]);
-  if (!wrapped && Math.min(...lons) >= -180 && Math.max(...lons) <= 180) {
+  if (!wrapped && turns === 0 && Math.min(...lons) >= -180 && Math.max(...lons) <= 180) {
     return area(unwound) > SLIVER ? [[...unwound, unwound[0]!]] : [];
   }
 
-  const turns = Math.round((unwound[0]![0] - unwound[unwound.length - 1]![0]) / 360);
   if (turns !== 0) {
     const mean = unwound.reduce((sum, p) => sum + p[1], 0) / unwound.length;
     const pole = mean >= 0 ? 90 : -90;
