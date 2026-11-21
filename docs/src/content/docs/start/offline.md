@@ -63,7 +63,7 @@ The [iPhone app](/Waypoint/start/ios/) reads the route with its own sign-in toke
 
 ## Checking before you travel
 
-Upcoming and each trip’s page show an **Offline access** panel. A green **Saved for offline** pill means saving is set up and working; the other states say what is missing, such as **This trip isn’t saved on this device** or **Couldn’t save the trips on this device**, with **Try again** in a browser. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
+Upcoming shows a green **Saved for offline** button at the top right while saving is set up and working on this device; it opens **Settings → Offline & notifications**, which says what is saved and when, whether saving is on, and what is missing when it isn’t. Neither Upcoming nor a trip’s page shows a status card. In the iPhone app a failed save has no button: saving is tried again each time you open Waypoint online.
 
 ## Using it with no connection, in a browser
 

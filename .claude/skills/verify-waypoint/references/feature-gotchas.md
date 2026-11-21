@@ -3,7 +3,7 @@
 Hand-edited. `tools/user_feature_map.py` merges these into [feature-map.md](feature-map.md) (generated; never edit that one). A `## <name>` heading must be a page (`upcoming`, `trips`, ...) or a flow's name (a file in `frontend/verify/flows/`), and only `- ` bullets go under it. Demo data only; no real names, codes or numbers. General advice is in [gotchas.md](gotchas.md).
 
 ## upcoming
-- A session that hasn't run `tools/control offline` shows an "Offline access" panel saying the device can't make a passkey; make verify's images show the page after offline access is set up.
+- A session that hasn't run `tools/control offline` shows no Saved for offline button on Upcoming, and Settings → Offline & notifications says the device can't make a passkey; make verify's images show the pages after offline access is set up.
 - The first card is the next thing under way on the frozen day (2026-06-15): in the demo it is a London hotel check-in two days out. Nothing here moves with the real date.
 
 ## trips

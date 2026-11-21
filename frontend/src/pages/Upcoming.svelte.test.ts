@@ -839,20 +839,18 @@ describe("Upcoming header, review banner and timeline", () => {
     expect(screen.getByText("Dec 30, 2026 – Jan 2, 2027 · 3 nights")).toBeInTheDocument();
   });
 
-  it("shows the Saved for offline pill only when offline saving is working", async () => {
+  it("shows the Saved for offline pill, linking to the offline settings, only when offline saving is working", async () => {
     Object.assign(offline, { setUp: true, hasCopy: true, savedAt: Date.now(), trips: [{ id: 1, name: "Trip" }] });
     serve([london]);
     const { unmount } = render(Upcoming);
-    const pill = await screen.findByRole("button", { name: "Saved for offline" });
-    expect(screen.queryByTestId("offline-status")).toBeNull();
-    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(pill);
-    expect(screen.getByTestId("offline-status")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Saved for offline" })).toHaveAttribute("href", "#settings/offline");
+    expect(screen.queryByText(/Saved on this device/)).toBeNull();
     unmount();
     Object.assign(offline, { failed: true });
     render(Upcoming);
     await screen.findByRole("heading", { name: "JFK → LHR" });
-    expect(screen.queryByRole("button", { name: "Saved for offline" })).toBeNull();
-    expect(screen.getByTestId("offline-status")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Saved for offline" })).toBeNull();
+    expect(screen.queryByText(/Couldn’t save the trips on this device/)).toBeNull();
   });
 });
 

@@ -10,7 +10,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Reach it:** desktop: the sidebar's Upcoming; phone: the tab bar; URL `#upcoming`; control `tools/control goto upcoming`.
 - **Drive it:** `tools/control goto upcoming`, `tools/control snapshot --text`, then `click`/`type`/`press`; `tools/control viewport phone|desktop`; batch check `make verify PAGES="upcoming"`.
 - **What usually breaks:**
-  - A session that hasn't run `tools/control offline` shows an "Offline access" panel saying the device can't make a passkey; make verify's images show the page after offline access is set up.
+  - A session that hasn't run `tools/control offline` shows no Saved for offline button on Upcoming, and Settings → Offline & notifications says the device can't make a passkey; make verify's images show the pages after offline access is set up.
   - The first card is the next thing under way on the frozen day (2026-06-15): in the demo it is a London hotel check-in two days out. Nothing here moves with the real date.
 
 ### Flows on Upcoming

@@ -29,7 +29,6 @@
   import LoyaltyNumber from "$lib/components/LoyaltyNumber.svelte";
   import MessageView from "$lib/components/MessageView.svelte";
   import OfflineSetup from "$lib/components/OfflineSetup.svelte";
-  import OfflineStatus from "$lib/components/OfflineStatus.svelte";
   import PastTrip from "$lib/components/PastTrip.svelte";
   import SavedTripLock from "$lib/components/SavedTripLock.svelte";
   import PlaceTime from "$lib/components/PlaceTime.svelte";
@@ -423,7 +422,6 @@
       {#if countNote(t.costs)}<span class="text-muted-foreground"> · {countNote(t.costs)}</span>{/if}</p>
   {/if}
   {#if t.notes && !editingTrip}<p class="mt-2 whitespace-pre-line break-words text-sm">{t.notes}</p>{/if}
-  {#if !over}<OfflineStatus tripId={t.id} />{/if}
 
   {#if form && form.id === null}
     <div class="mt-6" use:revealForm><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>

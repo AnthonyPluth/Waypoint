@@ -56,7 +56,6 @@ describe("Trip: the saved offline copy", () => {
     Object.assign(offline, { checked: true, setUp: true, hasCopy: true, trips: [{ id: 9, name: "Next cruise" }] });
     render(TripPage);
     await screen.findByRole("heading", { name: "Past journey" });
-    expect(screen.queryByTestId("offline-status")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Keep this trip available offline" })).not.toBeInTheDocument();
     expect(device.writes).toEqual([]);
   });
@@ -94,31 +93,6 @@ describe("Trip: the saved offline copy", () => {
     expect(device.calls).toEqual(before);
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(device.appears("Springfield")).toBe(false);
-  });
-
-  it("says in the header that this trip is saved on the device, and when", async () => {
-    await setUp();
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText(/updated just now/)).toBeInTheDocument();
-    expect(screen.getByTestId("offline-status-line")).toHaveTextContent("Saved on this device · updated just now");
-  });
-
-  it("says in the header when the save failed", async () => {
-    await setUp();
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.mocked(api).mockImplementation(async (path) => {
-      if (path === "/api/people") return { people: [] };
-      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
-    if (path === "/api/distance-unit") return { distance_unit: "mi" };
-    if (String(path).endsWith("/summary")) throw new Error("no summary");
-      if (path === "/api/offline") throw new Error("Server error");
-      return held;
-    });
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText("Couldn’t save the trips on this device.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("neither asks nor saves on a device that can't do it", async () => {
@@ -206,20 +180,6 @@ describe("Trip: the saved offline copy", () => {
     expect(screen.queryByText("QX7R2M")).not.toBeInTheDocument();
   });
 
-  it("shows which trips are saved, in the header, when several are", async () => {
-    await setUp();
-    vi.mocked(api).mockImplementation(async (path) => {
-      if (path === "/api/people") return { people: [] };
-      if (path === "/api/loyalty") return { loyalty: [], programs: {} };
-    if (path === "/api/distance-unit") return { distance_unit: "mi" };
-    if (String(path).endsWith("/summary")) throw new Error("no summary");
-      if (path === "/api/offline") return { trips: [{ trip: held, messages: [] }, { trip: { ...held, id: 2, name: "Trip to Paris" }, messages: [] }] };
-      return held;
-    });
-    render(TripPage);
-    await screen.findByRole("heading", { name: "Trip to Springfield" });
-    expect(await screen.findByText(/also saved: “Trip to Paris”/)).toBeInTheDocument();
-  });
 });
 
 describe("Trip: a warm iPhone app that lost its connection", () => {

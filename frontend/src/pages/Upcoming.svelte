@@ -21,14 +21,13 @@
   import { flightCardView, flightsToday, nextFlightShown } from "$lib/flightcard";
   import { isMobile } from "$lib/platform";
   import { flightStatus, loadFlightStatus, statusFor, followFlightStatus } from "$lib/flightstatus.svelte";
-  import OfflineStatus from "$lib/components/OfflineStatus.svelte";
+  import OfflinePill from "$lib/components/OfflinePill.svelte";
   import PassCard from "$lib/components/PassCard.svelte";
   import { dateTile, laterLine, laterTrips, startsIn } from "$lib/side-column";
   import { showsCode } from "$lib/gate-code";
   import RowShowCode from "$lib/components/RowShowCode.svelte";
   import { type Day, type DayItem, appWord, bookingCards, tripTravellers, vendorLink, dayIn, dayLabel, END_WORD, START_WORD, endAt, featuredTrip, flightEvidence, headline, nextUp, nightsLabel, rangeLabel, startAt, subline, timesDiffer, todayLabel, tripDays, untimed, upcomingTitle, viewerZone } from "$lib/trips";
   import KindTile from "$lib/components/KindTile.svelte";
-  import { offlineWorking } from "$lib/offline.svelte";
   import { viewport } from "$lib/phone.svelte";
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { Sheet } from "$lib/components/ui/sheet";
@@ -44,7 +43,6 @@
   let asking = $state(false);
   let mail = $state<MailboxList | null>(null);
   let connecting = $state(false);
-  let offlineOpen = $state(false);
   let detail = $state<{ segment: Segment; bookings: Segment[] } | null>(null);
   let heroDetailOpen = $state(false);
   let heroOpener: HTMLElement | null = null;
@@ -234,7 +232,7 @@
   </div>
   {#if trips && trips.length > 0}
     <div class="flex shrink-0 items-center gap-2">
-      <OfflineStatus pill open={offlineOpen} ontoggle={() => (offlineOpen = !offlineOpen)} />
+      <OfflinePill />
       <Button href="#trips?add=booking" variant="secondary" class="phone:size-11 phone:p-0"><Plus aria-hidden="true" /><span class="phone:sr-only">Add a booking</span></Button>
     </div>
   {/if}
@@ -301,7 +299,6 @@
   <div class="@container">
   <div class={`grid gap-x-8 gap-y-2 ${homeFlight ? "@[900px]:grid-cols-2 @[900px]:items-start" : ""}`} data-columns={homeFlight ? "two" : "one"}>
   <div class="min-w-0">
-  {#if !offlineWorking() || offlineOpen}<div class="-mt-1 mb-6"><OfflineStatus /></div>{/if}
   {#if next}
     {@const s = next.segment}
     {@const proof = s.kind === "flight" && flightStatus.list?.enabled ? flightEvidence(statusFor(s.id), now, typeof navigator === "undefined" || navigator.onLine !== false) : "scheduled"}
