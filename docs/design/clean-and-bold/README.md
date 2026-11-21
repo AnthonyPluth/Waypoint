@@ -127,3 +127,5 @@ Departures found in the build that #876 does not list, drawn as built:
 - The typeface is decided (#877). Screens not drawn in a to d (the other pages, the states of #878) are in e to k and in their own sub-issues of #875.
 
 Trips and the completed-trip page in this look (#879, group A): see [README-group-a.md](README-group-a.md).
+
+People, Settings with the design specimen, and the shared pieces in this look (#879, group C): see [README-group-c.md](README-group-c.md).
