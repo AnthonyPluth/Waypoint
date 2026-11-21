@@ -33,7 +33,7 @@
       "screenshot": "card"
     },
     {
-      "click": "[role='dialog'] button:text-is('Edit') >> visible=true"
+      "click": "[data-testid=booking-detail] button:text-is('Edit') >> visible=true"
     },
     {
       "wait_for": "[aria-label='Seat of Jane Doe']"

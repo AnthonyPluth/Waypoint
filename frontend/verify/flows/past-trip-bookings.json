@@ -41,11 +41,11 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "expect_text": {
-        "selector": "role=dialog[name=\"Hôtel du Parc\"]",
+        "selector": "[data-testid=booking-detail]",
         "text": "Edit"
       }
     },
@@ -53,10 +53,7 @@
       "screenshot": "stay-detail"
     },
     {
-      "press": {
-        "selector": "role=dialog >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "goto": "#trip/2"
@@ -80,7 +77,7 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Bayview Inn\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Bayview Inn\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "done-trip-detail"

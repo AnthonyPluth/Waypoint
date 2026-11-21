@@ -12,7 +12,7 @@
     { "click": "form[aria-label='Edit trip details'] button:has-text('Cancel')" },
     { "click": "ul[aria-label='Bookings'] button[data-booking] >> visible=true >> nth=-1" },
     { "wait_for": "[data-testid=booking-detail]" },
-    { "click": "[role='dialog'] button:text-is('Edit') >> visible=true" },
+    { "click": "[data-testid=booking-detail] button:text-is('Edit') >> visible=true" },
     { "wait_for": "li[aria-label='Edit booking'], [data-slot='sheet'] form" },
     { "screenshot": "edit-booking" }
   ]

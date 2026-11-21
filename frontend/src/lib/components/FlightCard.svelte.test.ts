@@ -549,6 +549,28 @@ describe("what a reader and a screen get", () => {
     expect(ondetail).toHaveBeenCalledWith(row);
   });
 
+  it("expands the detail in place when it is given its state, naming the region it controls", async () => {
+    const detail = createRawSnippet(() => ({ render: () => "<p>in place</p>" }));
+    const view = draw(CASES[0], { ondetail: vi.fn(), detailOpen: false, detailId: "booking-detail-3", detail });
+    const row = await screen.findByRole("button", { name: "Confirmation, travellers and price" });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(row).toHaveAttribute("aria-controls", "booking-detail-3");
+    expect(document.getElementById("booking-detail-3")).toHaveAttribute("hidden");
+    expect(screen.queryByText("in place")).toBeNull();
+    view.unmount();
+    draw(CASES[0], { ondetail: vi.fn(), detailOpen: true, detailId: "booking-detail-3", detail });
+    const open = await screen.findByRole("button", { name: "Confirmation, travellers and price" });
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(within(screen.getByRole("region", { name: "Booking detail" })).getByText("in place")).toBeInTheDocument();
+  });
+
+  it("leaves the detail row without aria-expanded when the page opens a sheet instead", async () => {
+    draw(CASES[0], { ondetail: vi.fn() });
+    const row = await screen.findByRole("button", { name: "Confirmation, travellers and price" });
+    expect(row).not.toHaveAttribute("aria-expanded");
+    expect(screen.queryByRole("region", { name: "Booking detail" })).toBeNull();
+  });
+
   it("has no detail row without a handler", async () => {
     draw(CASES[0]);
     await screen.findByRole("article");

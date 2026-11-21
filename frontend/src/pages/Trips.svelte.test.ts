@@ -299,8 +299,6 @@ describe("two panes", () => {
     const u = user();
     const detail = await openBooking(u, "JFK → LHR");
     await u.click(within(detail!).getByRole("button", { name: "Edit" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "JFK → LHR" })).toBeNull());
-    document.body.style.pointerEvents = "";
     await u.type(screen.getByLabelText("Confirmation code"), "Z");
     const links = within(screen.getByRole("list", { name: "Upcoming trips" })).getAllByRole("link");
     const keepEditing = async () => {
@@ -476,8 +474,6 @@ describe("changing a trip in the pane", () => {
     await within(pane).findByRole("heading", { level: 1, name: "Trip to London" });
     const detail = await openBooking(u, "Harbour Hotel");
     await u.click(within(detail!).getByRole("button", { name: "Edit" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull());
-    document.body.style.pointerEvents = "";
     await u.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await within(pane).findByRole("heading", { level: 1, name: "Trip to Auckland" })).toBeInTheDocument();
     expect(within(pane).getByRole("button", { name: /Harbour Hotel/ })).toBeInTheDocument();

@@ -8,7 +8,7 @@
     { "wait_for": "[data-itinerary]" },
     { "scroll_to": "[data-itinerary]" },
     { "screenshot": "cruise-card" },
-    { "press": { "selector": "[role='dialog']", "key": "Escape" } },
+    { "click": "[data-booking-card='cruise'] button[data-booking][aria-expanded=true]" },
     { "click": "button:has-text('Add booking') >> visible=true" },
     { "wait_for": "label:has-text('What is it') select" },
     { "select": { "selector": "label:has-text('What is it') select", "index": 1 } },

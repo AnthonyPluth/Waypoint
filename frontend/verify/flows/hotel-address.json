@@ -16,7 +16,7 @@
     },
     {
       "expect_text": {
-        "selector": "[role='dialog']",
+        "selector": "[data-testid=booking-detail]",
         "text": "1 Quay Street"
       }
     },
@@ -24,10 +24,7 @@
       "screenshot": "trip-addresses"
     },
     {
-      "press": {
-        "selector": "[role='dialog']",
-        "key": "Escape"
-      }
+      "click": "button[data-booking][aria-expanded=true]"
     },
     {
       "click": "button[data-booking]:has-text('Camden Guesthouse'):has-text('Stay ·')"
