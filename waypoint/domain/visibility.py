@@ -77,6 +77,12 @@ def household_segments(conn: db.Connection, kind: str) -> list[Segment]:
     return list(conn.orm.scalars(select(Segment).where(Segment.kind == kind).order_by(Segment.id)).all())
 
 
+def barred_trips(conn: db.Connection, viewer: Viewer) -> set[int]:
+    if viewer.household or viewer.person_id is None:
+        return set()
+    return set(conn.orm.scalars(select(TripExclusion.trip_id).where(TripExclusion.person_id == viewer.person_id)).all())
+
+
 def note_recipient(conn: db.Connection, viewer: Viewer, segment: Segment) -> bool:
     if viewer.household or viewer.person_id is None or visible_segment(conn, viewer, segment.id) is not None:
         return False

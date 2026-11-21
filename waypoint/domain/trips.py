@@ -1035,6 +1035,8 @@ def add_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, trip_id:
                         booked_by=viewer.person_id)
             conn.orm.add(trip)
             conn.orm.flush()
+    if source != "email":
+        _refuse_excluded(conn, trip, (t["person_id"] for t in travelers if t["person_id"] is not None))
     before = _auto_name(conn, trip) if values["kind"] == "visit" else None
     named = [t["person_id"] for t in travelers if t["person_id"] is not None]
     for_everyone = (values["kind"] in SHARED_KINDS
@@ -1107,6 +1109,9 @@ def edit_segment(conn: db.Connection, viewer: Viewer, segment_id: int, changes: 
         changed.append("travelers")
     if ports != ports_before:
         changed.append("itinerary")
+    if owner is not None and "travelers" in changed:
+        _refuse_excluded(conn, owner, {t["person_id"] for t in travelers if t["person_id"] is not None}
+                         - {t["person_id"] for t in old if t["person_id"] is not None})
     if owner is not None and not becomes_shared and "travelers" in changed:
         _refuse_newcomers(conn, viewer, owner, travelers, assistant)
     for k, v in {**values, **located(values)}.items():
@@ -1301,7 +1306,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
         found, seen = [target], {target.id}
     else:
         wrote = fields.get("details") or {}
-        household = visibility.household_segments(conn, values["kind"] or "")
+        barred = visibility.barred_trips(conn, viewer)
+        household = [s for s in visibility.household_segments(conn, values["kind"] or "") if s.trip_id not in barred]
         verdicts = {s.id: reservation(s, values, wrote) for s in household if s.confirmation}
         coded = [s for s in household if verdicts.get(s.id) == "same"]
         uncoded = [s for s in household if not s.confirmation and _same_uncoded(s, values, wrote)]
@@ -1508,20 +1514,19 @@ def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | N
         .order_by(Segment.id)).first()
 
 
-def _take_access_away(conn: db.Connection, trip: Trip, leaving: Sequence[int]) -> None:
-    own = select(Segment.id).where(Segment.trip_id == trip.id)
-    conn.execute(update(Trip).where(Trip.id == trip.id, Trip.booked_by.in_(list(leaving))).values(booked_by=None))
-    conn.execute(update(Segment).where(Segment.trip_id == trip.id, Segment.booked_by.in_(list(leaving))).values(booked_by=None))
-    conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id.in_(list(leaving)), SegmentRecipient.segment_id.in_(own)))
-    trippeople.exclude(conn, trip.id, leaving)
-    conn.orm.flush()
-    conn.orm.expire_all()
+def _refuse_excluded(conn: db.Connection, trip: Trip, person_ids: Iterable[int]) -> None:
+    barred = set(person_ids) & trippeople.excluded(conn, trip.id)
+    if barred:
+        names = ", ".join(p["name"] for p in _named(conn, barred))
+        raise Invalid(f"{names} was taken off this trip. Add them to the trip’s people first.")
 
 
 def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence[int], confirmed: bool) -> None:
     wanted = _known_people(conn, given)
     have = trippeople.of(conn, [trip.id])[trip.id]
     leaving = [p for p in have if p not in wanted]
+    if leaving and not wanted and not viewer.household:
+        raise Invalid("A trip needs someone on it. Delete the trip instead, or leave one person on it.")
     for person in leaving:
         flight = _flight_of(conn, trip.id, person)
         if flight is not None:
@@ -1533,7 +1538,7 @@ def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence
         own = select(Segment.id).where(Segment.trip_id == trip.id)
         conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id.in_(leaving), SegmentTraveler.segment_id.in_(own)))
         trippeople.remove(conn, trip.id, leaving)
-        _take_access_away(conn, trip, leaving)
+        trippeople.exclude(conn, trip.id, leaving)
     trippeople.add(conn, trip.id, wanted)
 
 
@@ -1731,6 +1736,7 @@ def move_segment(conn: db.Connection, viewer: Viewer, segment_id: int, trip_id: 
         target = visibility.visible_trip(conn, viewer, trip_id)
         if target is None:
             return None
+        _refuse_excluded(conn, target, {t["person_id"] for t in effective_travelers(conn, seg) if t["person_id"] is not None})
         if not viewer.household and not confirmed:
             _needs_confirmation(conn, seg, target)
         target.auto = False
@@ -1777,6 +1783,9 @@ def name_traveler(conn: db.Connection, viewer: Viewer, traveler_id: int, person_
     done = 0
     trip_ids: set[int] = set()
     touched_trips = [s.trip_id for s in conn.orm.scalars(select(Segment).where(Segment.id.in_([t.segment_id for t in same]))).all()]
+    for trip_id in dict.fromkeys(touched_trips):
+        if (owning := conn.orm.get(Trip, trip_id)) is not None:
+            _refuse_excluded(conn, owning, [person_id])
     photogrants.lock_trips(conn, touched_trips)
     windows = _before(conn, touched_trips)
     for t in same:

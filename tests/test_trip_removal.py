@@ -76,8 +76,6 @@ class TakenOffLosesWhatTheyOnlyHadByBooking(Removal):
         self.assertSeesNothing(self.sam, trip_id, [flight["id"]])
         self.assertStrangersSeeNothing(trip_id, [flight["id"]])
         self.assertIsNotNone(trips.get(self.c, self.jane, trip_id))
-        self.assertIsNone(self.c.orm.get(Trip, trip_id).booked_by)
-        self.assertIsNone(self.c.orm.get(Segment, flight["id"]).booked_by)
         self.assertEqual(self.excluded(trip_id), {self.sid})
 
     def test_the_booker_of_a_booking_on_the_trip_loses_the_trip(self):
@@ -88,7 +86,6 @@ class TakenOffLosesWhatTheyOnlyHadByBooking(Removal):
         self.take_off(self.jane, trip_id, self.sid)
         self.assertSeesNothing(self.sam, trip_id, [flight["id"], stay["id"]])
         self.assertStrangersSeeNothing(trip_id, [flight["id"], stay["id"]])
-        self.assertIsNone(self.c.orm.get(Segment, stay["id"]).booked_by)
         self.assertEqual([t["id"] for t in trips.listing(self.c, self.jane)], [trip_id])
         self.assertIsNone(trips.add_segment(self.c, self.sam, HOTEL, trip_id))
         self.assertIsNone(trips.edit_trip(self.c, self.sam, trip_id, {"people": [self.sid]}, True))
@@ -103,22 +100,28 @@ class TakenOffLosesWhatTheyOnlyHadByBooking(Removal):
         self.assertIsNotNone(trips.get(self.c, self.sam, trip_id))
         self.put_on(self.jane, trip_id, self.sid, confirmed=False)
         self.take_off(self.jane, trip_id, self.sid)
-        self.assertEqual(self.c.orm.scalars(select(SegmentRecipient)).all(), [])
         self.assertSeesNothing(self.sam, trip_id, [seg_id])
         self.assertStrangersSeeNothing(trip_id, [seg_id])
 
-    def test_the_same_confirmation_arriving_again_in_their_mailbox_does_not_give_it_back(self):
+    def test_the_same_confirmation_arriving_again_in_their_mailbox_does_not_give_it_back_or_touch_the_booking(self):
         self.email(self.jane, self.jid)
         trip_id = self.c.orm.scalars(select(Segment.trip_id)).one()
         seg_id = self.c.orm.scalars(select(Segment.id)).one()
         self.email(self.sam, self.jid)
         self.put_on(self.jane, trip_id, self.sid, confirmed=False)
         self.take_off(self.jane, trip_id, self.sid)
-        for _ in range(2):
-            self.email(self.sam, self.jid)
-        self.assertEqual(self.c.orm.scalars(select(SegmentRecipient)).all(), [])
+        before = trips.get_segment(self.c, self.jane, seg_id)
+        with no_leaks(self, CODE, CANARY):
+            changed = {**FLIGHT, "end_local": "2026-06-02T09:30", "travelers": self.on(self.jid, self.sid)}
+            for _ in range(2):
+                trips.merge_email_segment(self.c, self.sam, changed)
+        self.assertEqual(trips.get_segment(self.c, self.jane, seg_id), before)
         self.assertEqual(self.aboard(trip_id), [self.jid])
-        self.assertSeesNothing(self.sam, trip_id, [seg_id])
+        self.assertIsNone(trips.get(self.c, self.sam, trip_id))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, seg_id))
+        mine = [t["id"] for t in trips.listing(self.c, self.sam)]
+        self.assertEqual(len(mine), 1)
+        self.assertNotIn(trip_id, mine)
         self.assertStrangersSeeNothing(trip_id, [seg_id])
 
     def test_a_trip_that_has_ended_is_the_same(self):
@@ -152,19 +155,33 @@ class NothingGivesItBack(Removal):
         self.put_on(self.jane, trip_id, self.sid)
         self.take_off(self.jane, trip_id, self.sid)
         printed = next(t for t in seg["travelers"] if t["person_id"] is None)
-        trips.name_traveler(self.c, self.jane, printed["id"], self.sid)
+        with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip"):
+            trips.name_traveler(self.c, self.jane, printed["id"], self.sid)
         self.assertEqual(self.aboard(trip_id), [self.jid])
         self.assertSeesNothing(self.sam, trip_id, [seg["id"]])
         self.assertStrangersSeeNothing(trip_id, [seg["id"]])
 
-    def test_a_booking_moved_into_the_trip_does_not_put_them_back(self):
+    def test_a_booking_of_theirs_moved_into_the_trip_is_refused_and_says_why(self):
         flight = self.shared_with_sam()
         trip_id = flight["trip_id"]
         self.take_off(self.jane, trip_id, self.sid)
         elsewhere = self.add(self.jane, FAR, None, self.on(self.jid, self.sid))
-        trips.move_segment(self.c, self.jane, elsewhere["id"], trip_id, True)
+        for confirmed in (False, True):
+            with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip. Add them to the trip’s people first"):
+                trips.move_segment(self.c, self.jane, elsewhere["id"], trip_id, confirmed)
+        self.assertEqual(self.c.orm.get(Segment, elsewhere["id"]).trip_id, elsewhere["trip_id"])
         self.assertEqual(self.aboard(trip_id), [self.jid])
-        self.assertSeesNothing(self.sam, trip_id, [flight["id"], elsewhere["id"]])
+        self.assertSeesNothing(self.sam, trip_id, [flight["id"]])
+
+    def test_naming_them_on_a_booking_of_the_trip_by_hand_is_refused_and_says_why(self):
+        flight = self.shared_with_sam()
+        trip_id = flight["trip_id"]
+        self.take_off(self.jane, trip_id, self.sid)
+        with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip"):
+            trips.add_segment(self.c, self.jane, {**FAR, "travelers": self.on(self.jid, self.sid)}, trip_id)
+        with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip"):
+            trips.edit_segment(self.c, self.jane, flight["id"], {"travelers": self.on(self.jid, self.sid)})
+        self.assertEqual(self.aboard(trip_id), [self.jid])
 
     def test_merging_another_trip_into_it_carries_the_exclusion_on_the_trip_they_were_taken_off(self):
         mine = self.add(self.jane, OUT, None, self.on(self.jid))
@@ -177,7 +194,8 @@ class NothingGivesItBack(Removal):
         self.assertEqual(self.excluded(mine["trip_id"]), {self.sid})
         self.email(self.sam, self.jid, fields=FAR_FLIGHT)
         self.assertEqual(self.c.orm.scalars(select(SegmentRecipient)).all(), [])
-        self.assertSeesNothing(self.sam, mine["trip_id"], [mine["id"], other_id])
+        self.assertIsNone(trips.get(self.c, self.sam, mine["trip_id"]))
+        self.assertIsNone(trips.get_segment(self.c, self.sam, other_id))
         self.assertStrangersSeeNothing(mine["trip_id"], [mine["id"], other_id])
 
     def test_merging_in_a_trip_someone_still_sees_names_them_and_keeps_what_they_had(self):
@@ -242,6 +260,19 @@ class PutBackOnTheTrip(Removal):
         self.assertEqual(self.c.orm.scalars(select(TripExclusion)).all(), [])
         self.assertIsNotNone(trips.get(self.c, self.sam, trip_id))
         self.assertIsNotNone(trips.get_segment(self.c, self.sam, flight["id"]))
+        self.assertEqual(self.c.orm.get(Trip, trip_id).booked_by, self.sid)
+        self.assertEqual(self.c.orm.get(Segment, flight["id"]).booked_by, self.sid)
+
+    def test_taking_the_last_person_off_is_refused_so_the_trip_never_ends_up_seen_by_nobody(self):
+        stay = self.add(self.jane, HOTEL)
+        trip_id = stay["trip_id"]
+        with self.assertRaisesRegex(trips.Invalid, "A trip needs someone on it"):
+            trips.edit_trip(self.c, self.jane, trip_id, {"people": []})
+        self.assertEqual(self.aboard(trip_id), [self.jid])
+        self.assertEqual(self.excluded(trip_id), set())
+        self.assertIsNotNone(trips.get(self.c, self.jane, trip_id))
+        trips.edit_trip(self.c, Viewer(self.jid, household=True), trip_id, {"people": []})
+        self.assertEqual(self.aboard(trip_id), [])
 
     def test_adding_them_and_taking_them_off_again_keeps_one_record_and_the_last_change_wins(self):
         self.email(self.jane, self.jid)
