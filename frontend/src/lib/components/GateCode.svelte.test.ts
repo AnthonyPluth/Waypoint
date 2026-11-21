@@ -159,6 +159,15 @@ describe("the full-screen code", () => {
     expect(request).toHaveBeenCalled();
   });
 
+  it("has a Close button at least 44 px square at every width, first in the dialog", async () => {
+    render(GateCode, { segment: lot, now: NOW });
+    await user.click(screen.getByRole("button", { name: /Show QR code/ }));
+    const dialog = await screen.findByRole("dialog", { name: "QR code" });
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    expect(close).toHaveClass("min-h-11", "min-w-11");
+    expect(within(dialog).getAllByRole("button")[0]).toBe(close);
+  });
+
   it("closes with its button and with Escape and returns focus to the button", async () => {
     render(GateCode, { segment: lot, now: NOW });
     const button = screen.getByRole("button", { name: /Show QR code/ });

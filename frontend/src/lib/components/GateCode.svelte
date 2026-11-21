@@ -131,7 +131,7 @@
         <Dialog.Title class="min-w-0 truncate font-medium">QR code</Dialog.Title>
         <Dialog.Close>
           {#snippet child({ props })}
-            <Button {...props} variant="ghost" size="icon" aria-label="Close"><X /></Button>
+            <Button {...props} variant="ghost" size="icon" class="min-h-11 min-w-11" aria-label="Close"><X /></Button>
           {/snippet}
         </Dialog.Close>
       </div>

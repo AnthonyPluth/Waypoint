@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, within } from "@testing-library/svelte";
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,6 +90,21 @@ describe("Copy and Close", () => {
     render(ConfirmationCode, { segment: stay, open: true });
     await user.click(await screen.findByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("has a Close button at least 44 px square at every width, first in the dialog", async () => {
+    render(ConfirmationCode, { segment: stay, open: true });
+    const dialog = await screen.findByRole("dialog", { name: "Check-in" });
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    expect(close).toHaveClass("min-h-11", "min-w-11");
+    expect(within(dialog).getAllByRole("button")[0]).toBe(close);
+  });
+
+  it("leaves the screen with Escape", async () => {
+    render(ConfirmationCode, { segment: rental, open: true });
+    await screen.findByRole("dialog", { name: "Pickup" });
+    await user.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("is not on screen until it is opened", () => {

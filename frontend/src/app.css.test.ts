@@ -118,3 +118,10 @@ describe("motion", () => {
     expect(reduced).not.toMatch(/@keyframes|\banimation:|\btransition:/);
   });
 });
+
+describe("the full-screen code dialogs", () => {
+  it("keep their header, with the Close button, clear of the status bar, notch and home indicator", () => {
+    const rule = css.match(/\.code-dialog \{[^}]*\}/)?.[0] ?? "";
+    for (const side of ["top", "right", "bottom", "left"]) expect(rule).toContain(`env(safe-area-inset-${side})`);
+  });
+});
