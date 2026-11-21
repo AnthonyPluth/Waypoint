@@ -77,17 +77,24 @@ try {
         const inDetail = await cards.count();
         let behindCards = 0;
         for (let index = 0; index < inDetail; index++) {
-          await cards.nth(index).click();
-          const dialog = page.getByRole('dialog');
-          await dialog.waitFor();
-          const mail = dialog.getByRole('button',{name:/^View email for/});
+          const card = cards.nth(index);
+          await card.click();
+          const controls = await card.getAttribute('aria-controls');
+          const detail = controls ? page.locator(`[id="${controls}"]`) : page.getByRole('dialog');
+          await detail.waitFor();
+          const mail = detail.getByRole('button',{name:/^View email for/});
           behindCards += await mail.count();
           if (await mail.count()) {
             await mail.first().click();
-            await dialog.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
+            await detail.getByText('SIMULATED BOOKING EMAIL',{exact:false}).first().waitFor();
           }
-          await page.keyboard.press('Escape');
-          await dialog.waitFor({state:'detached'});
+          if (controls) {
+            await card.click();
+            await detail.waitFor({state:'hidden'});
+          } else {
+            await page.keyboard.press('Escape');
+            await detail.waitFor({state:'detached'});
+          }
         }
         assert.equal(onPage + behindCards,trip.segments.length,`${route}: missing source emails`);
         for (let index = 0; index < onPage; index++) await buttons.first().click();
