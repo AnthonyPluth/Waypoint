@@ -33,7 +33,6 @@
   let found = $state<PhotoReply | null>(null);
   let status = $state<"loading" | "ready" | "error">("loading");
   let photoChanges = $state(0);
-  let looks = $state(0);
   let stopCount = $state(0);
   let mapShown = $state(false);
   let replaying = $state(false);
@@ -67,7 +66,6 @@
   const names = $derived(avatars.map((p) => p.name).join(", "));
   const counts = $derived(bookingCounts(trip));
   const hasTotal = $derived(costsShown && trip.costs.totals.length > 0);
-  const looksWords = $derived(`${looks} ${looks === 1 ? "photo needs" : "photos need"} a look`);
 
   $effect(() => {
     void trip.id;
@@ -135,10 +133,9 @@
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <TripSummary bind:this={facts} tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
         <AvatarStack people={avatars} />
-        {#if hasTotal || looks > 0 || (heroKind !== "map" && stopCount >= 2)}
+        {#if hasTotal || (heroKind !== "map" && stopCount >= 2)}
           <div class="flex basis-full flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-muted-foreground">
             {#if hasTotal}{@render total()}{/if}
-            {#if looks > 0}{@render lookChip()}{/if}
             {#if heroKind !== "map" && stopCount >= 2}
               <Button variant="outline" size="sm" aria-label="Replay trip" aria-expanded={replaying} aria-controls="past-trip-replay" onclick={() => (replaying = !replaying)}><Play class="size-3.5" aria-hidden="true" /> Replay</Button>
             {/if}
@@ -178,7 +175,6 @@
             <div class="flex flex-wrap items-center gap-2.5 text-sm text-muted-foreground">
               <AvatarStack people={avatars} />
               {#if names}<span class="min-w-0 break-words">{names}</span>{/if}
-              {#if looks > 0}{@render lookChip()}{/if}
             </div>
             {#if trip.notes}<p class="whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
           </div>
@@ -211,13 +207,10 @@
 {/snippet}
 
 {#snippet photos()}
-  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next) => (acting = next)} belowHeader={wide ? reminders : null} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onlook={(n) => (looks = n)} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
+  <TripPhotos bind:this={gallery} bind:sharingOpen onsharing={(next) => (acting = next)} belowHeader={wide ? reminders : null} onstatus={(next) => (status = next)} timeline {wide} {leftOut} onloaded={(next) => (found = next)} onchanged={() => photoChanges++} {trip} {people} {now} />
 {/snippet}
 
 {#snippet total()}
   <span data-trip-total>Total <b class="font-semibold text-foreground">{formatTotals(trip.costs.totals)}</b>{#if countNote(trip.costs)} · {countNote(trip.costs)}{/if}</span>
 {/snippet}
 
-{#snippet lookChip()}
-  <a class="inline-flex w-fit items-center phone:min-h-11" href="#settings/photos"><span class="inline-flex items-center gap-1.5 rounded-full bg-status-warn-soft px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-status-warn-ink"><span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>{looksWords}</span></a>
-{/snippet}

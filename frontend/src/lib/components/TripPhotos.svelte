@@ -18,9 +18,9 @@
 
   const NONE: ReadonlySet<number> = new Set();
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), belowHeader = null }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onstatus, onsharing, sharingOpen = $bindable(false), belowHeader = null }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
-    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
+    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onstatus?: (state: "loading" | "ready" | "error") => void;
     onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; belowHeader?: Snippet | null;
   } = $props();
 
@@ -84,15 +84,10 @@
     const state = loaded.state;
     untrack(() => onstatus?.(state));
   });
-  const looks = $derived(photos.filter((p) => isFar(p) && mineOf(p)).length);
   $effect(() => {
     const list = acting;
     const done = settled;
     untrack(() => onsharing?.(list, done));
-  });
-  $effect(() => {
-    const n = looks;
-    untrack(() => onlook?.(n));
   });
   const frozen = $derived(removing || staleView || acting.some((a) => a.locked));
   const selectedPersons = $derived([...new Set(photos.filter((p) => selected.has(p.id)).map((p) => p.person_id))]);

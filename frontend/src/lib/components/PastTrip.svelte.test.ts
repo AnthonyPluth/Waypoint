@@ -228,31 +228,6 @@ describe("PastTrip facts", () => {
     expect(document.querySelector("[data-trip-total]")).toBeNull();
   });
 
-  it("links the photos that need a look, counting only far photos of people the viewer acts for", async () => {
-    photos = [1, 2, 3, 4, 5].map((id) => shot(id)).concat([shot(6, 1, { match: "far", distance_km: 500 }), shot(7, 1, { match: "far", distance_km: 500 }), shot(8, 1, { match: "far", person_id: 2 })]);
-    best = [1, 2, 3];
-    show();
-    const link = await screen.findByRole("link", { name: "2 photos need a look" });
-    expect(link).toHaveAttribute("href", "#settings/photos");
-    expect(link.firstElementChild?.className).toContain("status-warn");
-  });
-
-  it("says one photo needs a look in the singular and shows no chip for none", async () => {
-    photos = [1, 2, 3, 4].map((id) => shot(id)).concat([shot(5, 1, { match: "far", distance_km: 500 })]);
-    best = [1, 2, 3];
-    show();
-    expect(await screen.findByRole("link", { name: "1 photo needs a look" })).toBeTruthy();
-  });
-
-  it("has no need-a-look chip when no photo is far", async () => {
-    photos = [1, 2, 3, 4].map((id) => shot(id));
-    best = [1, 2, 3];
-    show();
-    await screen.findByTestId("trip-hero");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Photo 1, Sun Mar 1, Marlow Springs" })).toBeTruthy());
-    expect(screen.queryByRole("link", { name: /need a look/ })).toBeNull();
-  });
-
   it("opens the replay under the facts from Replay trip when the hero is photos", async () => {
     photos = [1, 2, 3, 4].map((id) => shot(id));
     best = [1, 2, 3];
@@ -859,7 +834,7 @@ describe("PastTrip on desktop", () => {
   describe("left column", () => {
     const withTotal = { ...flown, costs: { totals: [{ currency: "USD", amount_minor: 431200 }], priced: 1, bookings: 1 } };
 
-    it("has the Trip summary list, the total, the photo count, the people and the need-a-look chip", async () => {
+    it("has the Trip summary list, the total, the photo count, and the people, with no need-a-look chip", async () => {
       photos = [...tiles(9), shot(50, 1, { match: "far", distance_km: 500 })];
       best = [101, 102, 103];
       show({ trip: withTotal });
@@ -872,7 +847,7 @@ describe("PastTrip on desktop", () => {
       expect(await within(column()).findByText("10 photos")).toBeTruthy();
       expect(within(column()).getByTestId("avatar-stack")).toHaveAttribute("role", "img");
       expect(within(column()).getByText("Jane Doe")).toBeTruthy();
-      expect(await within(column()).findByRole("link", { name: "1 photo needs a look" })).toHaveAttribute("href", "#settings/photos");
+      expect(screen.queryByRole("link", { name: /need a look/ })).toBeNull();
     });
 
     it("leaves the total out when costs are not shown, and shows the notes under the facts", async () => {
