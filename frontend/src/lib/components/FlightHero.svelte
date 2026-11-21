@@ -27,7 +27,7 @@
   {#if t.zoneName}<span class="font-mono text-[11px] tracking-[0.04em] text-label" data-zone={side}>{t.zoneName}</span>{/if}
 {/snippet}
 
-<article class="@container relative flex scroll-mt-20 flex-col rounded-hero border border-border bg-card p-5 shadow-card @[32rem]:p-7" class:ring-2={highlight} class:ring-ring={highlight} aria-label={view.name} data-kind="flight" data-state={view.state} data-progress={view.progress ?? undefined} data-hero>
+<article class="@container relative flex scroll-mt-20 flex-col rounded-hero bg-card p-5 @[32rem]:p-7" class:ring-2={highlight} class:ring-ring={highlight} aria-label={view.name} data-kind="flight" data-state={view.state} data-progress={view.progress ?? undefined} data-hero>
   <svelte:element this={`h${level}`} class="sr-only">{headline(segment)}</svelte:element>
   {#if href}<a {href} class="absolute inset-0 z-[1] rounded-hero outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60" aria-label={linkLabel} data-live-link></a>{/if}
 
@@ -50,13 +50,13 @@
 
   <div class="mt-5 grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2">
     <div class="flex min-w-[74px] flex-col gap-[3px]">
-      <b class={`text-airport @[32rem]:text-airport-lg tabular-nums ${hero.cancelled ? "text-label" : ""}`} data-code="origin">{view.origin}</b>
+      <b class={`font-mono text-airport @[32rem]:text-airport-lg tabular-nums ${hero.cancelled ? "text-label" : ""}`} data-code="origin">{view.origin}</b>
       {@render when(view.depart, "origin")}
     </div>
     <FlightArc progress={view.progress} class="mt-1" hero landed={hero.landed} />
     <div class="flex min-w-[74px] flex-col items-end gap-[3px] text-right">
-      {#if hero.was}<span class="text-xs font-semibold text-label line-through" data-was><span class="sr-only">Booked for </span>{hero.was}</span>{/if}
-      <b class={`text-airport @[32rem]:text-airport-lg tabular-nums ${hero.cancelled ? "text-label" : ""}`} data-code="destination">{view.destination}</b>
+      {#if hero.was}<span class="font-mono text-xs font-semibold text-label line-through" data-was><span class="sr-only">Booked for </span>{hero.was}</span>{/if}
+      <b class={`font-mono text-airport @[32rem]:text-airport-lg tabular-nums ${hero.cancelled ? "text-label" : ""}`} data-code="destination">{view.destination}</b>
       {@render when(view.arrive, "destination")}
     </div>
   </div>
