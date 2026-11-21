@@ -18,10 +18,10 @@
 
   const NONE: ReadonlySet<number> = new Set();
 
-  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onlook, onstatus, onsharing, sharingOpen = $bindable(false), headerEnd = null, belowHeader = null }: {
+  let { trip, people, now, onloaded, onchanged, timeline = false, wide = false, leftOut = NONE, onstatus, onsharing, sharingOpen = $bindable(false), belowHeader = null }: {
     trip: Trip; people: Person[]; now: number; onloaded?: (found: TripPhotos | null) => void; onchanged?: () => void;
-    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onlook?: (count: number) => void; onstatus?: (state: "loading" | "ready" | "error") => void;
-    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; headerEnd?: Snippet | null; belowHeader?: Snippet | null;
+    timeline?: boolean; wide?: boolean; leftOut?: ReadonlySet<number>; onstatus?: (state: "loading" | "ready" | "error") => void;
+    onsharing?: (acting: PersonSharing[], settled: boolean) => void; sharingOpen?: boolean; belowHeader?: Snippet | null;
   } = $props();
 
   type Loaded = { state: "loading" } | { state: "ready"; found: TripPhotos } | { state: "error" };
@@ -84,15 +84,10 @@
     const state = loaded.state;
     untrack(() => onstatus?.(state));
   });
-  const looks = $derived(photos.filter((p) => isFar(p) && mineOf(p)).length);
   $effect(() => {
     const list = acting;
     const done = settled;
     untrack(() => onsharing?.(list, done));
-  });
-  $effect(() => {
-    const n = looks;
-    untrack(() => onlook?.(n));
   });
   const frozen = $derived(removing || staleView || acting.some((a) => a.locked));
   const selectedPersons = $derived([...new Set(photos.filter((p) => selected.has(p.id)).map((p) => p.person_id))]);
@@ -393,12 +388,11 @@
 
 {#if signedIn && shows}
   <section class={`flex flex-col gap-3 ${timeline ? "" : "mb-6"}`} aria-labelledby="trip-photos-title" data-testid="trip-photos">
-    {#if timeline && wide && (total || headerEnd)}
-      <div class={`flex items-center gap-3 ${total ? "justify-between" : "justify-start"}`}>
-        <h2 id="trip-photos-title" class={total ? "text-[17px] leading-snug font-semibold tracking-tight outline-none" : "sr-only"} tabindex="-1" bind:this={heading}>Photos by day</h2>
+    {#if timeline && wide && total}
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="trip-photos-title" class="text-[17px] leading-snug font-semibold tracking-tight outline-none" tabindex="-1" bind:this={heading}>Photos by day</h2>
         <div class="flex items-center gap-2">
-          {#if headerEnd}{@render headerEnd()}{/if}
-          {#if total}<Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>{/if}
+          <Button variant="outline" size="sm" aria-expanded={expanded} aria-controls="trip-photos-gallery" onclick={() => (expanded ? close() : void open(false))}>{expanded ? "Close gallery" : "Open gallery"}</Button>
         </div>
       </div>
     {:else if timeline}

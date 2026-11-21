@@ -54,6 +54,18 @@ describe("SideNav", () => {
     expect(chip.textContent).toContain("DP");
   });
 
+  it("stretches its dark column to the full page height while its content stays in view as the page scrolls", () => {
+    render(SideNav);
+    const column = screen.getByRole("complementary");
+    expect(column.className).not.toContain("h-dvh");
+    expect(column.className).toContain("bg-sidebar");
+    const pinned = column.firstElementChild as HTMLElement;
+    expect(pinned.className).toContain("sticky");
+    expect(pinned.className).toContain("top-0");
+    expect(pinned.className).toContain("h-dvh");
+    expect(pinned.contains(screen.getByRole("navigation", { name: "Main" }))).toBe(true);
+  });
+
   it("has no person chip when nobody is signed in", () => {
     app.state = state();
     render(SideNav);
