@@ -8,7 +8,7 @@
     { "click": "ul[aria-label='Bookings'] button[data-booking] >> visible=true >> nth=0" },
     { "wait_for": "[data-testid=booking-detail]" },
     { "screenshot": "trip-booking-detail" },
-    { "press": { "selector": "[role=dialog] >> nth=-1", "key": "Escape" } },
-    { "wait_for": "ul[aria-label='Bookings']" }
+    { "click": "ul[aria-label='Bookings'] button[data-booking][aria-expanded=true]" },
+    { "expect_absent": "[data-testid=booking-detail]" }
   ]
 }

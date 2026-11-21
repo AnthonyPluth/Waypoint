@@ -10,7 +10,7 @@
     { "scroll_to": "[data-booking-card='parking']" },
     { "screenshot": "trip" },
     { "click": "[data-booking-card='parking'] button[data-booking]" },
-    { "click": "[role='dialog'] button:text-is('Edit')" },
+    { "click": "[data-testid=booking-detail] button:text-is('Edit')" },
     { "wait_for": "form[data-editor]" },
     { "expect_text": { "selector": "form[data-editor]", "text": "Space type" } },
     { "scroll_to": "form[data-editor]" },
