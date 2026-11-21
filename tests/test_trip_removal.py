@@ -183,6 +183,22 @@ class NothingGivesItBack(Removal):
             trips.edit_segment(self.c, self.jane, flight["id"], {"travelers": self.on(self.jid, self.sid)})
         self.assertEqual(self.aboard(trip_id), [self.jid])
 
+    def test_moving_a_booking_into_a_trip_they_see_names_them_when_they_were_taken_off_its_own(self):
+        self.email(self.jane, self.jid)
+        flight_id = self.c.orm.scalars(select(Segment.id)).one()
+        trip_id = self.c.orm.get(Segment, flight_id).trip_id
+        self.email(self.sam, self.jid)
+        self.add(self.jane, HOTEL, trip_id)
+        self.put_on(self.jane, trip_id, self.sid)
+        self.take_off(self.jane, trip_id, self.sid)
+        there = self.add(self.jane, FAR, None, self.on(self.jid, self.sid))
+        with self.assertRaises(trips.NeedsConfirmation) as asked:
+            trips.move_segment(self.c, self.jane, flight_id, there["trip_id"])
+        self.assertEqual([p["id"] for p in asked.exception.see_booking], [self.sid])
+        self.assertEqual(self.c.orm.get(Segment, flight_id).trip_id, trip_id)
+        trips.move_segment(self.c, self.jane, flight_id, there["trip_id"], True)
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, flight_id))
+
     def test_a_booking_moved_out_to_a_trip_of_its_own_keeps_them_off_it(self):
         self.email(self.jane, self.jid)
         flight_id = self.c.orm.scalars(select(Segment.id)).one()
