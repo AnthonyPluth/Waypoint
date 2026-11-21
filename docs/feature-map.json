@@ -111,6 +111,7 @@
       "path": "/api/people",
       "handler": "waypoint/server/api/people.py:api_person_add",
       "web": [
+        "frontend/src/lib/components/TripPeopleSheet.svelte",
         "frontend/src/pages/People.svelte"
       ],
       "tests": [
@@ -292,6 +293,7 @@
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
+        "tests/test_trip_people.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],
@@ -396,7 +398,8 @@
       "path": "/api/trips/{id}",
       "handler": "waypoint/server/api/trips.py:api_trip_edit",
       "web": [
-        "frontend/src/lib/components/TripDetails.svelte"
+        "frontend/src/lib/components/TripDetails.svelte",
+        "frontend/src/lib/components/TripPeopleSheet.svelte"
       ],
       "tests": [
         "tests/test_api_contract.py",
@@ -410,6 +413,7 @@
         "tests/test_routes.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
+        "tests/test_trip_people.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -433,6 +437,7 @@
         "tests/test_photos_api.py",
         "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
+        "tests/test_trip_people.py",
         "tests/test_trips.py"
       ],
       "docs": [

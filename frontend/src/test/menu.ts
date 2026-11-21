@@ -7,7 +7,7 @@ export async function pickFromMenu(u: Pick<UserEvent, "click">, trigger: string 
   await u.click(await screen.findByRole("button", { name: item }));
 }
 
-export async function tripOptions(u: Pick<UserEvent, "click">, item: "Add a booking" | "Delete trip" | "Merge another trip") {
+export async function tripOptions(u: Pick<UserEvent, "click">, item: "People on this trip" | "Add a booking" | "Delete trip" | "Merge another trip") {
   await u.click(await screen.findByRole("button", { name: "Trip options" }));
   await u.click(await screen.findByRole("menuitem", { name: item }));
 }

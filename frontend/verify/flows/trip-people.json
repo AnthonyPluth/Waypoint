@@ -1,0 +1,14 @@
+{
+  "name": "trip-people",
+  "page": "trips",
+  "steps": [
+    { "expect_text": { "selector": "h1", "text": "Trips" } },
+    { "click": "a[href^='#trip/'] >> visible=true" },
+    { "wait_for": "ul[aria-label='Bookings']" },
+    { "click": "button[aria-label='Trip options'] >> visible=true" },
+    { "click": "[role='menuitem']:has-text('People on this trip') >> visible=true" },
+    { "wait_for": "[role='dialog']:has-text('People on this trip')" },
+    { "expect_text": { "selector": "[role='dialog']", "text": "Add someone" } },
+    { "screenshot": "people-sheet" }
+  ]
+}

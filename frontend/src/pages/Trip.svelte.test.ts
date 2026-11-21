@@ -180,6 +180,40 @@ describe("Trip", () => {
       expect(within(document.querySelector("[data-trip-travellers]") as HTMLElement).getByRole("img", { name: "Jane Doe, Sam Doe" })).toBeInTheDocument();
     });
 
+    it("opens the people sheet from the avatars and from Trip options", async () => {
+      held = trip([flightFor, car], { people: [1, 2] });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await u.click(screen.getByRole("button", { name: "People on this trip: Jane Doe, Sam Doe" }));
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      expect(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" })).toBeInTheDocument();
+      await u.click(within(sheet).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
+      await tripOptions(u, "People on this trip");
+      expect(await screen.findByRole("dialog", { name: "People on this trip" })).toBeInTheDocument();
+    });
+
+    it("takes someone off the trip from the sheet, which then offers them to add again", async () => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { held = { ...held, people: (opts.body as { people: number[] }).people }; return held as never; }
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" }));
+      const confirm = await screen.findByRole("dialog", { name: "Remove Sam Doe from this trip?" });
+      await u.click(within(confirm).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { people: [1] } }));
+      expect(await within(sheet).findByRole("button", { name: "Add Sam Doe to this trip" })).toBeEnabled();
+    });
+
     it("keeps a flight's travellers and seats", async () => {
       held = trip([flightFor, car]);
       render(TripPage);
@@ -278,7 +312,7 @@ describe("Trip", () => {
       expect(screen.getByRole("button", { name: "Add booking" }).closest("[data-trip-footer]")).toHaveTextContent("2 bookings");
       expect(screen.queryByRole("menuitem", { name: "Delete trip" })).toBeNull();
       await u.click(screen.getByRole("button", { name: "Trip options" }));
-      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Add a booking", "Merge another trip", "Delete trip"]);
+      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["People on this trip", "Add a booking", "Merge another trip", "Delete trip"]);
       await u.click(screen.getByRole("menuitem", { name: "Add a booking" }));
       await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
       expect(screen.queryByRole("button", { name: "Trip options" })).toBeNull();
@@ -1489,7 +1523,7 @@ describe("Trip", () => {
       const trigger = await screen.findByRole("button", { name: "Trip options" });
       expect(trigger).toHaveAttribute("aria-haspopup", "menu");
       await u.click(trigger);
-      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Add a booking", "Merge another trip", "Delete trip"]);
+      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["People on this trip", "Add a booking", "Merge another trip", "Delete trip"]);
       await u.click(screen.getByRole("menuitem", { name: "Add a booking" }));
       await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
       expect(screen.queryByRole("button", { name: "Trip options" })).toBeNull();
@@ -1502,6 +1536,17 @@ describe("Trip", () => {
       await u.click(await screen.findByRole("button", { name: "Trip options" }));
       await u.click(screen.getByRole("menuitem", { name: "Delete trip" }));
       expect(await screen.findByRole("dialog", { name: "Delete Trip to London?" })).toBeInTheDocument();
+    });
+
+    it("opens the people sheet from Trip options on a completed trip, listing the trip’s people", async () => {
+      held = past({ people: [1, 2] });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("past-trip");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      expect(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" })).toBeInTheDocument();
+      expect(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" })).toBeInTheDocument();
     });
 
     const openBooking = async (name: RegExp | string = /Harbour Hotel/) => {

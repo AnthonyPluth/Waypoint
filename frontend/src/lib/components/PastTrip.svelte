@@ -26,9 +26,9 @@
 
   type Props = {
     trip: Trip; people: Person[]; now: number; dates: string; costsShown: boolean; loads: number; back: boolean;
-    options: OptionsMenuItem[]; editing?: boolean; onsaved: (next: Trip) => void; onbookings?: (() => void) | null; bookings?: Snippet | null;
+    options: OptionsMenuItem[]; onpeople?: (() => void) | null; editing?: boolean; onsaved: (next: Trip) => void; onbookings?: (() => void) | null; bookings?: Snippet | null;
   };
-  let { trip, people, now, dates, costsShown, loads, back, options, editing = $bindable(false), onsaved, onbookings = null, bookings = null }: Props = $props();
+  let { trip, people, now, dates, costsShown, loads, back, options, onpeople = null, editing = $bindable(false), onsaved, onbookings = null, bookings = null }: Props = $props();
 
   let found = $state<PhotoReply | null>(null);
   let status = $state<"loading" | "ready" | "error">("loading");
@@ -132,7 +132,7 @@
     {#if !wide}
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <TripSummary bind:this={facts} tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
-        <AvatarStack people={avatars} />
+        {@render stack()}
         {#if hasTotal || (heroKind !== "map" && stopCount >= 2)}
           <div class="flex basis-full flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-muted-foreground">
             {#if hasTotal}{@render total()}{/if}
@@ -173,7 +173,7 @@
               </div>
             {/if}
             <div class="flex flex-wrap items-center gap-2.5 text-sm text-muted-foreground">
-              <AvatarStack people={avatars} />
+              {@render stack()}
               {#if names}<span class="min-w-0 break-words">{names}</span>{/if}
             </div>
             {#if trip.notes}<p class="whitespace-pre-line break-words text-sm">{trip.notes}</p>{/if}
@@ -214,3 +214,11 @@
   <span data-trip-total>Total <b class="font-semibold text-foreground">{formatTotals(trip.costs.totals)}</b>{#if countNote(trip.costs)} · {countNote(trip.costs)}{/if}</span>
 {/snippet}
 
+{#snippet stack()}
+  {#if onpeople && avatars.length}
+    <button type="button" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-trip-travellers
+      aria-label={`People on this trip: ${names}`} onclick={onpeople}><AvatarStack people={avatars} /></button>
+  {:else}
+    <AvatarStack people={avatars} />
+  {/if}
+{/snippet}
