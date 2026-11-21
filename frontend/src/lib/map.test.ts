@@ -294,7 +294,7 @@ describe("what the map hands MapKit", () => {
   });
 
   it("keeps a ring that runs along the pole, as Antarctica does, in one piece", () => {
-    const ring: [number, number][] = [[-180, -85], [180, -85], [180, -90], [-180, -90], [-180, -85]];
+    const ring: [number, number][] = [[-180, -85], [0, -80], [180, -85], [180, -90], [-180, -90], [-180, -85]];
     expect(splitAtAntimeridian(ring)).toEqual([ring]);
   });
 
