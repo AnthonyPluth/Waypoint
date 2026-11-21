@@ -14,7 +14,7 @@
     { "expect_absent": "[data-flight-home] a:has-text('Open trip')" },
     { "click": "[data-flight-home] [data-detail]" },
     { "wait_for": "[role='dialog'] [data-testid='booking-detail']" },
-    { "expect_text": { "selector": "[role='dialog']", "text": "Confirmation" } },
+    { "expect_text": { "selector": "[role='dialog']", "text": "CONFIRMATION" } },
     { "wait_for": "[role='dialog'] a:has-text('Open trip')" },
     { "screenshot": "hero-booking" },
     { "press": { "selector": "[role='dialog']", "key": "Escape" } },
