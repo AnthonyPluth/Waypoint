@@ -424,7 +424,7 @@ describe("PastTrip Sharing", () => {
   const sharing = (extra: Partial<PhotoSharing> = {}): PhotoSharing => ({ ...NO_SHARING, state: "shared", scope: "only_me", count: 5, ...extra });
   const many = (n: number) => [...Array(n).keys()].map((i) => shot(i + 1, 1 + (i % 3)));
   const optionsButton = () => screen.getByRole("button", { name: "Trip options" });
-  const sharingItem = async (user = userEvent) => {
+  const sharingItem = async (user: { click: (element: Element) => Promise<void> } = userEvent) => {
     if (optionsButton().getAttribute("aria-expanded") !== "true") await user.click(optionsButton());
     return screen.findByRole("menuitem", { name: "Sharing" });
   };
