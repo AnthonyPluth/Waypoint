@@ -3,10 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import ColumnElement, false, or_, select, true
+from sqlalchemy import ColumnElement, and_, false, or_, select, true
 
 from ..storage import db
-from ..storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
+from ..storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripExclusion, TripPerson
 
 
 @dataclass(frozen=True)
@@ -27,7 +27,9 @@ def can_see(viewer: Viewer) -> ColumnElement[bool]:
     received = select(Segment.trip_id).join(SegmentRecipient, SegmentRecipient.segment_id == Segment.id) \
         .where(SegmentRecipient.person_id == me)
     listed = select(TripPerson.trip_id).where(TripPerson.person_id == me)
-    return or_(Trip.booked_by == me, Trip.id.in_(listed), Trip.id.in_(travelling), Trip.id.in_(booked_a_segment), Trip.id.in_(received))
+    taken_off = select(TripExclusion.trip_id).where(TripExclusion.person_id == me)
+    return and_(or_(Trip.booked_by == me, Trip.id.in_(listed), Trip.id.in_(travelling), Trip.id.in_(booked_a_segment), Trip.id.in_(received)),
+                Trip.id.not_in(taken_off))
 
 
 def visible_trips(conn: db.Connection, viewer: Viewer) -> list[Trip]:
@@ -77,6 +79,9 @@ def household_segments(conn: db.Connection, kind: str) -> list[Segment]:
 
 def note_recipient(conn: db.Connection, viewer: Viewer, segment: Segment) -> bool:
     if viewer.household or viewer.person_id is None or visible_segment(conn, viewer, segment.id) is not None:
+        return False
+    if conn.orm.scalars(select(TripExclusion.id).where(TripExclusion.trip_id == segment.trip_id,
+                                                      TripExclusion.person_id == viewer.person_id)).first() is not None:
         return False
     db.insert_ignore(conn, SegmentRecipient, {"segment_id": segment.id, "person_id": viewer.person_id},
                      key=["segment_id", "person_id"])

@@ -1477,14 +1477,15 @@ def _seen_by_bookings(conn: db.Connection, trip: Trip, apart_from: int | None = 
     booked = {p for p in conn.orm.scalars(select(Segment.booked_by).where(Segment.trip_id == trip.id)).all() if p is not None}
     received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
                                 .where(Segment.trip_id == trip.id)).all()
-    return {p for p in listed if p is not None} | booked | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())
+    seen = {p for p in listed if p is not None} | booked | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())
+    return seen - trippeople.excluded(conn, trip.id)
 
 
 def _seeing(conn: db.Connection, trip: Trip) -> set[int]:
     _, who = _involved(conn, [trip.id])
     received = conn.orm.scalars(select(SegmentRecipient.person_id).join(Segment, Segment.id == SegmentRecipient.segment_id)
                                 .where(Segment.trip_id == trip.id)).all()
-    return who[trip.id] | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())
+    return (who[trip.id] | set(received) | ({trip.booked_by} if trip.booked_by is not None else set())) - trippeople.excluded(conn, trip.id)
 
 
 def _confirm_adding(conn: db.Connection, viewer: Viewer, newly: set[int], confirmed: bool) -> None:
@@ -1507,6 +1508,16 @@ def _flight_of(conn: db.Connection, trip_id: int, person_id: int) -> Segment | N
         .order_by(Segment.id)).first()
 
 
+def _take_access_away(conn: db.Connection, trip: Trip, leaving: Sequence[int]) -> None:
+    own = select(Segment.id).where(Segment.trip_id == trip.id)
+    conn.execute(update(Trip).where(Trip.id == trip.id, Trip.booked_by.in_(list(leaving))).values(booked_by=None))
+    conn.execute(update(Segment).where(Segment.trip_id == trip.id, Segment.booked_by.in_(list(leaving))).values(booked_by=None))
+    conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id.in_(list(leaving)), SegmentRecipient.segment_id.in_(own)))
+    trippeople.exclude(conn, trip.id, leaving)
+    conn.orm.flush()
+    conn.orm.expire_all()
+
+
 def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence[int], confirmed: bool) -> None:
     wanted = _known_people(conn, given)
     have = trippeople.of(conn, [trip.id])[trip.id]
@@ -1522,6 +1533,7 @@ def _set_people(conn: db.Connection, viewer: Viewer, trip: Trip, given: Sequence
         own = select(Segment.id).where(Segment.trip_id == trip.id)
         conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id.in_(leaving), SegmentTraveler.segment_id.in_(own)))
         trippeople.remove(conn, trip.id, leaving)
+        _take_access_away(conn, trip, leaving)
     trippeople.add(conn, trip.id, wanted)
 
 
@@ -1566,7 +1578,15 @@ def edit_trip(conn: db.Connection, viewer: Viewer, trip_id: int, fields: TripIn,
     conn.orm.flush()
     refresh(conn, trip)
     photogrants.trips_changed(conn, [trip.id], windows)
+    if visibility.visible_trip(conn, viewer, trip.id) is None:
+        return _left(trip.id)
     return _trip_outs(conn, viewer, [trip])[0]
+
+
+def _left(trip_id: int) -> TripOut:
+    return {"id": trip_id, "name": "", "start_date": None, "end_date": None, "destination": None, "destination_manual": False,
+            "notes": None, "auto": False, "booked_by": None, "emails": 0, "can_clear_emails": False, "done_at": None, "people": [],
+            "costs": costs_of([]), "segments": []}
 
 
 def delete_trip(conn: db.Connection, viewer: Viewer, trip_id: int) -> bool:
@@ -1607,12 +1627,14 @@ def merge(conn: db.Connection, viewer: Viewer, trip_id: int, other_id: int, conf
     windows = _before(conn, [trip.id])
     aboard = trippeople.of(conn, [trip.id, other.id])
     joined = list(dict.fromkeys([*aboard[trip.id], *aboard[other.id]]))
+    carried = trippeople.excluded(conn, other.id) - _seeing(conn, trip) - set(joined)
     for seg in conn.orm.scalars(select(Segment).where(Segment.trip_id.in_([trip.id, other.id]), Segment.travelers_from_trip.is_(True))
                                 .order_by(Segment.id)).all():
         if set(aboard[seg.trip_id]) != set(joined):
             _freeze(conn, seg, aboard[seg.trip_id])
     conn.execute(update(Segment).where(Segment.trip_id == other.id).values(trip_id=trip.id))
     trippeople.add(conn, trip.id, joined)
+    trippeople.exclude(conn, trip.id, carried)
     trippeople.clear(conn, other.id)
     trip.auto = False
     if other.destination_manual and not trip.destination_manual:
@@ -1646,8 +1668,10 @@ def split(conn: db.Connection, viewer: Viewer, trip_id: int, segment_ids: Sequen
     leaving = list(conn.orm.scalars(select(Segment).where(Segment.id.in_(list(moving))).order_by(Segment.id)).all())
     before = trippeople.of(conn, [trip.id])[trip.id]
     listed = [t["person_id"] for s in leaving if not s.travelers_from_trip for t in effective_travelers(conn, s) if t["person_id"] is not None]
-    joined = before if any(s.travelers_from_trip for s in leaving) else listed
+    out = trippeople.excluded(conn, trip.id)
+    joined = [p for p in (before if any(s.travelers_from_trip for s in leaving) else listed) if p not in out]
     trippeople.add(conn, new.id, joined)
+    trippeople.exclude(conn, new.id, out)
     conn.execute(update(Segment).where(Segment.id.in_(list(moving))).values(trip_id=new.id))
     conn.orm.flush()
     if not conn.orm.scalars(select(Segment.id).where(Segment.trip_id == trip.id, Segment.travelers_from_trip.is_(True))).first():

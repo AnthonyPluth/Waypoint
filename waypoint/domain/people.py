@@ -7,7 +7,7 @@ from typing import Any, TypedDict
 from sqlalchemy import delete, select, update
 
 from ..storage import db, photo_sources
-from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
+from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripExclusion, TripPerson
 from . import photogrants, visibility
 
 
@@ -206,6 +206,11 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     has = select(SegmentRecipient.segment_id).where(SegmentRecipient.person_id == member_id)
     conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id == guest_id, SegmentRecipient.segment_id.in_(has)))
     conn.execute(update(SegmentRecipient).where(SegmentRecipient.person_id == guest_id).values(person_id=member_id))
+    listed = select(TripPerson.trip_id).where(TripPerson.person_id == member_id)
+    conn.execute(delete(TripExclusion).where(TripExclusion.person_id.in_([guest_id, member_id]), TripExclusion.trip_id.in_(listed)))
+    out = select(TripExclusion.trip_id).where(TripExclusion.person_id == member_id)
+    conn.execute(delete(TripExclusion).where(TripExclusion.person_id == guest_id, TripExclusion.trip_id.in_(out)))
+    conn.execute(update(TripExclusion).where(TripExclusion.person_id == guest_id).values(person_id=member_id))
     conn.execute(update(LoyaltyId).where(LoyaltyId.person_id == guest_id).values(person_id=member_id))
     if not photo_sources.lock_person(conn, guest_id):
         raise NoSuchGuest()

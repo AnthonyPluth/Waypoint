@@ -5,7 +5,7 @@ from collections.abc import Iterable, Sequence
 from sqlalchemy import delete, select
 
 from ..storage import db
-from ..storage.models import Segment, SegmentTraveler, TripPerson
+from ..storage.models import Segment, SegmentTraveler, TripExclusion, TripPerson
 
 
 def of(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, list[int]]:
@@ -17,9 +17,21 @@ def of(conn: db.Connection, trip_ids: Iterable[int]) -> dict[int, list[int]]:
     return out
 
 
-def add(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
-    have = set(of(conn, [trip_id])[trip_id])
+def excluded(conn: db.Connection, trip_id: int) -> set[int]:
+    return set(conn.orm.scalars(select(TripExclusion.person_id).where(TripExclusion.trip_id == trip_id)).all())
+
+
+def exclude(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
     for person_id in dict.fromkeys(person_ids):
+        db.insert_ignore(conn, TripExclusion, {"trip_id": trip_id, "person_id": person_id}, key=["trip_id", "person_id"])
+
+
+def add(conn: db.Connection, trip_id: int, person_ids: Iterable[int]) -> None:
+    wanted = list(dict.fromkeys(person_ids))
+    if wanted:
+        conn.execute(delete(TripExclusion).where(TripExclusion.trip_id == trip_id, TripExclusion.person_id.in_(wanted)))
+    have = set(of(conn, [trip_id])[trip_id])
+    for person_id in wanted:
         if person_id not in have:
             conn.orm.add(TripPerson(trip_id=trip_id, person_id=person_id))
             have.add(person_id)
@@ -46,4 +58,5 @@ def on_lists(conn: db.Connection, trip_id: int) -> list[int]:
 
 
 def keep_lists_inside(conn: db.Connection, trip_id: int) -> None:
-    add(conn, trip_id, on_lists(conn, trip_id))
+    out = excluded(conn, trip_id)
+    add(conn, trip_id, [p for p in on_lists(conn, trip_id) if p not in out])
