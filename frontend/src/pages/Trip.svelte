@@ -10,8 +10,8 @@
   import { ConfirmDialog } from "$lib/components/ui/confirm-dialog";
   import { OptionsMenu } from "$lib/components/ui/options-menu";
   import BookingCard from "$lib/components/BookingCard.svelte";
-  import BookingDetail from "$lib/components/BookingDetail.svelte";
   import BookingDetailBody from "$lib/components/BookingDetailBody.svelte";
+  import { viewport } from "$lib/phone.svelte";
   import PastBookings from "$lib/components/PastBookings.svelte";
   import PastBookingsSheet from "$lib/components/PastBookingsSheet.svelte";
   import ArrivalOpen from "$lib/components/ArrivalOpen.svelte";
@@ -68,9 +68,7 @@
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let bookingsOpen = $state(false);
-  let detailId = $state<number | null>(null);
   let expandedId = $state<number | null>(null);
-  let opener: HTMLElement | null = null;
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
   let askOffline = $state(false);
@@ -197,7 +195,7 @@
   }
   let seenRevision = untrack(() => revision);
   $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
-  $effect(() => { void id; form = null; editingTrip = false; detailId = null; expandedId = null; bookingsOpen = false; savedCopy = null; savedTrips = []; void load(); });
+  $effect(() => { void id; form = null; editingTrip = false; expandedId = null; bookingsOpen = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   let openedWanted = "";
@@ -210,8 +208,8 @@
     if (openedWanted === key) return;
     openedWanted = key;
     tick().then(() => document.getElementById(`segment-${found.lead.id}`)?.scrollIntoView({ block: "start" }));
-    opener = null;
-    if (completedPage) detailId = found.lead.id; else expandedId = found.lead.id;
+    expandedId = found.lead.id;
+    if (completedPage && viewport.phone) bookingsOpen = true;
   });
 
   const done = $derived(trip?.done_at != null);
@@ -224,15 +222,8 @@
     return () => { layout.wide = false; };
   });
   const cards = $derived(trip ? bookingCards(trip.segments) : []);
-  const detailCard = $derived(detailId === null ? null : (cards.find((c) => c.segments.some((s) => s.id === detailId)) ?? null));
-  const openDetail = (s: Segment, from: HTMLElement | null) => { opener = from; detailId = s.id; };
-  const afterDetail = (e: Event) => {
-    const back = opener;
-    opener = null;
-    if (back?.isConnected) { e.preventDefault(); back.focus(); }
-  };
   const toggleCard = (s: Segment) => { expandedId = expandedId === s.id ? null : s.id; };
-  const editFromDetail = (s: Segment, field = "") => { detailId = null; bookingsOpen = false; edit(s, field); };
+  const editFromDetail = (s: Segment, field = "") => { bookingsOpen = false; edit(s, field); };
   const moveFromDetail = (s: Segment) => { moving = s; moveTo = ""; moveOpen = true; void loadOthers(); };
   const removeFromDetail = (s: Segment) => { removing = s; asking = true; };
   const liveOn = $derived(flightStatus.list?.enabled === true);
@@ -484,17 +475,12 @@
 {/if}
 </div>
 
-<PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} onopen={openDetail} />
-
-{#if detailCard && completedPage}
-  {@const shown = detailCard}
-  <BookingDetail card={shown} {everyone} canChange={!done} onclose={() => (detailId = null)} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail} onCloseAutoFocus={afterDetail}>
-    {#snippet below()}{@render detailMore(shown)}{/snippet}
-  </BookingDetail>
-{/if}
+<PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} expanded={expandedId} ontoggle={toggleCard}>
+  {#snippet detail(card)}{@render cardDetail(card)}{/snippet}
+</PastBookingsSheet>
 
 {#snippet cardDetail(card: Card)}
-  <BookingDetailBody {card} {everyone} canChange={!done} inline withTimes onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail}>
+  <BookingDetailBody {card} {everyone} canChange={!done} inline withTimes={!completedPage} onedit={editFromDetail} onmove={moveFromDetail} onremove={removeFromDetail}>
     {#snippet above()}{@render detailActions(card)}{/snippet}
     {#snippet below()}{@render detailMore(card)}{/snippet}
   </BookingDetailBody>
@@ -509,7 +495,9 @@
           <h2 id="past-bookings-title" class="text-[17px] leading-snug font-semibold tracking-tight">Bookings · {counts.total}</h2>
           <span class="text-caption text-muted-foreground">{counts.words}</span>
         </div>
-        <PastBookings segments={trip.segments} grouped={false} selected={detailCard?.lead.id ?? null} onopen={openDetail} />
+        <PastBookings segments={trip.segments} grouped={false} expanded={expandedId} ontoggle={toggleCard}>
+          {#snippet detail(card)}{@render cardDetail(card)}{/snippet}
+        </PastBookings>
       </section>
     {/if}
   {/if}
@@ -561,7 +549,7 @@
 {/snippet}
 
 {#snippet detailActions(card: Card)}
-  {#if card}
+  {#if card && !completedPage}
     {#if card.timesDiffer}<p class="text-sm font-medium" data-times-differ><Badge variant="secondary">Times differ between bookings</Badge> <span class="text-muted-foreground">Each booking’s times are listed here.</span></p>{/if}
     {#each card.segments as s (s.id)}
       {#if (s.kind === "hotel" || s.kind === "cruise" || s.kind === "parking") && !s.details.address && s.status !== "cancelled" && !over}

@@ -1506,8 +1506,9 @@ describe("Trip", () => {
 
     const openBooking = async (name: RegExp | string = /Harbour Hotel/) => {
       const u = userEvent.setup();
-      await u.click(await screen.findByRole("button", { name }));
-      return { u, dialog: await screen.findByRole("dialog") };
+      const row = await screen.findByRole("button", { name });
+      await u.click(row);
+      return { u, dialog: document.getElementById(row.getAttribute("aria-controls")!)! };
     };
 
     it("keeps the essentials and drops the actions and loyalty numbers", async () => {
@@ -1559,6 +1560,7 @@ describe("Trip", () => {
       const form = await screen.findByRole("dialog", { name: "Edit this booking" });
       expect(within(form).getByRole("button", { name: "Save changes" })).toBeInTheDocument();
       expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull();
+      expect(document.querySelector("button[data-booking='2']")).toHaveAttribute("aria-expanded", "true");
     });
 
     it("moves a booking from More in the detail, through the same dialog the card had", async () => {
@@ -1586,7 +1588,8 @@ describe("Trip", () => {
       held = past();
       route.query = "segment=2";
       render(TripPage);
-      expect(await screen.findByRole("dialog", { name: "Harbour Hotel" })).toBeInTheDocument();
+      await waitFor(() => expect(document.querySelector("button[data-booking='2']")).toHaveAttribute("aria-expanded", "true"));
+      expect(screen.queryByRole("dialog")).toBeNull();
     });
 
     it("opens nothing for a segment the trip does not have", async () => {
@@ -1665,7 +1668,7 @@ describe("Trip on a phone", () => {
       expect(screen.queryByRole("list", { name: "Bookings" })).toBeNull();
     });
 
-    it("opens a booking's detail from the Bookings sheet, over it, and Close gives focus back to the row", async () => {
+    it("expands a booking in the Bookings sheet in place, and folds it again with focus on the row", async () => {
       held = past();
       render(TripPage);
       const u = userEvent.setup();
@@ -1673,35 +1676,34 @@ describe("Trip on a phone", () => {
       const sheet = await screen.findByRole("dialog", { name: "Bookings · 2" });
       const row = within(sheet).getByRole("button", { name: /Harbour Hotel/ });
       await u.click(row);
-      const detail = await screen.findByRole("dialog", { name: "Harbour Hotel" });
-      expect(detail).toHaveTextContent("H88231");
+      expect(row).toHaveAttribute("aria-expanded", "true");
+      expect(row).toHaveFocus();
+      expect(screen.getAllByRole("dialog")).toHaveLength(1);
+      expect(within(sheet).getByTestId("booking-detail")).toHaveTextContent("H88231");
+      await u.click(row);
+      expect(row).toHaveAttribute("aria-expanded", "false");
       expect(sheet).not.toHaveTextContent("H88231");
-      await u.click(within(detail).getByRole("button", { name: "Close" }));
-      await waitFor(() => expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull());
-      await waitFor(() => expect(row).toHaveFocus());
     });
 
-    it("leaves the Bookings sheet and a detail behind when another trip is opened", async () => {
+    it("leaves the Bookings sheet behind when another trip is opened", async () => {
       held = past();
       render(TripPage);
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: /^Bookings · 2/ }));
       await u.click(within(await screen.findByRole("dialog", { name: "Bookings · 2" })).getByRole("button", { name: /Harbour Hotel/ }));
-      await screen.findByRole("dialog", { name: "Harbour Hotel" });
       route.sub = "2";
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     });
 
-    it("closes both sheets and opens the booking form in a sheet when Edit is pressed", async () => {
+    it("closes the Bookings sheet and opens the booking form in a sheet when Edit is pressed", async () => {
       held = past();
       render(TripPage);
       const u = userEvent.setup();
       await u.click(await screen.findByRole("button", { name: /^Bookings · 2/ }));
       await u.click(within(await screen.findByRole("dialog", { name: "Bookings · 2" })).getByRole("button", { name: /Harbour Hotel/ }));
-      await u.click(within(await screen.findByRole("dialog", { name: "Harbour Hotel" })).getByRole("button", { name: "Edit" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Bookings · 2" })).getByRole("button", { name: "Edit" }));
       expect(await screen.findByRole("dialog", { name: "Edit this booking" })).toBeInTheDocument();
       await waitFor(() => expect(screen.queryByRole("dialog", { name: "Bookings · 2" })).toBeNull());
-      expect(screen.queryByRole("dialog", { name: "Harbour Hotel" })).toBeNull();
     });
   });
 
@@ -1796,7 +1798,7 @@ describe("Trip on a phone", () => {
     await u.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     document.body.style.pointerEvents = "";
-    await editBooking("JFK → LHR");
+    await u.click(within(document.querySelector("[data-testid=booking-detail]") as HTMLElement).getByRole("button", { name: "Edit" }));
     await u.click(await screen.findByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(vi.mocked(api).mock.calls.some(([, o]) => o?.method === "POST")).toBe(false);
