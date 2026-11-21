@@ -182,6 +182,11 @@ describe("the current trip", () => {
     expect(isCurrent(mine([untimedStay]), at("2026-11-21T20:00", NY))).toBe(true);
     expect(isCurrent(mine([untimedStay]), at("2026-11-22T00:01", NY))).toBe(false);
   });
+  it("picks the first booking by the moment it starts, not by the text of its local time", () => {
+    const west = mine([flightOn(1, "2026-11-21T00:30", LA, "2026-11-20T23:30", "Pacific/Honolulu"), stayOf(2, "2026-11-20T23:50", "2026-11-25T11:00", "Pacific/Honolulu")]);
+    expect(isCurrent(west, at("2026-11-20T23:00", LA))).toBe(false);
+    expect(isCurrent(west, at("2026-11-21T00:45", LA))).toBe(true);
+  });
   it("falls back to the trip's dates when it has no live booking", () => {
     expect(isCurrent(trip([], { start_date: "2000-01-01", end_date: "2100-01-01" }), at("2026-11-21T10:00", NY))).toBe(true);
     expect(isCurrent(trip([], { start_date: "2000-01-01", end_date: "2001-01-01" }), at("2026-11-21T10:00", NY))).toBe(false);
@@ -202,6 +207,11 @@ describe("the current trip", () => {
       const flying = mine([flightOn(4, "2026-11-21T12:00", NY, "2026-11-21T15:00", NY)], 4);
       expect(currentTrip([flying, staying, other], nextUp([flying, staying, other], now), now)?.id).toBe(4);
       expect(currentTrip([staying, other], null, now)?.id).toBe(3);
+    });
+    it("leaves nothing featured when the only trip's last booking ended earlier today", () => {
+      const after = at("2026-11-27T11:30", NY);
+      expect(featuredTrip([staying], nextUp([staying], after), "2026-11-27", after)).toBeNull();
+      expect(featuredTrip([staying], nextUp([staying], at("2026-11-27T10:30", NY)), "2026-11-27", at("2026-11-27T10:30", NY))?.id).toBe(1);
     });
     it("moves on to the next trip once the current one has ended, and to none when all are over", () => {
       const over = at("2026-11-28T09:00", NY);
