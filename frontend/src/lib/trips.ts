@@ -241,8 +241,28 @@ export function tripYears(trips: Trip[]): number[] {
   return [...years].sort((a, b) => b - a);
 }
 
-export const featuredTrip = (trips: Trip[], next: NextUp | null, today: string): Trip | null =>
-  next?.trip ?? splitTrips(trips, today).upcoming[0] ?? null;
+const endOfDay = (local: string, zone: string): number => instant(`${local.slice(0, 10)}T23:59`, zone) + 60_000;
+
+export function isCurrent(trip: Trip, now: number): boolean {
+  const live = trip.segments.filter((s) => s.status !== "cancelled");
+  if (!live.length) {
+    if (!trip.start_date || !trip.end_date) return false;
+    const day = dayIn(now, viewerZone());
+    return trip.start_date <= day && day <= trip.end_date;
+  }
+  const first = live.reduce((a, b) => (b.start_local < a.start_local ? b : a));
+  if (first.start_local.slice(0, 10) > dayIn(now, first.start_zone)) return false;
+  const ends = live.map((s) => (untimed(s) ? endOfDay(s.end_local, s.end_zone) : endAt(s))).filter(Number.isFinite);
+  return ends.length === 0 || now < Math.max(...ends);
+}
+
+export function currentTrip(trips: Trip[], next: NextUp | null, now: number): Trip | null {
+  const going = trips.filter((t) => isCurrent(t, now)).sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? "") || a.id - b.id);
+  return going.find((t) => t.id === next?.trip.id) ?? going[0] ?? null;
+}
+
+export const featuredTrip = (trips: Trip[], next: NextUp | null, today: string, now: number): Trip | null =>
+  currentTrip(trips, next, now) ?? next?.trip ?? splitTrips(trips, today).upcoming[0] ?? null;
 
 export type DayItem = { segment: Segment; bookings: Segment[]; role: "start" | "end" };
 export type Day = { date: string; items: DayItem[] };
