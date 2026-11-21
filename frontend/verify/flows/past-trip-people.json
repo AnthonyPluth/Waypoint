@@ -10,7 +10,7 @@
     { "wait_for": "role=menuitem[name='People on this trip']" },
     { "click": "role=menuitem[name='People on this trip']" },
     { "wait_for": "[role=dialog]:has-text('People on this trip')" },
-    { "expect_text": { "selector": "[role=dialog]", "text": "Add someone" } },
+    { "expect_text": { "selector": "[role=dialog]", "text": "Add guest" } },
     { "screenshot": "people-sheet" }
   ]
 }

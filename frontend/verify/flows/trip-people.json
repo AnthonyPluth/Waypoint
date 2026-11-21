@@ -8,7 +8,7 @@
     { "click": "button[aria-label='Trip options'] >> visible=true" },
     { "click": "[role='menuitem']:has-text('People on this trip') >> visible=true" },
     { "wait_for": "[role='dialog']:has-text('People on this trip')" },
-    { "expect_text": { "selector": "[role='dialog']", "text": "Add someone" } },
+    { "expect_text": { "selector": "[role='dialog']", "text": "Add guest" } },
     { "screenshot": "people-sheet" }
   ]
 }

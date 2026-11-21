@@ -338,7 +338,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`; goes to: `#trip/7`.
 - **Widths:** phone, desktop.
 - **Touches:** `Trip options`.
-- **Expects to see:** `Add someone`.
+- **Expects to see:** `Add guest`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
 - **Drive it:** `tools/control flow past-trip-people`; or `poetry run python run.py verify --flow past-trip-people`.
 
@@ -517,7 +517,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Starts at:** `#trips`.
 - **Widths:** phone, desktop.
 - **Touches:** `Trip options`, `People on this trip`.
-- **Expects to see:** `Trips`, `Add someone`.
+- **Expects to see:** `Trips`, `Add guest`.
 - **Drive it:** `tools/control flow trip-people`; or `poetry run python run.py verify --flow trip-people`.
 
 #### `trip-photos`
