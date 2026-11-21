@@ -413,6 +413,19 @@ class LookAndCandidateTests(AccessCase):
         self.assertEqual(self.ok("ana", "POST", f"/api/photos/{mine}", {"trip_id": later["trip_id"]})["trip_id"], later["trip_id"])
 
 
+class FakeClock:
+    def __init__(self):
+        self.now = time.monotonic()
+        self._lock = threading.Lock()
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def advance_to(self, at: float) -> None:
+        with self._lock:
+            self.now = max(self.now, at)
+
+
 class StewardTests(AccessCase):
     def setUp(self):
         super().setUp()
@@ -426,15 +439,18 @@ class StewardTests(AccessCase):
             self.book("ana", {**OUT, "start_local": f"2027-0{m}-01T19:00", "end_local": f"2027-0{m}-02T07:10"},
                       travelers=[{"person_id": self.person["ana"]}, {"person_id": self.kid}])
 
+        clock = FakeClock()
         started, lock = [], threading.Lock()
+        window_end = clock.now + 10
+        together = threading.Barrier(photocount.COUNT_AT_ONCE, action=lambda: clock.advance_to(window_end), timeout=30)
 
         def slow(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
             with lock:
                 started.append(taken_after)
-            time.sleep(0.7)
+            together.wait()
             return self.search(source, taken_after, taken_before, page=page)
         immich.search.side_effect = slow
-        with mock.patch.object(photocount, "COUNT_SECONDS", 0.3), mock.patch.object(photocount, "COUNT_TOTAL", 0.6):
+        with mock.patch.object(photocount, "time", clock), mock.patch.object(photocount, "COUNT_SECONDS", 5), mock.patch.object(photocount, "COUNT_TOTAL", 10):
             got = self.ok("ana", "GET", "/api/photo-grants")["people"]
         self.assertEqual([p["person_id"] for p in got], [self.person["ana"], self.kid])
         self.assertTrue(all(t["count"] is None for p in got for t in p["trips"]))
@@ -446,13 +462,16 @@ class StewardTests(AccessCase):
         child = self.book("ana", {**OUT, "start_local": "2028-01-01T19:00", "end_local": "2028-01-02T07:10"}, travelers=[{"person_id": self.kid}])["trip_id"]
         self.in_library(1, "2028-01-02T03:00:00.000Z")
 
+        clock = FakeClock()
+        steward_share_ends = clock.now + 6
+
         def search(source, taken_after, taken_before, *, updated_after=None, page=1, seconds=None):
             if taken_after.isoformat().startswith("2027-0"):
-                time.sleep(seconds or 0)
+                clock.advance_to(steward_share_ends)
                 raise immich.Unavailable(immich.TOO_SLOW)
             return self.search(source, taken_after, taken_before, page=page)
         immich.search.side_effect = search
-        with mock.patch.object(photocount, "COUNT_SECONDS", 0.8), mock.patch.object(photocount, "COUNT_TOTAL", 1.2):
+        with mock.patch.object(photocount, "time", clock), mock.patch.object(photocount, "COUNT_SECONDS", 8), mock.patch.object(photocount, "COUNT_TOTAL", 12):
             for _ in range(2):
                 photocount.forget_counts()
                 got = self.ok("ana", "GET", "/api/photo-grants")["people"]
