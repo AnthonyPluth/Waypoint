@@ -84,6 +84,8 @@ export const isRoadTrip = (trip: Trip): boolean => !trip.segments.some((s) => s.
 
 export const worthLocating = (trip: Trip, today: string): boolean => isPast(trip, today) && maxStops(trip) >= 2;
 
+export const worthMapping = (trip: Trip, today: string): boolean => isPast(trip, today) && (maxStops(trip) >= 2 || liveOf(trip).some((s) => s.kind === "hotel"));
+
 function visitsOf(trip: Trip, places: TripPlaces): Visit[] {
   const { airport, city, stay } = finder(places);
   const countries = byCountries(trip);

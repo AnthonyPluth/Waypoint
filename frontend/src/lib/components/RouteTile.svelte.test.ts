@@ -194,6 +194,48 @@ describe("a Past card's map on Apple's snapshot", () => {
   });
 });
 
+describe("a Past card of a trip with a single stay", () => {
+  const lone = (id = 9) => trip([stay(91, id, "Denver", "2026-09-03T15:00", "2026-09-05T10:00")], { id, name: `Lone stay ${id}`, start_date: "2026-09-03", end_date: "2026-09-05" });
+
+  it("draws the stay alone on the map when it has a place and Home is not set", async () => {
+    serve({ places: places({ stays: [{ segment_id: 91, ...DENVER, precision: "city" }] }) });
+    const { container } = render(PastTripCard, { trip: lone(9), today: TODAY });
+    await waitFor(() => expect(image(container)).not.toBeNull());
+    await fireEvent.load(image(container)!);
+    expect(asked("/api/map-snapshots")).toHaveLength(1);
+    expect(tile()).toHaveAttribute("data-drawn", "true");
+    expect(legs(container)).toHaveLength(0);
+    expect(dots(container)).toHaveLength(1);
+    expect(screen.queryByTestId("kinds-tile")).toBeNull();
+  });
+
+  it("draws the way out from Home to the stay and back when Home is set", async () => {
+    serve({ places: places({ home: { city: "Boulder", latitude: 40.01, longitude: -105.27 }, stays: [{ segment_id: 91, ...DENVER, precision: "city" }] }) });
+    const { container } = render(PastTripCard, { trip: lone(9), today: TODAY });
+    await waitFor(() => expect(image(container)).not.toBeNull());
+    await fireEvent.load(image(container)!);
+    expect(dots(container)).toHaveLength(3);
+    expect(legs(container)).toHaveLength(2);
+  });
+
+  it("keeps the kinds tile when the stay has no place Waypoint can find", async () => {
+    serve({ places: places({ stays: [] }) });
+    const { container } = render(PastTripCard, { trip: lone(9), today: TODAY });
+    await waitFor(() => expect(pending()).toBe("false"));
+    await new Promise((r) => setTimeout(r, 80));
+    expect(asked("/api/map-snapshots")).toHaveLength(0);
+    expect(image(container)).toBeNull();
+    expect(screen.getByTestId("trip-kinds")).toBeInTheDocument();
+  });
+
+  it("asks for nothing while the trip has not ended", async () => {
+    serve();
+    render(PastTripCard, { trip: lone(9), today: "2026-09-04" });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(vi.mocked(api)).not.toHaveBeenCalled();
+  });
+});
+
 describe("when there is no map to show", () => {
   it.each([["MapKit off", () => { app.state = state({ mapkit: false }); }], ["no state yet", () => { app.state = null; }], ["offline", () => { app.offline = true; }]])("asks for nothing with %s, and the kinds tile shows at full strength", async (_name, setUp) => {
     setUp();
@@ -215,8 +257,8 @@ describe("when there is no map to show", () => {
     expect(screen.queryByTestId("route-tile")).toBeNull();
   });
 
-  it("asks for no address when the trip has fewer than two stops it can place, and shows the kinds at full strength", async () => {
-    serve({ places: places({ stays: [places().stays[0]] }) });
+  it("asks for no address when the trip has no stop it can place, and shows the kinds at full strength", async () => {
+    serve({ places: places({ stays: [] }) });
     const { container } = render(PastTripCard, { trip: driven(9), today: TODAY });
     await waitFor(() => expect(pending()).toBe("false"));
     await new Promise((r) => setTimeout(r, 80));

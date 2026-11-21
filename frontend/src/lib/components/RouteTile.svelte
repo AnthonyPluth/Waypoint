@@ -35,7 +35,7 @@
     ? { width: Math.min(SIDES.width.max, Math.floor(clientWidth / SIDES.width.step) * SIDES.width.step), height: Math.min(SIDES.height.max, Math.floor(clientHeight / SIDES.height.step) * SIDES.height.step) }
     : null);
   const loaded = $derived(snapshot != null && image === "loaded");
-  const pending = $derived(wanted && (!looked || (stops.length >= 2 && snapshot === undefined) || (snapshot != null && image === "loading")));
+  const pending = $derived(wanted && (!looked || (stops.length >= 1 && snapshot === undefined) || (snapshot != null && image === "loading")));
   const frame = $derived(snapshot ? { center: snapshot.center, zoom: snapshot.zoom, width: snapshot.width, height: snapshot.height } : null);
   const spots = $derived(frame ? cardSpots(stops, frame) : []);
   const ratio = $derived(snapshot && clientWidth > 0 ? snapshot.width / clientWidth : 1);
@@ -63,7 +63,7 @@
 
   $effect(() => {
     const id = tripId;
-    if (!wanted || stops.length < 2 || !size) return;
+    if (!wanted || stops.length < 1 || !size) return;
     const { width, height } = size;
     const revision = stops.map((s) => `${s.latitude.toFixed(4)},${s.longitude.toFixed(4)}`).join(";");
     let live = true;
