@@ -287,7 +287,7 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 
 - **Starts at:** `#trips`; goes to: `#trip/1`, `#trip/5`.
 - **Widths:** phone, desktop.
-- **Touches:** `Bookings`, `JFK to CDG`, `Hôtel du Parc`, `Example Rentals`, `Portland to Seattle`, `Airport long-term parking`, `United States`, `Red Cliff Lodge`, `Canyon Rim Motel`, `More options for`, `Close`, `Example Voyager`.
+- **Touches:** `Bookings`, `JFK to CDG`, `Hôtel du Parc`, `Example Rentals`, `Portland to Seattle`, `Airport long-term parking`, `United States`, `Red Cliff Lodge`, `Canyon Rim Motel`, `More options for`, `Example Voyager`.
 - **Expects to see:** `Changed`, `Remove`.
 - **Fakes (the demo server can't):** `fake_bookings`.
 - **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.

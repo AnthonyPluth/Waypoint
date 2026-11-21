@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plane from "@lucide/svelte/icons/plane";
   import type { FlightStatusPause, Segment } from "$lib/api-types";
@@ -10,9 +11,9 @@
 
   type Props = {
     segment: Segment; view: FlightCardView; cities: Record<string, string>; now: number; paused?: FlightStatusPause | null; href?: string; linkLabel: string;
-    highlight?: boolean; level?: 2 | 3; travellers?: boolean; connection?: HeroConnection | null; ondetail?: (from: HTMLElement) => void; footer?: Snippet;
+    highlight?: boolean; level?: 2 | 3; travellers?: boolean; connection?: HeroConnection | null; ondetail?: (from: HTMLElement) => void; detailOpen?: boolean; detailId?: string; detail?: Snippet; footer?: Snippet;
   };
-  let { segment, view, cities, now, paused = null, href, linkLabel, highlight = false, level = 2, travellers = false, connection = null, ondetail, footer }: Props = $props();
+  let { segment, view, cities, now, paused = null, href, linkLabel, highlight = false, level = 2, travellers = false, connection = null, ondetail, detailOpen, detailId, detail, footer }: Props = $props();
 
   const hero = $derived(heroView(view, segment, (code) => cities[code] || code, now, travellers, connection));
   const TONE = { primary: "text-primary", success: "text-success", signal: "text-signal-ink" } as const;
@@ -96,9 +97,15 @@
   {/if}
 
   {#if ondetail}
-    <button type="button" class="relative z-10 mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border-t border-border pt-2.5 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60" onclick={(e) => ondetail(e.currentTarget)} data-detail>
-      Confirmation, travellers and price<ChevronRight class="size-4 flex-none text-label" aria-hidden="true" />
+    <button type="button" class="relative z-10 mt-3 flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border-t border-border pt-2.5 text-left text-sm font-semibold text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/60" aria-expanded={detailOpen} aria-controls={detailOpen === undefined ? undefined : detailId} onclick={(e) => ondetail(e.currentTarget)} data-detail>
+      Confirmation, travellers and price{#if detailOpen === undefined}<ChevronRight class="size-4 flex-none text-label" aria-hidden="true" />{:else}<ChevronDown class={`size-4 flex-none text-label transition-transform motion-reduce:transition-none ${detailOpen ? "rotate-180" : ""}`} aria-hidden="true" />{/if}
     </button>
+  {/if}
+
+  {#if detailOpen !== undefined}
+    <div id={detailId} role="region" aria-label="Booking detail" hidden={!detailOpen} class="relative z-10 mt-1">
+      {#if detailOpen}{@render detail?.()}{/if}
+    </div>
   {/if}
 
   {#if footer}<div class="relative z-10 mt-3 flex flex-col gap-3 border-t border-border pt-3">{@render footer()}</div>{/if}

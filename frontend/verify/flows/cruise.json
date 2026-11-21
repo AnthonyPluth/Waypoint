@@ -19,7 +19,7 @@
     },
     {
       "expect_text": {
-        "selector": "[role='dialog']",
+        "selector": "[data-testid=booking-detail]",
         "text": "Skagway"
       }
     },
@@ -36,7 +36,7 @@
       "screenshot": "itinerary"
     },
     {
-      "click": "button:has-text('Edit') >> visible=true"
+      "click": "[data-testid=booking-detail] button:text-is('Edit') >> visible=true"
     },
     {
       "wait_for": "fieldset[data-itinerary]"

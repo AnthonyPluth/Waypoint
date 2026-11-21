@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, within } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import BookingCard from "./BookingCard.svelte";
@@ -19,7 +20,7 @@ const lot = segment({ id: 5, kind: "parking", origin: "Bayside Park & Fly", dest
 const leg = segment({ id: 6, kind: "flight", provider: "Example Air", origin: "LIS", destination: "JFK", start_local: "2026-03-20T10:05", end_local: "2026-03-20T13:20", details: { flight_number: "EX 410" }, ...common });
 
 const cardOf = (s: typeof stay) => bookingCards([s])[0];
-const show = (s: typeof stay, extra: Partial<{ now: number }> = {}) => render(BookingCard, { card: cardOf(s), now: NOW, onopen: vi.fn(), ...extra });
+const show = (s: typeof stay, extra: Partial<{ now: number }> = {}) => render(BookingCard, { card: cardOf(s), now: NOW, ontoggle: vi.fn(), ...extra });
 const facts = (container: HTMLElement) => [...container.querySelectorAll("dl > div")].map((d) => [d.querySelector("dt")?.textContent, d.querySelector("dd")?.textContent]);
 
 describe("BookingCard facts", () => {
@@ -48,10 +49,10 @@ describe("BookingCard facts", () => {
   });
 
   it("opens a flight’s booking from its card, like every other kind", async () => {
-    const onopen = vi.fn();
-    show(leg, { onopen } as never);
+    const ontoggle = vi.fn();
+    show(leg, { ontoggle } as never);
     await userEvent.click(screen.getByRole("button", { name: /LIS/ }));
-    expect(onopen).toHaveBeenCalledOnce();
+    expect(ontoggle).toHaveBeenCalledOnce();
   });
 
   it("names the booking, its kind and place, and that it is confirmed", () => {
@@ -59,15 +60,15 @@ describe("BookingCard facts", () => {
     const header = screen.getByRole("button", { name: /Hotel Example/ });
     expect(header).toHaveTextContent("Stay · Lisbon");
     expect(header).not.toHaveTextContent("Confirmed");
-    expect(header).toHaveAttribute("aria-haspopup", "dialog");
+    expect(header).not.toHaveAttribute("aria-haspopup");
   });
 
   it("says Changed in place of Confirmed, and keeps a cancelled booking greyed with struck facts", () => {
-    const changed = render(BookingCard, { card: cardOf({ ...stay, status: "changed" }), now: NOW, onopen: vi.fn() });
+    const changed = render(BookingCard, { card: cardOf({ ...stay, status: "changed" }), now: NOW, ontoggle: vi.fn() });
     expect(changed.container.textContent).toContain("Changed");
     expect(changed.container.textContent).not.toContain("Confirmed");
     changed.unmount();
-    const { container } = render(BookingCard, { card: cardOf({ ...lot, status: "cancelled" }), now: NOW, onopen: vi.fn() });
+    const { container } = render(BookingCard, { card: cardOf({ ...lot, status: "cancelled" }), now: NOW, ontoggle: vi.fn() });
     expect(container.textContent).toContain("Cancelled");
     expect(container.querySelector("dd")?.className).toContain("line-through");
     expect(screen.queryByRole("button", { name: /Show code/ })).toBeNull();
@@ -123,13 +124,37 @@ describe("BookingCard keeps private details off the card", () => {
   });
 });
 
+const body = createRawSnippet(() => ({ render: () => `<p data-testid="inline-detail">Confirmation ZQ9X7K</p>` }));
+
 describe("BookingCard tap", () => {
-  it("opens the booking's detail from the header, at least 44 pixels tall", async () => {
-    const onopen = vi.fn();
-    const { container } = render(BookingCard, { card: cardOf(stay), now: NOW, onopen });
+  it("toggles the booking's detail from the header, at least 44 pixels tall", async () => {
+    const ontoggle = vi.fn();
+    const { container } = render(BookingCard, { card: cardOf(stay), now: NOW, ontoggle });
     const header = within(container).getByRole("button", { name: /Hotel Example/ });
     expect(header.className).toContain("min-h-16");
     await userEvent.click(header);
-    expect(onopen).toHaveBeenCalledWith(stay, header);
+    expect(ontoggle).toHaveBeenCalledWith(stay);
+  });
+
+  it("is a collapsed button controlling an empty panel until it is expanded", () => {
+    const { container } = render(BookingCard, { card: cardOf(stay), now: NOW, ontoggle: vi.fn(), detail: body });
+    const header = within(container).getByRole("button", { name: /Hotel Example/ });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    const panel = container.querySelector(`#${header.getAttribute("aria-controls")}`) as HTMLElement;
+    expect(panel).toHaveAttribute("hidden");
+    expect(panel).toBeEmptyDOMElement();
+    expect(screen.queryByTestId("inline-detail")).toBeNull();
+  });
+
+  it("shows the detail in a region named by the header when expanded, and keeps focus on the header", async () => {
+    const { container } = render(BookingCard, { card: cardOf(stay), now: NOW, ontoggle: vi.fn(), expanded: true, detail: body });
+    const header = within(container).getByRole("button", { name: /Hotel Example/ });
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    header.focus();
+    const panel = screen.getByRole("region", { name: /Hotel Example/ });
+    expect(panel).not.toHaveAttribute("hidden");
+    expect(panel.id).toBe(header.getAttribute("aria-controls"));
+    expect(within(panel).getByTestId("inline-detail")).toHaveTextContent("ZQ9X7K");
+    expect(header).toHaveFocus();
   });
 });

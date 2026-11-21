@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen, waitFor, within } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PastBookings from "./PastBookings.svelte";
@@ -23,12 +24,12 @@ afterEach(() => { viewport.phone = false; vi.restoreAllMocks(); });
 
 describe("PastBookings grouped", () => {
   it("lists Whole trip first, then a group per day in date order, then Other last", () => {
-    render(PastBookings, { segments: [...trip].reverse(), onopen: vi.fn() });
+    render(PastBookings, { segments: [...trip].reverse(), ontoggle: vi.fn() });
     expect(screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual(["Whole trip", "Thu, Jun 12, 2025", "Sun, Jun 15, 2025", "Thu, Jun 19, 2025", "Other"]);
   });
 
   it("names each list by its heading and puts a stay on its check-in day", () => {
-    render(PastBookings, { segments: trip, onopen: vi.fn() });
+    render(PastBookings, { segments: trip, ontoggle: vi.fn() });
     const day = screen.getByRole("list", { name: "Thu, Jun 12, 2025" });
     expect(within(day).getAllByRole("button").map((b) => b.getAttribute("data-booking"))).toEqual(["1", "2"]);
     expect(within(screen.getByRole("list", { name: "Whole trip" })).getByRole("button", { name: /Example Rentals/ })).toBeInTheDocument();
@@ -36,34 +37,34 @@ describe("PastBookings grouped", () => {
   });
 
   it("leaves the Other group out when nothing is parking", () => {
-    render(PastBookings, { segments: trip.filter((s) => s.kind !== "parking"), onopen: vi.fn() });
+    render(PastBookings, { segments: trip.filter((s) => s.kind !== "parking"), ontoggle: vi.fn() });
     expect(screen.queryByRole("heading", { name: "Other" })).toBeNull();
   });
 
   it("names a row by what it is and when, with times as at the place", () => {
-    render(PastBookings, { segments: trip, onopen: vi.fn() });
-    expect(screen.getByRole("button", { name: "DEN to GJT 9:40 AM – 10:52 AM" })).toHaveAttribute("aria-haspopup", "dialog");
+    render(PastBookings, { segments: trip, ontoggle: vi.fn() });
+    expect(screen.getByRole("button", { name: "DEN to GJT 9:40 AM – 10:52 AM" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: "Red Rock Lodge, Moab Check in · 3 nights" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "FLG to DEN 6:15 PM – 8:55 PM" })).toBeInTheDocument();
   });
 
   it("keeps a cancelled stay in its group with a quiet label", () => {
-    render(PastBookings, { segments: trip, onopen: vi.fn() });
+    render(PastBookings, { segments: trip, ontoggle: vi.fn() });
     const row = screen.getByRole("button", { name: /Cliffside Inn, Page/ });
     expect(within(screen.getByRole("list", { name: "Sun, Jun 15, 2025" })).getByRole("button", { name: /Cancelled/ })).toBe(row);
   });
 
   it("shows no confirmation code anywhere", () => {
-    const { container } = render(PastBookings, { segments: trip, onopen: vi.fn() });
+    const { container } = render(PastBookings, { segments: trip, ontoggle: vi.fn() });
     expect(container.textContent).not.toContain("ZQ9X7K");
   });
 
-  it("hands the booking and its row to onopen", async () => {
-    const onopen = vi.fn();
-    render(PastBookings, { segments: trip, onopen });
+  it("hands the booking to ontoggle", async () => {
+    const ontoggle = vi.fn();
+    render(PastBookings, { segments: trip, ontoggle });
     const row = screen.getByRole("button", { name: /DEN to GJT/ });
     await userEvent.click(row);
-    expect(onopen).toHaveBeenCalledWith(trip[0], row);
+    expect(ontoggle).toHaveBeenCalledWith(trip[0]);
   });
 });
 
@@ -71,27 +72,27 @@ describe("PastBookings changed", () => {
   const changed = segment({ id: 7, kind: "hotel", origin: "Red Cliff Lodge", destination: "Moab", start_local: "2025-06-12T15:00", end_local: "2025-06-14T11:00", status: "changed", confirmation: "ZQ9X7K" });
 
   it("shows a Changed chip on the row of a changed booking in the grouped list", () => {
-    render(PastBookings, { segments: [...trip, changed], onopen: vi.fn() });
+    render(PastBookings, { segments: [...trip, changed], ontoggle: vi.fn() });
     const row = screen.getByRole("button", { name: /Red Cliff Lodge/ });
     expect(within(row).getByText("Changed")).toHaveAttribute("data-tone", "warn");
     expect(within(screen.getByRole("button", { name: /Red Rock Lodge/ })).queryByText("Changed")).toBeNull();
   });
 
   it("shows it in the flat list too, and not as the cancelled label", () => {
-    render(PastBookings, { segments: [...trip, changed], grouped: false, onopen: vi.fn() });
+    render(PastBookings, { segments: [...trip, changed], grouped: false, ontoggle: vi.fn() });
     expect(within(screen.getByRole("list", { name: "Bookings" })).getAllByText("Changed")).toHaveLength(1);
     expect(within(screen.getByRole("button", { name: /Red Cliff Lodge/ })).queryByText(/Cancelled/)).toBeNull();
   });
 
   it("shows no chip when nothing changed", () => {
-    render(PastBookings, { segments: trip, onopen: vi.fn() });
+    render(PastBookings, { segments: trip, ontoggle: vi.fn() });
     expect(screen.queryByText("Changed")).toBeNull();
   });
 });
 
 describe("PastBookings flat", () => {
   it("has no group headings and puts the date in each row", () => {
-    render(PastBookings, { segments: trip, grouped: false, onopen: vi.fn() });
+    render(PastBookings, { segments: trip, grouped: false, ontoggle: vi.fn() });
     expect(screen.queryAllByRole("heading")).toEqual([]);
     const names = within(screen.getByRole("list", { name: "Bookings" })).getAllByRole("button").map((b) => b.textContent?.replace(/\s+/g, " ").trim());
     expect(names).toEqual([
@@ -105,16 +106,20 @@ describe("PastBookings flat", () => {
   });
 
   it("highlights the open booking", () => {
-    render(PastBookings, { segments: trip, grouped: false, selected: 2, onopen: vi.fn() });
-    expect(screen.getByRole("button", { name: /Red Rock Lodge/ })).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: /DEN to GJT/ })).not.toHaveAttribute("aria-current");
+    const detail = createRawSnippet(() => ({ render: () => "<p>in place</p>" }));
+    render(PastBookings, { segments: trip, grouped: false, expanded: 2, ontoggle: vi.fn(), detail });
+    const open = screen.getByRole("button", { name: /Red Rock Lodge/ });
+    expect(open).toHaveAttribute("aria-expanded", "true");
+    expect(within(screen.getByRole("region", { name: /Red Rock Lodge/ })).getByText("in place")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /DEN to GJT/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getAllByText("in place")).toHaveLength(1);
   });
 });
 
 describe("PastBookings in its sheet", () => {
   it("is a dialog named Bookings · 5 that takes focus and returns focus to the row", async () => {
     viewport.phone = true;
-    render(Harness, { segments: trip, onopen: vi.fn() });
+    render(Harness, { segments: trip, ontoggle: vi.fn() });
     const user = userEvent.setup();
     const opener = screen.getByRole("button", { name: "Bookings row" });
     await user.click(opener);

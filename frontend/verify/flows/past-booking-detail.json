@@ -26,16 +26,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"JFK to CDG\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"JFK to CDG\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "flight"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -44,16 +41,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "stay"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -62,16 +56,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Example Rentals\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Example Rentals · Grand Junction Regional Airport\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "car"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -80,16 +71,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Portland to Seattle\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Portland to Seattle\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "train"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -98,16 +86,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Airport long-term parking\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Airport long-term parking\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "parking"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -116,16 +101,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"United States\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"United States\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "visit"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -134,11 +116,11 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Red Cliff Lodge\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Red Cliff Lodge\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "expect_text": {
-        "selector": "role=dialog[name=\"Red Cliff Lodge\"]",
+        "selector": "[data-testid=booking-detail]",
         "text": "Changed"
       }
     },
@@ -146,10 +128,7 @@
       "screenshot": "changed-stay"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -158,16 +137,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Canyon Rim Motel\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Canyon Rim Motel\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "cancelled-stay"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -176,7 +152,7 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Hôtel du Parc\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Hôtel du Parc\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "click": "button[aria-label^='More options for']"
@@ -186,7 +162,7 @@
     },
     {
       "expect_text": {
-        "selector": "role=dialog[name=\"Hôtel du Parc\"]",
+        "selector": "[data-testid=booking-detail]",
         "text": "Remove"
       }
     },
@@ -200,7 +176,7 @@
       "screenshot": "more-closed"
     },
     {
-      "click": "[role=dialog] >> nth=-1 >> button[aria-label='Close']"
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"
@@ -221,16 +197,13 @@
       "click": "[data-testid=past-bookings] button[data-booking]:has-text(\"Example Voyager\") >> visible=true"
     },
     {
-      "wait_for": "role=dialog[name=\"Example Voyager · Miami\"]"
+      "wait_for": "[data-testid=booking-detail]"
     },
     {
       "screenshot": "cruise"
     },
     {
-      "press": {
-        "selector": "[role=dialog] >> nth=-1",
-        "key": "Escape"
-      }
+      "click": "[data-testid=past-bookings] button[data-booking][aria-expanded=true]"
     },
     {
       "wait_for": "[data-testid=past-bookings]"

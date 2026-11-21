@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import type { Segment } from "$lib/api-types";
   import BrandLogo from "$lib/components/BrandLogo.svelte";
   import GateCode from "$lib/components/GateCode.svelte";
@@ -6,10 +7,12 @@
   import { Button } from "$lib/components/ui/button";
   import { showsCode } from "$lib/gate-code";
   import { bookingName, cardFacts, dayLabel, endAt, headline, placeOf, type Card } from "$lib/trips";
-  import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
 
-  type Props = { card: Card; now: number; id?: string; highlight?: boolean; onopen: (segment: Segment, opener: HTMLElement) => void };
-  let { card, now, id, highlight = false, onopen }: Props = $props();
+  type Props = { card: Card; now: number; id?: string; highlight?: boolean; expanded?: boolean; ontoggle: (segment: Segment) => void; detail?: Snippet };
+  let { card, now, id, highlight = false, expanded = false, ontoggle, detail }: Props = $props();
+  const panelId = $derived(`booking-detail-${card.lead.id}`);
+  const buttonId = $derived(`booking-button-${card.lead.id}`);
 
   const s = $derived(card.lead);
   const KIND_WORD = { flight: "Flight", hotel: "Stay", car: "Car", train: "Train", cruise: "Cruise", parking: "Parking", visit: "Past visit" } as const;
@@ -29,9 +32,11 @@
   <button
     type="button"
     class="flex min-h-16 w-full cursor-pointer items-center gap-3 rounded-xl text-left focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-    aria-haspopup="dialog"
+    id={buttonId}
+    aria-expanded={expanded}
+    aria-controls={panelId}
     data-booking={s.id}
-    onclick={(e) => onopen(s, e.currentTarget)}
+    onclick={() => ontoggle(s)}
   >
     <span class={struck ? "opacity-55" : ""}><KindTile kind={s.kind} outline /></span>
     <span class="flex min-w-0 flex-1 flex-col">
@@ -39,7 +44,7 @@
       <span class="text-sm text-muted-foreground">{subtitle}{#if status}{" · "}<span class={`font-semibold ${status.tone}`}>{status.word}</span>{/if}</span>
     </span>
     <BrandLogo src={s.logo} size={32} />
-    <ChevronRight class="size-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
+    <ChevronDown class={`size-[18px] shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
   </button>
   <div class="mb-3 mt-1 h-px bg-border"></div>
   <dl class="grid grid-cols-3 gap-2.5">
@@ -55,4 +60,7 @@
     <Button bind:ref={showButton} class="mt-3.5 w-full" aria-label={`Show code for ${lot}`} onclick={() => (showing = true)}>Show code</Button>
   {/if}
   <GateCode segment={s} {now} buttons={false} returnFocus={showButton} bind:showing />
+  <div id={panelId} role="region" aria-labelledby={buttonId} hidden={!expanded} class="mt-3.5 border-t border-border pt-3" data-booking-panel>
+    {#if expanded}{@render detail?.()}{/if}
+  </div>
 </li>

@@ -15,7 +15,7 @@
   };
 </script>
 
-<PastBookings {segments} grouped={false} onopen={(s, el) => { opener = el; id = s.id; }} />
+<PastBookings {segments} grouped={false} ontoggle={(s) => { opener = document.activeElement as HTMLElement; id = s.id; }} />
 {#if card}
   <BookingDetail {card} everyone={tripTravellers(segments)} {canChange} onclose={() => (id = null)} {onedit} {onmove} {onremove} onCloseAutoFocus={afterClose} />
 {/if}

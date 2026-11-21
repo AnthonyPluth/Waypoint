@@ -2,7 +2,7 @@
   import type { Segment } from "$lib/api-types";
   import PastBookingsSheet from "./PastBookingsSheet.svelte";
 
-  let { segments, onopen }: { segments: Segment[]; onopen: (segment: Segment, opener: HTMLElement) => void } = $props();
+  let { segments, ontoggle }: { segments: Segment[]; ontoggle: (segment: Segment) => void } = $props();
   let open = $state(false);
 </script>
 
@@ -10,4 +10,4 @@
   <button type="button" onclick={() => (open = true)}>Bookings row</button>
   <p>Page behind</p>
 </div>
-<PastBookingsSheet bind:open {segments} {onopen} />
+<PastBookingsSheet bind:open {segments} {ontoggle} />
