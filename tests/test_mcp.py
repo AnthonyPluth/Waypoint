@@ -346,6 +346,73 @@ class VisibilityTests(Assistants):
         self.assertEqual(self.tool(ALL, "update_trip", {"trip_id": trip, "fields": {"people": [self.jane.person_id]}})["people"],
                          [self.jane.person_id])
 
+    def sees(self, who: Viewer, trip_id: int) -> bool:
+        with db.session() as conn:
+            return trips.get(conn, who, trip_id) is not None
+
+    def test_an_assistant_cannot_share_a_trip_by_naming_a_traveller_on_a_new_booking(self):
+        trip = self.jane_trip["id"]
+        before = self.tool(READ, "get_trip", {"trip_id": trip})
+        flight = {**OUT, "start_local": "2026-10-20T19:00", "end_local": "2026-10-21T07:10", "confirmation": "NAMESAM"}
+        for who in (self.sam.person_id, self.guest):
+            with self.subTest(who=who):
+                refused = self.refused(ALL, "add_segment", {"trip_id": trip, "fields": {**flight, "travelers": [{"person_id": who}]}})
+                self.assertIn("in the app", refused)
+                self.assertNotIn("Doe", refused)
+        after = self.tool(READ, "get_trip", {"trip_id": trip})
+        self.assertEqual((after["people"], len(after["segments"])), (before["people"], len(before["segments"])))
+        self.assertFalse(self.sees(self.sam, trip))
+
+    def test_an_assistant_cannot_share_a_trip_by_adding_a_traveller_to_a_booking(self):
+        trip = self.jane_trip["id"]
+        own = {**OUT, "start_local": "2026-10-20T19:00", "end_local": "2026-10-21T07:10", "confirmation": "JANEONLY"}
+        got = self.tool(ALL, "add_segment", {"trip_id": trip, "fields": {**own, "travelers": [{"person_id": self.jane.person_id}]}})
+        self.addCleanup(self.tool, ALL, "remove_segment", {"segment_id": got["id"]})
+        self.assertEqual([t["person_id"] for t in got["travelers"]], [self.jane.person_id])
+        for who in (self.sam.person_id, self.guest):
+            with self.subTest(who=who):
+                refused = self.refused(ALL, "update_segment", {"segment_id": got["id"], "fields": {
+                    "travelers": [{"person_id": self.jane.person_id}, {"person_id": who}]}})
+                self.assertIn("in the app", refused)
+                self.assertNotIn("Doe", refused)
+        after = self.tool(READ, "get_trip", {"trip_id": trip})
+        self.assertEqual(after["people"], [self.jane.person_id])
+        self.assertEqual([t["person_id"] for s in after["segments"] if s["id"] == got["id"] for t in s["travelers"]], [self.jane.person_id])
+        self.assertFalse(self.sees(self.sam, trip))
+
+    def test_a_refused_share_leaves_no_trace_of_the_name_it_would_have_shared_with(self):
+        trip = self.jane_trip["id"]
+        with db.session() as conn:
+            canary = people.add_guest(conn, person("Zed CANARY-GUEST-8H3K7P"))["id"]
+        self.addCleanup(self.forget_guest, canary)
+        flight = {**OUT, "start_local": "2026-10-20T19:00", "end_local": "2026-10-21T07:10", "confirmation": "NAMECAN"}
+        with no_leaks(self, "CANARY-GUEST-8H3K7P"):
+            refused = self.refused(ALL, "add_segment", {"trip_id": trip, "fields": {**flight, "travelers": [{"person_id": canary}]}})
+        self.assertIn("in the app", refused)
+        self.assertNotIn("CANARY-GUEST-8H3K7P", refused)
+
+    def forget_guest(self, person_id: int):
+        with db.session() as conn:
+            people.remove_guest(conn, person_id)
+
+    def test_the_web_path_still_shares_the_trip_with_a_booking_s_traveller(self):
+        trip = self.jane_trip["id"]
+        self.addCleanup(self.set_people, trip, [self.jane.person_id])
+        self.addCleanup(setattr, _current, "user", None)
+        self.addCleanup(vars(_current).pop, "assistant", None)
+        _current.user = {"sub": "u-jane", "name": "Jane Doe", "email": "jane@example.com"}
+        _current.assistant = False
+        flight = {**OUT, "start_local": "2026-10-20T19:00", "end_local": "2026-10-21T07:10", "confirmation": "WEBSAM",
+                  "trip_id": trip, "travelers": [{"person_id": self.sam.person_id}]}
+        with db.session() as conn:
+            added = trips_api.api_segment_add(conn, {}, flight)
+        self.addCleanup(self.remove_segment, added["id"])
+        self.assertTrue(self.sees(self.sam, trip))
+
+    def remove_segment(self, segment_id: int):
+        with db.session() as conn:
+            trips.delete_segment(conn, self.jane, segment_id)
+
     def test_a_stay_an_assistant_adds_or_edits_is_for_everyone_and_the_travellers_it_sends_are_ignored(self):
         trip = self.jane_trip["id"]
         got = self.tool(ALL, "add_segment", {"trip_id": trip, "fields": {**HOTEL, "travelers": [{"person_id": self.sam.person_id}]}})
