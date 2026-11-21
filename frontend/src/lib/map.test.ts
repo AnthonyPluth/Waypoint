@@ -2,7 +2,7 @@ import { geoContains, geoMercator } from "d3-geo";
 import { describe, expect, it } from "vitest";
 import type { StatsAirport, StatsFlights, StatsPlacePoint, StatsRoute, StatsStayPin, StatsVisit } from "./api-types";
 import { MAP_HEIGHT, MAP_WIDTH, worldProjection } from "./review-map";
-import { arcs, clipToWindow, COARSE_FROM_KM, countrySources, detailFor, dots, flownBounds, greatCircle, kmPerPixel, loadCountries, loadDetailedCountries, loadStates, MEDIUM_FROM_KM, pins, stateAt, stateSources, toOverlays, visitedFeatureIds, visitedPoints, visitedStateTrips, windowOf } from "./map";
+import { arcs, clipToWindow, COARSE_FROM_KM, countrySources, detailFor, dots, flownBounds, greatCircle, kmPerPixel, loadCountries, loadDetailedCountries, loadStates, MEDIUM_FROM_KM, pins, splitAtAntimeridian, stateAt, stateSources, toOverlays, visitedFeatureIds, visitedPoints, visitedStateTrips, windowOf } from "./map";
 
 const airport = (code: string, visits: number, latitude: number | null, longitude: number | null, city: string | null = null): StatsAirport =>
   ({ code, name: code, city, country: "XX", visits, latitude, longitude });
@@ -269,6 +269,52 @@ describe("what the map hands MapKit", () => {
     expect(toOverlays({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring, hole] } })).toEqual([ring, hole]);
     expect(toOverlays({ type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: [[ring], [hole]] } })).toEqual([ring, hole]);
     expect(toOverlays({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [0, 0] } })).toEqual([]);
+  });
+
+  it("splits a ring that jumps across the antimeridian so no edge spans the map", () => {
+    const crossing: [number, number][] = [[170, 60], [180, 60], [-180, 60], [-170, 60], [-170, 70], [-180, 70], [180, 70], [170, 70], [170, 60]];
+    const rings = splitAtAntimeridian(crossing);
+    expect(rings).toHaveLength(2);
+    for (const ring of rings) {
+      expect(ring[0]).toEqual(ring[ring.length - 1]);
+      for (let i = 1; i < ring.length; i++) expect(Math.abs(ring[i]![0] - ring[i - 1]![0])).toBeLessThan(180);
+      expect(ring.every((p) => p[0] >= -180 && p[0] <= 180)).toBe(true);
+    }
+    const lons = rings.map((ring) => [Math.min(...ring.map((p) => p[0])), Math.max(...ring.map((p) => p[0]))]);
+    expect(lons).toContainEqual([170, 180]);
+    expect(lons).toContainEqual([-180, -170]);
+  });
+
+  it("splits a ring drawn past 180 degrees, and drops rings with no area", () => {
+    const rings = splitAtAntimeridian([[175, 0], [185, 0], [185, 5], [175, 5], [175, 0]]);
+    expect(rings).toHaveLength(2);
+    expect(rings.every((ring) => ring.every((p) => p[0] >= -180 && p[0] <= 180))).toBe(true);
+    expect(splitAtAntimeridian([[0, 0], [1, 1], [2, 2], [0, 0]])).toEqual([]);
+    expect(splitAtAntimeridian([[0, 0], [1, 0]])).toEqual([]);
+  });
+
+  it("keeps a ring that runs along the pole, as Antarctica does, in one piece", () => {
+    const ring: [number, number][] = [[-180, -85], [0, -80], [180, -85], [180, -90], [-180, -90], [-180, -85]];
+    expect(splitAtAntimeridian(ring)).toEqual([ring]);
+    const flat: [number, number][] = [[-180, -85], [180, -85], [180, -90], [-180, -90], [-180, -85]];
+    expect(splitAtAntimeridian(flat)).toEqual([flat]);
+  });
+
+  it("gives MapKit no full-width ring for the countries that cross 180 degrees", async () => {
+    const countries = await loadDetailedCountries();
+    for (const name of ["Russia", "Fiji", "Antarctica"]) {
+      const found = countries.find((c) => c.properties?.name === name)!;
+      const rings = toOverlays(found);
+      expect(rings.length).toBeGreaterThan(0);
+      for (const ring of rings) {
+        for (let i = 1; i < ring.length; i++) {
+          const a = ring[i - 1]!;
+          const b = ring[i]!;
+          if (Math.abs(a[1]) >= 89.99 && Math.abs(b[1]) >= 89.99) continue;
+          expect(Math.abs(b[0] - a[0])).toBeLessThan(180);
+        }
+      }
+    }
   });
 
   it("lists the trips of each place that shades a country: the airport's routes, the stays and the past visits", () => {
