@@ -13,7 +13,7 @@ What is waiting is grouped by the decision it needs, each group titled with its 
 
 - **Check suggestions**: emails Waypoint (or the optional [AI](/Waypoint/start/ai/)) already read a booking from, or read only in part. Check the suggestion and add it.
 - **Add missing details**: emails nothing could read. Add the booking by hand.
-- **Match bookings**: an email that fits more than one booking you added yourself ([below](#match-bookings)).
+- **Match bookings**: an email that fits more than one booking you added yourself, or a confirmation for a booking on a trip you were taken off ([below](#match-bookings)).
 - **Match people**: a name on a booking that Waypoint couldn’t match to a person ([below](#match-people)).
 
 ## Check suggestions and Add missing details
@@ -72,6 +72,8 @@ Members see what the owner does (subject, sender, day, why it couldn’t be read
 ## Match bookings
 
 When a booking email (one with a confirmation code) fits more than one booking you added by hand without a code, Waypoint can’t tell which it is, so it doesn’t add the email and doesn’t guess. An item here shows the email’s booking and each booking it could be, with its trip.
+
+A confirmation that comes to your mailbox for a booking on a trip you were [taken off](/Waypoint/start/trips/#the-people-on-a-trip) waits here too. Waypoint doesn’t file it, keep it with that booking or show you that booking, so the item says the bookings it could be aren’t yours to see; you can add it as a booking of your own or dismiss it.
 
 - **It’s this one** fills in that booking with the email’s confirmation code, provider and link (a field you edited by hand is left as it is), and keeps the email with it.
 - **It’s a new booking** adds the email as a booking of its own.

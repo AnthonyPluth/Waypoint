@@ -1541,17 +1541,24 @@ def _relocate(conn: db.Connection, segment_ids: Sequence[int], source_id: int, t
     target_id = target.id
     sees = _seeing(conn, target)
     out = trippeople.excluded(conn, source_id) - trippeople.excluded(conn, target_id)
-    seen = list((out | {p for _, p in trippeople.cuts_on(conn, ids)}) & sees)
-    if ids and seen:
-        conn.execute(update(Segment).where(Segment.id.in_(ids), Segment.booked_by.in_(seen)).values(booked_by=None))
-        conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(ids), SegmentRecipient.person_id.in_(seen)))
-        conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id.in_(ids), SegmentTraveler.person_id.in_(seen)))
-        trippeople.uncut(conn, ids, seen)
+    _drop_ties(conn, ids, out & sees)
+    for segment_id, person_id in sorted(trippeople.cuts_on(conn, ids)):
+        if person_id in sees:
+            _drop_ties(conn, [segment_id], {person_id})
     trippeople.cut(conn, ids, out - sees)
     if ids:
         conn.execute(update(Segment).where(Segment.id.in_(ids)).values(trip_id=target_id))
     conn.orm.flush()
     conn.orm.expire_all()
+
+
+def _drop_ties(conn: db.Connection, segment_ids: Sequence[int], person_ids: set[int]) -> None:
+    people = sorted(person_ids)
+    if segment_ids and people:
+        conn.execute(update(Segment).where(Segment.id.in_(segment_ids), Segment.booked_by.in_(people)).values(booked_by=None))
+        conn.execute(delete(SegmentRecipient).where(SegmentRecipient.segment_id.in_(segment_ids), SegmentRecipient.person_id.in_(people)))
+        conn.execute(delete(SegmentTraveler).where(SegmentTraveler.segment_id.in_(segment_ids), SegmentTraveler.person_id.in_(people)))
+        trippeople.uncut(conn, segment_ids, people)
 
 
 def _tied(conn: db.Connection, seg: Segment) -> set[int]:

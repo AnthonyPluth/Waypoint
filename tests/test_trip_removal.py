@@ -18,6 +18,9 @@ FLIGHT = {**OUT, "confirmation": CODE, "provider": "American Airlines", "details
 FAR = {**OUT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
 FAR_FLIGHT = {**FLIGHT, "start_local": "2026-09-10T19:00", "end_local": "2026-09-11T07:10"}
 PAST = {**OUT, "start_local": "2020-03-01T19:00", "end_local": "2020-03-02T07:10"}
+LATER_LEG = {"kind": "flight", "origin": "LHR", "destination": "JFK", "start_local": "2026-09-14T11:00", "end_local": "2026-09-14T14:05",
+             "confirmation": "CANARYB2KQ", "provider": "Example Air", "details": {"flight_number": "EX 202"}}
+DECEMBER = {**OUT, "start_local": "2026-12-01T19:00", "end_local": "2026-12-02T07:10"}
 
 
 class Removal(Household):
@@ -546,6 +549,21 @@ class NothingOfABookingTheyWereCutOffFromTravelsWithIt(Removal):
             self.email(self.jane, self.jid, self.sid)
             self.assertEqual(trips.merge_email_segment(self.c, self.sam, {**FLIGHT, "travelers": self.on(self.jid)}), "ambiguous")
             self.assertKeptAway([flight_id, stay_id])
+
+    def test_a_cut_from_one_booking_drops_no_tie_to_another_booking_that_moves_with_it(self):
+        flight_id, _stay_id, _source, there = self.cut_off("got_its_confirmation")
+        trips.move_segment(self.c, self.jane, flight_id, there, True)
+        later = self.add(self.jane, LATER_LEG, there, self.on(self.jid))
+        trips.merge_email_segment(self.c, self.sam, {**LATER_LEG, "travelers": self.on(self.jid)})
+        self.assertIsNotNone(trips.get(self.c, self.sam, there))
+        self.assertEqual(self.cut_from(flight_id), {self.sid})
+        home = self.add(self.jane, DECEMBER, None, self.on(self.jid, self.sid))["trip_id"]
+        trips.merge(self.c, self.jane, home, there, True)
+        self.assertEqual(self.cut_from(flight_id), set())
+        self.assertEqual(self.c.orm.scalars(select(SegmentRecipient.person_id).where(SegmentRecipient.segment_id == later["id"])).all(), [self.sid])
+        alone = trips.move_segment(self.c, self.jane, later["id"], None)
+        self.assertIsNotNone(trips.get(self.c, self.sam, alone["id"]))
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, later["id"]))
 
     def test_adding_them_to_the_trip_a_booking_was_moved_into_asks_first_and_then_shares_it(self):
         flight_id, _stay_id, source, there = self.cut_off("got_its_confirmation")
