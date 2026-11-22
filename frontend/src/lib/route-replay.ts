@@ -25,6 +25,7 @@ export const ZOOM_UNITS = 0.35;
 export const MIN_ZOOM_SHARE = 0.25;
 export const MIN_MS = 6000;
 export const MAX_MS = 120000;
+export const SINGLE_STOP_MS = 4000;
 export const PER_STOP_MS = 2000;
 export const SLOW_AFTER_STOPS = 6;
 export const SLOW_PER_STOP_MS = 4000;
@@ -36,7 +37,7 @@ const EARTH_KM = 6371;
 const key = (text: string | null | undefined): string => (text ?? "").trim().toLowerCase();
 const head = (text: string): string => text.split(",")[0].trim();
 
-export const replayMs = (stops: number): number => Math.min(MAX_MS, Math.max(MIN_MS, Math.min(stops, SLOW_AFTER_STOPS) * PER_STOP_MS + Math.max(0, stops - SLOW_AFTER_STOPS) * SLOW_PER_STOP_MS));
+export const replayMs = (stops: number): number => stops <= 1 ? SINGLE_STOP_MS : Math.min(MAX_MS, Math.max(MIN_MS, Math.min(stops, SLOW_AFTER_STOPS) * PER_STOP_MS + Math.max(0, stops - SLOW_AFTER_STOPS) * SLOW_PER_STOP_MS));
 
 export const distanceKm = (a: Point, b: Point): number => geoDistance([a.longitude, a.latitude], [b.longitude, b.latitude]) * EARTH_KM;
 
@@ -156,7 +157,7 @@ export function stopsOf(trip: Trip, places: TripPlaces): Stop[] {
 }
 
 export const canReplay = (trip: Trip, today: string, places: TripPlaces | null): boolean =>
-  places !== null && worthLocating(trip, today) && stopsOf(trip, places).length >= 2;
+  places !== null && worthMapping(trip, today) && stopsOf(trip, places).length >= 1;
 
 const locale = () => (typeof navigator !== "undefined" && navigator.language) || "en-US";
 
@@ -287,8 +288,15 @@ const smooth = (t: number): number => {
   return c * c * (3 - 2 * c);
 };
 
+function zoomOnto(spot: Spot, width: number, height: number, share: number): Box {
+  const w = width * MIN_ZOOM_SHARE, h = height * MIN_ZOOM_SHARE;
+  const x = Math.min(width - w, Math.max(0, spot.x - w / 2)), y = Math.min(height - h, Math.max(0, spot.y - h / 2));
+  return { x: x * share, y: y * share, w: width + (w - width) * share, h: height + (h - height) * share };
+}
+
 export function cameraAt(stops: Stop[], spots: Spot[], width: number, height: number, progress: number, legs: Leg[] = []): Box {
   const full: Box = { x: 0, y: 0, w: width, h: height };
+  if (stops.length === 1) return zoomOnto(spots[0], width, height, smooth(progress));
   const units = progress * (stops.length - 1);
   let best = 0;
   let target = full;

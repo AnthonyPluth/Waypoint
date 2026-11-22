@@ -5,7 +5,7 @@
   import RouteReplayMap from "$lib/components/RouteReplayMap.svelte";
   import { app } from "$lib/app.svelte";
   import { loadMapkit, type Maps } from "$lib/mapkit";
-  import { stopsOf, worthLocating } from "$lib/route-replay";
+  import { stopsOf, worthMapping } from "$lib/route-replay";
   import { dayIn, viewerZone } from "$lib/trips";
 
   let { trip, now, shown = true, stopList = true, onstops, compact = false, onreplay = null, onended = null, wrapClass = "", wrapId = undefined, fallbackFocus = null, onmap }: { trip: Trip; now: number; shown?: boolean; stopList?: boolean; onstops?: (count: number) => void; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null; wrapClass?: string; wrapId?: string; fallbackFocus?: (() => HTMLElement | null) | null; onmap?: (showing: boolean) => void } = $props();
@@ -13,7 +13,7 @@
   let places = $state<TripPlaces | null>(null);
 
   const today = $derived(dayIn(now, viewerZone()));
-  const eligible = $derived(worthLocating(trip, today));
+  const eligible = $derived(worthMapping(trip, today));
   const stops = $derived(eligible && places ? stopsOf(trip, places) : []);
   const year = $derived(Number(today.slice(0, 4)));
   let connected = $state(typeof navigator === "undefined" || navigator.onLine !== false);
@@ -29,7 +29,7 @@
     return () => { window.removeEventListener("online", set); window.removeEventListener("offline", set); };
   });
   const online = $derived(!app.offline && connected);
-  const wanted = $derived(app.state?.mapkit === true && online && stops.length >= 2);
+  const wanted = $derived(app.state?.mapkit === true && online && stops.length >= 1);
 
   let maps = $state<Maps | null | undefined>(undefined);
   let appeared = $state(false);

@@ -88,8 +88,8 @@ describe("RouteReplay", () => {
     expect(vi.mocked(api)).not.toHaveBeenCalled();
   });
 
-  it("is absent when fewer than two stops have coordinates", async () => {
-    vi.mocked(api).mockResolvedValue({ airports: [places.airports[0]], cities: [], stays: [] } as never);
+  it("is absent when no stop has coordinates", async () => {
+    vi.mocked(api).mockResolvedValue({ airports: [], cities: [], stays: [] } as never);
     render(RouteReplay, { trip: trip([there, home]), now: after });
     await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
     await Promise.resolve();
@@ -97,11 +97,47 @@ describe("RouteReplay", () => {
     expect(loadMapkit).not.toHaveBeenCalled();
   });
 
-  it("is absent for a single stay, without asking", () => {
+  describe("for a single stay", () => {
     const stay = segment({ id: 3, kind: "hotel", origin: "Inn", destination: "San Francisco", start_local: "2025-12-05T15:00", start_zone: "America/Los_Angeles", end_local: "2025-12-08T11:00", end_zone: "America/Los_Angeles" });
-    render(RouteReplay, { trip: trip([stay]), now: after });
-    expect(region()).toBeNull();
-    expect(vi.mocked(api)).not.toHaveBeenCalled();
+    const located: TripPlaces = { ...places, cities: [{ city: "San Francisco", latitude: 37.77, longitude: -122.42 }] as never };
+
+    it("shows the map with the stay pinned and plays a zoom onto it", async () => {
+      vi.mocked(api).mockResolvedValue(located as never);
+      const onstops = vi.fn();
+      const { container } = render(RouteReplay, { trip: trip([stay]), now: after, onstops });
+      expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(await screen.findByRole("button", { name: "Pause" })).toBeTruthy();
+      expect(container.querySelector("[data-mapkit]")).toBeTruthy();
+      expect(container.querySelector('[aria-label="Map of the stay"]')).toBeTruthy();
+      expect(screen.queryByText("Flight")).toBeNull();
+      expect(screen.queryByText("Airport")).toBeNull();
+      expect(screen.getByText("Stay")).toBeTruthy();
+      expect(onstops).toHaveBeenLastCalledWith(1);
+      const label = container.querySelector("[data-label]");
+      expect(label?.textContent).toContain("Inn");
+    });
+
+    it("with reduced motion is a still map with the stay labelled and nothing to play", async () => {
+      reduced();
+      vi.mocked(api).mockResolvedValue(located as never);
+      const { container } = render(RouteReplay, { trip: trip([stay]), now: after });
+      expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(container.querySelector('[data-label][data-visible="true"]')).toBeTruthy();
+    });
+
+    it("is absent while the trip is still going and when the stay can't be placed", async () => {
+      render(RouteReplay, { trip: trip([stay]), now: during });
+      await Promise.resolve();
+      expect(region()).toBeNull();
+      expect(vi.mocked(api)).not.toHaveBeenCalled();
+      cleanup();
+      vi.mocked(api).mockResolvedValue({ home: null, airports: [], cities: [], stays: [] } as never);
+      render(RouteReplay, { trip: trip([stay]), now: after });
+      await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalled());
+      await Promise.resolve();
+      expect(region()).toBeNull();
+    });
   });
 
   it("is absent when the coordinates can't be loaded or come back malformed", async () => {

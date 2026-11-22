@@ -71,6 +71,10 @@ const options = (extra: Record<string, unknown> = {}) => [
   ...Object.entries(extra).map(([label, onselect]) => ({ label, onselect: onselect as () => void })),
 ];
 const show = (extra: Record<string, unknown> = {}) => render(PastTrip, { trip: roadTrip, people: [ada], now: after, dates: "Mar 1, 2026 – Mar 8, 2026", costsShown: true, loads: 1, back: true, options: options(), onsaved: vi.fn(), ...extra } as never);
+const placeStay = () => {
+  const base = vi.mocked(api).getMockImplementation()!;
+  vi.mocked(api).mockImplementation(async (path: string, ...rest: never[]) => String(path).endsWith("/places") ? { ...places, stays: [{ segment_id: 2, latitude: 39.7, longitude: -105, precision: "city" }] } : base(path, ...rest));
+};
 const settled = () => screen.findByRole("region", { name: /^Photos/ });
 const days = () => screen.getAllByRole("region").filter((r) => r.hasAttribute("data-day"));
 
@@ -253,6 +257,35 @@ describe("PastTrip facts", () => {
     expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
     await userEvent.click(replay);
     expect(screen.queryByRole("region", { name: "Route replay" })).toBeNull();
+  });
+
+  it("offers Replay trip for a trip with a single placed stay, which zooms onto the stay", async () => {
+    placeStay();
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show();
+    const replay = await screen.findByRole("button", { name: "Replay trip" });
+    await userEvent.click(replay);
+    expect(replay).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByRole("region", { name: "Route replay" })).toBeTruthy();
+    expect(document.querySelector("[data-label=\"Juniper House\"]")).toBeTruthy();
+  });
+
+  it("shows the map as the hero for a single placed stay when there are no photos", async () => {
+    placeStay();
+    show();
+    const region = await screen.findByRole("region", { name: "Route replay" });
+    expect(region.querySelector("[data-label]")?.textContent).toContain("Juniper House");
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
+  });
+
+  it("has no Replay trip button for a single stay that can't be placed", async () => {
+    photos = [1, 2, 3, 4].map((id) => shot(id));
+    best = [1, 2, 3];
+    show();
+    await screen.findByTestId("trip-hero");
+    await waitFor(() => expect(vi.mocked(api)).toHaveBeenCalledWith(expect.stringContaining("/places")));
+    expect(screen.queryByRole("button", { name: "Replay trip" })).toBeNull();
   });
 
   it("has no Replay trip button for a trip with no route", async () => {
@@ -936,6 +969,15 @@ describe("PastTrip on desktop", () => {
       expect(within(column()).queryByRole("list", { name: "Map key" })).toBeNull();
       expect(within(column()).queryByRole("slider")).toBeNull();
       expect(within(column()).queryByRole("region", { name: "Stops list" })).toBeNull();
+    });
+
+    it("is a still map in the column for a single placed stay, with Replay trip on it", async () => {
+      placeStay();
+      show({ trip: roadTrip });
+      const map = await within(column()).findByRole("group", { name: "Trip map" });
+      expect(within(map).getByRole("button", { name: "Replay trip" })).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(within(map).getByRole("button", { name: "Replay trip" }));
+      expect(await within(column()).findByRole("slider", { name: "Position along the route" })).toBeTruthy();
     });
 
     it("plays the replay in the column from Replay trip with only its own controls, and puts the map back when it ends", async () => {

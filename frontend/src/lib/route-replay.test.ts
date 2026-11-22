@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Trip, TripPlaces } from "./api-types";
-import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, worthMapping, type Stop } from "./route-replay";
+import { MIN_ZOOM_SHARE, SINGLE_STOP_MS, activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, worthMapping, type Stop } from "./route-replay";
 import { segment, trip } from "../test/fixtures";
 import { isDrive } from "./driving-routes";
 
@@ -211,14 +211,16 @@ describe("the text of a stop", () => {
 describe("whether a trip can be replayed", () => {
   const past = trip([out, stay, back]);
 
-  it("needs the trip to have ended and two located stops", () => {
+  it("needs the trip to have ended and a located stop", () => {
     expect(past.end_date).toBe("2025-12-11");
     expect(canReplay(past, "2026-01-01", places)).toBe(true);
     expect(canReplay(past, "2025-12-11", places)).toBe(false);
     expect(canReplay(past, "2025-12-01", places)).toBe(false);
     expect(canReplay(past, "2026-01-01", null)).toBe(false);
-    expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(false);
-    expect(canReplay(trip([out]), "2026-01-01", { home: null, airports: [places.airports[0]], cities: [], stays: [] })).toBe(false);
+    expect(canReplay(trip([stay]), "2026-01-01", places)).toBe(true);
+    expect(canReplay(trip([stay]), "2025-12-05", places)).toBe(false);
+    expect(canReplay(trip([out]), "2026-01-01", { home: null, airports: [places.airports[0]], cities: [], stays: [] })).toBe(true);
+    expect(canReplay(trip([out]), "2026-01-01", { home: null, airports: [], cities: [], stays: [] })).toBe(false);
   });
 
   it("counts the most stops a trip could have before asking for coordinates", () => {
@@ -230,7 +232,7 @@ describe("whether a trip can be replayed", () => {
     expect(worthLocating(trip([out]), "2025-12-05")).toBe(false);
   });
 
-  it("maps a trip that has ended and holds a single stay, though it is not worth replaying", () => {
+  it("maps a trip that has ended and holds a single stay, which replays as a zoom onto it", () => {
     expect(worthMapping(trip([stay]), "2027-01-01")).toBe(true);
     expect(worthMapping(trip([stay]), "2025-12-05")).toBe(false);
     expect(worthMapping(trip([{ ...stay, status: "cancelled" }]), "2027-01-01")).toBe(false);
@@ -315,6 +317,18 @@ describe("the camera and the timeline", () => {
     expect([0, 0.49, 0.5, 0.99, 1].map((p) => activeStop(3, p))).toEqual([0, 0, 1, 1, 2]);
   });
 
+  it("holds together at one stop, with no legs and nothing to divide by", () => {
+    const one = stopsOf(trip([stay]), places);
+    expect(one).toHaveLength(1);
+    expect(legsOf(one, routeProjection(one, 960, 520))).toEqual([]);
+    expect([0, 0.5, 1].map((p) => activeStop(1, p))).toEqual([0, 0, 0]);
+    expect([0, 0.5, 1].map((p) => reached(0, 1, p))).toEqual([true, true, true]);
+    expect([0, 0.5, 1].map((p) => labelLit(0, 1, p, false))).toEqual([false, false, false]);
+    expect([0, 0.5, 1].map((p) => legProgress(0, 1, p))).toEqual([0, 0, 0]);
+    expect(replayMs(1)).toBe(SINGLE_STOP_MS);
+    expect(replayMs(1)).toBeLessThan(replayMs(2));
+  });
+
   it("plays for between six seconds and a minute, two seconds a stop", () => {
     expect([2, 3, 4, 6, 9, 12, 20, 30, 40].map(replayMs)).toEqual([6000, 6000, 8000, 12000, 24000, 36000, 68000, 108000, 120000]);
   });
@@ -381,6 +395,28 @@ describe("the local legs and the camera", () => {
   });
 });
 
+describe("the camera at a single stop", () => {
+  const one = stopsOf(trip([stay]), places);
+  const projection = routeProjection(one, 960, 520);
+  const spots = positions(one, projection);
+  const at = (p: number) => cameraAt(one, spots, 960, 520, p);
+
+  it("starts on the whole map and zooms in onto the stay, keeping the map's shape and staying inside it", () => {
+    expect(at(0)).toEqual({ x: 0, y: 0, w: 960, h: 520 });
+    const end = at(1);
+    expect(end.w).toBeCloseTo(960 * MIN_ZOOM_SHARE);
+    expect(end.h / end.w).toBeCloseTo(520 / 960);
+    expect(end.x).toBeLessThanOrEqual(spots[0].x);
+    expect(end.x + end.w).toBeGreaterThanOrEqual(spots[0].x);
+    expect(end.y).toBeLessThanOrEqual(spots[0].y);
+    expect(end.y + end.h).toBeGreaterThanOrEqual(spots[0].y);
+    expect(end.x).toBeGreaterThanOrEqual(0);
+    expect(end.x + end.w).toBeLessThanOrEqual(960);
+    expect(at(0.5).w).toBeGreaterThan(end.w);
+    expect(at(0.5).w).toBeLessThan(960);
+  });
+});
+
 describe("a past trip made of countries", () => {
   const visit = (id: number, destination: string, first: string, last: string) =>
     segment({ id, kind: "visit", origin: null, destination, start_local: `${first}T00:00`, start_zone: "America/Guayaquil", end_local: `${last}T00:00`, end_zone: "America/Guayaquil" });
@@ -407,7 +443,8 @@ describe("a past trip made of countries", () => {
     expect(maxStops(past)).toBe(2);
     expect(worthLocating(past, "2026-01-01")).toBe(true);
     expect(canReplay(past, "2026-01-01", located)).toBe(true);
-    expect(canReplay(past, "2026-01-01", { ...located, stays: [located.stays[0]] })).toBe(false);
+    expect(canReplay(past, "2026-01-01", { ...located, stays: [located.stays[0]] })).toBe(true);
+    expect(canReplay(past, "2026-01-01", { ...located, stays: [] })).toBe(false);
     const single = trip([ecuador], { end_date: "2005-03-10" });
     expect(maxStops(single)).toBe(1);
     expect(worthLocating(single, "2026-01-01")).toBe(false);
