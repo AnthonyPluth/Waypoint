@@ -639,6 +639,24 @@ class ClaimingAGuest(Removal):
         self.assertIsNone(trips.get(self.c, self.sam, source))
         self.assertEqual(self.c.orm.scalars(select(SegmentRecipient.id).where(SegmentRecipient.segment_id == flight_id)).all(), [])
 
+    def test_claiming_a_guest_who_travels_on_the_booking_that_moved_makes_the_member_its_traveller(self):
+        self.email(self.jane, self.jid, self.mia)
+        flight_id = self.c.orm.scalars(select(Segment.id).where(Segment.confirmation == CODE)).one()
+        source = self.c.orm.get(Segment, flight_id).trip_id
+        self.add(self.jane, HOTEL, source)
+        self.put_on(self.jane, source, self.sid)
+        self.take_off(self.jane, source, self.sid)
+        there = self.add(self.jane, FAR, None, self.on(self.jid))["trip_id"]
+        trips.move_segment(self.c, self.jane, flight_id, there, True)
+        self.assertEqual(self.cut_from(flight_id), {self.sid})
+        self.assertEqual(self.aboard(there), [self.jid, self.mia])
+        people.claim_guest(self.c, self.sid, self.mia, "2026-10-05")
+        self.assertEqual(self.cut_from(flight_id), set())
+        self.assertEqual(self.aboard(there), [self.jid, self.sid])
+        self.assertEqual([t["person_id"] for t in trips.get_segment(self.c, self.jane, flight_id)["travelers"]], [self.jid, self.sid])
+        self.assertIsNotNone(trips.get_segment(self.c, self.sam, flight_id))
+        self.assertIsNone(trips.get(self.c, self.sam, source))
+
     def test_claiming_a_guest_on_the_trip_a_booking_moved_into_shares_that_trip_as_any_claim_does(self):
         flight_id, source, there = self.moved_out(self.sid)
         self.put_on(self.jane, there, self.mia)
