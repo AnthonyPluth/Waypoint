@@ -117,9 +117,12 @@ class FitTests(unittest.TestCase):
             self.assertLessEqual(abs(x - cx) * 2 ** found.zoom, 358 / 2 - 20)
             self.assertLessEqual(abs(y - cy) * 2 ** found.zoom, 168 / 2 - 20)
 
-    def test_no_place_or_one_place_is_no_map(self):
+    def test_no_place_is_no_map(self):
         self.assertIsNone(map_snapshots.fit([], 358, 168))
-        self.assertIsNone(map_snapshots.fit([(39.74, -104.99)], 358, 168))
+
+    def test_one_place_is_a_city_level_map_centred_on_it(self):
+        found = map_snapshots.fit([(39.74, -104.99)], 358, 168)
+        self.assertEqual((found.latitude, found.longitude, found.zoom, found.width, found.height), (39.74, -104.99, map_snapshots.MAX_ZOOM, 358, 168))
 
     def test_a_tiny_route_is_a_city_level_map(self):
         found = map_snapshots.fit([(39.74, -104.99), (39.7401, -104.9901)], 358, 168)
@@ -218,9 +221,17 @@ class RouteTests(SnapshotCase):
         self.assertEqual(self.snapshots("ana", theirs), (200, {"snapshots": []}))
         self.assertEqual(self.snapshots("ben", mine), (200, {"snapshots": []}))
 
-    def test_a_trip_with_fewer_than_two_places_is_left_out(self):
+    def test_a_trip_with_one_stay_it_can_place_gets_a_city_level_map(self):
         lonely = self.book("ana", DENVER)["trip_id"]
-        self.assertEqual(self.snapshots("ana", lonely), (200, {"snapshots": []}))
+        [snap] = self.snapshots("ana", lonely)[1]["snapshots"]
+        self.assertEqual((snap["trip_id"], snap["zoom"], snap["width"], snap["height"]), (lonely, map_snapshots.MAX_ZOOM, 358, 168))
+        self.assertAlmostEqual(snap["center"]["latitude"], 39.74, delta=0.5)
+        self.assertAlmostEqual(snap["center"]["longitude"], -104.99, delta=0.5)
+        self.assertEqual(self.snapshots("ben", lonely), (200, {"snapshots": []}))
+
+    def test_a_trip_with_no_place_it_can_place_is_left_out(self):
+        nowhere = self.book("ana", {**HOTEL, "origin": "Nowhere Lodge", "destination": None})["trip_id"]
+        self.assertEqual(self.snapshots("ana", nowhere), (200, {"snapshots": []}))
 
     def test_a_transatlantic_trip_gets_a_larger_image_at_zoom_3_and_a_wider_one_a_clipped_640_pixel_image(self):
         flown = self.book("ana", {**HOTEL, "kind": "flight", "origin": "JFK", "destination": "LHR", "start_local": "2026-06-01T19:00", "end_local": "2026-06-02T07:10"})["trip_id"]

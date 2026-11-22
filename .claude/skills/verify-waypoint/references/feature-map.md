@@ -333,6 +333,15 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
   - A past trip with photos (the road trip), one with none (the Paris trip, whose hero is the route map with "No photos yet") and, with `fake_photo_limit`, one with two photos (the Lakeside Resort trip), then the Trip options menu, Show all days and a photo in the viewer. Needs `--signed-in jane` for `tools/control`.
   - The map hero plays the replay on its own; the flow presses `End` on "Position along the route" before those pictures, as make verify does for the trip page, so they are the same every time.
 
+#### `past-trip-people`
+
+- **Starts at:** `#trips`; goes to: `#trip/7`.
+- **Widths:** phone, desktop.
+- **Touches:** `Trip options`.
+- **Expects to see:** `Add guest`.
+- **Console errors it expects:** `Applying inline style violates the following Content Security Policy`, `Blocked script execution in`.
+- **Drive it:** `tools/control flow past-trip-people`; or `poetry run python run.py verify --flow past-trip-people`.
+
 #### `past-trip-saved-route`
 
 - **Starts at:** `#trips`; goes to: `#trips?year=2025`.
@@ -502,6 +511,14 @@ What a person can do in the web app, by page: what is there, how to reach it, ho
 - **Touches:** `London`, `Quay Street Lodge`, `San Francisco`.
 - **Expects to see:** `Trips`, `CHECK-IN`, `PICK-UP`.
 - **Drive it:** `tools/control flow trip-pass-cards`; or `poetry run python run.py verify --flow trip-pass-cards`.
+
+#### `trip-people`
+
+- **Starts at:** `#trips`.
+- **Widths:** phone, desktop.
+- **Touches:** `Trip options`, `People on this trip`.
+- **Expects to see:** `Trips`, `Add guest`.
+- **Drive it:** `tools/control flow trip-people`; or `poetry run python run.py verify --flow trip-people`.
 
 #### `trip-photos`
 

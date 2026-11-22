@@ -4,7 +4,7 @@ from waypoint.domain import people, trippeople, trips, visibility
 from waypoint.domain.visibility import Viewer
 from waypoint.storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
 from tests.privacy import no_leaks
-from tests.test_trips import BACK, HOTEL, OUT, Household, guest
+from tests.test_trips import BACK, HOTEL, OUT, Household, RouteCase, guest
 
 SHIP = {"kind": "cruise", "origin": "Port Example", "destination": "Port Example", "start_local": "2026-06-02T15:00",
         "end_local": "2026-06-08T10:00", "start_zone": "Europe/London", "end_zone": "Europe/London"}
@@ -559,3 +559,37 @@ class AddedByHand(TripPeopleCase):
         trips.move_segment(self.c, self.jane, stay["id"], other["trip_id"], True)
         self.assertFalse(self.c.orm.get(Segment, stay["id"]).travelers_from_trip)
         self.assertEqual(sorted(self.aboard(other["trip_id"])), sorted([self.jid, self.sid, self.mia]))
+
+
+class TripPeopleRouteTests(RouteCase):
+    def test_a_member_adds_and_removes_the_trips_people_through_the_web_routes_under_the_visibility_rule(self):
+        ana, ben = self.person["ana"], self.person["ben"]
+        trip = f"/api/trips/{self.book('ana', travelers=[{'person_id': ana}])['trip_id']}"
+        self.assertEqual(self.call("ben", "GET", trip)[0], 404)
+        status, asked = self.call("ana", "POST", trip, {"people": [ana, ben]})
+        self.assertEqual((status, [p["name"] for p in asked["see_trip"]]), (409, ["Ben"]))
+        self.assertEqual(self.call("ben", "GET", trip)[0], 404)
+        self.assertEqual(sorted(self.ok("ana", "POST", trip, {"people": [ana, ben], "confirm": True})["people"]), sorted([ana, ben]))
+        self.assertEqual(self.call("ben", "GET", trip)[0], 200)
+        self.assertEqual(self.ok("ana", "POST", trip, {"people": [ana]})["people"], [ana])
+        self.assertEqual(self.call("ben", "GET", trip)[0], 404)
+
+    def test_someone_who_is_not_on_the_trip_cannot_change_its_people_or_learn_who_is_on_it(self):
+        ana, ben, cy = (self.person[n] for n in ("ana", "ben", "cy"))
+        trip = f"/api/trips/{self.book('ana', travelers=[{'person_id': ana}])['trip_id']}"
+        for body in ({"people": []}, {"people": [cy], "confirm": True}, {"people": [ana, ben, cy], "confirm": True}):
+            status, got = self.call("cy", "POST", trip, body)
+            self.assertEqual(status, 404)
+            self.assertEqual(got, {"error": "No such trip"})
+        self.assertEqual(self.ok("ana", "GET", trip)["people"], [ana])
+
+    def test_nothing_about_a_trips_people_is_logged_or_echoed_to_a_stranger(self):
+        ana, ben = self.person["ana"], self.person["ben"]
+        trip = f"/api/trips/{self.book('ana', travelers=[{'person_id': ana}])['trip_id']}"
+        with no_leaks(self, "ben@example.com"):
+            self.assertEqual(self.call("ana", "POST", trip, {"people": [ana, ben]})[0], 409)
+            self.ok("ana", "POST", trip, {"people": [ana, ben], "confirm": True})
+            self.ok("ana", "POST", trip, {"people": [ana]})
+            status, got = self.call("cy", "POST", trip, {"people": [ben], "confirm": True})
+            self.assertEqual(status, 404)
+            self.assertNotIn("Ben", str(got))
