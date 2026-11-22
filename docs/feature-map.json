@@ -294,6 +294,7 @@
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trip_people.py",
+        "tests/test_trip_removal.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],
@@ -414,6 +415,7 @@
         "tests/test_trip_destination.py",
         "tests/test_trip_emails_clear.py",
         "tests/test_trip_people.py",
+        "tests/test_trip_removal.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -438,6 +440,7 @@
         "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
         "tests/test_trip_people.py",
+        "tests/test_trip_removal.py",
         "tests/test_trips.py"
       ],
       "docs": [
@@ -1054,6 +1057,7 @@
         "tests/test_photos_api.py",
         "tests/test_route_cache.py",
         "tests/test_trip_destination.py",
+        "tests/test_trip_removal.py",
         "tests/test_trip_summary.py",
         "tests/test_trips.py"
       ],

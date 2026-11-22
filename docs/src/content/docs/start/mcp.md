@@ -46,7 +46,7 @@ An assistant can ask for **Change trips**: everything the app changes, as the ap
 Waypoint tells the assistant to describe every change and wait for your yes, and to confirm separately before anything destructive. Anything else the app can do is reached through the same checks.
 
 - An assistant can read a booking’s cost and set one. A cost set this way is entered by hand, so an email never replaces it.
-- It can take people off a trip, but not someone who is a traveller on one of its flights. It can’t add anyone who couldn’t already see the trip, whether by listing them on the trip or by naming them as a traveller on a booking it adds, changes or matches from the Review queue; that needs you, in the app.
+- It can take people off a trip, but not someone who is a traveller on one of its flights, and not the last person or the last one who signs in. Taking someone off is complete: they stop seeing the trip even if they booked it or its confirmation came to their mailbox, and only you, in the app (the trip’s **People on this trip**), can add them back. It can’t add anyone who couldn’t already see the trip, whether by listing them on the trip or by naming them as a traveller on a booking it adds, changes or matches from the Review queue; that needs you, in the app.
 - It can’t merge two trips that involve different people: that is refused and sends you to the app, where you confirm who will newly see what. Merging trips of the same people works.
 
 ## Reading email text (optional)

@@ -84,7 +84,7 @@ describe("TripPeopleSheet", () => {
     const u = show();
     await u.click(await screen.findByRole("button", { name: "Remove Sam Doe from this trip" }));
     const dialog = await screen.findByRole("dialog", { name: "Remove Sam Doe from this trip?" });
-    expect(dialog).toHaveTextContent("stop seeing the trip unless they booked it");
+    expect(dialog).toHaveTextContent("stop seeing the trip, even if they booked it or its confirmation came to their own mailbox. Adding them again gives it back.");
     expect(dialog).not.toHaveTextContent("That is you");
     expect(posts()).toHaveLength(0);
     await u.click(within(dialog).getByRole("button", { name: "Remove" }));
@@ -107,7 +107,7 @@ describe("TripPeopleSheet", () => {
   it("warns when the person being taken off is the viewer", async () => {
     const u = show(shared(), 2);
     await u.click(await screen.findByRole("button", { name: "Remove Sam Doe from this trip" }));
-    expect(await screen.findByRole("dialog", { name: "Remove Sam Doe from this trip?" })).toHaveTextContent("That is you. You won’t see this trip any more");
+    expect(await screen.findByRole("dialog", { name: "Remove Sam Doe from this trip?" })).toHaveTextContent("That is you. You won’t see this trip any more, even if you booked it or its confirmation came to your mailbox.");
   });
 
   it("adds a household person by sending the whole list and the new person", async () => {

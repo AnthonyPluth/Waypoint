@@ -4,10 +4,10 @@ import json
 import re
 from typing import Any, TypedDict
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, or_, select, update
 
 from ..storage import db, photo_sources
-from ..storage.models import LoyaltyId, Person, Segment, SegmentRecipient, SegmentTraveler, Trip, TripPerson
+from ..storage.models import LoyaltyId, Person, Segment, SegmentExclusion, SegmentRecipient, SegmentTraveler, Trip, TripExclusion, TripPerson
 from . import photogrants, visibility
 
 
@@ -93,6 +93,12 @@ def person_for_sub(conn: db.Connection, sub: str) -> int | None:
 
 def existing(conn: db.Connection, ids: list[int]) -> dict[int, str]:
     return dict(conn.execute(select(Person.id, Person.display_name).where(Person.id.in_(ids))).fetchall())
+
+
+def signing_in(conn: db.Connection, ids: set[int]) -> set[int]:
+    if not ids:
+        return set()
+    return set(conn.orm.scalars(select(Person.id).where(Person.id.in_(sorted(ids)), Person.user_sub.is_not(None))).all())
 
 
 def ensure_member(conn: db.Connection, sub: str, display_name: str, first_name: str | None) -> None:
@@ -197,15 +203,34 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
         raise NotAGuest()
     if decode_links(me.links):
         raise AlreadyClaimed()
-    mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
-    conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
-    conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))
+    barred = select(TripExclusion.trip_id).where(TripExclusion.person_id == member_id)
+    conn.execute(delete(TripPerson).where(TripPerson.person_id == guest_id, TripPerson.trip_id.in_(barred)))
     aboard = select(TripPerson.trip_id).where(TripPerson.person_id == member_id)
     conn.execute(delete(TripPerson).where(TripPerson.person_id == guest_id, TripPerson.trip_id.in_(aboard)))
     conn.execute(update(TripPerson).where(TripPerson.person_id == guest_id).values(person_id=member_id))
+    on_trips = select(TripPerson.trip_id).where(TripPerson.person_id == member_id)
+    conn.execute(delete(SegmentExclusion).where(SegmentExclusion.person_id.in_([guest_id, member_id]),
+                                                SegmentExclusion.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(on_trips)))))
+    cut = select(SegmentExclusion.segment_id).where(SegmentExclusion.person_id == member_id)
+    conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id,
+                                               or_(SegmentTraveler.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(barred))),
+                                                   SegmentTraveler.segment_id.in_(cut)))
+                 .values(person_id=None, name=func.coalesce(SegmentTraveler.name, guest.display_name)))
+    sees = select(Trip.id).where(visibility.can_see(visibility.Viewer(member_id)))
+    conn.execute(delete(SegmentExclusion).where(SegmentExclusion.person_id == guest_id,
+                                                or_(SegmentExclusion.segment_id.in_(cut),
+                                                    SegmentExclusion.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(sees))))))
+    conn.execute(update(SegmentExclusion).where(SegmentExclusion.person_id == guest_id).values(person_id=member_id))
+    mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
+    conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
+    conn.execute(update(SegmentTraveler).where(SegmentTraveler.person_id == guest_id).values(person_id=member_id))
     has = select(SegmentRecipient.segment_id).where(SegmentRecipient.person_id == member_id)
     conn.execute(delete(SegmentRecipient).where(SegmentRecipient.person_id == guest_id, SegmentRecipient.segment_id.in_(has)))
     conn.execute(update(SegmentRecipient).where(SegmentRecipient.person_id == guest_id).values(person_id=member_id))
+    conn.execute(delete(TripExclusion).where(TripExclusion.person_id.in_([guest_id, member_id]), TripExclusion.trip_id.in_(on_trips)))
+    out = select(TripExclusion.trip_id).where(TripExclusion.person_id == member_id)
+    conn.execute(delete(TripExclusion).where(TripExclusion.person_id == guest_id, or_(TripExclusion.trip_id.in_(out), TripExclusion.trip_id.in_(sees))))
+    conn.execute(update(TripExclusion).where(TripExclusion.person_id == guest_id).values(person_id=member_id))
     conn.execute(update(LoyaltyId).where(LoyaltyId.person_id == guest_id).values(person_id=member_id))
     if not photo_sources.lock_person(conn, guest_id):
         raise NoSuchGuest()

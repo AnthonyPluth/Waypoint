@@ -105,6 +105,20 @@ class TripPerson(Base):
     person_id: Mapped[int]
 
 
+class TripExclusion(Base):
+    __table__ = schema.trip_exclusions
+    id: Mapped[int]
+    trip_id: Mapped[int]
+    person_id: Mapped[int]
+
+
+class SegmentExclusion(Base):
+    __table__ = schema.segment_exclusions
+    id: Mapped[int]
+    segment_id: Mapped[int]
+    person_id: Mapped[int]
+
+
 class Segment(Base):
     __table__ = schema.segments
     id: Mapped[int]

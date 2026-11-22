@@ -194,6 +194,26 @@ segment_ports = Table(
     info={'doc': "a cruise's ports of call in order: the port's name and IANA zone, and the local times the ship arrives and leaves (none for a port without times)"},
 )
 
+trip_exclusions = Table(
+    'trip_exclusions', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('trip_id', Integer, refers('trip_exclusions', 'trip_id', 'trips.id', 'CASCADE'), nullable=False),
+    Column('person_id', Integer, refers('trip_exclusions', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    UniqueConstraint('trip_id', 'person_id', name='uq_trip_exclusions_trip_person'),
+    Index('ix_trip_exclusions_person_id', 'person_id'),
+    info={'doc': "who was taken off a trip's people: they don't see the trip however they came by it (as its booker, a traveller on a booking or the one a confirmation came to), and a later scan or edit does not give it back; putting them on the trip's people again deletes the row"},
+)
+
+segment_exclusions = Table(
+    'segment_exclusions', metadata,
+    Column('id', Integer, primary_key=True, autoincrement=True),
+    Column('segment_id', Integer, refers('segment_exclusions', 'segment_id', 'segments.id', 'CASCADE'), nullable=False),
+    Column('person_id', Integer, refers('segment_exclusions', 'person_id', 'people.id', 'CASCADE'), nullable=False),
+    UniqueConstraint('segment_id', 'person_id', name='uq_segment_exclusions_segment_person'),
+    Index('ix_segment_exclusions_person_id', 'person_id'),
+    info={'doc': "a booking that left a trip someone was taken off, into a trip they don't see: what they had on it as its booker, a traveller or the one its confirmation came to no longer shows them anything, and no later email or scan ties them to it again; putting them on its trip's people deletes the row"},
+)
+
 segment_recipients = Table(
     'segment_recipients', metadata,
     Column('id', Integer, primary_key=True, autoincrement=True),
