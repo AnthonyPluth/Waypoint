@@ -232,7 +232,7 @@ describe("whether a trip can be replayed", () => {
     expect(worthLocating(trip([out]), "2025-12-05")).toBe(false);
   });
 
-  it("does not replay a single stay that is cancelled or that Waypoint cannot place", () => {
+  it("does not replay a single stay that is cancelled or cannot be placed", () => {
     expect(canReplay(trip([{ ...stay, status: "cancelled" }]), "2026-01-01", places)).toBe(false);
     expect(canReplay(trip([stay]), "2026-01-01", { home: null, airports: [], cities: [], stays: [] })).toBe(false);
   });
