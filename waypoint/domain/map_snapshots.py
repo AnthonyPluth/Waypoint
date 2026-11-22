@@ -73,7 +73,7 @@ def _unwrapped(longitudes: list[float]) -> list[float]:
 
 
 def fit(points: list[tuple[float, float]], width: int, height: int) -> Fit | None:
-    if len(points) < 2:
+    if not points:
         return None
     wrapped = _unwrapped([lon for _, lon in points])
     ground = [_world(lat, lon) for (lat, _), lon in zip(points, wrapped, strict=True)]

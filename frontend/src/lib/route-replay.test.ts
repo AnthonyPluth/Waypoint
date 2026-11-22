@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Trip, TripPlaces } from "./api-types";
-import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, type Stop } from "./route-replay";
+import { activeStop, cameraAt, canReplay, legProgress, labelLit, legsOf, localRuns, maxStops, planeAt, positions, reached, replayMs, routeProjection, stopDates, stopLine, stopsOf, worthLocating, worthMapping, type Stop } from "./route-replay";
 import { segment, trip } from "../test/fixtures";
 import { isDrive } from "./driving-routes";
 
@@ -228,6 +228,15 @@ describe("whether a trip can be replayed", () => {
     expect(worthLocating(trip([stay]), "2027-01-01")).toBe(false);
     expect(worthLocating(trip([out]), "2027-01-01")).toBe(true);
     expect(worthLocating(trip([out]), "2025-12-05")).toBe(false);
+  });
+
+  it("maps a trip that has ended and holds a single stay, though it is not worth replaying", () => {
+    expect(worthMapping(trip([stay]), "2027-01-01")).toBe(true);
+    expect(worthMapping(trip([stay]), "2025-12-05")).toBe(false);
+    expect(worthMapping(trip([{ ...stay, status: "cancelled" }]), "2027-01-01")).toBe(false);
+    expect(worthMapping(trip([segment({ id: 9, kind: "parking" })]), "2027-01-01")).toBe(false);
+    expect(worthMapping(trip([out]), "2027-01-01")).toBe(true);
+    expect(worthLocating(trip([stay]), "2027-01-01")).toBe(false);
   });
 });
 
