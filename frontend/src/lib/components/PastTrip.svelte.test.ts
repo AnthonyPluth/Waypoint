@@ -73,7 +73,7 @@ const options = (extra: Record<string, unknown> = {}) => [
 const show = (extra: Record<string, unknown> = {}) => render(PastTrip, { trip: roadTrip, people: [ada], now: after, dates: "Mar 1, 2026 – Mar 8, 2026", costsShown: true, loads: 1, back: true, options: options(), onsaved: vi.fn(), ...extra } as never);
 const placeStay = () => {
   const base = vi.mocked(api).getMockImplementation()!;
-  vi.mocked(api).mockImplementation(async (path: string, ...rest: never[]) => String(path).endsWith("/places") ? { ...places, stays: [{ segment_id: 2, latitude: 39.7, longitude: -105, precision: "city" }] } : base(path, ...rest));
+  vi.mocked(api).mockImplementation(async (path: string, options?: Parameters<typeof api>[1]) => String(path).endsWith("/places") ? { ...places, stays: [{ segment_id: 2, latitude: 39.7, longitude: -105, precision: "city" }] } : base(path, options));
 };
 const settled = () => screen.findByRole("region", { name: /^Photos/ });
 const days = () => screen.getAllByRole("region").filter((r) => r.hasAttribute("data-day"));
