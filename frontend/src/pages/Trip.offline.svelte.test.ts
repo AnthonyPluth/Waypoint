@@ -18,7 +18,7 @@ import { installDevice, type Behaviour, type Device } from "../test/webauthn";
 import { segment, trip } from "../test/fixtures";
 import TripPage from "./Trip.svelte";
 
-const flight = segment({ id: 1, confirmation: "QX7R2M" });
+const flight = segment({ id: 1, confirmation: "QX7R2M", start_local: "2099-11-20T19:00", end_local: "2099-11-21T07:10" });
 let held: TripT;
 let device: Device;
 const withDevice = (b: Behaviour = {}) => { device = installDevice(b); };
