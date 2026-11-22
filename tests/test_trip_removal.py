@@ -3,9 +3,10 @@ import json
 from sqlalchemy import func, select, update
 
 from waypoint.domain import flight_import, people, trippeople, trips, visibility
+from waypoint.domain.mail import review
 from waypoint.domain.visibility import Viewer
 from waypoint.storage import stored_mail
-from waypoint.storage.models import Segment, SegmentRecipient, SegmentTraveler, Trip, TripExclusion
+from waypoint.storage.models import ReviewItem, Segment, SegmentRecipient, SegmentTraveler, StoredMessage, Trip, TripExclusion
 from tests.privacy import no_leaks
 from tests.test_mail_scan import NOW, ScanCase, eml
 from tests.test_trips import BACK, HOTEL, OUT, Household, guest
@@ -109,7 +110,7 @@ class TakenOffLosesWhatTheyOnlyHadByBooking(Removal):
         self.assertSeesNothing(self.sam, trip_id, [seg_id])
         self.assertStrangersSeeNothing(trip_id, [seg_id])
 
-    def test_the_same_confirmation_arriving_again_in_their_mailbox_does_not_give_it_back_or_touch_the_booking(self):
+    def test_the_same_confirmation_arriving_again_in_their_mailbox_is_held_for_review_and_gives_nothing_back(self):
         self.email(self.jane, self.jid)
         trip_id = self.c.orm.scalars(select(Segment.trip_id)).one()
         seg_id = self.c.orm.scalars(select(Segment.id)).one()
@@ -120,20 +121,16 @@ class TakenOffLosesWhatTheyOnlyHadByBooking(Removal):
         touched: list[int] = []
         with no_leaks(self, CODE, CANARY):
             changed = {**FLIGHT, "end_local": "2026-06-02T09:30", "travelers": self.on(self.jid, self.sid)}
-            for _ in range(2):
-                trips.merge_email_segment(self.c, self.sam, changed, touched=touched)
+            outcomes = [trips.merge_email_segment(self.c, self.sam, changed, touched=touched) for _ in range(2)]
+        self.assertEqual(outcomes, ["ambiguous", "ambiguous"])
+        self.assertEqual(touched, [])
         self.assertEqual(trips.get_segment(self.c, self.jane, seg_id), before)
         self.assertEqual(self.aboard(trip_id), [self.jid])
         self.assertIsNone(trips.get(self.c, self.sam, trip_id))
         self.assertIsNone(trips.get_segment(self.c, self.sam, seg_id))
-        mine = [t["id"] for t in trips.listing(self.c, self.sam)]
-        self.assertEqual(len(mine), 1)
-        self.assertNotIn(trip_id, mine)
-        copy = [s["id"] for s in trips.get(self.c, self.sam, mine[0])["segments"]]
-        self.assertEqual(len(copy), 1)
-        self.assertEqual(touched, copy * 2)
-        self.assertEqual(sorted(t["id"] for t in trips.listing(self.c, self.jane)), sorted([trip_id, mine[0]]))
-        self.assertEqual(self.aboard(mine[0]), [self.jid, self.sid])
+        self.assertEqual(trips.listing(self.c, self.sam), [])
+        self.assertEqual([t["id"] for t in trips.listing(self.c, self.jane)], [trip_id])
+        self.assertEqual(self.c.orm.scalars(select(Segment.id)).all(), [seg_id])
         self.assertStrangersSeeNothing(trip_id, [seg_id])
 
     def test_a_trip_that_has_ended_is_the_same(self):
@@ -539,17 +536,15 @@ class NothingOfABookingTheyWereCutOffFromTravelsWithIt(Removal):
             self.assertNotIn(self.sid, self.aboard(trip_id))
         self.assertEqual(self.c.orm.scalars(select(SegmentTraveler.id).where(SegmentTraveler.person_id == self.sid,
                                                                              SegmentTraveler.segment_id.in_(segment_ids))).all(), [])
-        own = visibility.visible_segments(self.c, self.sam)
-        self.assertEqual(len(own), 1)
-        self.assertNotIn(own[0].id, segment_ids)
-        self.assertNotIn(own[0].trip_id, holding)
+        self.assertEqual(visibility.visible_segments(self.c, self.sam), [])
+        self.assertEqual(visibility.visible_trips(self.c, self.sam), [])
 
     def check(self, tie, move):
         flight_id, stay_id, source, there = self.cut_off(tie)
         with no_leaks(self, CODE, CANARY):
             MOVES[move](self, flight_id, source, there)
             self.email(self.jane, self.jid, self.sid)
-            trips.merge_email_segment(self.c, self.sam, {**FLIGHT, "travelers": self.on(self.jid)})
+            self.assertEqual(trips.merge_email_segment(self.c, self.sam, {**FLIGHT, "travelers": self.on(self.jid)}), "ambiguous")
             self.assertKeptAway([flight_id, stay_id])
 
     def test_adding_them_to_the_trip_a_booking_was_moved_into_asks_first_and_then_shares_it(self):
@@ -615,6 +610,17 @@ class ClaimingAGuest(Removal):
         with self.assertRaisesRegex(trips.Invalid, "Sam Doe was taken off this trip"):
             trips.name_traveler(self.c, self.jane, next(t["id"] for t in travellers if t["person_id"] is None), self.sid)
 
+    def test_claiming_a_guest_taken_off_a_trip_the_member_booked_keeps_that_trip_theirs(self):
+        flight = self.add(self.sam, OUT, None, self.on(self.mia, self.joan))
+        trip_id = flight["trip_id"]
+        trips.edit_segment(self.c, self.sam, flight["id"], {"travelers": self.on(self.joan)})
+        trips.edit_trip(self.c, self.sam, trip_id, {"people": [self.joan]})
+        self.assertEqual(self.excluded(trip_id), {self.mia})
+        people.claim_guest(self.c, self.sid, self.mia, "2026-10-05")
+        self.assertEqual(self.excluded(trip_id), set())
+        self.assertIsNotNone(trips.get(self.c, self.sam, trip_id))
+        self.assertEqual(self.aboard(trip_id), [self.joan])
+
     def moved_out(self, who):
         self.email(self.jane, self.jid)
         flight_id = self.c.orm.scalars(select(Segment.id).where(Segment.confirmation == CODE)).one()
@@ -669,7 +675,7 @@ class ClaimingAGuest(Removal):
 
 
 class TheirOwnMailboxAfterwards(ScanCase):
-    def test_their_copy_of_the_confirmation_is_kept_with_a_booking_of_their_own_never_with_the_one_they_were_taken_off(self):
+    def test_their_copy_of_the_confirmation_waits_in_their_review_and_is_never_kept_with_the_one_they_were_taken_off(self):
         jid, sid = self.jane.person_id, self.sam.person_id
         self.put("flight_jsonld")
         self.scan()
@@ -684,13 +690,18 @@ class TheirOwnMailboxAfterwards(ScanCase):
         self.google.added[:] = ["sam-copy"]
         with no_leaks(self, BODY):
             self.scan(sam_box, now=NOW + 60)
-        [copy] = self.segments(self.sam)
-        self.assertNotEqual(copy["id"], original["id"])
-        self.assertNotEqual(copy["trip_id"], trip_id)
+        self.assertEqual(self.segments(self.sam), [])
+        self.assertEqual([s["id"] for s in self.segments(self.jane)], [original["id"]])
+        self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(Segment)).scalar()), 1)
         self.assertIsNone(self.read(lambda conn: trips.get(conn, self.sam, trip_id)))
         self.assertIsNone(self.read(lambda conn: trips.emails_of(conn, self.sam, original["id"])))
         self.assertEqual(len(self.read(lambda conn: stored_mail.for_segment(conn, original["id"]))), 1)
-        self.assertEqual(len(self.read(lambda conn: stored_mail.for_segment(conn, copy["id"]))), 1)
+        self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(StoredMessage)).scalar()), 2)
         self.assertEqual(self.read(lambda conn: conn.execute(select(func.count()).select_from(SegmentRecipient)).scalar()), 0)
         self.assertEqual(self.read(lambda conn: trippeople.excluded(conn, trip_id)), {sid})
-        self.assertEqual(sorted(s["id"] for s in self.segments(self.jane)), sorted([original["id"], copy["id"]]))
+        held = self.read(lambda conn: conn.execute(select(ReviewItem.reason, ReviewItem.matches).where(ReviewItem.mailbox_id == sam_box)).fetchall())
+        self.assertEqual([r["reason"] for r in held], ["match"])
+        self.assertEqual([m["candidates"] for m in json.loads(held[0]["matches"])], [[]])
+        [match] = self.read(lambda conn: review.matches(conn, "u-sam", self.sam))
+        self.assertEqual(match["candidates"], [])
+        self.assertEqual(self.read(lambda conn: review.matches(conn, "u-jane", self.jane)), [])

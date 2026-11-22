@@ -216,7 +216,10 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
                                                or_(SegmentTraveler.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(barred))),
                                                    SegmentTraveler.segment_id.in_(cut)))
                  .values(person_id=None, name=func.coalesce(SegmentTraveler.name, guest.display_name)))
-    conn.execute(delete(SegmentExclusion).where(SegmentExclusion.person_id == guest_id, SegmentExclusion.segment_id.in_(cut)))
+    sees = select(Trip.id).where(visibility.can_see(visibility.Viewer(member_id)))
+    conn.execute(delete(SegmentExclusion).where(SegmentExclusion.person_id == guest_id,
+                                                or_(SegmentExclusion.segment_id.in_(cut),
+                                                    SegmentExclusion.segment_id.in_(select(Segment.id).where(Segment.trip_id.in_(sees))))))
     conn.execute(update(SegmentExclusion).where(SegmentExclusion.person_id == guest_id).values(person_id=member_id))
     mine = select(SegmentTraveler.segment_id).where(SegmentTraveler.person_id == member_id)
     conn.execute(delete(SegmentTraveler).where(SegmentTraveler.person_id == guest_id, SegmentTraveler.segment_id.in_(mine)))
@@ -226,7 +229,7 @@ def claim_guest(conn: db.Connection, member_id: int, guest_id: int, today: str) 
     conn.execute(update(SegmentRecipient).where(SegmentRecipient.person_id == guest_id).values(person_id=member_id))
     conn.execute(delete(TripExclusion).where(TripExclusion.person_id.in_([guest_id, member_id]), TripExclusion.trip_id.in_(on_trips)))
     out = select(TripExclusion.trip_id).where(TripExclusion.person_id == member_id)
-    conn.execute(delete(TripExclusion).where(TripExclusion.person_id == guest_id, TripExclusion.trip_id.in_(out)))
+    conn.execute(delete(TripExclusion).where(TripExclusion.person_id == guest_id, or_(TripExclusion.trip_id.in_(out), TripExclusion.trip_id.in_(sees))))
     conn.execute(update(TripExclusion).where(TripExclusion.person_id == guest_id).values(person_id=member_id))
     conn.execute(update(LoyaltyId).where(LoyaltyId.person_id == guest_id).values(person_id=member_id))
     if not photo_sources.lock_person(conn, guest_id):

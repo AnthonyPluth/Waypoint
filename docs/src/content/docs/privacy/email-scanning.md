@@ -39,7 +39,7 @@ The message is never logged, reported or sent to any service other than Gmail’
 
 ## Who can see it
 
-- **Trips.** A booking is visible to the people on the trip, the person who booked it, and whoever got its confirmation in their own mailbox (the same email in two members’ mailboxes is one booking, shown to both; someone taken off a trip’s people stops seeing it that way too, and a later scan doesn’t bring it back). Anyone who can see a booking can read the email it was made from and see its images; no one else can.
+- **Trips.** A booking is visible to the people on the trip, the person who booked it, and whoever got its confirmation in their own mailbox (the same email in two members’ mailboxes is one booking, shown to both; someone taken off a trip’s people stops seeing it that way too, and a later scan doesn’t bring it back: their copy of a confirmation for one of its bookings waits in their Review instead of being filed). Anyone who can see a booking can read the email it was made from and see its images; no one else can.
 - **Review items.** Mail Waypoint couldn’t read is the mailbox owner’s alone unless they [share the mailbox’s items with the household](/Waypoint/start/review/#sharing-a-mailboxs-items-with-the-household). Then the household sees each one’s subject, sender and day and can read the message beside the Add by hand form.
 - **Connections.** Each member connects their own Gmail and sees only their own. A connection ends when its owner can no longer sign in. Anyone you let in can still download a backup, which holds the encrypted tokens ([SECURITY.md](https://github.com/AnthonyPluth/Waypoint/blob/main/SECURITY.md)).
 

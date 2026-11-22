@@ -1319,7 +1319,9 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
     else:
         wrote = fields.get("details") or {}
         barred, cut = visibility.barred_trips(conn, viewer), visibility.cut_segments(conn, viewer)
-        household = [s for s in visibility.household_segments(conn, values["kind"] or "") if s.trip_id not in barred and s.id not in cut]
+        every = visibility.household_segments(conn, values["kind"] or "")
+        household = [s for s in every if s.trip_id not in barred and s.id not in cut]
+        kept_off = [s for s in every if s.trip_id in barred or s.id in cut]
         verdicts = {s.id: reservation(s, values, wrote) for s in household if s.confirmation}
         coded = [s for s in household if verdicts.get(s.id) == "same"]
         uncoded = [s for s in household if not s.confirmation and _same_uncoded(s, values, wrote)]
@@ -1330,6 +1332,8 @@ def merge_email_segment(conn: db.Connection, viewer: Viewer, fields: SegmentIn, 
             candidates.extend(s.id for s in [*unsure, *uncoded])
             return "ambiguous"
         found = coded or (uncoded if len(uncoded) == 1 else [])
+        if not found and any(s.confirmation and reservation(s, values, wrote) == "same" for s in kept_off):
+            return "ambiguous"
     if len(found) > 1:
         found.sort(key=lambda s: (abs((date.fromisoformat(s.start_local[:10]) - date.fromisoformat(day)).days), s.id not in seen, s.id))
     if not found:

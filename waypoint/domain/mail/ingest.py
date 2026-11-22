@@ -176,7 +176,7 @@ def file_booking(conn: db.Connection, viewer: Viewer, b: extract.Booking, again:
         if not again and trips.attach_to_same_booking(conn, viewer, found, touched):
             return "attached"
         outcome = trips.merge_email_segment(conn, viewer, found, again, touched, fill_only, candidates)
-        if outcome == "ambiguous" and held is not None and candidates:
+        if outcome == "ambiguous" and held is not None and candidates is not None:
             held.append((found, candidates))
         return outcome
     except trips.Invalid:
