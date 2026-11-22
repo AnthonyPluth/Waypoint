@@ -153,8 +153,8 @@
 <ConfirmDialog bind:open={removeOpen} title={removing ? `Remove ${removing.display_name} from this trip?` : "Remove from this trip?"} confirmLabel="Remove" busyLabel="Removing…" destructive
   onconfirm={remove}>
   {#snippet description()}
-    <p>They come off the trip’s stays, rentals and parking, and stop seeing the trip unless they booked it or its confirmation came to their own mailbox.</p>
-    {#if removing && removing.id === me}<p><strong class="text-foreground">That is you.</strong> You won’t see this trip any more unless you booked it or its confirmation came to your mailbox.</p>{/if}
+    <p>They come off the trip’s stays, rentals and parking and stop seeing the trip, even if they booked it or its confirmation came to their own mailbox. Adding them again gives it back.</p>
+    {#if removing && removing.id === me}<p><strong class="text-foreground">That is you.</strong> You won’t see this trip any more, even if you booked it or its confirmation came to your mailbox.</p>{/if}
   {/snippet}
 </ConfirmDialog>
 

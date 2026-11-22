@@ -9,7 +9,7 @@ from waypoint.storage import stored_mail
 from waypoint.storage.models import ReviewItem, Segment, SegmentRecipient, SegmentTraveler, StoredMessage, Trip, TripExclusion
 from tests.privacy import no_leaks
 from tests.test_mail_scan import NOW, ScanCase, eml
-from tests.test_trips import BACK, HOTEL, OUT, Household, guest
+from tests.test_trips import BACK, HOTEL, OUT, Household, RouteCase, guest
 
 CANARY = "Zebulon Canarystone"
 CODE = "CANARY77XQ"
@@ -705,3 +705,20 @@ class TheirOwnMailboxAfterwards(ScanCase):
         [match] = self.read(lambda conn: review.matches(conn, "u-sam", self.sam))
         self.assertEqual(match["candidates"], [])
         self.assertEqual(self.read(lambda conn: review.matches(conn, "u-jane", self.jane)), [])
+
+
+class PutBackFromTheApp(RouteCase):
+    def test_someone_taken_off_is_put_back_through_the_trips_people_route_after_confirming(self):
+        ana, ben = self.person["ana"], self.person["ben"]
+        seg = self.book("ana", travelers=[{"person_id": ana}])
+        trip = f"/api/trips/{seg['trip_id']}"
+        self.ok("ana", "POST", trip, {"people": [ana, ben], "confirm": True})
+        self.ok("ana", "POST", trip, {"people": [ana]})
+        self.assertEqual(self.call("ben", "GET", trip)[0], 404)
+        self.assertEqual(self.call("ana", "POST", f"/api/segments/{seg['id']}", {"travelers": [{"person_id": ana}, {"person_id": ben}]}),
+                         (400, {"error": "Ben was taken off this trip. Add them to the trip’s people first."}))
+        status, asked = self.call("ana", "POST", trip, {"people": [ana, ben]})
+        self.assertEqual((status, [p["name"] for p in asked["see_trip"]]), (409, ["Ben"]))
+        self.assertEqual(self.call("ben", "GET", trip)[0], 404)
+        self.assertEqual(sorted(self.ok("ana", "POST", trip, {"people": [ana, ben], "confirm": True})["people"]), sorted([ana, ben]))
+        self.assertEqual(self.call("ben", "GET", trip)[0], 200)
