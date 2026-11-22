@@ -232,6 +232,11 @@ describe("whether a trip can be replayed", () => {
     expect(worthLocating(trip([out]), "2025-12-05")).toBe(false);
   });
 
+  it("does not replay a single stay that is cancelled or has nowhere to be placed", () => {
+    expect(canReplay(trip([{ ...stay, status: "cancelled" }]), "2026-01-01", places)).toBe(false);
+    expect(canReplay(trip([stay]), "2026-01-01", { home: null, airports: [], cities: [], stays: [] })).toBe(false);
+  });
+
   it("maps a trip that has ended and holds a single stay, which replays as a zoom onto it", () => {
     expect(worthMapping(trip([stay]), "2027-01-01")).toBe(true);
     expect(worthMapping(trip([stay]), "2025-12-05")).toBe(false);
