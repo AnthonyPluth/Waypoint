@@ -8,6 +8,7 @@ vi.mock("$lib/api", () => ({ api: vi.fn(), newPage: vi.fn(), signInUrl: () => "/
 vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
 
 import { api } from "$lib/api";
+import { toast } from "svelte-sonner";
 import type { LoyaltyEntry, Person, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
 import { app, layout, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
@@ -180,6 +181,116 @@ describe("Trip", () => {
       expect(within(document.querySelector("[data-trip-travellers]") as HTMLElement).getByRole("img", { name: "Jane Doe, Sam Doe" })).toBeInTheDocument();
     });
 
+    it("opens the people sheet from the avatars and from Trip options", async () => {
+      held = trip([flightFor, car], { people: [1, 2] });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await u.click(screen.getByRole("button", { name: "People on this trip: Jane Doe, Sam Doe" }));
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      expect(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" })).toBeInTheDocument();
+      await u.click(within(sheet).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      document.body.style.pointerEvents = "";
+      await tripOptions(u, "People on this trip");
+      expect(await screen.findByRole("dialog", { name: "People on this trip" })).toBeInTheDocument();
+    });
+
+    it("takes someone off the trip from the sheet, which then offers them to add again", async () => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { held = { ...held, people: (opts.body as { people: number[] }).people }; return held as never; }
+        return answer(path, opts) as never;
+      });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" }));
+      const confirm = await screen.findByRole("dialog", { name: "Remove Sam Doe from this trip?" });
+      await u.click(within(confirm).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(api).toHaveBeenCalledWith("/api/trips/1", { method: "POST", body: { people: [1] } }));
+      expect(await within(sheet).findByRole("button", { name: "Add Sam Doe to this trip" })).toBeEnabled();
+    });
+
+    it("leaves the trip and says so when the viewer takes themselves off and can no longer see it", async () => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      let gone = false;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { gone = true; return { ...held, people: [2], segments: [] } as never; }
+        if (path === "/api/trips/1" && gone) throw Object.assign(new Error("No such trip"), { status: 404 });
+        return answer(path, opts) as never;
+      });
+      const onchanged = vi.fn();
+      render(TripPage, { tripId: 1, onchanged });
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Remove Jane Doe from this trip?" })).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(onchanged).toHaveBeenCalled());
+      await waitFor(() => expect(screen.queryByRole("dialog", { name: "People on this trip" })).toBeNull());
+      expect(toast.success).toHaveBeenCalledWith("You no longer see this trip");
+    });
+
+    it.each([["a network failure", new Error("Failed to fetch")], ["a server error", Object.assign(new Error("Something went wrong"), { status: 500 })]])("offers a retry and does not leave the trip after %s while checking access", async (_name, failure) => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      let saved = false;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { saved = true; return { ...held, people: [2], segments: [] } as never; }
+        if (path === "/api/trips/1" && saved) { saved = false; throw failure; }
+        return answer(path, opts) as never;
+      });
+      const onchanged = vi.fn();
+      render(TripPage, { tripId: 1, onchanged });
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Remove Jane Doe from this trip?" })).getByRole("button", { name: "Remove" }));
+      const retry = await screen.findByRole("button", { name: "Try again" });
+      expect(onchanged).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalledWith("You no longer see this trip");
+      document.body.style.pointerEvents = "";
+      await u.click(retry);
+      expect(await screen.findByTestId("trip-bookings")).toBeInTheDocument();
+    });
+
+    it.each([["succeeds", false], ["finds no trip", true]])("ignores the access check when it %s after the page moved to another trip", async (_name, refused) => {
+      held = trip([car], { people: [1, 2] });
+      const answer = vi.mocked(api).getMockImplementation()!;
+      let settle: (v: unknown) => void = () => {};
+      let saved = false;
+      vi.mocked(api).mockImplementation(async (path, opts) => {
+        if (path === "/api/trips/1" && opts?.method === "POST") { saved = true; return { ...held, people: [2], segments: [] } as never; }
+        if (path === "/api/trips/1" && saved) { saved = false; return new Promise((resolve, reject) => { settle = refused ? () => reject(Object.assign(new Error("No such trip"), { status: 404 })) : resolve; }) as never; }
+        return answer(path, opts) as never;
+      });
+      const onchanged = vi.fn();
+      const view = render(TripPage, { tripId: 1, onchanged });
+      const u = userEvent.setup();
+      await screen.findByTestId("trip-bookings");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      await u.click(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" }));
+      await u.click(within(await screen.findByRole("dialog", { name: "Remove Jane Doe from this trip?" })).getByRole("button", { name: "Remove" }));
+      await waitFor(() => expect(saved).toBe(false));
+      await view.rerender({ tripId: 2, onchanged });
+      await screen.findByTestId("trip-bookings");
+      settle({ ...held, id: 1, name: "Stale trip A" });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByText("Stale trip A")).toBeNull();
+      expect(onchanged).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalledWith("You no longer see this trip");
+      expect(location.hash).toBe("#trip/1");
+    });
+
     it("keeps a flight's travellers and seats", async () => {
       held = trip([flightFor, car]);
       render(TripPage);
@@ -278,7 +389,7 @@ describe("Trip", () => {
       expect(screen.getByRole("button", { name: "Add booking" }).closest("[data-trip-footer]")).toHaveTextContent("2 bookings");
       expect(screen.queryByRole("menuitem", { name: "Delete trip" })).toBeNull();
       await u.click(screen.getByRole("button", { name: "Trip options" }));
-      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Add a booking", "Merge another trip", "Delete trip"]);
+      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["People on this trip", "Add a booking", "Merge another trip", "Delete trip"]);
       await u.click(screen.getByRole("menuitem", { name: "Add a booking" }));
       await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
       expect(screen.queryByRole("button", { name: "Trip options" })).toBeNull();
@@ -1489,7 +1600,7 @@ describe("Trip", () => {
       const trigger = await screen.findByRole("button", { name: "Trip options" });
       expect(trigger).toHaveAttribute("aria-haspopup", "menu");
       await u.click(trigger);
-      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Add a booking", "Merge another trip", "Delete trip"]);
+      expect(within(screen.getByRole("menu", { name: "Trip options" })).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["People on this trip", "Add a booking", "Merge another trip", "Delete trip"]);
       await u.click(screen.getByRole("menuitem", { name: "Add a booking" }));
       await waitFor(() => expect(document.querySelector("form")).not.toBeNull());
       expect(screen.queryByRole("button", { name: "Trip options" })).toBeNull();
@@ -1502,6 +1613,17 @@ describe("Trip", () => {
       await u.click(await screen.findByRole("button", { name: "Trip options" }));
       await u.click(screen.getByRole("menuitem", { name: "Delete trip" }));
       expect(await screen.findByRole("dialog", { name: "Delete Trip to London?" })).toBeInTheDocument();
+    });
+
+    it("opens the people sheet from Trip options on a completed trip, listing the trip’s people", async () => {
+      held = past({ people: [1, 2] });
+      render(TripPage);
+      const u = userEvent.setup();
+      await screen.findByTestId("past-trip");
+      await tripOptions(u, "People on this trip");
+      const sheet = await screen.findByRole("dialog", { name: "People on this trip" });
+      expect(within(sheet).getByRole("button", { name: "Remove Sam Doe from this trip" })).toBeInTheDocument();
+      expect(within(sheet).getByRole("button", { name: "Remove Jane Doe from this trip" })).toBeInTheDocument();
     });
 
     const openBooking = async (name: RegExp | string = /Harbour Hotel/) => {

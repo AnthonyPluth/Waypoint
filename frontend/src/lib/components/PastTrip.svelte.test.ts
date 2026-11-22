@@ -222,6 +222,19 @@ describe("PastTrip facts", () => {
     expect(screen.getByText("$4,312.00", { exact: false }).closest("[data-trip-total]")).toBeTruthy();
   });
 
+  it("makes the avatars a button that opens the people sheet, and plain avatars when the page offers none", async () => {
+    const onpeople = vi.fn();
+    const { unmount } = show({ onpeople });
+    const names = screen.getByTestId("avatar-stack").getAttribute("aria-label");
+    const button = screen.getByRole("button", { name: `People on this trip: ${names}` });
+    await userEvent.click(button);
+    expect(onpeople).toHaveBeenCalledOnce();
+    unmount();
+    show();
+    expect(screen.queryByRole("button", { name: /^People on this trip/ })).toBeNull();
+    expect(screen.getByTestId("avatar-stack")).toBeInTheDocument();
+  });
+
   it("leaves the total out when costs are not shown", async () => {
     show({ costsShown: false, trip: { ...roadTrip, costs: { totals: [{ currency: "USD", amount_minor: 431200 }], priced: 1, bookings: 1 } } });
     await settled().catch(() => null);

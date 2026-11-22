@@ -37,6 +37,7 @@
   import SegmentForm from "$lib/components/SegmentForm.svelte";
   import TripDetails from "$lib/components/TripDetails.svelte";
   import TripDone from "$lib/components/TripDone.svelte";
+  import TripPeopleSheet from "$lib/components/TripPeopleSheet.svelte";
   import TripPhotos from "$lib/components/TripPhotos.svelte";
   import TripSummary from "$lib/components/TripSummary.svelte";
   import { countNote, formatMoney, formatTotals } from "$lib/money";
@@ -49,6 +50,7 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import Trash2 from "@lucide/svelte/icons/trash-2";
+  import Users from "@lucide/svelte/icons/users";
   import { toast } from "svelte-sonner";
 
   const staticDemo = import.meta.env.MODE === "demo";
@@ -68,6 +70,7 @@
   let details = $state<{ open: () => Promise<void> } | null>(null);
   let editButton = $state<HTMLElement | null>(null);
   let bookingsOpen = $state(false);
+  let peopleOpen = $state(false);
   let expandedId = $state<number | null>(null);
   let removing = $state<Segment | null>(null);
   let asking = $state(false);
@@ -195,7 +198,7 @@
   }
   let seenRevision = untrack(() => revision);
   $effect(() => { if (revision !== seenRevision) { seenRevision = revision; void load(); } });
-  $effect(() => { void id; form = null; editingTrip = false; expandedId = null; bookingsOpen = false; savedCopy = null; savedTrips = []; void load(); });
+  $effect(() => { void id; form = null; editingTrip = false; expandedId = null; bookingsOpen = false; peopleOpen = false; savedCopy = null; savedTrips = []; void load(); });
 
   const wanted = $derived(new URLSearchParams(route.query).get("segment"));
   let openedWanted = "";
@@ -236,6 +239,7 @@
   const eyebrowOf = (s: Segment) => `${kindName(s)} · ${dayLabel(s.start_local)}`;
   const kindName = (s: Segment) => KINDS.find(([k]) => k === s.kind)?.[1] ?? s.kind;
   const tripOptions = $derived(!trip || form ? [] : [
+    { label: "People on this trip", icon: Users, onselect: () => { peopleOpen = true; } },
     { label: "Add a booking", icon: Plus, onselect: () => { focus = ""; form = blankFor(people, app.state?.person_id, trip!.id, trip!.costs.totals[0]?.currency); } },
     { label: "Merge another trip", icon: GitMerge, onselect: () => { mergeWith = ""; merging = true; void loadOthers(); } },
     { label: "Delete trip", icon: Trash2, destructive: true, divided: true, onselect: () => { deleting = true; } },
@@ -274,6 +278,28 @@
     dropDrafts();
     if (onchanged) onchanged(); else location.hash = "#trips";
   });
+
+  async function peopleChanged(changed: Trip) {
+    let next = changed;
+    const at = id;
+    const me = app.state?.person_id;
+    if (me != null && !next.people.includes(me)) {
+      try {
+        next = await apiCall<"GET /api/trips/{id}">(`/api/trips/${next.id}`);
+      } catch (e) {
+        if (id !== at) return;
+        peopleOpen = false;
+        if ((e as { status?: number }).status !== 404) { loadError = errMsg(e); return; }
+        toast.success("You no longer see this trip");
+        dropDrafts();
+        if (onchanged) onchanged(); else location.hash = "#trips";
+        return;
+      }
+    }
+    if (id !== at) return;
+    replace(next);
+    onchanged?.();
+  }
 
   const loadOthers = () => act(async () => {
     others = (await apiCall<"GET /api/trips">("/api/trips")).trips.filter((o) => o.id !== (trip?.id ?? -1))
@@ -377,7 +403,7 @@
   {@const t = trip}
   <ArrivalOpen tripId={t.id} segments={t.segments} {now} />
   {#if completedPage}
-    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={tripOptions} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
+    <PastTrip trip={t} {people} {now} dates={dates(t)} {costsShown} {loads} back={tripId === null} options={tripOptions} onpeople={() => (peopleOpen = true)} bind:editing={editingTrip} onsaved={(next) => { replace(next); onchanged?.(); }}
       onbookings={() => (bookingsOpen = true)} bookings={pastBookings} />
     {#if form && form.id === null}
       <div class="mt-6 mb-6" use:reveal><SegmentForm initial={form} {people} {focus} oncancel={() => (form = null)} onsaved={saved} /></div>
@@ -407,7 +433,8 @@
         <TripSummary tripId={t.id} revision={`${loads}.${photoChanges}`} />
       </div>
       {#if showTripTravellers(everyone, app.state?.person_id ?? null)}
-        <span class="mt-2 shrink-0" data-trip-travellers><AvatarStack people={tripPeople(t)} neutral /></span>
+        <button type="button" class="mt-0.5 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" data-trip-travellers
+          aria-label={`People on this trip: ${tripPeople(t).map((p) => p.name).join(", ")}`} onclick={() => (peopleOpen = true)}><AvatarStack people={tripPeople(t)} neutral /></button>
       {/if}
     </div>
   {/if}
@@ -474,6 +501,10 @@
   <TripDone trip={t} ondone={() => { onchanged?.(); void load(); }} />
 {/if}
 </div>
+
+{#if trip}
+  <TripPeopleSheet bind:open={peopleOpen} {trip} {people} me={app.state?.person_id ?? null} onsaved={peopleChanged} onguest={(guest) => (people = [...people, guest])} />
+{/if}
 
 <PastBookingsSheet bind:open={bookingsOpen} segments={trip?.segments ?? []} expanded={expandedId} ontoggle={toggleCard}>
   {#snippet detail(card)}{@render cardDetail(card)}{/snippet}

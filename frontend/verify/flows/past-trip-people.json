@@ -1,0 +1,16 @@
+{
+  "name": "past-trip-people",
+  "page": "trips",
+  "signed_in": true,
+  "allow_console": ["Applying inline style violates the following Content Security Policy", "Blocked script execution in"],
+  "steps": [
+    { "goto": "#trip/7" },
+    { "wait_for": "[data-testid=trip-hero]" },
+    { "click": "button[aria-label='Trip options']" },
+    { "wait_for": "role=menuitem[name='People on this trip']" },
+    { "click": "role=menuitem[name='People on this trip']" },
+    { "wait_for": "[role=dialog]:has-text('People on this trip')" },
+    { "expect_text": { "selector": "[role=dialog]", "text": "Add guest" } },
+    { "screenshot": "people-sheet" }
+  ]
+}
