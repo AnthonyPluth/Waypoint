@@ -16,7 +16,7 @@ RUN poetry install --only main --no-root --no-ansi
 
 # 2. Build the web app (frontend/) into waypoint/static/app. It's plain files, so it's built once on the build machine
 #    whatever the image's architecture.
-FROM --platform=$BUILDPLATFORM node:26-slim@sha256:ec7758ee051e457b468b32bde57b0879010b325bb9862718e9615225ce4aaae1 AS web
+FROM --platform=$BUILDPLATFORM node:26-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS web
 WORKDIR /web/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
