@@ -145,7 +145,7 @@ class PagesTests(Assistants):
         self.assertEqual(got["trips"], [])
 
 
-class JourneyTests(Assistants):
+class TwoFlightTests(Assistants):
 
     def setUp(self):
         super().setUp()
@@ -165,16 +165,17 @@ class JourneyTests(Assistants):
         with db.session() as conn:
             trips.delete_trip(conn, self.jane, self.trip)
 
-    def test_an_assistant_reads_the_journey_of_a_trip_it_can_see_and_nothing_private_with_it(self):
+    def test_an_assistant_reads_two_flights_on_one_booking_as_separate_segments_and_nothing_private_with_them(self):
         got = self.tool(READ, "get_trip", {"trip_id": self.trip})
         first, second = got["segments"]
-        self.assertEqual(second["journey"], {"lead": self.ids[0], "leg": 2, "legs": 2, "previous": self.ids[0], "next": None})
-        self.assertEqual(set(first["journey"]), {"lead", "leg", "legs", "previous", "next"})
+        self.assertEqual((first["id"], second["id"]), self.ids)
+        self.assertNotIn("journey", first)
+        self.assertNotIn("journey", second)
         text = json.dumps(got)
         self.assertNotIn(JANE_NUMBER, text)
         self.assertEqual(text.count("QZXW74"), 2)
 
-    def test_another_member_s_assistant_gets_no_trip_and_so_no_journey(self):
+    def test_another_member_s_assistant_gets_no_trip_with_two_flights_on_one_booking(self):
         self.assertEqual(self.refused(READ, "get_trip", {"trip_id": self.trip}, sub="u-sam"), "No such trip")
         self.assertNotIn(self.trip, [t["id"] for t in self.tool(READ, "list_trips", {}, sub="u-sam")["trips"]])
 

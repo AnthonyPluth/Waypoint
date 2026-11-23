@@ -204,7 +204,7 @@ class OfflineRouteTests(ServerCase):
         finally:
             _current.user = None
 
-    def test_the_saved_copy_carries_a_connection_and_stays_version_1(self):
+    def test_the_saved_copy_lists_two_flights_on_one_booking_apart_and_stays_version_1(self):
         leg = {"kind": "flight", "provider": "Aurora Air", "confirmation": "QZXW74", "start_zone": None}
         first = self.trip_with("ana", days(1), days(3), {**leg, "origin": "BOS", "destination": "JFK", "start_local": f"{days(1)}T06:10",
                                                          "end_local": f"{days(1)}T07:28", "details": {"flight_number": "AU1402"}},
@@ -214,9 +214,9 @@ class OfflineRouteTests(ServerCase):
         got = self.ok("ana")
         self.assertEqual(got["version"], 1)
         [trip] = [t for t in got["trips"] if t["trip"]["id"] == first["trip_id"]]
-        journeys = {s["id"]: s["journey"] for s in trip["trip"]["segments"]}
-        self.assertEqual(journeys[second["id"]], {"lead": first["id"], "leg": 2, "legs": 2, "previous": first["id"], "next": None})
-        self.assertEqual(journeys[first["id"]]["next"], second["id"])
+        segments = {s["id"]: s for s in trip["trip"]["segments"]}
+        self.assertEqual(set(segments), {first["id"], second["id"]})
+        self.assertTrue(all("journey" not in s for s in segments.values()))
 
     def test_the_apps_reply_keeps_the_gate_codes_state_and_carries_the_picture_of_a_ready_parking_booking(self):
         ready = self.parking("ana", days(1), days(3), True)
