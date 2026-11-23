@@ -10,9 +10,10 @@
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
   let { stops, year, maps, still = null, autoplay = false, stopList = true, tripId, compact = false, onreplay = null, onended = null, onready = null, onfailure = null }: { stops: Stop[]; year: number; maps: Maps; tripId?: number; still?: boolean | null; autoplay?: boolean; stopList?: boolean; compact?: boolean; onreplay?: (() => void) | null; onended?: (() => void) | null; onready?: (() => void) | null; onfailure?: (() => void) | null } = $props();
-  const replayable = $derived(stops.length >= 2);
+  const replayable = $derived(stops.length >= 1);
+  const single = $derived(stops.length === 1);
   const COMPACT_LABEL = "Trip map";
-  const mapLabel = $derived(stopList ? "Map of the route, stop by stop; the stops are listed below" : "Map of the route, stop by stop");
+  const mapLabel = $derived(single ? "Map of the stay" : stopList ? "Map of the route, stop by stop; the stops are listed below" : "Map of the route, stop by stop");
 
   const query = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
   let observed = $state(query?.matches ?? false);
@@ -126,11 +127,11 @@
   {#if !compact}
   <ul class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground" aria-label="Map key">
     {#if replayable}
-    <li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>
+    {#if !single || stops[0].kind === "airport"}<li class="flex items-center gap-2"><span class="size-2.5 rounded-full bg-map-airport" aria-hidden="true"></span>Airport</li>{/if}
     {#if stops.some((s) => s.kind === "stay")}<li class="flex items-center gap-2"><span class="size-2.5 rotate-45 rounded-[2px] bg-map-stay" aria-hidden="true"></span>Stay</li>{/if}
     {#if stops.some((s) => s.kind === "home")}<li class="flex items-center gap-2"><svg viewBox="-9 -9 18 16" class="h-3 w-3.5" aria-hidden="true"><path d="M0 -8 L8 -1 L5.5 -1 L5.5 6 L-5.5 6 L-5.5 -1 L-8 -1 Z" class="fill-map-visited" /></svg>Home</li>{/if}
     {#if stops.some((s) => s.kind === "place")}<li class="flex items-center gap-2"><span class="size-2 rounded-full bg-map-visited" aria-hidden="true"></span>Other stop</li>{/if}
-    <li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>
+    {#if !single}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-route" aria-hidden="true"></span>Flight</li>{/if}
     {#if otherTravel}<li class="flex items-center gap-2"><span class="h-0.5 w-4 rounded-full bg-map-stay" aria-hidden="true"></span>Other travel</li>{/if}
     {/if}
   </ul>

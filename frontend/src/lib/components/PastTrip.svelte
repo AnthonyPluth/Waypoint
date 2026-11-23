@@ -133,10 +133,10 @@
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <TripSummary bind:this={facts} tripId={trip.id} revision={`${loads}.${photoChanges}`} facts />
         {@render stack()}
-        {#if hasTotal || (heroKind !== "map" && stopCount >= 2)}
+        {#if hasTotal || (heroKind !== "map" && stopCount >= 1)}
           <div class="flex basis-full flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-muted-foreground">
             {#if hasTotal}{@render total()}{/if}
-            {#if heroKind !== "map" && stopCount >= 2}
+            {#if heroKind !== "map" && stopCount >= 1}
               <Button variant="outline" size="sm" aria-label="Replay trip" aria-expanded={replaying} aria-controls="past-trip-replay" onclick={() => (replaying = !replaying)}><Play class="size-3.5" aria-hidden="true" /> Replay</Button>
             {/if}
           </div>
