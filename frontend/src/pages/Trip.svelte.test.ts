@@ -9,7 +9,7 @@ vi.mock("svelte-sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn
 
 import { api } from "$lib/api";
 import { toast } from "svelte-sonner";
-import type { LoyaltyEntry, Person, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
+import type { LoyaltyEntry, Person, Segment, Trip as TripT, TripSummary as TripSummaryT } from "$lib/api-types";
 import { app, layout, route } from "$lib/app.svelte";
 import { flightStatus } from "$lib/flightstatus.svelte";
 import { viewport } from "$lib/phone.svelte";
@@ -2256,39 +2256,38 @@ describe("Trip layout", () => {
     expect(document.querySelectorAll("[data-hero]")).toHaveLength(1);
   });
 
-  const linked = (leg: 1 | 2) => ({ lead: 1, leg, legs: 2, previous: leg === 2 ? 1 : null, next: leg === 1 ? 6 : null });
-  const first = { ...flight, journey: linked(1) };
   const onward = segment({ id: 6, origin: "LHR", destination: "DUB", start_local: "2026-11-21T09:00", start_zone: "Europe/London", end_local: "2026-11-21T10:20", end_zone: "Europe/Dublin",
-    details: { flight_number: "AA 9", terminal: "5" }, journey: linked(2) });
+    details: { flight_number: "AA 9", terminal: "5" } });
 
-  it("draws the next flight as a connection before the first leg, with the stop on the arc and a Then line", async () => {
-    held = trip([first, onward, stay]);
+  it("draws the next flight as its own hero, from its own origin to its own destination, when another flight follows it", async () => {
+    held = trip([flight, onward, stay]);
     render(TripPage);
     const hero = await screen.findByRole("article", { name: /AA 101/ });
-    expect(hero).toHaveAttribute("data-connection", "before");
-    expect(hero.querySelector("[data-code='destination']")).toHaveTextContent("DUB");
-    expect(hero.querySelector("[data-arc-note]")).toHaveTextContent("1 stop, LHR");
-    expect(hero.querySelector("[data-then]")).toHaveTextContent("Then, at LHR");
-    expect(hero.querySelector("[data-then]")).toHaveTextContent("AA 9 departs 9:00 AM");
+    expect(hero.querySelector("[data-code='destination']")).toHaveTextContent("LHR");
+    expect(hero).not.toHaveAttribute("data-connection");
+    expect(hero.querySelector("[data-then]")).toBeNull();
+    expect(hero.querySelector("[data-arc-note]")).toBeNull();
     expect(document.querySelectorAll("[data-hero]")).toHaveLength(1);
+    const then = screen.getByRole("list", { name: "Bookings" });
+    expect(then.querySelector("#segment-6")).toHaveAttribute("data-booking-card", "flight");
   });
 
-  it("draws the connection as Earlier and Leg 2 of 2 once the first leg has landed", async () => {
+  it("still opens a saved copy whose flights carry the old journey field, and draws each flight on its own", async () => {
+    const old = (extra: object) => ({ ...extra, journey: { lead: 1, leg: 1, legs: 2, previous: null, next: 6 } }) as unknown as Segment;
+    held = trip([old(flight), old(onward), stay]);
+    render(TripPage);
+    const hero = await screen.findByRole("article", { name: /AA 101/ });
+    expect(hero.querySelector("[data-code='destination']")).toHaveTextContent("LHR");
+    expect(hero.querySelector("[data-then]")).toBeNull();
+  });
+
+  it("makes the second flight its own hero once the first has landed", async () => {
     vi.setSystemTime(Date.UTC(2026, 10, 21, 7, 30));
-    held = trip([first, onward, stay]);
+    held = trip([flight, onward, stay]);
     render(TripPage);
     const hero = await screen.findByRole("article", { name: /AA 9/ });
-    expect(hero).toHaveAttribute("data-connection", "during");
-    expect(hero.querySelector("[data-code='origin']")).toHaveTextContent("JFK");
-    expect(hero.querySelector("[data-quiet]")).toHaveTextContent("Leg 2 of 2");
-    expect(hero.querySelector("[data-then]")).toHaveTextContent("Earlier");
-  });
-
-  it("keeps the hero of one flight when the trip's flights carry no journey", async () => {
-    held = trip([flight, { ...onward, journey: undefined }, stay]);
-    render(TripPage);
-    const hero = await screen.findByRole("article", { name: /AA 101/ });
-    expect(hero).not.toHaveAttribute("data-connection");
+    expect(hero.querySelector("[data-code='origin']")).toHaveTextContent("LHR");
+    expect(hero.querySelector("[data-code='destination']")).toHaveTextContent("DUB");
     expect(hero.querySelector("[data-then]")).toBeNull();
   });
 

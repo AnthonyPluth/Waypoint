@@ -459,7 +459,7 @@
         <ul class="flex flex-col gap-3" aria-label="Next up">
           {#if s.kind === "flight"}
             <li id={`segment-${heroCard.lead.id}`} class="scroll-mt-20" data-flight-card>
-              <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} tripSegments={t.segments} statusOf={statusFor} ondetail={() => toggleCard(heroCard.lead)} detailOpen={expandedId === heroCard.lead.id} detailId={`booking-detail-${heroCard.lead.id}`}>
+              <FlightCard segment={s} status={liveOn ? statusFor(s.id) : undefined} {liveOn} {now} online={typeof navigator === "undefined" || navigator.onLine !== false} highlight={wanted === String(s.id)} paused={liveOn ? flightStatus.list?.paused : null} href={`#trip/${t.id}/flight/${s.id}`} travellers={showBookingTravellers(s, everyone)} ondetail={() => toggleCard(heroCard.lead)} detailOpen={expandedId === heroCard.lead.id} detailId={`booking-detail-${heroCard.lead.id}`}>
                 {#snippet detail()}{@render cardDetail(heroCard)}{/snippet}
               </FlightCard>
             </li>

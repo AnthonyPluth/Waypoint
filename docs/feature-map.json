@@ -2098,7 +2098,6 @@
         "tests/test_offline.py"
       ],
       "docs": [
-        "contributing/design",
         "start/ios",
         "start/offline"
       ]

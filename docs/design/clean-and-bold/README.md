@@ -24,7 +24,7 @@ Each file is a self-contained HTML page (vector only, no raster images, dark onl
 | #878 7 | [h-show-code.html](h-show-code.html) | The gate code dialog opened, phone and desktop |
 | #878 8 | [i-upcoming.html](i-upcoming.html) | Upcoming at desktop width; the empty states (no trips, with and without Gmail to connect; nothing next) at phone and desktop |
 | #878 9 | [j-navigation.html](j-navigation.html) | The phone tab bar, frosted (recommended) and plain black, More opened; the side navigation from `lg` |
-| #878 10 | [k-travellers-connection.html](k-travellers-connection.html) | The hero with three travellers' seats, and a connection before the first leg and at the stop |
+| #878 10 | [k-travellers-connection.html](k-travellers-connection.html) | The hero with three travellers' seats, and a connection before the first leg and at the stop (the connection was removed on the owner's request: each flight is its own hero) |
 
 ## Owner decision 2026-11-21: option A, raised slate
 

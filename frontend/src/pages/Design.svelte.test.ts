@@ -34,14 +34,6 @@ describe("Design", () => {
     expect(routes.slice(2)).toEqual(["0", routes[3]]);
     expect(Number(routes[3])).toBeGreaterThan(0);
   });
-  it("shows a connection before the first leg and during it", () => {
-    render(Design);
-    const section = screen.getByRole("heading", { name: "Flight card: a connection" }).closest("section") as HTMLElement;
-    const heroes = [...section.querySelectorAll("article[data-hero]")];
-    expect(heroes.map((h) => h.getAttribute("data-connection"))).toEqual(["before", "during"]);
-    expect(heroes.map((h) => h.querySelector("[data-arc-note]")?.textContent)).toEqual(["1 stop, JFK", "At JFK"]);
-    expect(heroes.map((h) => h.querySelector("[data-then-label]")?.textContent)).toEqual(["Then, at JFK", "Earlier"]);
-  });
   it("shows every kind tile and avatar stacks of one, three and six people", () => {
     render(Design);
     const kinds = screen.getByRole("heading", { name: "Kind tiles" }).closest("section") as HTMLElement;

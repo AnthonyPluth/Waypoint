@@ -6139,40 +6139,6 @@
         ],
         "additionalProperties": false
       },
-      "Journey": {
-        "type": "object",
-        "properties": {
-          "lead": {
-            "type": "integer"
-          },
-          "leg": {
-            "type": "integer"
-          },
-          "legs": {
-            "type": "integer"
-          },
-          "previous": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "next": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "lead",
-          "leg",
-          "legs",
-          "previous",
-          "next"
-        ],
-        "additionalProperties": false
-      },
       "LabelsBody": {
         "type": "object",
         "properties": {
@@ -8695,16 +8661,6 @@
           },
           "links": {
             "$ref": "#/components/schemas/SegmentLinks"
-          },
-          "journey": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Journey"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
