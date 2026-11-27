@@ -22,4 +22,4 @@ jobs:
     permissions:
       contents: read   # count the commits since the last scan
       issues: write    # read the earlier issues and open the reminder
-    uses: AnthonyPluth/fleet/.github/workflows/deep-scan-due.yml@bf386593387dcbb56303dcb11f16c93dcc59a5d9   # v7.1.0
+    uses: AnthonyPluth/fleet/.github/workflows/deep-scan-due.yml@100abcdba67b4c60b8bfc973ae3d1f9ae2285ac5   # v7.1.1
